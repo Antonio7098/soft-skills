@@ -1,0 +1,427 @@
+ma_version: 1
+name: SoftSkills Constitution
+status: active
+
+project:
+  name: SoftSkills
+  purpose: >
+    An AI-driven simulation, assessment, and progression platform for practising
+    consultancy and professional skills in tech and AI environments through
+    realistic scenarios, interview simulations, communication exercises, and
+    rubric-based feedback.
+  benchmark_unit: demonstrated_competency_growth
+  source_of_truth: observability_artifacts
+
+product_foundations:
+  core_entities:
+    - skills
+    - competencies
+    - rubrics
+    - collections
+    - scenarios
+    - mock_companies
+    - mock_people
+    - attempts
+    - assessments
+    - progress_history
+  primary_user_outcome: >
+    Users improve real professional performance over time through repeated,
+    realistic, feedback-rich practice.
+  core_loop:
+    - practice
+    - assess
+    - reflect
+    - progress
+    - repeat
+
+technology:
+  backend:
+    language: python
+    framework: fastapi
+    stack:
+      - fastapi
+      - sqlalchemy
+      - alembic
+      - pydantic
+      - openai_sdk
+      - stageflow
+    requirements:
+      - strong_typing
+      - schema_validated_boundaries
+      - explicit_error_handling
+      - modular_service_boundaries
+      - dependency_injection_at_composition_root
+      - interface_driven_boundaries
+      - swappable_auth_provider_adapters
+      - swappable_database_adapters
+      - async_first_when_appropriate
+      - orchestration_is_explicit_not_implicit
+  frontend:
+    language: typescript
+    framework: react
+    build_tool: vite
+    requirements:
+      - strict_typing
+      - design_system_driven_architecture
+      - maximum_component_reusability
+      - theme_token_abstraction
+      - schema_validated_api_boundaries
+      - modular_feature_oriented_structure
+
+operating_principles:
+  - competency_first
+  - realism_over_gimmicks
+  - assessment_must_be_explainable
+  - observability_is_truth
+  - fail_fast_fail_loud
+  - explicit_versioning_everywhere
+  - reusable_frontend_by_default
+  - consistency_is_a_feature
+  - no_dead_waiting
+  - responsive_systems_feel_alive
+
+rules:
+  - id: CL-001
+    category: mission
+    title: Competency Growth Is the Product Outcome
+    priority: critical
+    rule: >
+      The system must optimize for meaningful competency development over time,
+      not superficial engagement, content volume, or AI output novelty.
+    requirements:
+      - Practice flows must map to skills, competencies, and rubrics.
+      - Assessments must contribute to longitudinal progress tracking.
+      - Success metrics must distinguish completion from actual demonstrated improvement.
+      - Recommendations should prioritize learning value, not mere activity generation.
+    prohibited:
+      - Optimizing for question count over learning quality
+      - Treating content generation volume as proof of product value
+
+  - id: CL-002
+    category: typing
+    title: Strong Typing and Schemas Are Mandatory
+    priority: critical
+    rule: >
+      All backend and frontend code must be typed, and all contracts across API,
+      persistence, orchestration, and LLM boundaries must be schema-validated.
+    requirements:
+      - Python code must use type hints consistently.
+      - Pydantic models must define all external request, response, and LLM payload contracts.
+      - TypeScript must run in strict mode.
+      - Database models, API models, and domain models must not drift silently.
+      - Type escape hatches must be rare and justified.
+    prohibited:
+      - Untyped production interfaces
+      - Passing raw dictionaries or loosely shaped objects across critical boundaries
+      - Trusting model output without validation
+
+  - id: CL-003
+    category: failure
+    title: Fail Fast, Fail Loud
+    priority: critical
+    rule: >
+      Invalid state, schema mismatch, scoring ambiguity, orchestration failure,
+      or broken invariants must produce explicit failures rather than hidden degradation.
+    requirements:
+      - Validate inputs and outputs at all system boundaries.
+      - Reject malformed or incomplete LLM outputs immediately.
+      - Surface failures with stable machine-readable error codes and human-readable context.
+      - Loading, scoring, and generation failures must be visible in both the product and traces.
+    prohibited:
+      - Silent fallbacks that hide corruption, drift, or invalid output
+      - Best-effort continuation after critical invariant failure
+      - Infinite spinners or blank loading states that conceal system state
+
+  - id: CL-004
+    category: architecture
+    title: SOLID and Modular Design
+    priority: critical
+    rule: >
+      The codebase must follow SOLID principles with clean boundaries between
+      domain logic, scoring, orchestration, persistence, API, UI, and design system layers.
+    requirements:
+      - Components and services must have single, well-defined responsibilities.
+      - Interfaces must be explicit, small, and stable.
+      - Dependency injection must be used to compose infrastructure dependencies at the application boundary.
+      - Dependencies must point inward toward domain concepts.
+      - Auth providers and database implementations must sit behind explicit interfaces or adapters.
+      - Swapping auth providers or database backends must not require domain or API contract rewrites.
+      - Stageflow pipelines must orchestrate work, not absorb unrelated business logic.
+      - Domain models must remain independent of presentation concerns.
+    prohibited:
+      - God files
+      - God services
+      - Hard-coupling domain or application logic to a specific auth vendor
+      - Hard-coupling domain or application logic to a specific database engine
+      - Hidden coupling between AI orchestration and core domain semantics
+      - Dumping cross-cutting concerns into generic utility modules
+
+  - id: CL-005
+    category: observability
+    title: Observability Is Truth
+    priority: critical
+    rule: >
+      The authoritative account of system behaviour is the recorded trace:
+      events, prompts, model metadata, rubric evaluations, user actions, progress updates,
+      and persistence outcomes.
+    requirements:
+      - Every major workflow emits structured, correlated events.
+      - Practice, scoring, feedback, generation, and recommendation flows must be traceable end-to-end.
+      - Stageflow runs must preserve step-level execution metadata.
+      - Debugging and assessment disputes must defer to recorded artifacts over anecdotal interpretation.
+    prohibited:
+      - Treating memory or informal logs as the primary explanation of behaviour
+      - Shipping critical AI flows that cannot be traced or audited
+
+  - id: CL-006
+    category: errors
+    title: Error Taxonomy Is Required
+    priority: high
+    rule: >
+      Errors must be classified into a stable taxonomy so failures can be understood,
+      queried, monitored, and improved systematically.
+    requirements:
+      - Define categories such as validation, domain, scoring, orchestration, provider, persistence, auth, and UI errors.
+      - Attach stable error codes to emitted failures.
+      - Preserve root cause and causal chain across boundaries.
+      - Distinguish user error, system error, and assessment-semantic failure.
+    prohibited:
+      - Generic opaque failures as the main operational interface
+      - String-matching logs as an error contract
+
+  - id: CL-007
+    category: logging
+    title: Structured Logging Only
+    priority: high
+    rule: >
+      Logs must be machine-readable, correlated, and aligned with the event model
+      used for traces and diagnostics.
+    requirements:
+      - Emit identifiers such as request_id, user_id, session_id, attempt_id, workflow_id, prompt_version, and error_code where applicable.
+      - Log important state transitions, validations, external calls, retries, and persistence outcomes.
+      - Logs must support filtering, aggregation, and replay analysis.
+    prohibited:
+      - Print debugging as an operational dependency
+      - Logs that omit correlation identifiers
+
+  - id: CL-008
+    category: llm_contract
+    title: LLM Outputs Must Be Self-Describing and Validated
+    priority: critical
+    rule: >
+      Every LLM output is a typed artifact and must carry sufficient metadata to
+      identify the prompt contract and execution source.
+    requirements:
+      - Every LLM artifact must include prompt_version, model_slug, and provider.
+      - All structured outputs must be validated against declared schemas before use.
+      - Validation failure is a hard stop, not a warning.
+      - Stored artifacts must preserve validated payloads and relevant execution metadata.
+    prohibited:
+      - Consuming raw model text as trusted structured data
+      - Omitting prompt identity or model identity from persisted LLM artifacts
+
+  - id: CL-009
+    category: assessment
+    title: Assessment Must Be Explainable
+    priority: critical
+    rule: >
+      Users must be able to understand why they received a score, what evidence
+      supported it, and how to improve.
+    requirements:
+      - Every assessment must map to a rubric.
+      - Feedback must distinguish strengths, weaknesses, and suggested next actions.
+      - Skill-level scoring must be visible where relevant.
+      - Competency progression must be derived from explainable underlying evidence.
+    prohibited:
+      - Black-box scoring with no rationale
+      - Feedback that is generic, contradictory, or detached from the user response
+
+  - id: CL-010
+    category: progression
+    title: Progress Must Be Meaningful
+    priority: high
+    rule: >
+      Skill and competency growth must reflect repeated demonstrated performance,
+      not one-off spikes or gamified inflation.
+    requirements:
+      - Progress models must aggregate evidence over time.
+      - Recency may influence weighting, but historical performance must remain visible.
+      - Confidence and proficiency should be distinguishable where possible.
+      - Level changes must feel earned.
+    prohibited:
+      - Instant level inflation after isolated strong attempts
+      - Treating simple activity completion as competency mastery
+
+  - id: CL-011
+    category: frontend
+    title: Reusability and Consistency Are Core Frontend Requirements
+    priority: critical
+    rule: >
+      The frontend must be built as a reusable design system with consistent patterns,
+      abstracted components, and token-driven theming.
+    requirements:
+      - Shared primitives and composed components must be preferred over one-off implementations.
+      - Design tokens must control theme, spacing, typography, motion, and colour semantics.
+      - New themes must be easy to create or change without structural rewrites.
+      - Feature surfaces must reuse patterns for loading, error, empty, success, and interaction states.
+      - Visual and interaction consistency must be enforced across the app.
+    prohibited:
+      - Feature-specific UI snowflakes without strong justification
+      - Hardcoded styling that blocks theming
+      - Inconsistent interaction patterns across similar surfaces
+
+  - id: CL-012
+    category: frontend_experience
+    title: The App Must Feel Alive
+    priority: critical
+    rule: >
+      The product must always communicate state clearly and responsively.
+      Waiting should feel intentional, informative, and satisfying.
+    requirements:
+      - No blank loading screens.
+      - No silent hangs.
+      - Every non-trivial wait state must show progress, status, or meaningful activity.
+      - Loading indicators and animations must feel polished and responsive, not decorative noise.
+      - Perceived responsiveness must be treated as a product requirement, not a cosmetic enhancement.
+    prohibited:
+      - Empty waiting states
+      - Frozen-looking interfaces during async operations
+      - Abrupt transitions that make the product feel brittle or lifeless
+
+  - id: CL-013
+    category: api_design
+    title: API Boundaries Must Be Explicit
+    priority: high
+    rule: >
+      FastAPI endpoints must expose explicit contracts that reflect stable domain
+      semantics rather than leaking persistence or orchestration internals.
+    requirements:
+      - Request and response schemas must be explicit and versionable.
+      - API handlers should remain thin and delegate to domain/application services.
+      - Validation must occur before orchestration or persistence side effects.
+      - Backward-incompatible contract changes must be deliberate and documented.
+    prohibited:
+      - Ad hoc endpoint payloads
+      - Business logic buried directly in route handlers
+      - Leaking raw ORM models through the API
+
+  - id: CL-014
+    category: persistence
+    title: Core Workflows Must Be Persisted
+    priority: high
+    rule: >
+      Practice history, assessments, traces, prompt metadata, and progression-relevant
+      artifacts must be stored durably enough to support replay, audit, analytics, and improvement.
+    requirements:
+      - Store attempt metadata, responses, assessment outputs, rubric versions, prompt versions, and trace identifiers.
+      - Preserve history needed for progression and diagnostics.
+      - Alembic migrations must be the only path for production schema evolution.
+      - Persistence contracts must be explicit enough to support swapping database backends with limited adapter-layer change.
+      - Persistence design must distinguish transactional domain data from observability/event data.
+    prohibited:
+      - Summary-only persistence for critical learning workflows
+      - Manual schema drift outside migration discipline
+
+  - id: CL-015
+    category: repository
+    title: Repository Structure Must Stay Coherent
+    priority: high
+    rule: >
+      The repository must remain clearly organized, with deliberate boundaries for
+      domain logic, API, orchestration, persistence, frontend, schemas, docs, and tooling.
+    requirements:
+      - Directory layout must reflect stable responsibilities.
+      - Shared abstractions must live in deliberate modules, not catch-all folders.
+      - Large features must be split into focused files with explicit ownership.
+    prohibited:
+      - Monolithic files accumulating unrelated concerns
+      - Ambiguous placement of schemas, prompts, services, and UI state logic
+
+  - id: CL-016
+    category: documentation
+    title: Documentation Must Be Thorough
+    priority: high
+    rule: >
+      Architecture, domain concepts, assessment semantics, prompt contracts,
+      event models, and operational workflows must be documented alongside the code.
+    requirements:
+      - Public modules and major workflows must have durable documentation.
+      - Core invariants and scoring semantics must be documented where they are defined.
+      - Prompting strategy and versioning rules must be documented.
+      - Documentation must be updated alongside behavioural change.
+    prohibited:
+      - Undocumented core flows
+      - Critical knowledge existing only in maintainer memory
+
+  - id: CL-017
+    category: testing
+    title: Testing Must Be Thorough
+    priority: critical
+    rule: >
+      The system must be thoroughly tested across schemas, domain logic, scoring,
+      orchestration, persistence, and frontend contract boundaries.
+    requirements:
+      - Core domain logic must have deterministic automated tests.
+      - Pydantic validation paths must have positive and negative coverage.
+      - FastAPI contracts must be tested.
+      - Stageflow workflows must be tested for success, failure, retry, and trace emission paths.
+      - Critical frontend flows and typed API integrations must be covered.
+      - Regression tests must protect scoring semantics and artifact compatibility.
+      - Complex flows that depend on external providers must have smoke tests that hit real providers or real backing services before release.
+      - Mock-only testing is insufficient for complex auth, scoring, generation, and other provider-mediated workflows.
+    prohibited:
+      - Relying on manual testing for assessment-critical behaviour
+      - Declaring provider-backed complex flows production-ready based only on mocked tests
+      - Shipping untested schema or scoring changes
+
+  - id: CL-018
+    category: content_generation
+    title: Generated Content Must Serve Realism and Learning
+    priority: high
+    rule: >
+      AI-generated questions, scenarios, stakeholders, and collections must be
+      realistic, coherent, and pedagogically useful.
+    requirements:
+      - Generated content must align to skill and competency goals.
+      - Scenarios must preserve internal consistency across company, people, context, and constraints.
+      - Content generation flows must support review and editing before publication when appropriate.
+      - Content should prefer realism, specificity, and useful variation over novelty theatre.
+    prohibited:
+      - Generic filler scenarios
+      - Contradictory mock worlds
+      - Generating content detached from learning outcomes
+
+  - id: CL-019
+    category: infrastructure_portability
+    title: Infrastructure Dependencies Must Be Swappable
+    priority: critical
+    rule: >
+      Authentication providers, database backends, and other infrastructure
+      integrations must be replaceable through stable interfaces and dependency
+      injection rather than invasive application rewrites.
+    requirements:
+      - Auth integration must use explicit provider adapters behind stable interfaces.
+      - Persistence integration must use explicit repository or adapter boundaries.
+      - Concrete implementations must be wired at the composition root.
+      - Provider-specific concerns must stay out of domain entities and core application services.
+      - Adding an in-house auth flow, Google, Clerk, or another provider should primarily require adapter and configuration work.
+    prohibited:
+      - Vendor-specific logic spread across routes, domain services, or UI state
+      - Assuming a single database engine in core business logic
+      - Constructing infrastructure dependencies ad hoc inside core services
+
+enforcement:
+  ci_gates:
+    - format
+    - lint
+    - typecheck
+    - test
+    - schema_validation
+    - migration_check
+    - documentation_review
+  release_requirements:
+    - versioned_prompt_metadata
+    - replayable_trace_artifacts
+    - validated_llm_contracts
+    - real_provider_smoke_tests_for_complex_flows
+    - changelog_or_equivalent_release_notes
