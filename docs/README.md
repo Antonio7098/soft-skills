@@ -22,6 +22,7 @@ runtime source of truth once this canon exists.
 - `product-spec.md`: MVP purpose, users, scope, outcomes, and resolved product decisions
 - `domain-model.md`: core entities, relationships, lifecycle states, and invariants
 - `assessment-and-progression.md`: rubric semantics, scoring outputs, feedback rules, and progression model
+- `marking-engine.md`: reusable marking pipeline, artifact contracts, evaluation framework, and calibration rules
 - `content-system.md`: collection structure, authoring flows, publication rules, and realism constraints
 - `technical-architecture.md`: system boundaries, stack decisions, repository structure, and delivery rules
 - `observability-and-operations.md`: traces, events, logging, error taxonomy, metrics, and release gates

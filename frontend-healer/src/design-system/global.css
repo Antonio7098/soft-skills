@@ -1,0 +1,157 @@
+/**
+ * Global base styles for SoftSkills.
+ * Provides reset and CSS custom property defaults.
+ */
+
+/* Import fonts */
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* CSS Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-body, 'DM Sans', sans-serif);
+  font-size: var(--font-size-base, 1rem);
+  line-height: var(--line-height-normal, 1.5);
+  color: var(--color-fg-primary, #1A1A1A);
+  background-color: var(--color-bg-primary, #F5F2ED);
+  min-height: 100vh;
+  transition:
+    color var(--duration-normal, 250ms) var(--easing-default, cubic-bezier(0.4, 0, 0.2, 1)),
+    background-color var(--duration-normal, 250ms) var(--easing-default, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+/* Typography defaults */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display, 'Instrument Serif', serif);
+  font-weight: 400;
+  line-height: var(--line-height-tight, 1.1);
+  letter-spacing: -0.025em;
+  color: var(--color-fg-primary);
+}
+
+h1 { font-size: var(--font-size-5xl, 3.815rem); }
+h2 { font-size: var(--font-size-4xl, 3.052rem); }
+h3 { font-size: var(--font-size-3xl, 2.441rem); }
+h4 { font-size: var(--font-size-2xl, 1.953rem); }
+h5 { font-size: var(--font-size-xl, 1.563rem); }
+h6 { font-size: var(--font-size-lg, 1.25rem); }
+
+p {
+  color: var(--color-fg-secondary);
+  line-height: var(--line-height-relaxed, 1.75);
+}
+
+a {
+  color: var(--color-interactive-default);
+  text-decoration: none;
+  transition: color var(--duration-fast, 150ms) var(--easing-default);
+}
+
+a:hover {
+  color: var(--color-interactive-hover);
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--color-border-accent);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background-color: var(--color-accent-primary);
+  color: var(--color-fg-inverse);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-default);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}
+
+/* Utility classes */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}

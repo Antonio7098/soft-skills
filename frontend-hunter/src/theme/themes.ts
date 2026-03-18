@@ -1,0 +1,228 @@
+import type { ThemeTokens } from "@/types/theme";
+
+export const darkTheme: ThemeTokens = {
+  mode: "dark",
+  colors: {
+    bg: {
+      primary: "#0C0B0A",
+      secondary: "#151311",
+      tertiary: "#1E1B18",
+      elevated: "#232019",
+      overlay: "rgba(12, 11, 10, 0.85)",
+    },
+    text: {
+      primary: "#EDE8E0",
+      secondary: "#9B9488",
+      tertiary: "#6B655C",
+      inverse: "#0C0B0A",
+    },
+    accent: {
+      primary: "#C87533",
+      secondary: "#D4944A",
+      muted: "rgba(200, 117, 51, 0.15)",
+    },
+    border: {
+      default: "#2A2620",
+      subtle: "#1E1B18",
+      strong: "#3D3830",
+    },
+    status: {
+      success: "#5B9A6F",
+      warning: "#D4944A",
+      error: "#C45454",
+      info: "#5B8EC4",
+    },
+    surface: {
+      hover: "rgba(237, 232, 224, 0.05)",
+      active: "rgba(237, 232, 224, 0.08)",
+      selected: "rgba(200, 117, 51, 0.1)",
+    },
+  },
+  typography: {
+    fontFamily: {
+      display: "'Instrument Serif', Georgia, serif",
+      body: "'DM Sans', system-ui, sans-serif",
+      mono: "'JetBrains Mono', 'Fira Code', monospace",
+    },
+    fontSize: {
+      xs: "0.6875rem",
+      sm: "0.8125rem",
+      base: "0.9375rem",
+      lg: "1.0625rem",
+      xl: "1.25rem",
+      "2xl": "1.5rem",
+      "3xl": "2rem",
+      "4xl": "2.625rem",
+      "5xl": "3.5rem",
+      "6xl": "4.5rem",
+    },
+    fontWeight: {
+      regular: 400,
+      medium: 500,
+      semibold: 600,
+      bold: 700,
+    },
+    lineHeight: {
+      tight: "1.1",
+      normal: "1.5",
+      relaxed: "1.75",
+    },
+    letterSpacing: {
+      tight: "-0.02em",
+      normal: "0em",
+      wide: "0.04em",
+      wider: "0.08em",
+    },
+  },
+  spacing: {
+    "0": "0",
+    "1": "0.25rem",
+    "2": "0.5rem",
+    "3": "0.75rem",
+    "4": "1rem",
+    "5": "1.25rem",
+    "6": "1.5rem",
+    "8": "2rem",
+    "10": "2.5rem",
+    "12": "3rem",
+    "16": "4rem",
+    "20": "5rem",
+    "24": "6rem",
+    "32": "8rem",
+  },
+  radius: {
+    none: "0",
+    sm: "0.25rem",
+    md: "0.5rem",
+    lg: "0.75rem",
+    xl: "1rem",
+    full: "9999px",
+  },
+  shadow: {
+    sm: "0 1px 2px rgba(0,0,0,0.3)",
+    md: "0 4px 12px rgba(0,0,0,0.4)",
+    lg: "0 8px 24px rgba(0,0,0,0.5)",
+    xl: "0 16px 48px rgba(0,0,0,0.6)",
+  },
+  transition: {
+    fast: "120ms ease",
+    normal: "200ms ease",
+    slow: "350ms cubic-bezier(0.16, 1, 0.3, 1)",
+  },
+};
+
+export const lightTheme: ThemeTokens = {
+  mode: "light",
+  colors: {
+    bg: {
+      primary: "#F6F1EB",
+      secondary: "#EDE8E0",
+      tertiary: "#E3DDD4",
+      elevated: "#FFFFFF",
+      overlay: "rgba(246, 241, 235, 0.9)",
+    },
+    text: {
+      primary: "#1A1614",
+      secondary: "#5C564E",
+      tertiary: "#8A8278",
+      inverse: "#EDE8E0",
+    },
+    accent: {
+      primary: "#B56A2A",
+      secondary: "#9A5820",
+      muted: "rgba(181, 106, 42, 0.1)",
+    },
+    border: {
+      default: "#D4CEC4",
+      subtle: "#E3DDD4",
+      strong: "#B8B0A4",
+    },
+    status: {
+      success: "#3D7A50",
+      warning: "#9A5820",
+      error: "#A33838",
+      info: "#3D6A9A",
+    },
+    surface: {
+      hover: "rgba(26, 22, 20, 0.04)",
+      active: "rgba(26, 22, 20, 0.07)",
+      selected: "rgba(181, 106, 42, 0.08)",
+    },
+  },
+  typography: {
+    fontFamily: {
+      display: "'Instrument Serif', Georgia, serif",
+      body: "'DM Sans', system-ui, sans-serif",
+      mono: "'JetBrains Mono', 'Fira Code', monospace",
+    },
+    fontSize: {
+      xs: "0.6875rem",
+      sm: "0.8125rem",
+      base: "0.9375rem",
+      lg: "1.0625rem",
+      xl: "1.25rem",
+      "2xl": "1.5rem",
+      "3xl": "2rem",
+      "4xl": "2.625rem",
+      "5xl": "3.5rem",
+      "6xl": "4.5rem",
+    },
+    fontWeight: {
+      regular: 400,
+      medium: 500,
+      semibold: 600,
+      bold: 700,
+    },
+    lineHeight: {
+      tight: "1.1",
+      normal: "1.5",
+      relaxed: "1.75",
+    },
+    letterSpacing: {
+      tight: "-0.02em",
+      normal: "0em",
+      wide: "0.04em",
+      wider: "0.08em",
+    },
+  },
+  spacing: {
+    "0": "0",
+    "1": "0.25rem",
+    "2": "0.5rem",
+    "3": "0.75rem",
+    "4": "1rem",
+    "5": "1.25rem",
+    "6": "1.5rem",
+    "8": "2rem",
+    "10": "2.5rem",
+    "12": "3rem",
+    "16": "4rem",
+    "20": "5rem",
+    "24": "6rem",
+    "32": "8rem",
+  },
+  radius: {
+    none: "0",
+    sm: "0.25rem",
+    md: "0.5rem",
+    lg: "0.75rem",
+    xl: "1rem",
+    full: "9999px",
+  },
+  shadow: {
+    sm: "0 1px 2px rgba(0,0,0,0.06)",
+    md: "0 4px 12px rgba(0,0,0,0.08)",
+    lg: "0 8px 24px rgba(0,0,0,0.1)",
+    xl: "0 16px 48px rgba(0,0,0,0.12)",
+  },
+  transition: {
+    fast: "120ms ease",
+    normal: "200ms ease",
+    slow: "350ms cubic-bezier(0.16, 1, 0.3, 1)",
+  },
+};
+
+export const themes: Record<string, ThemeTokens> = {
+  dark: darkTheme,
+  light: lightTheme,
+};
