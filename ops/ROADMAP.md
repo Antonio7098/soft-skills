@@ -1,6 +1,12 @@
 # MVP Roadmap
 
-Backend-first roadmap for delivering the SoftSkills MVP defined in `docs/`.
+> **Location:** `soft-skills/ops/ROADMAP.md`
+
+Backend-first execution plan for delivering the SoftSkills MVP canon now housed
+in `soft-skills/ops/mvp-spec/`. Each section below translates decisions from the
+canon (product spec, domain model, engines, and observability docs) into build
+work. When in doubt, align scope with the MVP precedence stack: `CONSTITUTION`
+→ `docs/` → `ops/mvp-spec/`.
 
 ## 0. Canon Lock
 
@@ -171,3 +177,35 @@ Backend-first roadmap for delivering the SoftSkills MVP defined in `docs/`.
 - [ ] Review scope against MVP exclusions and remove non-essential work
 - [ ] Prepare release notes or equivalent MVP change summary
 - [ ] Declare MVP ready for internal use
+
+## 15. Live Chat Interview Practice (Post-MVP)
+
+Reference: `ops/post-mvp-spec/live-chat-interview-practice.md`
+
+- [ ] Extend practice runtime and marking engine to accept multi-turn transcripts tagged with `source=live_chat`
+- [ ] Build realtime session service (websocket state machine, timers, fallbacks) with full trace coverage
+- [ ] Ship live chat UI with typing indicators, countdown timers, pause/resume, and graceful disconnect handling
+- [ ] Instrument interviewer agent prompts with version IDs and safeguard rules identical to text flows
+- [ ] Update recommendation/progression engines so live attempt evidence affects next-practice selection
+- [ ] Define scheduling/throttling rules plus admin shadow/takeover workflow
+
+## 16. Media Archive (Post-MVP)
+
+Reference: `ops/post-mvp-spec/media-archive.md`
+
+- [ ] Implement client capture SDK for audio/video with resumable uploads and bandwidth fallbacks
+- [ ] Provision ingest gateway, storage policies, and media processing/transcription pipeline with observability hooks
+- [ ] Persist `AttemptMedia` + `Transcript` entities, retention timers, and privacy/consent flags
+- [ ] Wire assessment feedback to surface transcript snippets and playback links with permission checks
+- [ ] Support learner data export/deletion by cascading media tombstones while keeping explainability trails
+- [ ] Track ingestion cost/latency metrics and alert on transcription confidence regressions
+
+## 17. Knowledge Graph Substrate (Post-MVP)
+
+Reference: `ops/post-mvp-spec/knowledge-graph-substrate.md`
+
+- [ ] Stand up managed graph store (Neo4j/Neptune/etc.) with schema matching learner, attempt, assessment, media, and skill nodes
+- [ ] Stream canonical events (attempt submitted, assessment validated, recommendation issued) into deterministic graph mutations
+- [ ] Expose internal graph API plus agent-friendly query helpers/embeddings for coaching copilots
+- [ ] Enforce lineage + retention parity: every graph fact links back to trace IDs and respects deletion requests
+- [ ] Document tenant/isolation strategy and SLAs for graph freshness before agents read context
