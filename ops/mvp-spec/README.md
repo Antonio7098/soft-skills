@@ -22,15 +22,18 @@ runtime source of truth once this canon exists.
 
 ## Canonical Documents
 
-- `product-spec.md`: MVP purpose, users, scope, outcomes, and resolved product decisions
-- `domain-model.md`: core entities, relationships, lifecycle states, and invariants
-- `assessment-and-progression.md`: rubric semantics, scoring outputs, feedback rules, and progression model
-- `marking-engine.md`: reusable marking pipeline, artifact contracts, evaluation framework, and calibration rules
-- `content-system.md`: collection structure, authoring flows, publication rules, and realism constraints
-- `technical-architecture.md`: system boundaries, stack decisions, repository structure, and delivery rules
-- `observability-and-operations.md`: traces, events, logging, error taxonomy, metrics, and release gates
-- `recommendation-engine.md` / `progression-engine.md`: platform-agnostic engines for capability recommendation and progression
-- `soft-skill-recommendation.md` / `soft-skill-progression.md`: Soft Skills implementations that extend the shared engines with the platform taxonomy
+The canon is now grouped into subfolders to keep related artifacts together:
+
+- `foundational/`
+  - `PRD.md`, `product-spec.md`, `domain-model.md`, `technical-architecture.md`
+- `platform/`
+  - `assessment-and-progression.md`, `soft-skill-progression.md`, `soft-skill-recommendation.md`
+- `engines/`
+  - `marking-engine.md`, `recommendation-engine.md`, `progression-engine.md`
+- `operations/`
+  - `content-system.md`, `observability-and-operations.md`
+
+Each file keeps the same intent detailed below; only the paths changed.
 
 ## Working Rules
 
