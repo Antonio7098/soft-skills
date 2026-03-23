@@ -1,0 +1,209 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   THEME TOKEN DEFINITIONS
+   Three themes: Obsidian (dark), Chalk (light), Verdant (earthy)
+   ============================================================ */
+
+[data-theme='obsidian'] {
+  --color-surface-primary: #09090B;
+  --color-surface-secondary: #131316;
+  --color-surface-elevated: #1C1C21;
+  --color-surface-inverse: #FAFAF9;
+
+  --color-content-primary: #FAFAF9;
+  --color-content-secondary: #8E8E93;
+  --color-content-tertiary: #5C5C63;
+  --color-content-inverse: #09090B;
+
+  --color-accent: #C9A96E;
+  --color-accent-hover: #DDB978;
+  --color-accent-muted: rgba(201, 169, 110, 0.12);
+  --color-accent-text: #C9A96E;
+
+  --color-line: #26262C;
+  --color-line-hover: #3A3A42;
+
+  --color-status-success: #4ADE80;
+  --color-status-error: #F87171;
+  --color-status-warning: #FBBF24;
+  --color-status-info: #60A5FA;
+
+  --color-sidebar-bg: #0D0D10;
+  --color-sidebar-text: #FAFAF9;
+  --color-sidebar-text-muted: #6B6B73;
+  --color-sidebar-item-hover: rgba(201, 169, 110, 0.08);
+  --color-sidebar-item-active: rgba(201, 169, 110, 0.14);
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(201, 169, 110, 0.1);
+  --shadow-elevated: 0 8px 32px rgba(0, 0, 0, 0.6);
+
+  --noise-opacity: 0.03;
+}
+
+[data-theme='chalk'] {
+  --color-surface-primary: #FAFAF7;
+  --color-surface-secondary: #F2F0EB;
+  --color-surface-elevated: #FFFFFF;
+  --color-surface-inverse: #141422;
+
+  --color-content-primary: #141422;
+  --color-content-secondary: #60607A;
+  --color-content-tertiary: #9090A3;
+  --color-content-inverse: #FAFAF7;
+
+  --color-accent: #1A6B5C;
+  --color-accent-hover: #1E7D6B;
+  --color-accent-muted: rgba(26, 107, 92, 0.08);
+  --color-accent-text: #15594D;
+
+  --color-line: #E4E2DC;
+  --color-line-hover: #D0CEC7;
+
+  --color-status-success: #059669;
+  --color-status-error: #DC2626;
+  --color-status-warning: #D97706;
+  --color-status-info: #2563EB;
+
+  --color-sidebar-bg: #F0EDE6;
+  --color-sidebar-text: #141422;
+  --color-sidebar-text-muted: #8B8B9E;
+  --color-sidebar-item-hover: rgba(26, 107, 92, 0.06);
+  --color-sidebar-item-active: rgba(26, 107, 92, 0.1);
+
+  --shadow-card: 0 1px 3px rgba(20, 20, 34, 0.06), 0 0 0 1px rgba(20, 20, 34, 0.04);
+  --shadow-card-hover: 0 4px 16px rgba(20, 20, 34, 0.1), 0 0 0 1px rgba(26, 107, 92, 0.12);
+  --shadow-elevated: 0 8px 32px rgba(20, 20, 34, 0.12);
+
+  --noise-opacity: 0.015;
+}
+
+[data-theme='verdant'] {
+  --color-surface-primary: #F5F2EA;
+  --color-surface-secondary: #EBE7DC;
+  --color-surface-elevated: #FDFCF9;
+  --color-surface-inverse: #1B2B1B;
+
+  --color-content-primary: #1B2B1B;
+  --color-content-secondary: #546454;
+  --color-content-tertiary: #7D8E7D;
+  --color-content-inverse: #F5F2EA;
+
+  --color-accent: #8B5E3C;
+  --color-accent-hover: #A06E48;
+  --color-accent-muted: rgba(139, 94, 60, 0.1);
+  --color-accent-text: #7A5233;
+
+  --color-line: #D8D2C4;
+  --color-line-hover: #C5BFB0;
+
+  --color-status-success: #16A34A;
+  --color-status-error: #DC2626;
+  --color-status-warning: #CA8A04;
+  --color-status-info: #2563EB;
+
+  --color-sidebar-bg: #E8E4D8;
+  --color-sidebar-text: #1B2B1B;
+  --color-sidebar-text-muted: #7A8B7A;
+  --color-sidebar-item-hover: rgba(139, 94, 60, 0.08);
+  --color-sidebar-item-active: rgba(139, 94, 60, 0.14);
+
+  --shadow-card: 0 1px 3px rgba(27, 43, 27, 0.06), 0 0 0 1px rgba(27, 43, 27, 0.05);
+  --shadow-card-hover: 0 4px 16px rgba(27, 43, 27, 0.1), 0 0 0 1px rgba(139, 94, 60, 0.12);
+  --shadow-elevated: 0 8px 32px rgba(27, 43, 27, 0.12);
+
+  --noise-opacity: 0.02;
+}
+
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    transition-property: color, background-color, border-color, box-shadow;
+    transition-duration: 300ms;
+    transition-timing-function: ease;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply font-body text-body-md bg-surface-primary text-content-primary;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-muted);
+    color: var(--color-accent-text);
+  }
+}
+
+/* ============================================================
+   NOISE TEXTURE OVERLAY (adds depth to backgrounds)
+   ============================================================ */
+
+.noise-overlay::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: var(--noise-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* ============================================================
+   SCROLLBAR STYLING
+   ============================================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-content-tertiary);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-content-secondary);
+}
+
+/* ============================================================
+   ANIMATION STAGGER UTILITY
+   ============================================================ */
+
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 60ms; }
+.stagger-3 { animation-delay: 120ms; }
+.stagger-4 { animation-delay: 180ms; }
+.stagger-5 { animation-delay: 240ms; }
+.stagger-6 { animation-delay: 300ms; }
+.stagger-7 { animation-delay: 360ms; }
+.stagger-8 { animation-delay: 420ms; }

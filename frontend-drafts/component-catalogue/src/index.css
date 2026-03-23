@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@theme {
+  /* Minimal Theme */
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-fg);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-fg);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-fg);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-fg);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+@layer base {
+  :root {
+    /* Base configuration */
+    --bg: #ffffff;
+    --fg: #0f172a;
+    
+    --primary: #2563eb;
+    --primary-fg: #f8fafc;
+    
+    --secondary: #f1f5f9;
+    --secondary-fg: #334155;
+    
+    --accent: #3b82f6;
+    --accent-fg: #eff6ff;
+    
+    --muted: #f8fafc;
+    --muted-fg: #64748b;
+    
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #94a3b8;
+    
+    --radius-sm: 0.125rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-display: 'Inter', system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  [data-theme='dark'] {
+    --bg: #0f172a;
+    --fg: #f8fafc;
+    
+    --primary: #3b82f6;
+    --primary-fg: #f8fafc;
+    
+    --secondary: #1e293b;
+    --secondary-fg: #cbd5e1;
+    
+    --accent: #3b82f6;
+    --accent-fg: #eff6ff;
+    
+    --muted: #1e293b;
+    --muted-fg: #94a3b8;
+    
+    --border: #334155;
+    --input: #1e293b;
+    --ring: #3b82f6;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased transition-colors duration-300;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
+  }
+}
