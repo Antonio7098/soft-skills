@@ -933,6 +933,35 @@ Created `/backend/` directory with:
 - The AI interprets task descriptions but doesn't always execute properly
 - Consider using explicit command steps instead of AI interpretation
 
+## Workflow Runtime Analysis (Mar 24, 2026 - 09:30 UTC)
+
+### What the Events Show
+From `/home/antonioborgerees/.hivemind/events.jsonl` for workflow `ca651905-af8b-4117-a4ba-ef7355dfcef2`:
+
+**Successful Technical Execution:**
+- 4 attempts, each with `runtime_exited exit_code=0` ✓
+- `WaitOutcome::ProtocolCompleted` triggered properly ✓
+- 3 checkpoints completed ✓
+- `init-repo` step: `running → verifying → succeeded` ✓
+- Step state transitions working correctly ✓
+
+**What the AI Actually Did:**
+- Only ran `bash ls -la` and multiple `glob` commands
+- Never ran `Write` tool to create files
+- Explored `frontend-drafts/...` paths but didn't create backend files
+
+**Root Cause:**
+Task description "Configure ruff linting" was too vague. The AI didn't understand it should create `pyproject.toml` with ruff config - it just explored existing files.
+
+### Solution Needed
+Workflow task steps need more explicit instructions or the AI needs better context about WHAT to create, not just general descriptions.
+
+### Backend Created Manually
+Created backend structure directly in soft-skills repo at commit `2c21c8b`:
+- FastAPI app structure
+- SQLAlchemy, Pydantic, structlog configured
+- API routes scaffolded
+
 ## Phase 5 Sprint 71 Testing (Mar 24, 2026 - 09:20 UTC)
 
 ### Testing Performed
