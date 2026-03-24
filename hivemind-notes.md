@@ -869,3 +869,30 @@ Flow `047c80dc-f464-435e-a062-919e0648fd32` completed successfully:
 ### Tests
 All 344 tests pass ✓
 
+## Merge Success Test (Mar 24, 2026 - 08:44 UTC)
+
+### Test Summary
+Successfully tested the full workflow cycle:
+1. Created workflow run `33e2e051-a34d-46ba-b5a5-01fff768d8d4`
+2. Ticked workflow - step `initialize-backend` started running
+3. Runtime exited with `exit_code=0` (only ONE event, no duplicate)
+4. Completed checkpoint manually
+5. Ticked workflow - step transitioned to `succeeded`, workflow `Completed`
+6. Merge prepared, approved, and executed successfully
+
+### Event Timeline (flow `2e857fcd-3e6c-4627-9885-1b2a3da03c9f`)
+- seq=944: `task_execution_state_changed ready→running`
+- seq=1096: `runtime_exited exit_code=0` (ONLY ONE runtime_exited!)
+- seq=1098: `runtime_terminated checkpoints_incomplete`
+- Checkpoint completed via CLI
+- Workflow tick: step succeeded, workflow completed
+- Merge: Prepared → Approved → Completed ✓
+
+### Phase 5 Features Verified
+- [x] Protocol completion detection - `runtime_exited exit_code=0` within ~100ms of step_finish
+- [x] Single `runtime_exited` event - no duplicate
+- [x] Checkpoint completion triggers task completion
+- [x] Workflow step transitions from `running` → `succeeded`
+- [x] Merge prepare/approve/execute cycle works
+- [x] Workflow completes after step succeeds
+
