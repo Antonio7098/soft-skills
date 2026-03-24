@@ -933,3 +933,28 @@ Created `/backend/` directory with:
 - The AI interprets task descriptions but doesn't always execute properly
 - Consider using explicit command steps instead of AI interpretation
 
+## Phase 5 Sprint 71 Testing (Mar 24, 2026 - 09:20 UTC)
+
+### Testing Performed
+1. **Nested workflows**: Created `auth-workflow` as child workflow with 2 steps (init-auth-model, setup-auth-service)
+2. **Join steps**: `wait-setup` joins linting and testing dependencies
+3. **Conditional steps**: Attempted but requires proper branch configuration
+4. **Wait/signal steps**: Schema validation works, JSON format needs clarification
+
+### Workflows Created
+- `backend-full-workflow` (ID: 3ef3d671-4ace-4584-93b9-d6400d3b4657)
+  - 6 steps: init-repo, setup-linting, setup-testing, wait-setup, run-auth-workflow, final-verification
+- `auth-workflow` (ID: 44a42449-3388-440c-aaf6-4c6d6ed4b565)
+  - 2 steps: init-auth-model, setup-auth-service
+
+### Opencode Restore-Turn Test
+- Test script: `test_runtime_restore_turn_real_opencode.sh` - PASSES ✓
+- Real opencode integration working correctly
+
+### Worktrees Cleaned
+- All Hivemind worktrees cleaned up after testing
+
+### Git Commit
+- Committed backend foundation to soft-skills repo: `2c21c8b`
+- Backend structure with FastAPI, SQLAlchemy, Pydantic, structlog
+
