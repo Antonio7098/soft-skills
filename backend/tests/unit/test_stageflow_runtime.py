@@ -1,42 +1,42 @@
 from __future__ import annotations
 
-import importlib.util
+import importlib
 
 import pytest
 
 from soft_skills_backend.application.container import build_container
 from soft_skills_backend.config import Settings
+from soft_skills_backend.domain.errors import AppError
 
 
-def test_stageflow_runtime_reports_missing_dependency(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(importlib.util, "find_spec", lambda name: None if name == "stageflow" else None)
+def test_stageflow_runtime_requires_dependency(monkeypatch, tmp_path) -> None:
+    real_import_module = importlib.import_module
+
+    def _import_module(name: str, package: str | None = None):
+        if name.startswith("stageflow"):
+            raise ModuleNotFoundError(name)
+        return real_import_module(name, package)
+
+    monkeypatch.setattr(importlib, "import_module", _import_module)
 
     settings = Settings(
-        environment="test",
-        database_url=f"sqlite+pysqlite:///{tmp_path / 'stageflow.db'}",
-        stageflow_required=False,
+        environment="test", database_url=f"sqlite+pysqlite:///{tmp_path / 'stageflow.db'}"
     )
-    container = build_container(settings)
+    with pytest.raises(AppError) as exc_info:
+        build_container(settings)
 
-    assert container.stageflow_runtime.installed is False
-    assert "stageflow-core" in str(container.stageflow_runtime.missing_reason)
-
-    container.dispose()
+    assert exc_info.value.code == "SS-ORCHESTRATION-002"
 
 
 def test_stageflow_runtime_reports_available_dependency(tmp_path) -> None:
     settings = Settings(
-        environment="test",
-        database_url=f"sqlite+pysqlite:///{tmp_path / 'stageflow-present.db'}",
-        stageflow_required=False,
+        environment="test", database_url=f"sqlite+pysqlite:///{tmp_path / 'stageflow-present.db'}"
     )
     container = build_container(settings)
 
-    if container.stageflow_runtime.installed:
-        assert container.stageflow_runtime.pipeline_type_name == "Pipeline"
-        assert "LoggingInterceptor" in container.stageflow_runtime.default_interceptor_names
-        assert container.stageflow_runtime.runtime_objects is not None
-    else:
-        pytest.skip("Stageflow is not installed in this interpreter")
+    assert container.stageflow_runtime.installed is True
+    assert container.stageflow_runtime.pipeline_type_name == "Pipeline"
+    assert "LoggingInterceptor" in container.stageflow_runtime.default_interceptor_names
+    assert container.stageflow_runtime.runtime_objects is not None
 
     container.dispose()

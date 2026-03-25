@@ -1,4 +1,4 @@
-"""Quick-practice domain rules and typed assessment artifacts."""
+"""Practice domain rules and typed assessment artifacts."""
 
 from __future__ import annotations
 
@@ -15,6 +15,15 @@ class PracticeType(StrEnum):
     """Supported practice modes."""
 
     QUICK_PRACTICE = "quick_practice"
+    INTERVIEW = "interview"
+    SCENARIO = "scenario"
+
+
+PRACTICE_DELIVERY_VERSIONS: dict[PracticeType, str] = {
+    PracticeType.QUICK_PRACTICE: "quick-practice.delivery.v1",
+    PracticeType.INTERVIEW: "interview.delivery.v1",
+    PracticeType.SCENARIO: "scenario.delivery.v1",
+}
 
 
 class SessionStatus(StrEnum):

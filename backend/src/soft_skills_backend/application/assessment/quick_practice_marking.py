@@ -216,7 +216,10 @@ class DefaultQuickPracticeMarkingProvider:
             ASSESSMENT_PROMPT_NAME,
             version=self._settings.assessment_prompt_version,
             variables={
+                "practice_type": prompt_payload.prompt.practice_type.value,
+                "prompt_type": prompt_payload.prompt.prompt_type,
                 "prompt_text": prompt_payload.prompt.prompt_text,
+                "context_block": _render_context_block(prompt_payload),
                 "response_text": prompt_payload.response_text,
                 "skill_slugs": ", ".join(prompt_payload.prompt.target_skill_slugs),
                 "rubric_version": prompt_payload.prompt.rubric_version,
@@ -287,3 +290,56 @@ def _stringify_provider_content(content: str | dict[str, Any]) -> str:
     if isinstance(content, str):
         return content
     return json.dumps(content)
+
+
+def _render_context_block(prompt_payload: ResolvedAttemptPayload) -> str:
+    prompt = prompt_payload.prompt
+    lines: list[str] = ["- none"]
+    if prompt.interview_context is not None:
+        interview_lines = [
+            "- interview competency context: "
+            f"{prompt.interview_context.competency_context or 'not provided'}",
+            "- interviewer perspective: "
+            f"{prompt.interview_context.interviewer_perspective or 'not provided'}",
+        ]
+        lines = interview_lines
+    if prompt.scenario_context is not None:
+        lines = [
+            f"- business context: {prompt.scenario_context.business_context}",
+            f"- learner objective: {prompt.scenario_context.learner_objective}",
+        ]
+        if prompt.scenario_context.constraints:
+            lines.append(
+                "- constraints: " + "; ".join(prompt.scenario_context.constraints)
+            )
+        if prompt.scenario_context.stakeholder_tensions:
+            lines.append(
+                "- stakeholder tensions: "
+                + "; ".join(prompt.scenario_context.stakeholder_tensions)
+            )
+        if prompt.scenario_context.mock_company is not None:
+            lines.append(
+                "- company: "
+                f"{prompt.scenario_context.mock_company.name} / "
+                f"{prompt.scenario_context.mock_company.industry} / "
+                f"{prompt.scenario_context.mock_company.operating_context}"
+            )
+        if prompt.scenario_context.mock_people:
+            lines.append(
+                "- stakeholders: "
+                + " | ".join(
+                    f"{person.name} ({person.role}) goals={'; '.join(person.goals) or 'none'} "
+                    f"style={person.communication_style} "
+                    f"relationship={person.relationship_to_scenario}"
+                    for person in prompt.scenario_context.mock_people
+                )
+            )
+        if prompt.scenario_context.artifacts:
+            lines.append(
+                "- artifacts: "
+                + " | ".join(
+                    f"{artifact.title} [{artifact.artifact_type}] {artifact.body}"
+                    for artifact in prompt.scenario_context.artifacts
+                )
+            )
+    return "\n".join(lines)

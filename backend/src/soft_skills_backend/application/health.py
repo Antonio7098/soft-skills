@@ -66,7 +66,6 @@ class HealthService:
         except Exception as exc:
             database_check = HealthCheck(status="failed", detail=str(exc))
 
-        stageflow_status = "ready" if self._stageflow_runtime.installed else "not_installed"
         overall_status = "ready" if database_check.status == "ready" else "degraded"
 
         return ReadinessPayload(
@@ -77,7 +76,7 @@ class HealthService:
             checks={"database": database_check},
             stageflow={
                 "installed": self._stageflow_runtime.installed,
-                "status": stageflow_status,
+                "status": "ready",
                 "pipeline_type": self._stageflow_runtime.pipeline_type_name,
                 "pipeline_context_type": self._stageflow_runtime.pipeline_context_type_name,
             },

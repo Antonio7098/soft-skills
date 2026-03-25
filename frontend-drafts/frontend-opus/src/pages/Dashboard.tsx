@@ -82,7 +82,7 @@ export function Dashboard() {
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h3 className="font-display text-display-xs text-content-primary">Recent Activity</h3>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/history')}>View all</Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/history')}>View History</Button>
             </div>
             <div className="flex flex-col gap-3">
               {recentActivity.map((activity, i) => (

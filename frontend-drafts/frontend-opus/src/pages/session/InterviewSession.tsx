@@ -85,6 +85,7 @@ export function InterviewSession() {
           <ResponseInput
             onSubmit={handleSubmit}
             loading={phase === 'submitting'}
+            minLength={10}
             submitLabel={session.current_turn >= session.total_turns ? 'Submit Final Answer' : 'Submit Answer'}
             placeholder="Share your experience using the STAR method (Situation, Task, Action, Result)..."
           />

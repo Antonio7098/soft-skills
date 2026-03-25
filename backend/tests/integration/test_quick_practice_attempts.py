@@ -222,13 +222,16 @@ async def test_quick_practice_start_submit_and_persist(app, client, test_setting
         assessment_record = session.get(
             AssessmentRecord, attempt_payload["assessment"]["assessment_id"]
         )
-        pipeline_runs = session.query(PipelineRunRecord).all()
+        pipeline_run_names = {
+            record.pipeline_name for record in session.query(PipelineRunRecord).all()
+        }
         event_types = {record.event_type for record in session.query(WorkflowEventRecord).all()}
 
     assert session_record is not None and session_record.status == "completed"
     assert attempt_record is not None and attempt_record.status == "assessed"
     assert assessment_record is not None and assessment_record.validation_status == "validated"
-    assert len(pipeline_runs) == 2
+    assert "quick_practice_session_start" in pipeline_run_names
+    assert "quick_practice_assessment" in pipeline_run_names
     assert "practice.session_started.v1" in event_types
     assert "practice.prompt_delivered.v1" in event_types
     assert "practice.attempt_submitted.v1" in event_types
@@ -270,6 +273,46 @@ async def test_quick_practice_rejects_missing_version_metadata(client, app, test
     assert assessment_record is not None and assessment_record.validation_status == "rejected"
     assert assessment_record.rejection_code == "SS-VALIDATION-019"
     assert "assessment.rejected.v1" in event_types
+
+
+@pytest.mark.asyncio
+async def test_quick_practice_session_start_is_idempotent_per_request_id(
+    app, client, test_settings
+) -> None:
+    _migrate(test_settings)
+    learner, prompt = await _seed_quick_practice_prompt(client)
+
+    headers = {
+        "X-User-ID": learner["id"],
+        "X-Request-ID": "practice-start-fixed-request",
+    }
+
+    first_response = await client.post(
+        "/api/attempts/quick-practice/sessions",
+        headers=headers,
+        json={"prompt_item_id": prompt["id"]},
+    )
+    second_response = await client.post(
+        "/api/attempts/quick-practice/sessions",
+        headers=headers,
+        json={"prompt_item_id": prompt["id"]},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert (
+        first_response.json()["data"]["session_id"] == second_response.json()["data"]["session_id"]
+    )
+    assert (
+        first_response.json()["data"]["attempt_id"] == second_response.json()["data"]["attempt_id"]
+    )
+
+    with app.state.container.session_factory() as session:
+        sessions = session.query(PracticeSessionRecord).all()
+        attempts = session.query(AttemptRecord).all()
+
+    assert len(sessions) == 1
+    assert len(attempts) == 1
 
 
 @pytest.mark.asyncio

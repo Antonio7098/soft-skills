@@ -90,6 +90,7 @@ export function ScenarioSession() {
           <ResponseInput
             onSubmit={handleSubmit}
             loading={phase === 'submitting'}
+            minLength={10}
             submitLabel={session.current_step >= session.total_steps ? 'Complete Scenario' : 'Submit & Continue'}
             placeholder="How would you respond in this situation?"
           />

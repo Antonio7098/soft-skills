@@ -27,7 +27,6 @@ from soft_skills_backend.integrations.llm.openai_compatible import (
 )
 from soft_skills_backend.observability.event_sink import DurableEventSink
 from soft_skills_backend.observability.stageflow_logging import DatabaseProviderCallLogger
-from soft_skills_backend.orchestration.quick_practice import QuickPracticePipelineExecutor
 from soft_skills_backend.orchestration.stageflow_runtime import (
     StageflowRuntime,
     build_stageflow_runtime,
@@ -94,6 +93,7 @@ def build_container(settings: Settings) -> AppContainer:
     catalog_service = CatalogService(
         session_factory=session_factory,
         workflow_events=workflow_events,
+        stageflow_runtime=stageflow_runtime,
     )
     provider_call_logger = DatabaseProviderCallLogger(provider_calls)
     practice_store = QuickPracticeRepository(
@@ -102,7 +102,7 @@ def build_container(settings: Settings) -> AppContainer:
         workflow_events=workflow_events,
     )
     practice_service = QuickPracticeService(
-        pipeline_executor=QuickPracticePipelineExecutor(pipeline_runs),
+        stageflow_runtime=stageflow_runtime,
         store=practice_store,
         assessment_marker=DefaultQuickPracticeMarkingProvider(
             settings=settings,

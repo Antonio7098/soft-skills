@@ -113,7 +113,113 @@ Every implementation should answer:
 - what gets logged and traced
 - how does it fail
 
-## 8. Add Observability As Part Of The Work
+## 8. Enforce Organisational Hygiene While Coding
+
+Operational discipline is part of implementation, not cleanup. Do not accept
+"working code" if it degrades structure, readability, or change safety.
+
+### File Size And Scope Limits
+
+- Target files under 400 lines
+- Hard limit: no file may exceed 600 lines
+- If a file crosses 400 lines during a sprint, stop and assess whether it must
+  be split before continuing
+- If a change would push a file past 600 lines, split it in the same sprint
+- A file must have one clear reason to change. If it mixes orchestration,
+  persistence, validation, mapping, and event emission, it is already too broad
+
+### Module Structure Rules
+
+- Organise by feature first, then by responsibility
+- Prefer directories such as `practice/quick_practice/`,
+  `catalog/collections/`, and `catalog/scenarios/` over large feature-agnostic
+  modules
+- Do not keep adding unrelated behavior to a top-level `service.py` once a
+  feature has multiple workflows or subdomains
+- Keep shared code in `_shared/` only if it is genuinely cross-cutting and used
+  by more than one feature
+- Do not create generic dumping grounds such as `utils.py`, `helpers.py`, or
+  `misc.py`
+
+### Responsibility Split Inside A Feature
+
+For any non-trivial feature, split code across explicit files instead of
+accumulating everything in one service or repository.
+
+- `commands.py`: request and command models for write operations
+- `views.py` or `queries.py`: read models and query-facing shapes
+- `models.py`: application-layer DTOs only, not mixed with orchestration or SQL
+- `service.py`: workflow orchestration and use-case coordination only
+- `repository.py`: persistence operations only
+- `events.py`: event recording and event payload helpers only
+- `validators.py` or `policies.py`: business validation, state guards, and
+  lifecycle rules
+- `mappers.py`: translation between persistence records and application views
+
+Do not let a single file both define models and implement business workflows.
+Do not let a repository also own event taxonomy, permission policy, and view
+assembly unless the module is still trivially small.
+
+### Model Discipline
+
+- Put request models, response models, DTOs, and view models in dedicated model
+  files
+- Keep Pydantic or schema definitions separate from workflow execution code
+- Keep SQLAlchemy records in the persistence layer, not the application layer
+- Do not define large inline data shapes inside service methods when they belong
+  in named models
+- When a workflow has more than a couple of intermediate payloads, extract them
+  into explicit model classes instead of ad hoc dictionaries
+
+### Service And Repository Rules
+
+- Services coordinate workflows; they should not contain large blocks of SQL or
+  record-construction code
+- Repositories load and persist state; they should not own workflow branching,
+  provider-calling logic, or complex response shaping
+- Validation that does not require I/O should live outside repositories
+- Event recording should be delegated to a focused event helper when the event
+  surface becomes non-trivial
+- Mapping persistence records to API or workflow views should be extracted once
+  the mapping is longer than a small helper
+
+### Refactor Triggers
+
+Refactor immediately during the sprint if any of these appear:
+
+- one file exceeds 400 lines and is still growing
+- one class has more than roughly 7 public methods
+- one method exceeds 80 lines
+- a service starts constructing multiple persistence records directly
+- a repository starts returning many different view shapes
+- a module needs section comments to explain unrelated chunks of behavior
+- code review feedback includes phrases such as "mixed concerns",
+  "hard to navigate", "where should this live?", or "I am afraid to edit this"
+
+### PR And Review Hygiene
+
+- No sprint PR should introduce a new oversized file without an explicit written
+  justification
+- If a touched file is already oversized, reduce or isolate the damage instead
+  of expanding it casually
+- Review for structure, not only correctness
+- "It passes tests" is not sufficient if the change increases coupling or hides
+  responsibilities
+- If a reviewer cannot identify where contracts, validation, persistence, and
+  orchestration live within a few minutes, the structure is not acceptable
+
+### Done Criteria For Code Organisation
+
+Before calling a slice done, confirm:
+
+- files respect the size limits
+- each new module has a single clear purpose
+- models are in dedicated files
+- feature directories are coherent and discoverable
+- orchestration, validation, persistence, and event emission are separated
+- another engineer could predict where the next related change should go
+
+## 9. Add Observability As Part Of The Work
 
 Observability is not a cleanup step.
 
@@ -127,7 +233,7 @@ For every changed workflow, add or update:
 
 If the workflow cannot be replayed or diagnosed, it is incomplete.
 
-## 9. Add Tests While The Design Is Fresh
+## 10. Add Tests While The Design Is Fresh
 
 Every sprint must include backend verification at three levels.
 
@@ -159,7 +265,7 @@ Run backend smoke flows against the real provider for the sprint scope.
 - If the sprint does not add a new provider-backed flow, the baseline smoke suite must still pass
 - Prefer backend-driven smoke coverage that exercises real end-to-end workflows rather than isolated provider pings
 
-## 10. Test Failure Paths, Not Only Happy Paths
+## 11. Test Failure Paths, Not Only Happy Paths
 
 Every sprint should explicitly test:
 
@@ -172,7 +278,7 @@ Every sprint should explicitly test:
 
 Soft failure that hides corruption or ambiguity is not acceptable in this codebase.
 
-## 11. Update The Canonical Docs During The Sprint
+## 12. Update The Canonical Docs During The Sprint
 
 Documentation updates are part of done, not post-work.
 
@@ -186,7 +292,7 @@ Update as needed:
 
 If the code changes behavior and the docs do not, the sprint is incomplete.
 
-## 12. Keep The Sprint Doc Current
+## 13. Keep The Sprint Doc Current
 
 Throughout execution, update the sprint doc with:
 
@@ -199,7 +305,7 @@ Throughout execution, update the sprint doc with:
 
 The sprint doc should be usable as historical context for future work.
 
-## 13. Run The Final Verification Pass
+## 14. Run The Final Verification Pass
 
 Before considering the sprint complete, run the full sprint verification set:
 
@@ -218,7 +324,7 @@ Also verify:
 - persisted artifacts contain required version metadata
 - no silent fallback was introduced
 
-## 14. Create The Sprint Execution Report
+## 15. Create The Sprint Execution Report
 
 Before handing off or opening a PR, create or update the sprint execution
 report in `ops/reports/` using
@@ -236,7 +342,7 @@ The report should capture:
 
 The report is part of the deliverable, not optional project hygiene.
 
-## 15. Close Out The Sprint Cleanly
+## 16. Close Out The Sprint Cleanly
 
 Before handing off or opening a PR:
 

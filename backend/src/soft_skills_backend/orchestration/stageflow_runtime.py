@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import importlib
-import importlib.util
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Any
 
 from soft_skills_backend.application.ports import PipelineRunRepository, ProviderCallRepository
@@ -18,25 +16,14 @@ from soft_skills_backend.observability.stageflow_logging import (
 )
 
 
-class SoftSkillsStageKind(StrEnum):
-    """Stable stage kinds even before Stageflow is installed."""
-
-    GUARD = "GUARD"
-    ENRICH = "ENRICH"
-    ROUTE = "ROUTE"
-    TRANSFORM = "TRANSFORM"
-    WORK = "WORK"
-    AGENT = "AGENT"
-
-
 @dataclass(slots=True)
 class StageflowRuntime:
     """Resolved Stageflow runtime capabilities."""
 
-    installed: bool
+    installed: bool = True
     pipeline_type_name: str = "Pipeline"
     pipeline_context_type_name: str = "PipelineContext"
-    stage_kinds: tuple[str, ...] = tuple(kind.value for kind in SoftSkillsStageKind)
+    stage_kinds: tuple[str, ...] = ()
     default_interceptor_names: tuple[str, ...] = (
         "TimeoutInterceptor",
         "CircuitBreakerInterceptor",
@@ -47,18 +34,7 @@ class StageflowRuntime:
     event_sink_type_name: str = "BackpressureAwareEventSink"
     pipeline_run_logger_type_name: str = "PipelineRunLogger"
     provider_call_logger_type_name: str = "ProviderCallLogger"
-    missing_reason: str | None = None
     runtime_objects: dict[str, Any] | None = None
-
-    def require_installed(self) -> None:
-        """Raise a stable error if Stageflow is required but unavailable."""
-
-        if not self.installed:
-            raise orchestration_error(
-                "Stageflow runtime is not installed",
-                code="SS-ORCHESTRATION-002",
-                details={"missing_reason": self.missing_reason},
-            )
 
 
 def build_stageflow_runtime(
@@ -68,20 +44,18 @@ def build_stageflow_runtime(
     pipeline_runs: PipelineRunRepository,
     provider_calls: ProviderCallRepository,
 ) -> StageflowRuntime:
-    """Build a runtime wrapper around Stageflow if it is installed."""
+    """Build the mandatory Stageflow runtime wrapper for the application."""
 
-    if importlib.util.find_spec("stageflow") is None:
-        runtime = StageflowRuntime(
-            installed=False,
-            missing_reason="Install `stageflow-core` to enable pipeline execution.",
-        )
-        if settings.stageflow_required:
-            runtime.require_installed()
-        return runtime
-
-    stageflow_module = importlib.import_module("stageflow")
-    stageflow_advanced_module = importlib.import_module("stageflow.advanced")
-    stageflow_api_module = importlib.import_module("stageflow.api")
+    try:
+        stageflow_module = importlib.import_module("stageflow")
+        stageflow_advanced_module = importlib.import_module("stageflow.advanced")
+        stageflow_api_module = importlib.import_module("stageflow.api")
+    except ModuleNotFoundError as exc:
+        raise orchestration_error(
+            "Stageflow runtime is required but not installed",
+            code="SS-ORCHESTRATION-002",
+            details={"missing_reason": "Install `stageflow-core` to run the backend."},
+        ) from exc
 
     backpressure_aware_event_sink_cls = stageflow_module.BackpressureAwareEventSink
     get_default_interceptors = stageflow_advanced_module.get_default_interceptors

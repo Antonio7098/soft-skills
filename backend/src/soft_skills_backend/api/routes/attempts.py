@@ -1,4 +1,4 @@
-"""Quick-practice attempt endpoints."""
+"""Practice attempt endpoints."""
 
 from __future__ import annotations
 
@@ -10,7 +10,9 @@ from soft_skills_backend.application.practice.quick_practice import (
     AttemptView,
     PracticeCorrelation,
     QuickPracticeSessionView,
+    StartInterviewSessionCommand,
     StartQuickPracticeSessionCommand,
+    StartScenarioSessionCommand,
     SubmitAttemptCommand,
 )
 
@@ -33,6 +35,36 @@ async def start_quick_practice_session(
     actor = require_actor(request)
     service = get_practice_service(request)
     payload = await service.start_session(actor, _correlation_from_request(request), command)
+    return ok_response(request, payload)
+
+
+@router.post("/interview/sessions", response_model=ApiEnvelope[QuickPracticeSessionView])
+async def start_interview_session(
+    request: Request,
+    command: StartInterviewSessionCommand,
+) -> ApiEnvelope[QuickPracticeSessionView]:
+    actor = require_actor(request)
+    service = get_practice_service(request)
+    payload = await service.start_interview_session(
+        actor,
+        _correlation_from_request(request),
+        command,
+    )
+    return ok_response(request, payload)
+
+
+@router.post("/scenario/sessions", response_model=ApiEnvelope[QuickPracticeSessionView])
+async def start_scenario_session(
+    request: Request,
+    command: StartScenarioSessionCommand,
+) -> ApiEnvelope[QuickPracticeSessionView]:
+    actor = require_actor(request)
+    service = get_practice_service(request)
+    payload = await service.start_scenario_session(
+        actor,
+        _correlation_from_request(request),
+        command,
+    )
     return ok_response(request, payload)
 
 

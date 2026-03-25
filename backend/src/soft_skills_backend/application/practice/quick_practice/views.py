@@ -1,4 +1,4 @@
-"""Quick-practice view builders and shared helpers."""
+"""Practice view builders and shared helpers."""
 
 from __future__ import annotations
 
@@ -6,11 +6,11 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from soft_skills_backend.application.assessment.models import QuickPracticePromptView
+from soft_skills_backend.application.assessment.models import PracticePromptView
 from soft_skills_backend.application.auth import Actor
 from soft_skills_backend.application.practice.models import (
     AttemptView,
-    QuickPracticeAssessmentView,
+    PracticeAssessmentView,
 )
 from soft_skills_backend.domain.errors import domain_error
 from soft_skills_backend.domain.practice import (
@@ -38,8 +38,8 @@ def build_attempt_view(session: Session, attempt: AttemptRecord) -> AttemptView:
             status_code=404,
             details={"session_id": attempt.session_id},
         )
-    prompt = QuickPracticePromptView.model_validate(practice_session.prompt_payload)
-    assessment: QuickPracticeAssessmentView | None
+    prompt = PracticePromptView.model_validate(practice_session.prompt_payload)
+    assessment: PracticeAssessmentView | None
     if attempt.assessment_id is None:
         assessment = None
     else:
@@ -60,10 +60,10 @@ def build_attempt_view(session: Session, attempt: AttemptRecord) -> AttemptView:
     )
 
 
-def _assessment_record_to_view(record: AssessmentRecord) -> QuickPracticeAssessmentView:
+def _assessment_record_to_view(record: AssessmentRecord) -> PracticeAssessmentView:
     """Build the learner-facing assessment view."""
 
-    return QuickPracticeAssessmentView(
+    return PracticeAssessmentView(
         assessment_id=record.id,
         attempt_id=record.attempt_id,
         session_id=record.session_id,

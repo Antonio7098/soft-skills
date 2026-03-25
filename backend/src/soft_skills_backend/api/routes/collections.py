@@ -16,8 +16,17 @@ from soft_skills_backend.application.catalog import (
     ScenarioCreateCommand,
     ScenarioView,
 )
+from soft_skills_backend.application.practice.quick_practice import PracticeCorrelation
 
 router = APIRouter()
+
+
+def _correlation_from_request(request: Request) -> PracticeCorrelation:
+    return PracticeCorrelation(
+        request_id=getattr(request.state, "request_id", ""),
+        trace_id=getattr(request.state, "trace_id", ""),
+        workflow_id=getattr(request.state, "workflow_id", None),
+    )
 
 
 @router.get("", response_model=ApiEnvelope[list[CollectionView]])
@@ -45,7 +54,15 @@ async def create_collection(
 ) -> ApiEnvelope[CollectionView]:
     actor = require_actor(request)
     service = get_catalog_service(request)
-    return ok_response(request, service.create_collection(actor, command))
+    correlation = _correlation_from_request(request)
+    payload = await service.create_collection(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        command=command,
+    )
+    return ok_response(request, payload)
 
 
 @router.get("/{collection_id}", response_model=ApiEnvelope[CollectionView])
@@ -61,7 +78,16 @@ async def update_collection_lifecycle(
 ) -> ApiEnvelope[CollectionView]:
     actor = require_actor(request)
     service = get_catalog_service(request)
-    return ok_response(request, service.update_collection_lifecycle(actor, collection_id, command))
+    correlation = _correlation_from_request(request)
+    payload = await service.update_collection_lifecycle(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        collection_id=collection_id,
+        command=command,
+    )
+    return ok_response(request, payload)
 
 
 @router.post("/{collection_id}/prompt-items", response_model=ApiEnvelope[PromptItemView])
@@ -70,7 +96,16 @@ async def add_prompt_item(
 ) -> ApiEnvelope[PromptItemView]:
     actor = require_actor(request)
     service = get_catalog_service(request)
-    return ok_response(request, service.add_prompt_item(actor, collection_id, command))
+    correlation = _correlation_from_request(request)
+    payload = await service.add_prompt_item(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        collection_id=collection_id,
+        command=command,
+    )
+    return ok_response(request, payload)
 
 
 @router.post("/{collection_id}/scenarios", response_model=ApiEnvelope[ScenarioView])
@@ -79,4 +114,13 @@ async def add_scenario(
 ) -> ApiEnvelope[ScenarioView]:
     actor = require_actor(request)
     service = get_catalog_service(request)
-    return ok_response(request, service.add_scenario(actor, collection_id, command))
+    correlation = _correlation_from_request(request)
+    payload = await service.add_scenario(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        collection_id=collection_id,
+        command=command,
+    )
+    return ok_response(request, payload)

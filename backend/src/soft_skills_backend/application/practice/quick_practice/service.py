@@ -1,15 +1,25 @@
-"""Quick-practice orchestration service."""
+"""Practice runtime orchestration service."""
 
 from __future__ import annotations
 
-import re
-from typing import cast
+from typing import Any, cast
 from uuid import uuid4
 
+from stageflow.api import Pipeline, StageKind, stage
+
+from soft_skills_backend.application._shared.stageflow import (
+    StageflowPipelineSupport,
+    StageflowStageResult,
+    ok_output,
+    payload_from_inputs,
+    payload_from_results,
+    run_logged_pipeline,
+)
 from soft_skills_backend.application.assessment.models import (
     AssessmentTransformPayload,
+    InterviewContextView,
     LearnerContextPayload,
-    QuickPracticePromptView,
+    PracticeArtifactView,
     ResolvedAttemptPayload,
 )
 from soft_skills_backend.application.assessment.quick_practice_marking import (
@@ -17,46 +27,45 @@ from soft_skills_backend.application.assessment.quick_practice_marking import (
     StructuredOutputRejectionError,
 )
 from soft_skills_backend.application.auth import Actor
-from soft_skills_backend.application.ports.telemetry import ProviderCallContext
 from soft_skills_backend.application.practice.models import (
+    AttemptGuardPayload,
     AttemptView,
     PracticeCorrelation,
+    PromptContextPayload,
     QuickPracticeSessionView,
     SessionTransformPayload,
     StartInputPayload,
+    StartInterviewSessionCommand,
     StartQuickPracticeSessionCommand,
+    StartScenarioSessionCommand,
     SubmitAttemptCommand,
     ValidatedAssessmentPayload,
 )
-from soft_skills_backend.application.practice.quick_practice.repository import (
-    DELIVERY_VERSION,
-    QuickPracticeRepository,
-)
-from soft_skills_backend.domain.errors import AppError, auth_error, scoring_error
-from soft_skills_backend.domain.practice import validate_assessment_draft
-from soft_skills_backend.orchestration.quick_practice import (
-    PipelineDefinition,
-    PipelineExecutionContext,
-    PipelineStage,
-    QuickPracticePipelineExecutor,
-    StageExecutionResult,
-)
-from soft_skills_backend.orchestration.stageflow_runtime import SoftSkillsStageKind
+from soft_skills_backend.domain.errors import AppError, auth_error
+from soft_skills_backend.domain.practice import PracticeType
+from soft_skills_backend.orchestration.stageflow_runtime import StageflowRuntime
+
+from .assessment_service import QuickPracticeAssessmentService
+from .repository import QuickPracticeRepository
 
 
 class QuickPracticeService:
-    """Own the Sprint 3 quick-practice vertical slice."""
+    """Own the shared text-practice runtime workflow."""
 
     def __init__(
         self,
         *,
-        pipeline_executor: QuickPracticePipelineExecutor,
+        stageflow_runtime: StageflowRuntime,
         store: QuickPracticeRepository,
         assessment_marker: QuickPracticeMarkingProvider,
     ) -> None:
-        self._pipeline_executor = pipeline_executor
         self._store = store
         self._assessment_marker = assessment_marker
+        self._stageflow = StageflowPipelineSupport.from_runtime(stageflow_runtime)
+        self._assessment = QuickPracticeAssessmentService(
+            store=store,
+            assessment_marker=assessment_marker,
+        )
 
     async def start_session(
         self,
@@ -64,81 +73,179 @@ class QuickPracticeService:
         correlation: PracticeCorrelation,
         command: StartQuickPracticeSessionCommand,
     ) -> QuickPracticeSessionView:
-        session_id = uuid4().hex
-        attempt_id = uuid4().hex
-        workflow_id = session_id
+        return await self._start_practice_session(
+            actor=actor,
+            correlation=correlation,
+            start_input=StartInputPayload(
+                practice_type=PracticeType.QUICK_PRACTICE,
+                content_item_id=command.prompt_item_id,
+            ),
+        )
 
-        definition = PipelineDefinition(
-            name="quick_practice_session_start",
-            stages=(
-                PipelineStage(
-                    name="input_guard",
-                    kind=SoftSkillsStageKind.GUARD.value,
-                    handler=lambda _ctx, _deps: StageExecutionResult(
-                        payload=StartInputPayload(prompt_item_id=command.prompt_item_id),
-                        summary={"prompt_item_id": command.prompt_item_id},
-                    ),
-                ),
-                PipelineStage(
-                    name="prompt_enrich",
-                    kind=SoftSkillsStageKind.ENRICH.value,
-                    dependencies=("input_guard",),
-                    handler=lambda _ctx, deps: self._store.load_start_prompt_context(
-                        actor,
-                        deps["input_guard"],
-                    ),
-                ),
-                PipelineStage(
-                    name="learner_enrich",
-                    kind=SoftSkillsStageKind.ENRICH.value,
-                    dependencies=("input_guard",),
-                    handler=lambda _ctx, _deps: self._store.load_learner_context(actor.user_id),
-                ),
-                PipelineStage(
-                    name="session_transform",
-                    kind=SoftSkillsStageKind.TRANSFORM.value,
-                    dependencies=("prompt_enrich", "learner_enrich"),
-                    handler=lambda _ctx, deps: StageExecutionResult(
-                        payload=SessionTransformPayload(
-                            session_id=session_id,
-                            attempt_id=attempt_id,
-                            workflow_id=workflow_id,
-                            prompt=QuickPracticePromptView(
-                                content_item_id=deps["prompt_enrich"].content_item_id,
-                                prompt_type=deps["prompt_enrich"].prompt_type,
-                                title=deps["prompt_enrich"].title,
-                                prompt_text=deps["prompt_enrich"].prompt_text,
-                                difficulty=deps["prompt_enrich"].difficulty,
-                                delivery_version=DELIVERY_VERSION,
-                                target_skill_slugs=deps["prompt_enrich"].target_skill_slugs,
-                                rubric_id=deps["prompt_enrich"].rubric_id,
-                                rubric_version=deps["prompt_enrich"].rubric_version,
-                            ),
-                        ),
-                        summary={"session_id": session_id, "attempt_id": attempt_id},
-                    ),
-                ),
-                PipelineStage(
-                    name="persistence_work",
-                    kind=SoftSkillsStageKind.WORK.value,
-                    dependencies=("session_transform",),
-                    handler=lambda ctx, deps: self._store.persist_session_start(
-                        ctx=ctx,
-                        actor=actor,
-                        transform_payload=deps["session_transform"],
-                    ),
+    async def start_interview_session(
+        self,
+        actor: Actor,
+        correlation: PracticeCorrelation,
+        command: StartInterviewSessionCommand,
+    ) -> QuickPracticeSessionView:
+        return await self._start_practice_session(
+            actor=actor,
+            correlation=correlation,
+            start_input=StartInputPayload(
+                practice_type=PracticeType.INTERVIEW,
+                content_item_id=command.prompt_item_id,
+                interview_context=InterviewContextView(
+                    competency_context=command.competency_context,
+                    interviewer_perspective=command.interviewer_perspective,
                 ),
             ),
         )
 
-        pipeline_result = await self._pipeline_executor.run(
-            definition,
+    async def start_scenario_session(
+        self,
+        actor: Actor,
+        correlation: PracticeCorrelation,
+        command: StartScenarioSessionCommand,
+    ) -> QuickPracticeSessionView:
+        artifacts = [
+            PracticeArtifactView(
+                artifact_id=f"{command.scenario_id}-artifact-{index}",
+                artifact_type=artifact.artifact_type,
+                title=artifact.title,
+                body=artifact.body,
+            )
+            for index, artifact in enumerate(command.artifacts, start=1)
+        ]
+        return await self._start_practice_session(
+            actor=actor,
+            correlation=correlation,
+            start_input=StartInputPayload(
+                practice_type=PracticeType.SCENARIO,
+                content_item_id=command.scenario_id,
+                artifacts=artifacts,
+            ),
+        )
+
+    async def _start_practice_session(
+        self,
+        *,
+        actor: Actor,
+        correlation: PracticeCorrelation,
+        start_input: StartInputPayload,
+    ) -> QuickPracticeSessionView:
+        session_id = uuid4().hex
+        attempt_id = uuid4().hex
+        workflow_id = session_id
+
+        async def input_guard(_ctx) -> Any:
+            return ok_output(
+                StageflowStageResult(
+                    payload=start_input,
+                    summary={
+                        "practice_type": start_input.practice_type.value,
+                        "content_item_id": start_input.content_item_id,
+                    },
+                )
+            )
+
+        async def prompt_enrich(ctx) -> Any:
+            return ok_output(
+                self._store.load_start_prompt_context(
+                    actor,
+                    cast(StartInputPayload, payload_from_inputs(ctx, "input_guard")),
+                )
+            )
+
+        async def learner_enrich(_ctx) -> Any:
+            return ok_output(self._store.load_learner_context(actor.user_id))
+
+        async def session_transform(ctx) -> Any:
+            prompt_payload = cast(
+                PromptContextPayload,
+                payload_from_inputs(ctx, "prompt_enrich"),
+            )
+            return ok_output(
+                StageflowStageResult(
+                    payload=SessionTransformPayload(
+                        session_id=session_id,
+                        attempt_id=attempt_id,
+                        workflow_id=workflow_id,
+                        prompt=prompt_payload.prompt,
+                    ),
+                    summary={"session_id": session_id, "attempt_id": attempt_id},
+                )
+            )
+
+        async def persistence_work(ctx) -> Any:
+            return ok_output(
+                self._store.persist_session_start(
+                    ctx=ctx,
+                    actor=actor,
+                    transform_payload=cast(
+                        SessionTransformPayload,
+                        payload_from_inputs(ctx, "session_transform"),
+                    ),
+                )
+            )
+
+        pipeline = Pipeline.from_stages(
+            stage("input_guard", cast(Any, input_guard), StageKind.GUARD),
+            stage(
+                "prompt_enrich",
+                cast(Any, prompt_enrich),
+                StageKind.ENRICH,
+                dependencies=("input_guard",),
+            ),
+            stage(
+                "learner_enrich",
+                cast(Any, learner_enrich),
+                StageKind.ENRICH,
+                dependencies=("input_guard",),
+            ),
+            stage(
+                "session_transform",
+                cast(Any, session_transform),
+                StageKind.TRANSFORM,
+                dependencies=("prompt_enrich", "learner_enrich"),
+            ),
+            stage(
+                "persistence_work",
+                cast(Any, persistence_work),
+                StageKind.WORK,
+                dependencies=("session_transform",),
+            ),
+            name=f"{start_input.practice_type.value}_session_start",
+        )
+
+        pipeline_result = await run_logged_pipeline(
+            self._stageflow,
+            pipeline,
             request_id=correlation.request_id,
             trace_id=correlation.trace_id,
             workflow_id=workflow_id,
             user_id=actor.user_id,
+            session_id=session_id,
+            execution_mode="practice_runtime",
+            service="soft_skills_backend.practice",
+            idempotency_key=(
+                f"{start_input.practice_type.value}_session_start:{actor.user_id}:{correlation.request_id}"
+            ),
+            idempotency_params={
+                "practice_type": start_input.practice_type.value,
+                "content_item_id": start_input.content_item_id,
+                "interview_context": None
+                if start_input.interview_context is None
+                else start_input.interview_context.model_dump(mode="json"),
+                "artifacts": [
+                    artifact.model_dump(mode="json") for artifact in start_input.artifacts
+                ],
+            },
         )
-        return cast(QuickPracticeSessionView, pipeline_result.payload_for("persistence_work"))
+        return payload_from_results(
+            pipeline_result,
+            "persistence_work",
+            expected_type=QuickPracticeSessionView,
+        )
 
     async def submit_attempt(
         self,
@@ -155,91 +262,152 @@ class QuickPracticeService:
                 status_code=403,
                 details={"attempt_id": attempt_id},
             )
+        self._assessment.set_marker(self._assessment_marker)
 
-        definition = PipelineDefinition(
-            name="quick_practice_assessment",
-            stages=(
-                PipelineStage(
-                    name="input_guard",
-                    kind=SoftSkillsStageKind.GUARD.value,
-                    handler=lambda _ctx, _deps: self._store.load_submit_guard(
-                        actor=actor,
-                        attempt_id=attempt_id,
-                        response_text=command.response_text,
+        async def input_guard(_ctx) -> Any:
+            return ok_output(
+                self._store.load_submit_guard(
+                    actor=actor,
+                    attempt_id=attempt_id,
+                    response_text=command.response_text,
+                )
+            )
+
+        async def prompt_enrich(ctx) -> Any:
+            return ok_output(
+                self._store.load_resolved_attempt(
+                    cast(AttemptGuardPayload, payload_from_inputs(ctx, "input_guard"))
+                )
+            )
+
+        async def learner_enrich(_ctx) -> Any:
+            return ok_output(self._store.load_learner_context(actor.user_id))
+
+        async def submission_work(ctx) -> Any:
+            return ok_output(
+                self._store.persist_attempt_submission(
+                    ctx=ctx,
+                    guard=cast(AttemptGuardPayload, payload_from_inputs(ctx, "input_guard")),
+                )
+            )
+
+        async def assessing_work(ctx) -> Any:
+            return ok_output(
+                self._store.mark_attempt_assessing(
+                    cast(AttemptGuardPayload, payload_from_inputs(ctx, "submission_work"))
+                )
+            )
+
+        async def assessment_transform(ctx) -> Any:
+            return ok_output(
+                await self._assessment.run_transform(
+                    ctx=ctx,
+                    prompt_payload=cast(
+                        ResolvedAttemptPayload,
+                        payload_from_inputs(ctx, "prompt_enrich"),
                     ),
-                ),
-                PipelineStage(
-                    name="prompt_enrich",
-                    kind=SoftSkillsStageKind.ENRICH.value,
-                    dependencies=("input_guard",),
-                    handler=lambda _ctx, deps: self._store.load_resolved_attempt(
-                        deps["input_guard"]
+                    learner_payload=cast(
+                        LearnerContextPayload,
+                        payload_from_inputs(ctx, "learner_enrich"),
                     ),
-                ),
-                PipelineStage(
-                    name="learner_enrich",
-                    kind=SoftSkillsStageKind.ENRICH.value,
-                    dependencies=("input_guard",),
-                    handler=lambda _ctx, _deps: self._store.load_learner_context(actor.user_id),
-                ),
-                PipelineStage(
-                    name="submission_work",
-                    kind=SoftSkillsStageKind.WORK.value,
-                    dependencies=("input_guard",),
-                    handler=lambda ctx, deps: self._store.persist_attempt_submission(
-                        ctx=ctx,
-                        guard=deps["input_guard"],
+                )
+            )
+
+        async def output_guard(ctx) -> Any:
+            return ok_output(
+                self._assessment.validate_output(
+                    prompt_payload=cast(
+                        ResolvedAttemptPayload,
+                        payload_from_inputs(ctx, "prompt_enrich"),
                     ),
-                ),
-                PipelineStage(
-                    name="assessing_work",
-                    kind=SoftSkillsStageKind.WORK.value,
-                    dependencies=("submission_work",),
-                    handler=lambda _ctx, deps: self._store.mark_attempt_assessing(
-                        deps["submission_work"],
+                    transform_payload=cast(
+                        AssessmentTransformPayload,
+                        payload_from_inputs(ctx, "assessment_transform"),
                     ),
-                ),
-                PipelineStage(
-                    name="assessment_transform",
-                    kind=SoftSkillsStageKind.TRANSFORM.value,
-                    dependencies=("prompt_enrich", "learner_enrich", "assessing_work"),
-                    handler=lambda ctx, deps: self._run_assessment_transform(
-                        ctx=ctx,
-                        prompt_payload=deps["prompt_enrich"],
-                        learner_payload=deps["learner_enrich"],
+                )
+            )
+
+        async def persistence_work(ctx) -> Any:
+            return ok_output(
+                self._store.persist_assessment(
+                    ctx=ctx,
+                    guard=cast(AttemptGuardPayload, payload_from_inputs(ctx, "input_guard")),
+                    assessment=cast(
+                        ValidatedAssessmentPayload,
+                        payload_from_inputs(ctx, "output_guard"),
                     ),
-                ),
-                PipelineStage(
-                    name="output_guard",
-                    kind=SoftSkillsStageKind.GUARD.value,
-                    dependencies=("prompt_enrich", "assessment_transform"),
-                    handler=lambda _ctx, deps: self._validate_assessment_output(
-                        prompt_payload=deps["prompt_enrich"],
-                        transform_payload=deps["assessment_transform"],
-                    ),
-                ),
-                PipelineStage(
-                    name="persistence_work",
-                    kind=SoftSkillsStageKind.WORK.value,
-                    dependencies=("input_guard", "output_guard"),
-                    handler=lambda ctx, deps: self._store.persist_assessment(
-                        ctx=ctx,
-                        guard=deps["input_guard"],
-                        assessment=deps["output_guard"],
-                    ),
-                ),
+                )
+            )
+
+        pipeline = Pipeline.from_stages(
+            stage("input_guard", cast(Any, input_guard), StageKind.GUARD),
+            stage(
+                "prompt_enrich",
+                cast(Any, prompt_enrich),
+                StageKind.ENRICH,
+                dependencies=("input_guard",),
             ),
+            stage(
+                "learner_enrich",
+                cast(Any, learner_enrich),
+                StageKind.ENRICH,
+                dependencies=("input_guard",),
+            ),
+            stage(
+                "submission_work",
+                cast(Any, submission_work),
+                StageKind.WORK,
+                dependencies=("input_guard",),
+            ),
+            stage(
+                "assessing_work",
+                cast(Any, assessing_work),
+                StageKind.WORK,
+                dependencies=("submission_work",),
+            ),
+            stage(
+                "assessment_transform",
+                cast(Any, assessment_transform),
+                StageKind.TRANSFORM,
+                dependencies=("prompt_enrich", "learner_enrich", "assessing_work"),
+            ),
+            stage(
+                "output_guard",
+                cast(Any, output_guard),
+                StageKind.GUARD,
+                dependencies=("prompt_enrich", "assessment_transform"),
+            ),
+            stage(
+                "persistence_work",
+                cast(Any, persistence_work),
+                StageKind.WORK,
+                dependencies=("input_guard", "output_guard"),
+            ),
+            name=f"{ownership.practice_type}_assessment",
         )
 
         try:
-            pipeline_result = await self._pipeline_executor.run(
-                definition,
+            pipeline_result = await run_logged_pipeline(
+                self._stageflow,
+                pipeline,
                 request_id=correlation.request_id,
                 trace_id=correlation.trace_id,
                 workflow_id=ownership.workflow_id,
                 user_id=actor.user_id,
+                session_id=ownership.session_id,
+                execution_mode="practice_runtime",
+                service="soft_skills_backend.practice",
+                idempotency_key=f"{ownership.practice_type}_assessment:{actor.user_id}:{correlation.request_id}:{attempt_id}",
+                idempotency_params={
+                    "attempt_id": attempt_id,
+                    "response_text": command.response_text,
+                },
             )
-            return cast(AttemptView, pipeline_result.payload_for("persistence_work"))
+            return payload_from_results(
+                pipeline_result,
+                "persistence_work",
+                expected_type=AttemptView,
+            )
         except StructuredOutputRejectionError as exc:
             self._store.persist_rejected_assessment(
                 attempt_id=attempt_id,
@@ -263,160 +431,3 @@ class QuickPracticeService:
 
     def get_attempt(self, actor: Actor, attempt_id: str) -> AttemptView:
         return self._store.get_attempt(actor, attempt_id)
-
-    async def _run_assessment_transform(
-        self,
-        *,
-        ctx: PipelineExecutionContext,
-        prompt_payload: ResolvedAttemptPayload,
-        learner_payload: LearnerContextPayload,
-    ) -> StageExecutionResult:
-        self._store.record_event(
-            event_type="assessment.started.v1",
-            request_id=ctx.request_id,
-            trace_id=ctx.trace_id,
-            workflow_id=ctx.workflow_id,
-            payload={
-                "attempt_id": prompt_payload.attempt_id,
-                "session_id": prompt_payload.session_id,
-                "prompt_version": self._store.settings.assessment_prompt_version,
-                "rubric_version": prompt_payload.prompt.rubric_version,
-                "provider": self._assessment_marker.provider_name,
-                "model_slug": self._assessment_marker.model_slug,
-            },
-        )
-        call_context = ProviderCallContext(
-            operation="quick_practice_assessment",
-            request_id=ctx.request_id,
-            trace_id=ctx.trace_id,
-            pipeline_run_id=ctx.pipeline_run_id,
-            workflow_id=ctx.workflow_id,
-            user_id=ctx.user_id,
-        )
-        payload = await self._assessment_marker.mark_attempt(
-            prompt_payload=prompt_payload,
-            learner_payload=learner_payload,
-            call_context=call_context,
-        )
-        return StageExecutionResult(
-            payload=payload,
-            summary={
-                "model_slug": payload.model_slug,
-                "schema_version": payload.schema_version,
-            },
-        )
-
-    def _validate_assessment_output(
-        self,
-        *,
-        prompt_payload: ResolvedAttemptPayload,
-        transform_payload: AssessmentTransformPayload,
-    ) -> StageExecutionResult:
-        draft = transform_payload.draft
-        settings = self._store.settings
-        if draft.prompt_version != settings.assessment_prompt_version:
-            raise StructuredOutputRejectionError(
-                app_error=scoring_error(
-                    "Assessment output prompt version did not match the active contract",
-                    code="SS-SCORING-007",
-                    details={
-                        "expected_prompt_version": settings.assessment_prompt_version,
-                        "observed_prompt_version": draft.prompt_version,
-                    },
-                ),
-                raw_payload=transform_payload.raw_payload,
-            )
-        if draft.rubric_version != prompt_payload.prompt.rubric_version:
-            raise StructuredOutputRejectionError(
-                app_error=scoring_error(
-                    "Assessment output rubric version did not match the active rubric",
-                    code="SS-SCORING-008",
-                    details={
-                        "expected_rubric_version": prompt_payload.prompt.rubric_version,
-                        "observed_rubric_version": draft.rubric_version,
-                    },
-                ),
-                raw_payload=transform_payload.raw_payload,
-            )
-        if (
-            draft.provider != self._assessment_marker.provider_name
-            or not _model_slug_matches_execution_source(
-                executed_slug=transform_payload.model_slug,
-                output_slug=draft.model_slug,
-                configured_slug=self._assessment_marker.model_slug,
-            )
-        ):
-            raise StructuredOutputRejectionError(
-                app_error=scoring_error(
-                    "Assessment output provider metadata did not match the execution source",
-                    code="SS-SCORING-009",
-                    details={
-                        "expected_provider": self._assessment_marker.provider_name,
-                        "observed_provider": draft.provider,
-                        "expected_model_slug": transform_payload.model_slug,
-                        "observed_model_slug": draft.model_slug,
-                    },
-                ),
-                raw_payload=transform_payload.raw_payload,
-            )
-        try:
-            validate_assessment_draft(
-                response_text=prompt_payload.response_text,
-                required_skill_slugs=prompt_payload.prompt.target_skill_slugs,
-                draft=draft,
-            )
-        except AppError as exc:
-            raise StructuredOutputRejectionError(
-                app_error=exc,
-                raw_payload=transform_payload.raw_payload,
-            ) from exc
-
-        return StageExecutionResult(
-            payload=ValidatedAssessmentPayload(
-                prompt_version=draft.prompt_version,
-                rubric_id=prompt_payload.prompt.rubric_id,
-                rubric_version=draft.rubric_version,
-                provider=draft.provider,
-                model_slug=transform_payload.model_slug,
-                schema_version=transform_payload.schema_version,
-                config_version=settings.scoring_config_version,
-                overall_score=draft.overall_score,
-                rationale=draft.rationale,
-                skill_scores=draft.skill_scores,
-                evidence=draft.evidence,
-                strengths=draft.strengths,
-                weaknesses=draft.weaknesses,
-                next_actions=draft.next_actions,
-                raw_payload=transform_payload.raw_payload,
-            ),
-            summary={"overall_score": draft.overall_score},
-        )
-
-
-def _model_slug_matches_execution_source(
-    *,
-    executed_slug: str,
-    output_slug: str,
-    configured_slug: str,
-) -> bool:
-    accepted_slugs = {
-        executed_slug,
-        output_slug,
-        configured_slug,
-        _normalize_model_slug(executed_slug),
-        _normalize_model_slug(output_slug),
-        _normalize_model_slug(configured_slug),
-    }
-    normalized_executed = _normalize_model_slug(executed_slug)
-    normalized_output = _normalize_model_slug(output_slug)
-    normalized_configured = _normalize_model_slug(configured_slug)
-    return (
-        output_slug in accepted_slugs
-        and normalized_output in {normalized_executed, normalized_configured}
-    )
-
-
-def _normalize_model_slug(model_slug: str) -> str:
-    base, separator, suffix = model_slug.partition(":")
-    normalized_base = re.sub(r"(?:-\d{8}|-\d{4}-\d{2}-\d{2})$", "", base)
-    return normalized_base if not separator else f"{normalized_base}{separator}{suffix}"

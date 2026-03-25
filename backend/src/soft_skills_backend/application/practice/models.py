@@ -4,11 +4,16 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field, field_validator
 
-from soft_skills_backend.application.assessment.models import QuickPracticePromptView
+from soft_skills_backend.application.assessment.models import (
+    InterviewContextView,
+    PracticeArtifactView,
+    PracticePromptView,
+)
 from soft_skills_backend.domain.practice import (
     AssessmentValidationStatus,
     AttemptStatus,
     EvidenceItem,
+    PracticeType,
     SessionStatus,
     SkillScore,
 )
@@ -25,21 +30,16 @@ class PracticeCorrelation(BaseModel):
 class StartInputPayload(BaseModel):
     """Validated start input."""
 
-    prompt_item_id: str
+    practice_type: PracticeType
+    content_item_id: str
+    interview_context: InterviewContextView | None = None
+    artifacts: list[PracticeArtifactView] = Field(default_factory=list)
 
 
 class PromptContextPayload(BaseModel):
     """Prompt and rubric context resolved from persistence."""
 
-    content_item_id: str
-    content_item_type: str
-    prompt_type: str
-    title: str
-    prompt_text: str
-    difficulty: str
-    target_skill_slugs: list[str]
-    rubric_id: str
-    rubric_version: str
+    prompt: PracticePromptView
 
 
 class SessionTransformPayload(BaseModel):
@@ -48,7 +48,7 @@ class SessionTransformPayload(BaseModel):
     session_id: str
     attempt_id: str
     workflow_id: str
-    prompt: QuickPracticePromptView
+    prompt: PracticePromptView
 
 
 class AttemptGuardPayload(BaseModel):
@@ -87,7 +87,7 @@ class QuickPracticeSessionView(BaseModel):
     attempt_id: str
     workflow_id: str
     status: SessionStatus
-    prompt: QuickPracticePromptView
+    prompt: PracticePromptView
     started_at: str
     trace_id: str
 
@@ -131,7 +131,7 @@ class QuickPracticeAttemptView(BaseModel):
     last_error_code: str | None = None
     submitted_at: str | None = None
     assessed_at: str | None = None
-    prompt: QuickPracticePromptView
+    prompt: PracticePromptView
     assessment: QuickPracticeAssessmentView | None = None
 
 
@@ -149,6 +149,61 @@ class StartQuickPracticeSessionCommand(BaseModel):
         return cleaned
 
 
+class StartInterviewSessionCommand(BaseModel):
+    """Interview session start payload."""
+
+    prompt_item_id: str
+    competency_context: str | None = None
+    interviewer_perspective: str | None = None
+
+    @field_validator("prompt_item_id")
+    @classmethod
+    def _require_prompt_item_id(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("prompt_item_id must not be blank")
+        return cleaned
+
+    @field_validator("competency_context", "interviewer_perspective")
+    @classmethod
+    def _normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class ScenarioArtifactInput(BaseModel):
+    """Scenario artifact provided at runtime."""
+
+    artifact_type: str
+    title: str
+    body: str
+
+    @field_validator("artifact_type", "title", "body")
+    @classmethod
+    def _require_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("artifact fields must not be blank")
+        return cleaned
+
+
+class StartScenarioSessionCommand(BaseModel):
+    """Scenario session start payload."""
+
+    scenario_id: str
+    artifacts: list[ScenarioArtifactInput] = Field(default_factory=list)
+
+    @field_validator("scenario_id")
+    @classmethod
+    def _require_scenario_id(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("scenario_id must not be blank")
+        return cleaned
+
+
 class SubmitAttemptCommand(BaseModel):
     """Attempt submission payload."""
 
@@ -163,4 +218,7 @@ class SubmitAttemptCommand(BaseModel):
         return cleaned
 
 
+PracticeSessionView = QuickPracticeSessionView
+PracticeAssessmentView = QuickPracticeAssessmentView
+PracticeAttemptView = QuickPracticeAttemptView
 AttemptView = QuickPracticeAttemptView

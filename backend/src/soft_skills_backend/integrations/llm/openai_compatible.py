@@ -28,6 +28,7 @@ class ResolvedLLMProviderConfig:
     base_url: str
     api_key: str | None
     model_slug: str
+    backup_model_slug: str | None = None
 
 
 class OpenAICompatibleLLMProvider(LLMProvider):
@@ -66,12 +67,6 @@ class OpenAICompatibleLLMProvider(LLMProvider):
     ) -> ProviderCompletion:
         self.assert_configured()
 
-        payload = {
-            "model": self._resolved.model_slug,
-            "messages": messages,
-            "temperature": 0,
-            "response_format": {"type": "json_object"},
-        }
         url = f"{self._resolved.base_url.rstrip('/')}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self._resolved.api_key}",
@@ -79,10 +74,17 @@ class OpenAICompatibleLLMProvider(LLMProvider):
         }
 
         for attempt in range(self._settings.provider_max_retries + 1):
+            active_model_slug = self._model_slug_for_attempt(attempt)
+            payload = {
+                "model": active_model_slug,
+                "messages": messages,
+                "temperature": 0,
+                "response_format": {"type": "json_object"},
+            }
             call_id = await self._provider_call_logger.log_call_start(
                 operation=call_context.operation,
                 provider=self._resolved.provider_name,
-                model_id=self._resolved.model_slug,
+                model_id=active_model_slug,
                 pipeline_run_id=call_context.pipeline_run_id,
                 request_id=call_context.request_id,
                 trace_id=call_context.trace_id,
@@ -105,7 +107,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                         error=error_message,
                         operation=call_context.operation,
                         provider=self._resolved.provider_name,
-                        model_id=self._resolved.model_slug,
+                        model_id=active_model_slug,
                         pipeline_run_id=call_context.pipeline_run_id,
                         request_id=call_context.request_id,
                         trace_id=call_context.trace_id,
@@ -136,7 +138,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     latency_ms=latency_ms,
                     operation=call_context.operation,
                     provider=self._resolved.provider_name,
-                    model_id=self._resolved.model_slug,
+                    model_id=active_model_slug,
                     pipeline_run_id=call_context.pipeline_run_id,
                     request_id=call_context.request_id,
                     trace_id=call_context.trace_id,
@@ -146,7 +148,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                 )
                 return ProviderCompletion(
                     content=_extract_message_content(response_payload),
-                    model_slug=str(response_payload.get("model", self._resolved.model_slug)),
+                    model_slug=str(response_payload.get("model", active_model_slug)),
                     usage=usage,
                     raw_response=response_payload,
                 )
@@ -162,7 +164,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     error=timeout_error,
                     operation=call_context.operation,
                     provider=self._resolved.provider_name,
-                    model_id=self._resolved.model_slug,
+                    model_id=active_model_slug,
                     pipeline_run_id=call_context.pipeline_run_id,
                     request_id=call_context.request_id,
                     trace_id=call_context.trace_id,
@@ -190,7 +192,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     error=str(exc),
                     operation=call_context.operation,
                     provider=self._resolved.provider_name,
-                    model_id=self._resolved.model_slug,
+                    model_id=active_model_slug,
                     pipeline_run_id=call_context.pipeline_run_id,
                     request_id=call_context.request_id,
                     trace_id=call_context.trace_id,
@@ -211,6 +213,11 @@ class OpenAICompatibleLLMProvider(LLMProvider):
             code="SS-PROVIDER-006",
         )
 
+    def _model_slug_for_attempt(self, attempt: int) -> str:
+        if self._resolved.backup_model_slug and attempt >= 2:
+            return self._resolved.backup_model_slug
+        return self._resolved.model_slug
+
 
 def resolve_llm_provider_config(settings: Settings) -> ResolvedLLMProviderConfig:
     """Resolve provider details, including OpenRouter environment aliases."""
@@ -222,6 +229,7 @@ def resolve_llm_provider_config(settings: Settings) -> ResolvedLLMProviderConfig
 
     if settings.llm_marking_model:
         model_slug = settings.llm_marking_model
+    backup_model_slug = settings.llm_marking_model_backup
 
     if api_key is None and settings.openrouter_api_key:
         api_key = settings.openrouter_api_key
@@ -237,6 +245,7 @@ def resolve_llm_provider_config(settings: Settings) -> ResolvedLLMProviderConfig
         base_url=base_url,
         api_key=api_key,
         model_slug=model_slug,
+        backup_model_slug=backup_model_slug,
     )
 
 

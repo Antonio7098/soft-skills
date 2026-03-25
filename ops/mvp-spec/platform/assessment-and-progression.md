@@ -116,17 +116,27 @@ Recommendations must not optimize for novelty alone.
 - If model metadata or prompt version is missing, reject the artifact.
 - If rubric and content mapping is invalid, fail before model execution where possible.
 
-## Quick Practice V1 Runtime Contract
+## Shared Text Practice Runtime Contract
 
-The Sprint 3 quick-practice vertical slice establishes the minimum runtime
-contract for text-first assessment-backed practice.
+The Sprint 3 and Sprint 4 runtime establishes one shared contract for
+text-first assessment-backed practice across:
+
+- quick practice
+- interview prompts
+- scenario steps
 
 - Session start persists a practice session plus an initial attempt in
-  `prompt_delivered` state.
+  `prompt_delivered` state for every supported text practice mode.
 - Attempt submission transitions through:
   `prompt_delivered -> submitted -> assessing -> assessed`
   or terminal failure states:
   `assessment_rejected` / `assessment_failed`
+- The persisted prompt snapshot may include:
+  - shared prompt metadata such as `practice_type`, `prompt_type`,
+    `delivery_version`, `rubric_id`, and `rubric_version`
+  - interview-specific context such as competency focus or interviewer framing
+  - scenario-specific context such as business context, stakeholder actors,
+    tensions, and runtime artifacts
 - Validated assessment artifacts persist:
   - `prompt_version`
   - `rubric_version`
@@ -138,6 +148,8 @@ contract for text-first assessment-backed practice.
   - `pipeline_run_id`
 - Rejected structured outputs must be persisted separately from validated
   learner-facing artifacts so replay and diagnosis remain possible.
+- Observability events must include enough context to distinguish the practice
+  mode without forking the event taxonomy.
 
 ## MVP Boundaries
 
