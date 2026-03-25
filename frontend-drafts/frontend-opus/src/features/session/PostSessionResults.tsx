@@ -15,6 +15,7 @@ import {
   Clock,
   CheckCircle2,
   Sparkles,
+  SkipForward,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ScoreRing } from '@/design-system/patterns/ScoreRing';
@@ -30,6 +31,8 @@ interface PostSessionResultsProps {
   readonly attempt: AttemptView;
   readonly elapsedSeconds?: number;
   readonly onRetry?: () => void;
+  readonly onContinue?: () => void;
+  readonly continueLabel?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -373,7 +376,7 @@ function ResponseCard({ responseText }: { responseText: string }) {
   );
 }
 
-function ActionBar({ onRetry }: { onRetry?: () => void }) {
+function ActionBar({ onRetry, onContinue, continueLabel }: { onRetry?: () => void; onContinue?: () => void; continueLabel?: string }) {
   const navigate = useNavigate();
 
   return (
@@ -381,6 +384,11 @@ function ActionBar({ onRetry }: { onRetry?: () => void }) {
       {onRetry && (
         <Button variant="secondary" icon={<RotateCcw className="w-4 h-4" />} onClick={onRetry}>
           Try Again
+        </Button>
+      )}
+      {onContinue && (
+        <Button variant="secondary" icon={<SkipForward className="w-4 h-4" />} onClick={onContinue}>
+          {continueLabel ?? 'Next Question'}
         </Button>
       )}
       <Button
@@ -406,7 +414,7 @@ function ActionBar({ onRetry }: { onRetry?: () => void }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function PostSessionResults({ attempt, elapsedSeconds, onRetry }: PostSessionResultsProps) {
+export function PostSessionResults({ attempt, elapsedSeconds, onRetry, onContinue, continueLabel }: PostSessionResultsProps) {
   const data = useData();
   const [competencies, setCompetencies] = useState<CompetencyView[]>([]);
 
@@ -453,7 +461,7 @@ export function PostSessionResults({ attempt, elapsedSeconds, onRetry }: PostSes
 
       {attempt.response_text && <ResponseCard responseText={attempt.response_text} />}
 
-      <ActionBar onRetry={onRetry} />
+      <ActionBar onRetry={onRetry} onContinue={onContinue} continueLabel={continueLabel} />
     </motion.div>
   );
 }
