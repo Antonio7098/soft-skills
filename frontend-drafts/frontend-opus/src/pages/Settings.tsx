@@ -14,7 +14,7 @@ export function Settings() {
             <h3 className="font-display text-display-xs text-content-primary">Appearance</h3>
             <p className="text-body-sm text-content-secondary">Customize the look and feel of the application.</p>
           </div>
-          
+
           <div className="p-4 rounded-xl bg-surface-secondary/50 border border-line">
             <ThemeSwitcher />
           </div>

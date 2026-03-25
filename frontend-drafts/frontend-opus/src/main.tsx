@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { DataProviderProvider } from './data';
 import { MainLayout } from './components/layout/MainLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Practice } from './pages/Practice';
@@ -29,7 +30,9 @@ if (root) {
   createRoot(root).render(
     <StrictMode>
       <ThemeProvider>
-        <RouterProvider router={router} />
+        <DataProviderProvider>
+          <RouterProvider router={router} />
+        </DataProviderProvider>
       </ThemeProvider>
     </StrictMode>,
   );
