@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { BookOpen, Clock, Star, Users } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
 import { Badge } from '@/design-system/primitives/Badge';
@@ -11,6 +12,8 @@ interface CollectionFeaturedCardProps {
 }
 
 export function CollectionFeaturedCard({ collection }: CollectionFeaturedCardProps) {
+  const navigate = useNavigate();
+
   return (
     <Card variant="elevated" className="overflow-hidden">
       <div className="flex flex-col lg:flex-row gap-6">
@@ -67,7 +70,7 @@ export function CollectionFeaturedCard({ collection }: CollectionFeaturedCardPro
                 </Badge>
               </div>
             </div>
-            <Button>Start Collection</Button>
+            <Button onClick={() => navigate(`/collections/${collection.id}`)}>View Collection</Button>
           </div>
         </div>
       </div>

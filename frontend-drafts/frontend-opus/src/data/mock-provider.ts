@@ -15,6 +15,8 @@ import type {
   AttemptView,
   CompetencyProgressView,
   AttemptHistoryItem,
+  InterviewSessionView,
+  ScenarioSessionView,
 } from './types';
 import {
   SEED_SKILLS,
@@ -34,6 +36,8 @@ import {
 let _collections = [...SEED_COLLECTIONS];
 let _user = { ...SEED_CURRENT_USER };
 let _attempts = [...SEED_ATTEMPT_HISTORY];
+const _interviewSessions = new Map<string, InterviewSessionView>();
+const _scenarioSessions = new Map<string, ScenarioSessionView>();
 
 function delay(ms = 300): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -389,6 +393,162 @@ export const mockDataProvider: DataProvider = {
         created_at: historyItem.created_at,
       },
     };
+  },
+
+  // --- Interview -----------------------------------------------------------
+
+  async startInterviewSession(promptItemId: string): Promise<InterviewSessionView> {
+    await delay(200);
+    const item = _collections
+      .flatMap((c) => c.prompt_items)
+      .find((p) => p.id === promptItemId);
+    if (!item) throw new Error(`Prompt item ${promptItemId} not found`);
+
+    const sessionId = `sess-${uid()}`;
+    const attemptId = `att-${uid()}`;
+    _interviewSessions.set(sessionId, {
+      session_id: sessionId,
+      attempt_id: attemptId,
+      status: 'active',
+      total_turns: 3,
+      current_turn: 1,
+      current_question: item.prompt_text,
+      competency_context: `This question assesses your ${item.target_skill_slugs.map((s) => s.replace(/-/g, ' ')).join(', ')} skills.`,
+      history: [],
+      target_skill_slugs: item.target_skill_slugs,
+      difficulty: item.difficulty,
+      started_at: new Date().toISOString(),
+    });
+    return _interviewSessions.get(sessionId)!;
+  },
+
+  async submitInterviewTurn(sessionId: string, cmd: SubmitAttemptCommand): Promise<InterviewSessionView> {
+    await delay(800);
+    const session = _interviewSessions.get(sessionId);
+    if (!session) throw new Error(`Interview session ${sessionId} not found`);
+
+    const newHistory = [
+      ...session.history,
+      { turn_number: session.current_turn, question: session.current_question, response: cmd.response_text },
+    ];
+
+    const isComplete = session.current_turn >= session.total_turns;
+    const followUps = [
+      'Can you tell me more about how you handled the outcome of that situation?',
+      'What would you do differently if you faced this situation again?',
+      'How did the other stakeholders respond to your approach?',
+    ];
+
+    const updated: InterviewSessionView = {
+      ...session,
+      history: newHistory,
+      current_turn: isComplete ? session.current_turn : session.current_turn + 1,
+      current_question: isComplete ? session.current_question : followUps[session.current_turn - 1] ?? followUps[0]!,
+      competency_context: isComplete
+        ? 'Interview complete — generating your assessment.'
+        : `Follow-up ${session.current_turn} of ${session.total_turns - 1}: probing deeper into your response.`,
+      status: isComplete ? 'completed' : 'active',
+    };
+
+    _interviewSessions.set(sessionId, updated);
+
+    if (isComplete) {
+      _attempts = [
+        {
+          id: session.attempt_id,
+          session_id: sessionId,
+          title: session.current_question.slice(0, 50),
+          practice_type: 'quick_practice',
+          score: Math.floor(Math.random() * 2) + 3,
+          skill_slugs: session.target_skill_slugs,
+          created_at: new Date().toISOString(),
+          status: 'assessed',
+        },
+        ..._attempts,
+      ];
+    }
+
+    return updated;
+  },
+
+  // --- Scenario ------------------------------------------------------------
+
+  async startScenarioSession(scenarioId: string): Promise<ScenarioSessionView> {
+    await delay(200);
+    const scenario = _collections
+      .flatMap((c) => c.scenarios)
+      .find((s) => s.id === scenarioId);
+    if (!scenario) throw new Error(`Scenario ${scenarioId} not found`);
+
+    const sessionId = `sess-${uid()}`;
+    const attemptId = `att-${uid()}`;
+
+    const stepPrompts = [
+      `You've just entered the meeting room. ${scenario.mock_people[0]?.name ?? 'The stakeholder'} is visibly frustrated. How do you open the conversation?`,
+      `${scenario.mock_people[0]?.name ?? 'The stakeholder'} has raised concerns about the timeline. Present your recovery plan while addressing their specific worries.`,
+      `The meeting is wrapping up. Summarize the agreed-upon next steps and set clear expectations for the follow-up.`,
+    ];
+
+    _scenarioSessions.set(sessionId, {
+      session_id: sessionId,
+      attempt_id: attemptId,
+      status: 'active',
+      scenario,
+      total_steps: stepPrompts.length,
+      current_step: 1,
+      current_prompt_text: stepPrompts[0]!,
+      history: [],
+      started_at: new Date().toISOString(),
+    });
+
+    return _scenarioSessions.get(sessionId)!;
+  },
+
+  async submitScenarioStep(sessionId: string, cmd: SubmitAttemptCommand): Promise<ScenarioSessionView> {
+    await delay(800);
+    const session = _scenarioSessions.get(sessionId);
+    if (!session) throw new Error(`Scenario session ${sessionId} not found`);
+
+    const newHistory = [
+      ...session.history,
+      { step_number: session.current_step, prompt: session.current_prompt_text, response: cmd.response_text },
+    ];
+
+    const isComplete = session.current_step >= session.total_steps;
+
+    const stepPrompts = [
+      '',
+      `${session.scenario.mock_people[0]?.name ?? 'The stakeholder'} has raised concerns about the timeline. Present your recovery plan while addressing their specific worries.`,
+      `The meeting is wrapping up. Summarize the agreed-upon next steps and set clear expectations for the follow-up.`,
+    ];
+
+    const updated: ScenarioSessionView = {
+      ...session,
+      history: newHistory,
+      current_step: isComplete ? session.current_step : session.current_step + 1,
+      current_prompt_text: isComplete ? session.current_prompt_text : stepPrompts[session.current_step] ?? '',
+      status: isComplete ? 'completed' : 'active',
+    };
+
+    _scenarioSessions.set(sessionId, updated);
+
+    if (isComplete) {
+      _attempts = [
+        {
+          id: session.attempt_id,
+          session_id: sessionId,
+          title: session.scenario.title,
+          practice_type: 'quick_practice',
+          score: Math.floor(Math.random() * 2) + 3,
+          skill_slugs: session.scenario.target_skill_slugs,
+          created_at: new Date().toISOString(),
+          status: 'assessed',
+        },
+        ..._attempts,
+      ];
+    }
+
+    return updated;
   },
 
   // --- Progress ------------------------------------------------------------

@@ -14,6 +14,8 @@ import type {
   AttemptView,
   CompetencyProgressView,
   AttemptHistoryItem,
+  InterviewSessionView,
+  ScenarioSessionView,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -41,6 +43,14 @@ export interface DataProvider {
   startQuickPracticeSession(cmd: StartQuickPracticeSessionCommand): Promise<QuickPracticeSessionView>;
   submitAttempt(attemptId: string, cmd: SubmitAttemptCommand): Promise<AttemptView>;
   getAttempt(attemptId: string): Promise<AttemptView>;
+
+  // --- Interview -----------------------------------------------------------
+  startInterviewSession(promptItemId: string): Promise<InterviewSessionView>;
+  submitInterviewTurn(sessionId: string, cmd: SubmitAttemptCommand): Promise<InterviewSessionView>;
+
+  // --- Scenario ------------------------------------------------------------
+  startScenarioSession(scenarioId: string): Promise<ScenarioSessionView>;
+  submitScenarioStep(sessionId: string, cmd: SubmitAttemptCommand): Promise<ScenarioSessionView>;
 
   // --- Progress (derived — no backend endpoint yet) ------------------------
   getCompetencyProgress(userId: string): Promise<CompetencyProgressView[]>;
