@@ -202,7 +202,7 @@ export const SEED_COLLECTIONS: CollectionView[] = [
     target_competency_slugs: ['communication', 'stakeholder-management'],
     rubric_ids: ['quick_practice_text', 'interview_text'],
     prompt_items: [PROMPT_ITEMS[0]!, PROMPT_ITEMS[2]!, PROMPT_ITEMS[4]!],
-    scenarios: [],
+    scenarios: [SCENARIOS[0]!],
   },
   {
     id: 'col-002',
@@ -217,7 +217,7 @@ export const SEED_COLLECTIONS: CollectionView[] = [
     target_skill_slugs: ['empathy', 'negotiation', 'conflict-handling', 'expectation-setting'],
     target_competency_slugs: ['stakeholder-management', 'teamwork'],
     rubric_ids: ['quick_practice_text', 'scenario_text', 'interview_text'],
-    prompt_items: [PROMPT_ITEMS[1]!],
+    prompt_items: [PROMPT_ITEMS[1]!, PROMPT_ITEMS[4]!, PROMPT_ITEMS[5]!],
     scenarios: [SCENARIOS[0]!],
   },
   {
@@ -233,7 +233,7 @@ export const SEED_COLLECTIONS: CollectionView[] = [
     target_skill_slugs: ['prioritization-under-pressure', 'decision-justification', 'structured-communication', 'concise-explanation'],
     target_competency_slugs: ['prioritization', 'problem-solving', 'adaptability'],
     rubric_ids: ['quick_practice_text', 'scenario_text'],
-    prompt_items: [PROMPT_ITEMS[3]!],
+    prompt_items: [PROMPT_ITEMS[3]!, PROMPT_ITEMS[5]!],
     scenarios: [SCENARIOS[1]!],
   },
   {

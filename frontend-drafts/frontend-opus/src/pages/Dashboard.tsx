@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Award, Clock, Star, Target } from 'lucide-react';
 import { PageShell } from '@/design-system/patterns/PageShell';
 import { StatCard } from '@/design-system/patterns/StatCard';
@@ -12,6 +13,7 @@ import { useData } from '@/data';
 import type { AttemptHistoryItem, CompetencyProgressView } from '@/data';
 
 export function Dashboard() {
+  const navigate = useNavigate();
   const data = useData();
   const [user, setUser] = useState<{ display_name: string } | null>(null);
   const [history, setHistory] = useState<AttemptHistoryItem[]>([]);
@@ -47,7 +49,7 @@ export function Dashboard() {
       title={`Welcome back, ${user?.display_name ?? 'Learner'}`}
       subtitle={`You've completed ${history.length} attempts. Keep building your skills.`}
       actions={
-        <Button variant="primary" icon={<Target className="w-4 h-4" />}>
+        <Button variant="primary" icon={<Target className="w-4 h-4" />} onClick={() => navigate('/practice')}>
           Start Practice
         </Button>
       }
@@ -80,7 +82,7 @@ export function Dashboard() {
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h3 className="font-display text-display-xs text-content-primary">Recent Activity</h3>
-              <Button variant="ghost" size="sm">View all</Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/history')}>View all</Button>
             </div>
             <div className="flex flex-col gap-3">
               {recentActivity.map((activity, i) => (
@@ -110,7 +112,7 @@ export function Dashboard() {
                     ))}
                   </div>
                 </div>
-                <Button variant="secondary" className="w-full mt-2">Practice Skills</Button>
+                <Button variant="secondary" className="w-full mt-2" onClick={() => navigate('/practice')}>Practice Skills</Button>
               </Card>
             </section>
           )}

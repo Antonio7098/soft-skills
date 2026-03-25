@@ -6,6 +6,8 @@ import type {
   CollectionListFilters,
   QuickPracticeSessionView,
   AttemptView,
+  InterviewSessionView,
+  ScenarioSessionView,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -65,6 +67,18 @@ export const apiDataProvider: DataProvider = {
   submitAttempt: (attemptId, cmd) =>
     request<AttemptView>(`/attempts/${attemptId}/submit`, { method: 'POST', body: JSON.stringify(cmd) }),
   getAttempt: (attemptId) => request<AttemptView>(`/attempts/${attemptId}`),
+
+  // --- Interview -----------------------------------------------------------
+  startInterviewSession: (promptItemId) =>
+    request<InterviewSessionView>('/attempts/interview/sessions', { method: 'POST', body: JSON.stringify({ prompt_item_id: promptItemId }) }),
+  submitInterviewTurn: (sessionId, cmd) =>
+    request<InterviewSessionView>(`/attempts/interview/sessions/${sessionId}/turns`, { method: 'POST', body: JSON.stringify(cmd) }),
+
+  // --- Scenario ------------------------------------------------------------
+  startScenarioSession: (scenarioId) =>
+    request<ScenarioSessionView>('/attempts/scenario/sessions', { method: 'POST', body: JSON.stringify({ scenario_id: scenarioId }) }),
+  submitScenarioStep: (sessionId, cmd) =>
+    request<ScenarioSessionView>(`/attempts/scenario/sessions/${sessionId}/steps`, { method: 'POST', body: JSON.stringify(cmd) }),
 
   // --- Progress (no backend endpoint yet — stub) ---------------------------
   getCompetencyProgress: async () => {

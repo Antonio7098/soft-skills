@@ -285,6 +285,46 @@ export interface SubmitAttemptCommand {
   readonly response_text: string;
 }
 
+// --- Interview & Scenario sessions ----------------------------------------
+
+export interface InterviewTurn {
+  readonly turn_number: number;
+  readonly question: string;
+  readonly response: string;
+}
+
+export interface InterviewSessionView {
+  readonly session_id: string;
+  readonly attempt_id: string;
+  readonly status: SessionStatus;
+  readonly total_turns: number;
+  readonly current_turn: number;
+  readonly current_question: string;
+  readonly competency_context: string;
+  readonly history: InterviewTurn[];
+  readonly target_skill_slugs: string[];
+  readonly difficulty: Difficulty;
+  readonly started_at: string;
+}
+
+export interface ScenarioStepEntry {
+  readonly step_number: number;
+  readonly prompt: string;
+  readonly response: string;
+}
+
+export interface ScenarioSessionView {
+  readonly session_id: string;
+  readonly attempt_id: string;
+  readonly status: SessionStatus;
+  readonly scenario: ScenarioView;
+  readonly total_steps: number;
+  readonly current_step: number;
+  readonly current_prompt_text: string;
+  readonly history: ScenarioStepEntry[];
+  readonly started_at: string;
+}
+
 // --- Derived view types (not in backend, useful for frontend) -------------
 
 export interface CompetencyProgressView {

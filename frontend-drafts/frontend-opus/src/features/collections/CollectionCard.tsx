@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { BookOpen, Clock, Star } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
 import { Badge } from '@/design-system/primitives/Badge';
@@ -11,8 +12,10 @@ interface CollectionCardProps {
 }
 
 export function CollectionCard({ collection }: CollectionCardProps) {
+  const navigate = useNavigate();
+
   return (
-    <Card interactive className="flex flex-col gap-4">
+    <Card interactive className="flex flex-col gap-4" onClick={() => navigate(`/collections/${collection.id}`)}>
       <div className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
           <h4 className="font-display text-display-sm text-content-primary line-clamp-2">
@@ -58,7 +61,7 @@ export function CollectionCard({ collection }: CollectionCardProps) {
               {collection.difficulty}
             </Badge>
           </div>
-          <Button variant="secondary" size="sm">Start</Button>
+          <Button variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/collections/${collection.id}`); }}>View</Button>
         </div>
       </div>
     </Card>
