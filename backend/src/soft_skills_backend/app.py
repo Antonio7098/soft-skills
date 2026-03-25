@@ -8,12 +8,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from soft_skills_backend.api.error_handlers import register_error_handlers
-from soft_skills_backend.api.router import api_router
-from soft_skills_backend.application.container import AppContainer, build_container
 from soft_skills_backend.config import Settings, get_settings
-from soft_skills_backend.observability.logging import configure_logging, get_logger
-from soft_skills_backend.observability.middleware import RequestContextMiddleware
+from soft_skills_backend.entrypoints.http.error_handlers import register_error_handlers
+from soft_skills_backend.entrypoints.http.router import api_router
+from soft_skills_backend.platform.container import AppContainer, build_container
+from soft_skills_backend.platform.observability.logging import configure_logging, get_logger
+from soft_skills_backend.platform.observability.middleware import RequestContextMiddleware
 
 
 def create_app(settings: Settings | None = None, container: AppContainer | None = None) -> FastAPI:

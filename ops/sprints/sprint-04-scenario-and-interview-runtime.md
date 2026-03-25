@@ -28,39 +28,39 @@
 
 ## Scope Checklist
 
-- [ ] Task 1: Extend runtime APIs and domain models for scenario practice and text interview sessions; keep them on the same Stageflow pipeline shape as quick practice
-- [ ] Task 2: Support richer prompt payloads, scenario context, stakeholder data, and artifacts; use composition for shared guard and enrichment components
-- [ ] Task 3: Reuse and extend the marking pipeline for all MVP text practice modes; keep typed outputs, prompt versions, and provider telemetry identical across modes
-- [ ] Task 4: Expand traces, events, and persistence so richer flows remain replayable and debuggable; use wide events on critical runs
-- [ ] Task 5: Documentation updates for all changed behavior and contracts
+- [x] Task 1: Extend runtime APIs and domain models for scenario practice and text interview sessions; keep them on the same Stageflow pipeline shape as quick practice
+- [x] Task 2: Support richer prompt payloads, scenario context, stakeholder data, and artifacts; use composition for shared guard and enrichment components
+- [x] Task 3: Reuse and extend the marking pipeline for all MVP text practice modes; keep typed outputs, prompt versions, and provider telemetry identical across modes
+- [x] Task 4: Expand traces, events, and persistence so richer flows remain replayable and debuggable; use wide events on critical runs
+- [x] Task 5: Documentation updates for all changed behavior and contracts
 
 ## Constitution And Quality Checklist
 
-- [ ] Competency growth remains the product outcome, not activity theater
-- [ ] All new external boundaries are typed and schema-validated
-- [ ] Fail-fast and fail-loud behavior is preserved with stable error codes
-- [ ] Route handlers remain thin; business rules stay out of transport layers
-- [ ] Dependency injection and adapter boundaries remain explicit
-- [ ] Critical workflow artifacts are durably persisted where required
-- [ ] Traces, logs, and events cover all changed workflow steps
-- [ ] Prompt, rubric, model, and config versions are preserved where applicable
-- [ ] Assessment and progression behavior remains explainable
-- [ ] No silent fallback is introduced in scoring, progression, generation, or recommendation paths
+- [x] Competency growth remains the product outcome, not activity theater
+- [x] All new external boundaries are typed and schema-validated
+- [x] Fail-fast and fail-loud behavior is preserved with stable error codes
+- [x] Route handlers remain thin; business rules stay out of transport layers
+- [x] Dependency injection and adapter boundaries remain explicit
+- [x] Critical workflow artifacts are durably persisted where required
+- [x] Traces, logs, and events cover all changed workflow steps
+- [x] Prompt, rubric, model, and config versions are preserved where applicable
+- [x] Assessment and progression behavior remains explainable
+- [x] No silent fallback is introduced in scoring, progression, generation, or recommendation paths
 
 ## Testing And Documentation Checklist
 
-- [ ] Unit Tests: richer prompt payload validation, scenario coherence rules, and mode-specific orchestration guards
-- [ ] Integration Tests: scenario and interview session flows, persistence, assessment reuse, and trace/event coverage
-- [ ] Smoke Tests With Real Provider: run backend smokes for scenario and interview assessments against the real provider
-- [ ] Failure Path Coverage: invalid scenario mappings, bad artifacts, provider failures, and partial workflow failures tested
-- [ ] Documentation Updates: update canonical docs in `ops/`, the roadmap/sprint docs, and any affected contracts
+- [x] Unit Tests: richer prompt payload validation, scenario coherence rules, and mode-specific orchestration guards
+- [x] Integration Tests: scenario and interview session flows, persistence, assessment reuse, and trace/event coverage
+- [x] Smoke Tests With Real Provider: run backend smokes for scenario and interview assessments against the real provider
+- [x] Failure Path Coverage: invalid scenario mappings, bad artifacts, provider failures, and partial workflow failures tested
+- [x] Documentation Updates: update canonical docs in `ops/`, the roadmap/sprint docs, and any affected contracts
 
 ## Success Criteria
 
-- [ ] Scenario and text interview flows run through the same trusted assessment path as quick practice
-- [ ] Richer context payloads remain validated, versioned, persisted, and traceable
-- [ ] Expanded real-provider smokes pass for all MVP text practice modes
-- [ ] Regression coverage grows with the runtime surface instead of trailing behind it
+- [x] Scenario and text interview flows run through the same trusted assessment path as quick practice
+- [x] Richer context payloads remain validated, versioned, persisted, and traceable
+- [x] Expanded real-provider smokes pass for all MVP text practice modes
+- [x] Regression coverage grows with the runtime surface instead of trailing behind it
 
 Minimum Viable Sprint:
 Scenario and interview runtime exists and shares the same core assessment guarantees, even if dashboards and recommendations are not yet implemented.
@@ -69,31 +69,40 @@ Scenario and interview runtime exists and shares the same core assessment guaran
 
 | Risk | Impact | Mitigation | Status |
 | --- | --- | --- | --- |
-| New practice modes fork the assessment contracts | High | Force contract reuse and mode adapters rather than separate pipelines | Open |
-| Rich scenario content becomes inconsistent or under-validated | High | Validate mappings, actors, artifacts, and rubric links at the boundary | Open |
+| New practice modes fork the assessment contracts | High | Force contract reuse and mode adapters rather than separate pipelines | Mitigated |
+| Rich scenario content becomes inconsistent or under-validated | High | Validate mappings, actors, artifacts, and rubric links at the boundary | Mitigated |
+| Practice runtime drifts away from the real Stageflow runtime | Medium | Run the text practice DAGs directly through `Pipeline.run(...)`, enable wide events, and verify with the real-provider smoke harness | Mitigated |
 
 ## Sprint Notes
 
 Key decisions, tradeoffs, and implementation notes:
 
 ```text
-[Notes go here]
+- Widened the persisted prompt snapshot into a shared typed practice prompt that carries practice type, prompt type, rubric metadata, and optional interview/scenario context.
+- Kept one submit/assessment path for all text practice modes instead of forking route handlers or marker contracts.
+- Scenario runtime currently accepts typed artifacts at session start and persists them with the prompt snapshot for replay.
+- Removed the custom quick-practice executor and now run all text-practice orchestration directly through the Stageflow `Pipeline` API with Stageflow interceptors, wide events, and persisted pipeline runs.
+- Ran the backend real-provider smoke successfully on 2026-03-25 against `openrouter` with returned model slug `openai/gpt-oss-20b:free`.
+- Real-provider smoke now covers all MVP text practice modes in one run:
+  - quick practice overall score: `4`
+  - interview overall score: `3`
+  - scenario overall score: `3`
 ```
 
 ## Review And Sign-Off
 
-- Sprint Status: Not Started
-- Completion Date: [Date]
+- Sprint Status: Completed
+- Completion Date: 2026-03-25
 
 Checklist:
 
-- [ ] Primary goal achieved
-- [ ] Constitution and quality checks passed
-- [ ] Unit tests completed
-- [ ] Integration tests completed
-- [ ] Smoke tests with real provider completed
-- [ ] Documentation updated
-- [ ] Code review completed
+- [x] Primary goal achieved
+- [x] Constitution and quality checks passed
+- [x] Unit tests completed
+- [x] Integration tests completed
+- [x] Smoke tests with real provider completed
+- [x] Documentation updated
+- [x] Code review completed
 
 Next Sprint Priorities:
 

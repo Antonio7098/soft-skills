@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import httpx
@@ -15,7 +16,6 @@ def test_settings(tmp_path: Path) -> Settings:
     return Settings(
         environment="test",
         database_url=f"sqlite+pysqlite:///{tmp_path / 'test.db'}",
-        stageflow_required=False,
     )
 
 
@@ -25,7 +25,7 @@ def app(test_settings: Settings):
 
 
 @pytest_asyncio.fixture()
-async def client(app) -> httpx.AsyncClient:
+async def client(app) -> AsyncGenerator[httpx.AsyncClient, None]:
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as async_client:
         yield async_client

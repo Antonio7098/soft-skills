@@ -47,6 +47,15 @@ Every scenario should define:
 
 Scenario realism matters more than narrative complexity.
 
+## Runtime Delivery Rules
+
+- Interview prompts and scenario steps should be deliverable through the same
+  typed runtime contract as quick practice.
+- Scenario runtime payloads may include validated artifacts such as emails,
+  notes, or reports when the practice turn depends on them.
+- Runtime-added artifacts must be persisted with the delivered prompt snapshot
+  so assessment replay keeps the exact learner context.
+
 ## Authoring Flows
 
 The MVP supports three authoring flows:

@@ -6,7 +6,11 @@ import pytest
 from alembic.config import Config
 
 from alembic import command
-from soft_skills_backend.persistence.models import WorkflowEventRecord
+from soft_skills_backend.platform.db.models import (
+    CollectionRecord,
+    PipelineRunRecord,
+    WorkflowEventRecord,
+)
 
 
 def _migrate(test_settings) -> None:
@@ -146,9 +150,14 @@ async def test_identity_bootstrap_and_private_draft_authoring(app, client, test_
     assert len(list_response.json()["data"]) == 1
 
     with app.state.container.session_factory() as session:
-        event_types = {
-            record.event_type for record in session.query(WorkflowEventRecord).all()
+        pipeline_run_names = {
+            record.pipeline_name for record in session.query(PipelineRunRecord).all()
         }
+        event_types = {record.event_type for record in session.query(WorkflowEventRecord).all()}
+    assert "catalog_collection_create" in pipeline_run_names
+    assert "catalog_prompt_item_create" in pipeline_run_names
+    assert "catalog_scenario_create" in pipeline_run_names
+    assert "catalog_collection_lifecycle_update" in pipeline_run_names
     assert "identity.user_registered.v1" in event_types
     assert "taxonomy.catalog_seeded.v1" in event_types
     assert "catalog.collection.created.v1" in event_types
@@ -159,7 +168,9 @@ async def test_identity_bootstrap_and_private_draft_authoring(app, client, test_
 @pytest.mark.asyncio
 async def test_catalog_rejects_invalid_mappings_and_requires_auth(client, test_settings) -> None:
     _migrate(test_settings)
-    admin = await _register_user(client, email="admin2@example.com", display_name="Admin", role="admin")
+    admin = await _register_user(
+        client, email="admin2@example.com", display_name="Admin", role="admin"
+    )
     await client.post("/api/skills/bootstrap-canon", headers={"X-User-ID": admin["id"]})
     learner = await _register_user(client, email="learner2@example.com", display_name="Learner")
 
@@ -194,3 +205,54 @@ async def test_catalog_rejects_invalid_mappings_and_requires_auth(client, test_s
     )
     assert invalid_mapping_response.status_code == 422
     assert invalid_mapping_response.json()["error"]["code"] == "SS-VALIDATION-016"
+
+
+@pytest.mark.asyncio
+async def test_catalog_create_collection_is_idempotent_per_request_id(
+    app, client, test_settings
+) -> None:
+    _migrate(test_settings)
+    admin = await _register_user(
+        client, email="admin3@example.com", display_name="Admin", role="admin"
+    )
+    await client.post("/api/skills/bootstrap-canon", headers={"X-User-ID": admin["id"]})
+    learner = await _register_user(client, email="learner3@example.com", display_name="Learner")
+
+    headers = {
+        "X-User-ID": learner["id"],
+        "X-Request-ID": "catalog-create-fixed-request",
+    }
+    payload = {
+        "title": "Idempotent Collection",
+        "summary": "Should only persist once",
+        "target_audience": "Anyone",
+        "difficulty": "intermediate",
+        "content_format_mix": ["quick_practice_prompt"],
+        "target_skill_slugs": ["active-listening"],
+        "target_competency_slugs": ["stakeholder-management"],
+        "rubric_ids": ["quick_practice_text@v1"],
+    }
+
+    first_response = await client.post("/api/collections", headers=headers, json=payload)
+    second_response = await client.post("/api/collections", headers=headers, json=payload)
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert first_response.json()["data"]["id"] == second_response.json()["data"]["id"]
+
+    with app.state.container.session_factory() as session:
+        pipeline_runs = (
+            session.query(PipelineRunRecord)
+            .filter(PipelineRunRecord.pipeline_name == "catalog_collection_create")
+            .count()
+        )
+        collection_events = (
+            session.query(WorkflowEventRecord)
+            .filter(WorkflowEventRecord.event_type == "catalog.collection.created.v1")
+            .count()
+        )
+        collections = session.query(CollectionRecord).all()
+
+    assert pipeline_runs == 2
+    assert collection_events == 1
+    assert len(collections) == 1

@@ -5,8 +5,8 @@ import asyncio
 import pytest
 
 from soft_skills_backend.config import Settings
-from soft_skills_backend.domain.errors import AppError
-from soft_skills_backend.integrations.llm.openai_compatible import resolve_llm_provider_config
+from soft_skills_backend.shared.errors import AppError
+from soft_skills_backend.platform.providers.llm.openai_compatible import resolve_llm_provider_config
 from soft_skills_backend.smoke import provider_baseline
 from soft_skills_backend.smoke.provider_baseline import run_provider_smoke
 
@@ -32,7 +32,9 @@ def test_provider_smoke_accepts_openrouter_api_key() -> None:
     assert resolved.model_slug == "openrouter/test-model"
 
 
-def test_provider_smoke_fails_fast_when_flow_exceeds_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_provider_smoke_fails_fast_when_flow_exceeds_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class _ConfiguredProvider:
         def assert_configured(self) -> None:
             return None
@@ -41,11 +43,40 @@ def test_provider_smoke_fails_fast_when_flow_exceeds_budget(monkeypatch: pytest.
         await asyncio.sleep(60)
         return object()
 
-    monkeypatch.setattr(provider_baseline, "_build_smoke_provider", lambda _settings: _ConfiguredProvider())
-    monkeypatch.setattr(provider_baseline, "_run_quick_practice_smoke", _never_finishes)
+    monkeypatch.setattr(
+        provider_baseline, "_build_smoke_provider", lambda _settings: _ConfiguredProvider()
+    )
+    monkeypatch.setattr(provider_baseline, "_run_text_practice_smoke", _never_finishes)
     monkeypatch.setattr(provider_baseline, "SMOKE_FLOW_TIMEOUT_SECONDS", 0.01)
 
     with pytest.raises(AppError) as exc_info:
         run_provider_smoke(Settings(_env_file=None))
 
     assert exc_info.value.code == "SS-PROVIDER-012"
+
+
+def test_provider_smoke_result_supports_multiple_modes() -> None:
+    result = provider_baseline.ProviderSmokeResult(
+        status="ok",
+        results=[
+            provider_baseline.PracticeModeSmokeResult(
+                practice_type="quick_practice",
+                provider="openrouter",
+                model_slug="test-model",
+                assessment_id="assessment-1",
+                attempt_id="attempt-1",
+                overall_score=4,
+            ),
+            provider_baseline.PracticeModeSmokeResult(
+                practice_type="interview",
+                provider="openrouter",
+                model_slug="test-model",
+                assessment_id="assessment-2",
+                attempt_id="attempt-2",
+                overall_score=4,
+            ),
+        ],
+    )
+
+    assert result.status == "ok"
+    assert [item.practice_type for item in result.results] == ["quick_practice", "interview"]

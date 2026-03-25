@@ -15,6 +15,7 @@ class Settings(BaseSettings):
         env_prefix="SOFT_SKILLS_",
         env_file=".env",
         extra="ignore",
+        populate_by_name=True,
     )
 
     app_name: str = "SoftSkills Backend"
@@ -24,7 +25,6 @@ class Settings(BaseSettings):
     cors_allowed_origins: tuple[str, ...] = ("*",)
     database_url: str = "sqlite+pysqlite:///./softskills.db"
     log_level: str = "INFO"
-    stageflow_required: bool = False
     stageflow_event_queue_size: int = Field(default=1000, ge=1)
     provider_name: str = "openai"
     provider_base_url: str = "https://api.openai.com/v1"
@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     llm_marking_model: str | None = Field(
         default=None,
         validation_alias="LLM_MARKING_MODEL",
+    )
+    llm_marking_model_backup: str | None = Field(
+        default=None,
+        validation_alias="LLM_MARKING_MODEL_BACKUP",
     )
     smoke_timeout_seconds: float = Field(default=10.0, gt=0)
     provider_max_retries: int = Field(default=2, ge=0, le=5)

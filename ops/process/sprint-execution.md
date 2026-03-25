@@ -113,7 +113,41 @@ Every implementation should answer:
 - what gets logged and traced
 - how does it fail
 
-## 8. Add Observability As Part Of The Work
+## 8. Enforce Organisational Hygiene While Coding
+
+Operational discipline is part of implementation, not cleanup.
+
+- Keep top-level responsibilities clear:
+  - `entrypoints/http`: FastAPI routes, schemas, dependencies, error handling
+  - `platform`: runtime/framework concerns such as container, DB,
+    observability, providers, and Stageflow integration
+  - `modules`: business features
+  - `shared`: cross-cutting types, errors, and ports
+- Inside each non-trivial feature, organise by layer:
+  - `contracts`: commands, views, boundary DTOs
+  - `domain`: pure business rules and policies
+  - `use_cases`: service facades
+  - `workflows`: Stageflow pipelines, stages, retry/idempotency policy
+  - `infra`: repositories, persistence, mappers, event recording
+- Keep boundaries strict:
+  - route handlers stay thin
+  - Stageflow code lives in `workflows`
+  - SQLAlchemy and persistence concerns live in `platform/db` or feature `infra`
+  - provider code stays behind `platform/providers`
+  - cross-feature helpers go in `shared` only if they are genuinely reused
+- Do not create dumping grounds such as `utils.py`, `helpers.py`, or `misc.py`
+- Keep files focused:
+  - target under 400 lines
+  - hard limit 600 lines
+  - split immediately when a file mixes contracts, orchestration, persistence,
+    and validation
+- A slice is not done unless another engineer can quickly tell:
+  - where the contract lives
+  - where the business rule lives
+  - where the pipeline lives
+  - where persistence lives
+
+## 9. Add Observability As Part Of The Work
 
 Observability is not a cleanup step.
 
@@ -127,7 +161,7 @@ For every changed workflow, add or update:
 
 If the workflow cannot be replayed or diagnosed, it is incomplete.
 
-## 9. Add Tests While The Design Is Fresh
+## 10. Add Tests While The Design Is Fresh
 
 Every sprint must include backend verification at three levels.
 
@@ -159,7 +193,7 @@ Run backend smoke flows against the real provider for the sprint scope.
 - If the sprint does not add a new provider-backed flow, the baseline smoke suite must still pass
 - Prefer backend-driven smoke coverage that exercises real end-to-end workflows rather than isolated provider pings
 
-## 10. Test Failure Paths, Not Only Happy Paths
+## 11. Test Failure Paths, Not Only Happy Paths
 
 Every sprint should explicitly test:
 
@@ -172,7 +206,7 @@ Every sprint should explicitly test:
 
 Soft failure that hides corruption or ambiguity is not acceptable in this codebase.
 
-## 11. Update The Canonical Docs During The Sprint
+## 12. Update The Canonical Docs During The Sprint
 
 Documentation updates are part of done, not post-work.
 
@@ -186,7 +220,7 @@ Update as needed:
 
 If the code changes behavior and the docs do not, the sprint is incomplete.
 
-## 12. Keep The Sprint Doc Current
+## 13. Keep The Sprint Doc Current
 
 Throughout execution, update the sprint doc with:
 
@@ -199,7 +233,7 @@ Throughout execution, update the sprint doc with:
 
 The sprint doc should be usable as historical context for future work.
 
-## 13. Run The Final Verification Pass
+## 14. Run The Final Verification Pass
 
 Before considering the sprint complete, run the full sprint verification set:
 
@@ -218,7 +252,7 @@ Also verify:
 - persisted artifacts contain required version metadata
 - no silent fallback was introduced
 
-## 14. Create The Sprint Execution Report
+## 15. Create The Sprint Execution Report
 
 Before handing off or opening a PR, create or update the sprint execution
 report in `ops/reports/` using
@@ -236,7 +270,7 @@ The report should capture:
 
 The report is part of the deliverable, not optional project hygiene.
 
-## 15. Close Out The Sprint Cleanly
+## 16. Close Out The Sprint Cleanly
 
 Before handing off or opening a PR:
 
