@@ -218,7 +218,25 @@ Also verify:
 - persisted artifacts contain required version metadata
 - no silent fallback was introduced
 
-## 14. Close Out The Sprint Cleanly
+## 14. Create The Sprint Execution Report
+
+Before handing off or opening a PR, create or update the sprint execution
+report in `ops/reports/` using
+[ops/process/sprint-ecexuton-report-template.md](/home/antonioborgerees/df/soft-skills/ops/process/sprint-ecexuton-report-template.md).
+
+The report should capture:
+
+- what was planned vs what was actually delivered
+- the real sprint outcome, not just the intended one
+- constitution conformance and where the sprint was strained
+- testing completed, including smoke coverage status
+- technical debt, architectural debt, and documentation debt introduced
+- open risks, deferred work, and recommendations for the next sprint
+- Stageflow observations if the sprint used Stageflow
+
+The report is part of the deliverable, not optional project hygiene.
+
+## 15. Close Out The Sprint Cleanly
 
 Before handing off or opening a PR:
 
@@ -231,7 +249,7 @@ Before handing off or opening a PR:
 The sprint is only complete when the implementation, tests, observability, and
 documentation all agree.
 
-## 15. Execution Checklist
+## 16. Execution Checklist
 
 Use this as the short-form procedure:
 
@@ -251,6 +269,7 @@ Use this as the short-form procedure:
 - [ ] Update canonical docs in `ops/mvp-spec/` and root `README.md`
 - [ ] If Stageflow was used, update [ops/process/stageflow-reporting.md](/home/antonioborgerees/df/soft-skills/ops/process/stageflow-reporting.md) with any bugs, DX improvements, or notable observations
 - [ ] Update the sprint doc
+- [ ] Create or update the sprint report in `ops/reports/` using [ops/process/sprint-ecexuton-report-template.md](/home/antonioborgerees/df/soft-skills/ops/process/sprint-ecexuton-report-template.md)
 - [ ] Run format, lint, typecheck, tests, and smokes
 - [ ] Verify traces, versions, and persistence artifacts
 - [ ] Review residual risks and close the sprint cleanly
