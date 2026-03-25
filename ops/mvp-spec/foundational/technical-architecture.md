@@ -162,3 +162,19 @@ No MVP slice is complete unless it includes:
 - trace emission
 - tests for the main path and failure path
 - corresponding documentation updates
+
+## Backend Definition Of Done
+
+Every backend sprint slice must satisfy the following before it is marked done:
+
+- the user or system outcome is explicit and mapped to the core competency loop
+- API, persistence, orchestration, and provider contracts are typed and schema-validated
+- route handlers remain thin and domain rules live in application or domain services
+- persistence stores all artifacts required for replay, audit, and progression semantics
+- structured logs, structured events, and traces include required correlation identifiers
+- prompt, rubric, config, model, provider, and contract versions are stored where they affect meaning
+- stable machine-readable error codes exist for new failure modes
+- unit tests cover invariants and validation rules
+- integration tests cover contract, persistence, orchestration, and observability behavior
+- real-provider smoke tests pass for every provider-backed flow in scope, or the established baseline smoke suite passes unchanged when provider-backed behavior is untouched
+- canonical docs and the active sprint doc are updated in the same change

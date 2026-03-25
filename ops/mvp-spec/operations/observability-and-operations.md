@@ -55,6 +55,21 @@ The MVP should emit structured events for:
 
 Events must be machine-readable and queryable.
 
+### Event Naming Convention
+
+- Use dotted domain-action versions, for example `assessment.started.v1`, `assessment.validated.v1`, `progress.updated.v1`.
+- Major semantic changes require a new event version suffix.
+- Event payloads must keep correlation fields stable across versions even when additional fields are added.
+
+### Wide Event Baseline
+
+Emit wide events for these critical backend workflows:
+
+- assessment runs
+- progression updates
+- recommendation generation
+- content generation
+
 ## Logging Rules
 
 - Use structured logging only.
@@ -76,6 +91,38 @@ The MVP must classify errors into stable categories, at minimum:
 - UI
 
 Each failure should expose a stable error code and enough context for diagnosis.
+
+### Error Code Convention
+
+Use `SS-<CATEGORY>-<NUMBER>` with stable categories, for example:
+
+- `SS-VALIDATION-001`
+- `SS-DOMAIN-001`
+- `SS-SCORING-001`
+- `SS-ORCHESTRATION-001`
+- `SS-PROVIDER-001`
+- `SS-PERSISTENCE-001`
+- `SS-AUTH-001`
+- `SS-UI-001`
+
+Numbers must be stable once assigned. Rewording a message does not justify
+changing the code.
+
+## Versioning Rules
+
+The following artifacts require explicit persisted versions wherever they
+affect system meaning:
+
+- prompt contracts
+- rubric definitions
+- engine and scoring configs
+- API contract versions when introduced
+- event versions
+- typed-output schema versions
+- error code taxonomy revisions when categories expand
+
+Use semantic major versions for contract-breaking changes. Do not silently
+reinterpret historical artifacts under a new rubric, prompt, or config version.
 
 ## LLM Artifact Rules
 
@@ -117,6 +164,7 @@ Before release, critical workflows must demonstrate:
 - passing tests
 - migration discipline for schema changes
 - documentation updates for behavioral changes
+- passing real-provider smoke coverage for provider-backed workflows
 
 ## MVP Operational Boundaries
 

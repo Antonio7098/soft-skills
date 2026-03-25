@@ -161,7 +161,7 @@ artifacts associated with a workflow execution.
 The platform-defined MVP framework should start narrow enough to calibrate
 assessment quality.
 
-### Recommended Competencies
+### Frozen MVP V1 Competencies
 
 - stakeholder management
 - communication
@@ -172,7 +172,7 @@ assessment quality.
 - adaptability
 - managing ambiguity
 
-### Recommended Skills
+### Frozen MVP V1 Skills
 
 - active listening
 - structured communication
@@ -184,6 +184,53 @@ assessment quality.
 - negotiation
 - executive summary
 - decision justification
+
+### Frozen MVP V1 Competency Mapping
+
+This mapping is the initial source of truth for Sprint 1 and Sprint 2 seed
+data. Expansion is allowed later, but changes must be explicit canon updates
+rather than ad hoc implementation drift.
+
+| Competency | Seed skills |
+| --- | --- |
+| stakeholder management | active listening, empathy, expectation setting, negotiation |
+| communication | structured communication, concise explanation, executive summary |
+| teamwork | active listening, empathy, conflict handling |
+| prioritization | prioritization under pressure, decision justification, executive summary |
+| professionalism | expectation setting, concise explanation, conflict handling |
+| problem solving | structured communication, decision justification, executive summary |
+| adaptability | active listening, prioritization under pressure, decision justification |
+| managing ambiguity | expectation setting, prioritization under pressure, negotiation |
+
+### Frozen MVP V1 Rubric Families
+
+The MVP starts with a narrow rubric set tied to the text-first practice modes.
+Rubrics are platform-defined and versioned.
+
+- `quick_practice_text`: compact single-response rubric for one prompt with one to three target skills
+- `scenario_text`: rubric for workplace scenario responses with tradeoffs, stakeholder handling, and reasoning
+- `interview_text`: rubric for interview-style answers with clarity, evidence, and follow-up readiness
+
+All rubric families must produce:
+
+- an overall score
+- skill-level scores for mapped skills
+- evidence excerpts
+- rationale tied to rubric dimensions
+- strengths
+- weaknesses
+- suggested next actions
+
+### Frozen MVP V1 Assessable Content Types
+
+Only the following content types are assessable in the initial MVP:
+
+- `quick_practice_prompt`
+- `scenario_step`
+- `interview_prompt`
+
+Non-assessable supporting artifacts may exist for context, but they must not be
+treated as independently scored attempt targets.
 
 ## Modeling Guidance
 

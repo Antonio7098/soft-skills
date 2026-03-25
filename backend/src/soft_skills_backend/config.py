@@ -1,0 +1,53 @@
+"""Application settings."""
+
+from __future__ import annotations
+
+from functools import lru_cache
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Runtime configuration."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="SOFT_SKILLS_",
+        env_file=".env",
+        extra="ignore",
+    )
+
+    app_name: str = "SoftSkills Backend"
+    app_version: str = "0.1.0"
+    environment: str = "local"
+    api_prefix: str = "/api"
+    cors_allowed_origins: tuple[str, ...] = ("*",)
+    database_url: str = "sqlite+pysqlite:///./softskills.db"
+    log_level: str = "INFO"
+    stageflow_required: bool = False
+    stageflow_event_queue_size: int = Field(default=1000, ge=1)
+    provider_name: str = "openai"
+    provider_base_url: str = "https://api.openai.com/v1"
+    provider_model_slug: str = "gpt-4.1-mini"
+    provider_api_key: str | None = None
+    smoke_timeout_seconds: float = Field(default=10.0, gt=0)
+
+    @field_validator("cors_allowed_origins", mode="before")
+    @classmethod
+    def _normalize_cors_allowed_origins(
+        cls, value: str | tuple[str, ...] | list[str]
+    ) -> tuple[str, ...]:
+        if isinstance(value, str):
+            return tuple(part.strip() for part in value.split(",") if part.strip())
+        return tuple(value)
+
+    @property
+    def is_sqlite(self) -> bool:
+        return self.database_url.startswith("sqlite")
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Return cached settings."""
+
+    return Settings()

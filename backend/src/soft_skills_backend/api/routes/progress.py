@@ -1,4 +1,4 @@
-"""Progress endpoints"""
+"""Progress endpoints."""
 
 from fastapi import APIRouter
 

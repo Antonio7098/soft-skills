@@ -108,6 +108,16 @@ This gives SoftSkills:
 Use `include_auth=True` only where the pipeline is directly tied to an
 authenticated request boundary and the auth adapter is ready.
 
+For MVP backend work, the Stageflow baseline is:
+
+- `Pipeline` and `PipelineContext` are the default runtime primitives
+- `get_default_interceptors()` is the mandatory starting point for production pipelines
+- `PipelineRunLogger` is enabled for pipeline run visibility
+- provider-call logging is enabled for provider-backed stages
+- typed outputs are required for LLM-produced structured artifacts
+- wide events are enabled for assessment, progression, recommendation, and content-generation workflows
+- real-provider smoke coverage is required for provider-backed pipelines before a sprint is considered complete
+
 ### Default Event Sink Strategy
 
 For production-oriented MVP workflows, prefer `BackpressureAwareEventSink`
@@ -202,6 +212,26 @@ Recommended use:
   undo, or richer telemetry
 
 Do not use unconstrained agent loops for learner assessment paths in MVP.
+
+## Versioning And Contract Conventions
+
+### Prompt Versioning
+
+- Every prompt contract uses a stable slug plus semantic version, for example `assessment.quick-practice.v1`.
+- Backward-incompatible prompt contract changes require a major version bump.
+- Prompt text tweaks that do not change output shape or scoring semantics require a minor version bump in implementation metadata, but the persisted contract version must still identify the active major contract.
+
+### Typed Output Conventions
+
+- Structured LLM outputs must be registered as explicit typed contracts.
+- Every typed output schema carries its own schema version.
+- Validation failure is terminal for the workflow and must emit a stable error code plus trace-linked failure event.
+
+### Engine Config Versioning
+
+- Progression, recommendation, and scoring-support config sets must expose explicit version identifiers.
+- Config versions must be persisted on any artifact whose meaning depends on them.
+- Recalculation or replay workflows must record both input artifact versions and the config version used for recomputation.
 
 ## Observability And Tracing
 

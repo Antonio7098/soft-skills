@@ -1,1 +1,1 @@
-"""Domain models"""
+"""Domain package."""

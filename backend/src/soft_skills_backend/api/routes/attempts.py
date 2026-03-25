@@ -1,4 +1,4 @@
-"""Attempts endpoints"""
+"""Attempts endpoints."""
 
 from fastapi import APIRouter
 

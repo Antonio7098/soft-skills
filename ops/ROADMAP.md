@@ -14,6 +14,7 @@ in the linked sprint documents under `ops/sprints/`.
 - MVP scope frozen
 - Initial taxonomy and rubric set frozen
 - Versioning and error/event conventions agreed
+- Reusable backend definition of done and Stageflow baseline locked
 
 **Exit Criteria:** The team can build without reopening core MVP semantics each week.
 
@@ -165,3 +166,4 @@ in the linked sprint documents under `ops/sprints/`.
   suite must still pass.
 - `CONSTITUTION.yml` and the relevant `ops/mvp-spec/` files are mandatory input
   to sprint planning and sprint execution.
+- If no repo-root `ROADMAP.md` exists, this file is the roadmap of record for backend sprint sequencing.

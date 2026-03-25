@@ -12,13 +12,16 @@ still exist elsewhere in the repo.
 When documents disagree, use this order of precedence:
 
 1. `CONSTITUTION.yml`
-2. Files in `docs/`
-3. `PRD.md`
+2. The relevant file in `ops/mvp-spec/`
+3. The active sprint doc in `ops/sprints/` for execution details only
+4. `foundational/PRD.md`
 
 The constitution defines non-negotiable architectural and product rules.
 The docs in this directory turn those rules and the PRD into explicit MVP
-decisions. The PRD remains the upstream product input, but it is not the
-runtime source of truth once this canon exists.
+decisions. Sprint docs may narrow implementation order or delivery details, but
+they must not override the constitution or MVP canon. The PRD remains the
+upstream product input, but it is not the runtime source of truth once this
+canon exists.
 
 ## Canonical Documents
 
@@ -42,6 +45,9 @@ Each file keeps the same intent detailed below; only the paths changed.
 - Treat text-first practice as the MVP baseline. Voice can be layered later, but it is not required for MVP completeness.
 - Do not implement features that violate explainability, schema validation, traceability, or durable persistence.
 - When a new product or engineering decision changes behavior, update the relevant file in this directory in the same change.
+- Treat `ops/ROADMAP.md` and `ops/sprints/` as execution planning inputs, not semantic overrides.
+- If a repo-level roadmap file does not exist, the `ops/ROADMAP.md` file is the roadmap of record for backend sprint sequencing.
+- New backend slices are not done unless they satisfy typed contracts, fail-fast behavior, durable persistence where required, structured observability, tests, real-provider smoke coverage for provider-backed flows, and doc updates.
 
 ## MVP Decision Style
 

@@ -1,1 +1,1 @@
-"""Observability"""
+"""Observability package."""
