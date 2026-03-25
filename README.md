@@ -8,12 +8,42 @@ product and engineering development.
 
 ## What Is Here
 
+### Operations & Documentation
+
 - `ops/CONSTITUTION.yml`: non-negotiable architectural, testing, and operating rules
 - `ops/mvp-spec/`: canonical MVP documentation set
 - `ops/ROADMAP.md`: detailed backend execution roadmap
 - `ops/sprints/`: sprint-by-sprint execution docs
 - `ops/process/`: sprint execution process, templates, and Stageflow reporting
 - `ops/post-mvp-spec/`: explicitly deferred post-MVP ideas
+
+### Backend (`backend/src/soft_skills_backend/`)
+
+```
+soft_skills_backend/
+├── entrypoints/http/     # FastAPI routes, schemas, dependencies
+│   └── routes/          # API endpoint handlers
+├── platform/             # Framework/runtime concerns
+│   ├── container.py      # Dependency injection container
+│   ├── db/              # SQLAlchemy models, session, repositories
+│   ├── observability/   # Logging, middleware, event sink
+│   ├── providers/llm/   # LLM provider adapters
+│   └── workflows/       # Stageflow runtime integration
+├── modules/              # Business features
+│   ├── practice/        # Practice sessions, attempts, assessment
+│   ├── catalog/         # Collections, prompt items, scenarios
+│   ├── identity/        # User registration, authentication
+│   └── taxonomy/        # Skills and competencies
+└── shared/              # Cross-cutting: errors, ports, auth
+```
+
+Each business module follows a consistent layer pattern:
+
+- `contracts/` - Command/query/view DTOs (Pydantic request/response types)
+- `domain/` - Pure business rules, invariants, policies (no framework deps)
+- `use_cases/` - Thin application service facades
+- `workflows/` - Stageflow pipelines and stage implementations
+- `infra/` - Repositories, persistence mappers, event recording
 
 ## Source Of Truth
 
@@ -40,8 +70,32 @@ When documents disagree, use this order:
 - Complex provider-backed flows require real-provider smoke tests before release
 - Auth providers and databases must be swappable through interfaces and dependency injection
 
-## Current State
+## Running the Backend
 
-This repo is documentation-first at the moment. The next implementation work
-should follow `ops/CONSTITUTION.yml`, the relevant `ops/mvp-spec/` files, and
-the active sprint doc rather than extending old planning documents directly.
+```bash
+cd backend
+pip install -e .
+python -m soft_skills_backend
+```
+
+Run tests:
+```bash
+cd backend
+pytest tests/ -v
+```
+
+Run linting:
+```bash
+cd backend
+ruff check src/
+mypy src/
+```
+
+## Architecture Principles
+
+1. **Feature-first at business level, layer-second inside each feature**
+2. **Platform/framework code separated at top level** - `entrypoints/`, `platform/`, `modules/`, `shared/`
+3. **Domain stays pure** - No SQLAlchemy, FastAPI, or Stageflow imports
+4. **Stageflow code only in workflows/** - No stage closures buried in service facades
+5. **Persistence code only in infra/** - Queries, persistence, repositories live together
+6. **One public facade per feature** - Routes call `modules.<feature>.use_cases` only
