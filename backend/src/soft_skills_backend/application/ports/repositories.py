@@ -1,4 +1,4 @@
-"""Application ports for adapter boundaries."""
+"""Repository ports used by application services."""
 
 from __future__ import annotations
 

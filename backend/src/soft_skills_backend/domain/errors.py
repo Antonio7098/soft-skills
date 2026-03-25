@@ -115,6 +115,22 @@ def provider_error(
     )
 
 
+def scoring_error(
+    message: str,
+    *,
+    code: str = "SS-SCORING-001",
+    status_code: int = 422,
+    details: Mapping[str, Any] | None = None,
+) -> AppError:
+    return AppError(
+        code=code,
+        category=ErrorCategory.SCORING,
+        message=message,
+        status_code=status_code,
+        details=details,
+    )
+
+
 def orchestration_error(
     message: str,
     *,

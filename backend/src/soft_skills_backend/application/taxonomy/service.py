@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, sessionmaker
 
+from soft_skills_backend.application.taxonomy.models import (
+    CompetencyView,
+    RubricView,
+    SkillView,
+    TaxonomySnapshot,
+)
 from soft_skills_backend.observability.events import WorkflowEvent
 from soft_skills_backend.persistence.models import (
     CompetencyRecord,
@@ -43,62 +48,106 @@ class RubricSeed:
 
 
 SKILL_SEEDS: tuple[SkillSeed, ...] = (
-    SkillSeed("active-listening", "Active Listening", "Listen carefully and respond to stakeholder signals."),
+    SkillSeed(
+        "active-listening",
+        "Active Listening",
+        "Listen carefully and respond to stakeholder signals.",
+    ),
     SkillSeed("structured-communication", "Structured Communication", "Organize ideas clearly."),
     SkillSeed("concise-explanation", "Concise Explanation", "Explain decisions succinctly."),
     SkillSeed("empathy", "Empathy", "Acknowledge stakeholder concerns and emotion."),
-    SkillSeed("expectation-setting", "Expectation Setting", "Set realistic next steps and boundaries."),
-    SkillSeed("prioritization-under-pressure", "Prioritization Under Pressure", "Choose effectively under constraints."),
+    SkillSeed(
+        "expectation-setting", "Expectation Setting", "Set realistic next steps and boundaries."
+    ),
+    SkillSeed(
+        "prioritization-under-pressure",
+        "Prioritization Under Pressure",
+        "Choose effectively under constraints.",
+    ),
     SkillSeed("conflict-handling", "Conflict Handling", "Address disagreement productively."),
     SkillSeed("negotiation", "Negotiation", "Trade off and align competing interests."),
-    SkillSeed("executive-summary", "Executive Summary", "Summarize clearly for senior stakeholders."),
-    SkillSeed("decision-justification", "Decision Justification", "Back decisions with evidence and reasoning."),
+    SkillSeed(
+        "executive-summary", "Executive Summary", "Summarize clearly for senior stakeholders."
+    ),
+    SkillSeed(
+        "decision-justification",
+        "Decision Justification",
+        "Back decisions with evidence and reasoning.",
+    ),
 )
 
 COMPETENCY_SEEDS: tuple[CompetencySeed, ...] = (
-    CompetencySeed("stakeholder-management", "Stakeholder Management", "Manage stakeholder relationships.", ("active-listening", "empathy", "expectation-setting", "negotiation")),
-    CompetencySeed("communication", "Communication", "Communicate clearly and effectively.", ("structured-communication", "concise-explanation", "executive-summary")),
-    CompetencySeed("teamwork", "Teamwork", "Work constructively with others.", ("active-listening", "empathy", "conflict-handling")),
-    CompetencySeed("prioritization", "Prioritization", "Prioritize under constraints.", ("prioritization-under-pressure", "decision-justification", "executive-summary")),
-    CompetencySeed("professionalism", "Professionalism", "Behave credibly and reliably.", ("expectation-setting", "concise-explanation", "conflict-handling")),
-    CompetencySeed("problem-solving", "Problem Solving", "Diagnose and solve problems.", ("structured-communication", "decision-justification", "executive-summary")),
-    CompetencySeed("adaptability", "Adaptability", "Adjust appropriately as conditions change.", ("active-listening", "prioritization-under-pressure", "decision-justification")),
-    CompetencySeed("managing-ambiguity", "Managing Ambiguity", "Operate effectively with unclear inputs.", ("expectation-setting", "prioritization-under-pressure", "negotiation")),
+    CompetencySeed(
+        "stakeholder-management",
+        "Stakeholder Management",
+        "Manage stakeholder relationships.",
+        ("active-listening", "empathy", "expectation-setting", "negotiation"),
+    ),
+    CompetencySeed(
+        "communication",
+        "Communication",
+        "Communicate clearly and effectively.",
+        ("structured-communication", "concise-explanation", "executive-summary"),
+    ),
+    CompetencySeed(
+        "teamwork",
+        "Teamwork",
+        "Work constructively with others.",
+        ("active-listening", "empathy", "conflict-handling"),
+    ),
+    CompetencySeed(
+        "prioritization",
+        "Prioritization",
+        "Prioritize under constraints.",
+        ("prioritization-under-pressure", "decision-justification", "executive-summary"),
+    ),
+    CompetencySeed(
+        "professionalism",
+        "Professionalism",
+        "Behave credibly and reliably.",
+        ("expectation-setting", "concise-explanation", "conflict-handling"),
+    ),
+    CompetencySeed(
+        "problem-solving",
+        "Problem Solving",
+        "Diagnose and solve problems.",
+        ("structured-communication", "decision-justification", "executive-summary"),
+    ),
+    CompetencySeed(
+        "adaptability",
+        "Adaptability",
+        "Adjust appropriately as conditions change.",
+        ("active-listening", "prioritization-under-pressure", "decision-justification"),
+    ),
+    CompetencySeed(
+        "managing-ambiguity",
+        "Managing Ambiguity",
+        "Operate effectively with unclear inputs.",
+        ("expectation-setting", "prioritization-under-pressure", "negotiation"),
+    ),
 )
 
 RUBRIC_SEEDS: tuple[RubricSeed, ...] = (
-    RubricSeed("quick_practice_text@v1", "quick_practice_text", "v1", "quick_practice_prompt", "v1", "Quick Practice Text Rubric"),
-    RubricSeed("scenario_text@v1", "scenario_text", "v1", "scenario_step", "v1", "Scenario Text Rubric"),
-    RubricSeed("interview_text@v1", "interview_text", "v1", "interview_prompt", "v1", "Interview Text Rubric"),
+    RubricSeed(
+        "quick_practice_text@v1",
+        "quick_practice_text",
+        "v1",
+        "quick_practice_prompt",
+        "v1",
+        "Quick Practice Text Rubric",
+    ),
+    RubricSeed(
+        "scenario_text@v1", "scenario_text", "v1", "scenario_step", "v1", "Scenario Text Rubric"
+    ),
+    RubricSeed(
+        "interview_text@v1",
+        "interview_text",
+        "v1",
+        "interview_prompt",
+        "v1",
+        "Interview Text Rubric",
+    ),
 )
-
-
-class SkillView(BaseModel):
-    slug: str
-    name: str
-    description: str
-
-
-class CompetencyView(BaseModel):
-    slug: str
-    name: str
-    description: str
-    skill_slugs: list[str] = Field(default_factory=list)
-
-
-class RubricView(BaseModel):
-    rubric_id: str
-    family: str
-    version: str
-    content_type: str
-    schema_version: str
-    name: str
-
-
-class TaxonomySnapshot(BaseModel):
-    skills: list[SkillView]
-    competencies: list[CompetencyView]
-    rubrics: list[RubricView]
 
 
 class TaxonomyService:
@@ -159,7 +208,11 @@ class TaxonomyService:
         self._workflow_events.record(
             WorkflowEvent(
                 event_type="taxonomy.catalog_seeded.v1",
-                payload={"skills": len(SKILL_SEEDS), "competencies": len(COMPETENCY_SEEDS), "rubrics": len(RUBRIC_SEEDS)},
+                payload={
+                    "skills": len(SKILL_SEEDS),
+                    "competencies": len(COMPETENCY_SEEDS),
+                    "rubrics": len(RUBRIC_SEEDS),
+                },
             )
         )
         return self.snapshot()
@@ -173,7 +226,9 @@ class TaxonomyService:
             mappings = session.query(CompetencySkillMapRecord).all()
             competency_to_skills: dict[str, list[str]] = {}
             for mapping in mappings:
-                competency_to_skills.setdefault(mapping.competency_slug, []).append(mapping.skill_slug)
+                competency_to_skills.setdefault(mapping.competency_slug, []).append(
+                    mapping.skill_slug
+                )
             competencies = [
                 CompetencyView(
                     slug=record.slug,

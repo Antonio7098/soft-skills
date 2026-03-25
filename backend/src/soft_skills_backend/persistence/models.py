@@ -224,3 +224,83 @@ class MockPersonRecord(Base):
     goals: Mapped[list[str]] = mapped_column(JSON, default=list)
     communication_style: Mapped[str] = mapped_column(Text)
     relationship_to_scenario: Mapped[str] = mapped_column(Text)
+
+
+class PracticeSessionRecord(Base):
+    """Durable practice session state."""
+
+    __tablename__ = "practice_sessions"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    practice_type: Mapped[str] = mapped_column(String(32), index=True)
+    content_item_id: Mapped[str] = mapped_column(String(32), index=True)
+    content_item_type: Mapped[str] = mapped_column(String(32))
+    workflow_id: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    delivery_version: Mapped[str] = mapped_column(String(64))
+    rubric_id: Mapped[str] = mapped_column(String(128), index=True)
+    rubric_version: Mapped[str] = mapped_column(String(32))
+    prompt_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    last_attempt_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AttemptRecord(Base):
+    """Durable learner attempt state."""
+
+    __tablename__ = "attempts"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    workflow_id: Mapped[str] = mapped_column(String(64), index=True)
+    practice_type: Mapped[str] = mapped_column(String(32), index=True)
+    content_item_id: Mapped[str] = mapped_column(String(32), index=True)
+    content_item_type: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    response_mode: Mapped[str] = mapped_column(String(32))
+    response_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    delivery_version: Mapped[str] = mapped_column(String(64))
+    rubric_id: Mapped[str] = mapped_column(String(128), index=True)
+    rubric_version: Mapped[str] = mapped_column(String(32))
+    assessment_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    last_error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    assessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AssessmentRecord(Base):
+    """Validated or rejected assessment artifact."""
+
+    __tablename__ = "assessments"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    attempt_id: Mapped[str] = mapped_column(String(32), index=True)
+    session_id: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    workflow_id: Mapped[str] = mapped_column(String(64), index=True)
+    practice_type: Mapped[str] = mapped_column(String(32), index=True)
+    validation_status: Mapped[str] = mapped_column(String(32), index=True)
+    prompt_version: Mapped[str] = mapped_column(String(64))
+    rubric_id: Mapped[str] = mapped_column(String(128), index=True)
+    rubric_version: Mapped[str] = mapped_column(String(32))
+    schema_version: Mapped[str] = mapped_column(String(64))
+    config_version: Mapped[str] = mapped_column(String(64))
+    provider: Mapped[str] = mapped_column(String(64), index=True)
+    model_slug: Mapped[str] = mapped_column(String(128), index=True)
+    overall_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    skill_scores: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    evidence: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    strengths: Mapped[list[str]] = mapped_column(JSON, default=list)
+    weaknesses: Mapped[list[str]] = mapped_column(JSON, default=list)
+    next_actions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    raw_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    rejection_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    trace_id: Mapped[str] = mapped_column(String(32), index=True)
+    pipeline_run_id: Mapped[str] = mapped_column(String(32), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

@@ -116,6 +116,29 @@ Recommendations must not optimize for novelty alone.
 - If model metadata or prompt version is missing, reject the artifact.
 - If rubric and content mapping is invalid, fail before model execution where possible.
 
+## Quick Practice V1 Runtime Contract
+
+The Sprint 3 quick-practice vertical slice establishes the minimum runtime
+contract for text-first assessment-backed practice.
+
+- Session start persists a practice session plus an initial attempt in
+  `prompt_delivered` state.
+- Attempt submission transitions through:
+  `prompt_delivered -> submitted -> assessing -> assessed`
+  or terminal failure states:
+  `assessment_rejected` / `assessment_failed`
+- Validated assessment artifacts persist:
+  - `prompt_version`
+  - `rubric_version`
+  - `provider`
+  - `model_slug`
+  - `schema_version`
+  - `config_version`
+  - `trace_id`
+  - `pipeline_run_id`
+- Rejected structured outputs must be persisted separately from validated
+  learner-facing artifacts so replay and diagnosis remain possible.
+
 ## MVP Boundaries
 
 - Human override workflows are optional, not required for MVP.

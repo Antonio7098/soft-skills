@@ -14,3 +14,13 @@ def test_settings_parse_cors_csv() -> None:
 def test_settings_reject_zero_event_queue_size() -> None:
     with pytest.raises(ValidationError):
         Settings(stageflow_event_queue_size=0)
+
+
+def test_settings_support_openrouter_aliases(monkeypatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter-key")
+    monkeypatch.setenv("LLM_MARKING_MODEL", "openrouter/test-model")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.openrouter_api_key == "test-openrouter-key"
+    assert settings.llm_marking_model == "openrouter/test-model"

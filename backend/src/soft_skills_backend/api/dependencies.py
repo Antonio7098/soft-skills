@@ -11,6 +11,7 @@ from soft_skills_backend.application.catalog import CatalogService
 from soft_skills_backend.application.container import AppContainer
 from soft_skills_backend.application.health import HealthService
 from soft_skills_backend.application.identity import IdentityService
+from soft_skills_backend.application.practice.quick_practice import QuickPracticeService
 from soft_skills_backend.application.taxonomy import TaxonomyService
 
 
@@ -52,3 +53,7 @@ def get_taxonomy_service(request: Request) -> TaxonomyService:
 
 def get_catalog_service(request: Request) -> CatalogService:
     return get_container(request).catalog_service
+
+
+def get_practice_service(request: Request) -> QuickPracticeService:
+    return get_container(request).practice_service

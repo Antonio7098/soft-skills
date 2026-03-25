@@ -6,10 +6,25 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.application.auth import Actor
+from soft_skills_backend.application.catalog.collections.commands import (
+    CollectionCreateCommand,
+    CollectionLifecycleCommand,
+    CollectionListFilters,
+)
+from soft_skills_backend.application.catalog.collections.views import CollectionView
+from soft_skills_backend.application.catalog.prompt_items.commands import PromptItemCreateCommand
+from soft_skills_backend.application.catalog.prompt_items.views import PromptItemView
+from soft_skills_backend.application.catalog.scenarios.commands import (
+    ScenarioCreateCommand,
+)
+from soft_skills_backend.application.catalog.scenarios.views import (
+    MockCompanyView,
+    MockPersonView,
+    ScenarioView,
+)
 from soft_skills_backend.domain.errors import auth_error, domain_error, validation_error
 from soft_skills_backend.observability.events import WorkflowEvent
 from soft_skills_backend.persistence.models import (
@@ -46,122 +61,6 @@ ALLOWED_COLLECTION_TRANSITIONS: dict[str, set[str]] = {
     "published_public": {"review", "archived"},
     "archived": set(),
 }
-
-
-class CollectionCreateCommand(BaseModel):
-    title: str
-    summary: str
-    target_audience: str
-    difficulty: str
-    content_format_mix: list[str] = Field(default_factory=list)
-    target_skill_slugs: list[str]
-    target_competency_slugs: list[str]
-    rubric_ids: list[str]
-
-
-class CollectionLifecycleCommand(BaseModel):
-    lifecycle_state: str
-    verification_state: str | None = None
-
-
-class PromptItemCreateCommand(BaseModel):
-    prompt_type: str
-    title: str
-    prompt_text: str
-    difficulty: str
-    target_skill_slugs: list[str]
-    rubric_id: str
-
-
-class MockCompanyInput(BaseModel):
-    name: str
-    industry: str
-    operating_context: str
-
-
-class MockPersonInput(BaseModel):
-    name: str
-    role: str
-    goals: list[str] = Field(default_factory=list)
-    communication_style: str
-    relationship_to_scenario: str
-
-
-class ScenarioCreateCommand(BaseModel):
-    title: str
-    business_context: str
-    learner_objective: str
-    constraints: list[str] = Field(default_factory=list)
-    stakeholder_tensions: list[str] = Field(default_factory=list)
-    target_skill_slugs: list[str]
-    rubric_id: str
-    mock_company: MockCompanyInput | None = None
-    mock_people: list[MockPersonInput] = Field(default_factory=list)
-
-
-class MockCompanyView(BaseModel):
-    id: str
-    name: str
-    industry: str
-    operating_context: str
-
-
-class MockPersonView(BaseModel):
-    id: str
-    name: str
-    role: str
-    goals: list[str]
-    communication_style: str
-    relationship_to_scenario: str
-
-
-class PromptItemView(BaseModel):
-    id: str
-    prompt_type: str
-    title: str
-    prompt_text: str
-    difficulty: str
-    lifecycle_state: str
-    target_skill_slugs: list[str]
-    rubric_id: str
-
-
-class ScenarioView(BaseModel):
-    id: str
-    title: str
-    business_context: str
-    learner_objective: str
-    constraints: list[str]
-    stakeholder_tensions: list[str]
-    lifecycle_state: str
-    target_skill_slugs: list[str]
-    rubric_id: str
-    mock_company: MockCompanyView | None = None
-    mock_people: list[MockPersonView] = Field(default_factory=list)
-
-
-class CollectionView(BaseModel):
-    id: str
-    author_user_id: str
-    title: str
-    summary: str
-    target_audience: str
-    difficulty: str
-    lifecycle_state: str
-    verification_state: str
-    content_format_mix: list[str]
-    target_skill_slugs: list[str]
-    target_competency_slugs: list[str]
-    rubric_ids: list[str]
-    prompt_items: list[PromptItemView] = Field(default_factory=list)
-    scenarios: list[ScenarioView] = Field(default_factory=list)
-
-
-class CollectionListFilters(BaseModel):
-    difficulty: str | None = None
-    skill_slug: str | None = None
-    competency_slug: str | None = None
-    include_private: bool = True
 
 
 class CatalogService:

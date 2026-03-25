@@ -70,6 +70,21 @@ Emit wide events for these critical backend workflows:
 - recommendation generation
 - content generation
 
+### Quick Practice V1 Event Set
+
+The first quick-practice runtime should emit these concrete events:
+
+- `practice.session_started.v1`
+- `practice.prompt_delivered.v1`
+- `practice.attempt_submitted.v1`
+- `assessment.started.v1`
+- `assessment.validated.v1`
+- `assessment.rejected.v1`
+- `workflow.failed.v1`
+
+These events must preserve stable correlation fields so an attempt can be
+replayed from prompt delivery through assessment persistence or failure.
+
 ## Logging Rules
 
 - Use structured logging only.

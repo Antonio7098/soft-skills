@@ -5,52 +5,18 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, sessionmaker
 
+from soft_skills_backend.application.identity.models import (
+    LearnerProfileView,
+    RegisterUserCommand,
+    UpdateProfileCommand,
+    UserView,
+)
 from soft_skills_backend.domain.errors import domain_error
 from soft_skills_backend.observability.events import WorkflowEvent
 from soft_skills_backend.persistence.models import LearnerProfileRecord, UserAccountRecord
 from soft_skills_backend.persistence.repositories import SqlAlchemyWorkflowEventRepository
-
-
-class RegisterUserCommand(BaseModel):
-    """Account creation payload."""
-
-    email: str
-    display_name: str
-    role: str = "standard_user"
-    target_role: str | None = None
-    goals: list[str] = Field(default_factory=list)
-    practice_preferences: dict[str, str] = Field(default_factory=dict)
-
-
-class UpdateProfileCommand(BaseModel):
-    """Profile patch payload."""
-
-    target_role: str | None = None
-    goals: list[str] | None = None
-    practice_preferences: dict[str, str] | None = None
-
-
-class LearnerProfileView(BaseModel):
-    """Learner profile response."""
-
-    target_role: str | None = None
-    goals: list[str] = Field(default_factory=list)
-    practice_preferences: dict[str, str] = Field(default_factory=dict)
-
-
-class UserView(BaseModel):
-    """User response payload."""
-
-    id: str
-    email: str
-    display_name: str
-    role: str
-    auth_provider: str
-    created_at: datetime
-    profile: LearnerProfileView
 
 
 class IdentityService:
