@@ -123,14 +123,6 @@
    ============================================================ */
 
 @layer base {
-  *,
-  *::before,
-  *::after {
-    transition-property: color, background-color, border-color, box-shadow;
-    transition-duration: 300ms;
-    transition-timing-function: ease;
-  }
-
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
