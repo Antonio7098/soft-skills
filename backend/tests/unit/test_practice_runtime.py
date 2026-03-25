@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from soft_skills_backend.application.practice.models import (
+from soft_skills_backend.modules.practice.models import (
     StartInterviewSessionCommand,
     StartScenarioSessionCommand,
 )

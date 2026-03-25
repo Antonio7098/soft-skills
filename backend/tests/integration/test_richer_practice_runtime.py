@@ -6,12 +6,12 @@ import pytest
 from alembic.config import Config
 
 from alembic import command
-from soft_skills_backend.application.assessment import (
+from soft_skills_backend.modules.practice.workflows.assessment import (
     AssessmentTransformPayload,
     ResolvedAttemptPayload,
 )
-from soft_skills_backend.domain.practice import QuickPracticeAssessmentDraft
-from soft_skills_backend.persistence.models import (
+from soft_skills_backend.modules.practice.domain.practice import QuickPracticeAssessmentDraft
+from soft_skills_backend.platform.db.models import (
     AssessmentRecord,
     AttemptRecord,
     PracticeSessionRecord,
@@ -79,13 +79,13 @@ async def _create_collection(
             "title": title,
             "summary": "Runtime coverage collection.",
             "target_audience": "Early-career consultants",
-                "difficulty": "intermediate",
-                "content_format_mix": content_format_mix,
-                "target_skill_slugs": target_skill_slugs,
-                "target_competency_slugs": target_competency_slugs,
-                "rubric_ids": rubric_ids,
-            },
-        )
+            "difficulty": "intermediate",
+            "content_format_mix": content_format_mix,
+            "target_skill_slugs": target_skill_slugs,
+            "target_competency_slugs": target_competency_slugs,
+            "rubric_ids": rubric_ids,
+        },
+    )
     assert response.status_code == 200
     return response.json()["data"]
 
@@ -328,7 +328,10 @@ async def test_scenario_runtime_persists_rich_context_and_artifacts(
     assert session_record is not None and session_record.practice_type == "scenario"
     assert attempt_record is not None and attempt_record.practice_type == "scenario"
     assert assessment_record is not None and assessment_record.practice_type == "scenario"
-    assert session_record.prompt_payload["scenario_context"]["artifacts"][0]["artifact_type"] == "email"
+    assert (
+        session_record.prompt_payload["scenario_context"]["artifacts"][0]["artifact_type"]
+        == "email"
+    )
     assert "practice.session_started.v1" in event_types
     assert "assessment.validated.v1" in event_types
 
@@ -349,9 +352,7 @@ async def test_quick_practice_session_rejects_interview_prompt(client, test_sett
 
 
 @pytest.mark.asyncio
-async def test_scenario_session_rejects_invalid_rubric_mapping(
-    app, client, test_settings
-) -> None:
+async def test_scenario_session_rejects_invalid_rubric_mapping(app, client, test_settings) -> None:
     _migrate(test_settings)
     learner, scenario = await _seed_scenario(client)
 

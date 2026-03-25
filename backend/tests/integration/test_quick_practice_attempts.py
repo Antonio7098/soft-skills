@@ -6,14 +6,14 @@ import pytest
 from alembic.config import Config
 
 from alembic import command
-from soft_skills_backend.application.assessment import (
+from soft_skills_backend.modules.practice.workflows.assessment import (
     AssessmentTransformPayload,
     ResolvedAttemptPayload,
     StructuredOutputRejectionError,
 )
-from soft_skills_backend.domain.errors import provider_error, validation_error
-from soft_skills_backend.domain.practice import QuickPracticeAssessmentDraft
-from soft_skills_backend.persistence.models import (
+from soft_skills_backend.shared.errors import provider_error, validation_error
+from soft_skills_backend.modules.practice.domain.practice import QuickPracticeAssessmentDraft
+from soft_skills_backend.platform.db.models import (
     AssessmentRecord,
     AttemptRecord,
     PipelineRunRecord,

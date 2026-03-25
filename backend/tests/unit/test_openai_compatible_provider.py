@@ -4,10 +4,10 @@ import asyncio
 
 import pytest
 
-from soft_skills_backend.application.ports.telemetry import ProviderCallContext
+from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 from soft_skills_backend.config import Settings
-from soft_skills_backend.domain.errors import AppError
-from soft_skills_backend.integrations.llm.openai_compatible import OpenAICompatibleLLMProvider
+from soft_skills_backend.shared.errors import AppError
+from soft_skills_backend.platform.providers.llm.openai_compatible import OpenAICompatibleLLMProvider
 
 
 class _NoOpProviderCallLogger:
@@ -37,7 +37,7 @@ async def test_openai_compatible_provider_enforces_total_timeout(
             raise AssertionError("timeout should fire before post returns")
 
     monkeypatch.setattr(
-        "soft_skills_backend.integrations.llm.openai_compatible.httpx.AsyncClient",
+        "soft_skills_backend.platform.providers.llm.openai_compatible.httpx.AsyncClient",
         _SlowAsyncClient,
     )
 
@@ -110,7 +110,7 @@ async def test_openai_compatible_provider_switches_to_backup_model_on_third_atte
             )
 
     monkeypatch.setattr(
-        "soft_skills_backend.integrations.llm.openai_compatible.httpx.AsyncClient",
+        "soft_skills_backend.platform.providers.llm.openai_compatible.httpx.AsyncClient",
         _RetryingAsyncClient,
     )
 

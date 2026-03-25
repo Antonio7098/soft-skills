@@ -4,10 +4,10 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from soft_skills_backend.api.error_handlers import register_error_handlers
+from soft_skills_backend.entrypoints.http.error_handlers import register_error_handlers
 from soft_skills_backend.config import Settings
-from soft_skills_backend.domain.errors import validation_error
-from soft_skills_backend.observability.middleware import RequestContextMiddleware
+from soft_skills_backend.shared.errors import validation_error
+from soft_skills_backend.platform.observability.middleware import RequestContextMiddleware
 
 
 @pytest.mark.asyncio

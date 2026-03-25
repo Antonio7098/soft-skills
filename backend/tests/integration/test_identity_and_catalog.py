@@ -6,7 +6,7 @@ import pytest
 from alembic.config import Config
 
 from alembic import command
-from soft_skills_backend.persistence.models import (
+from soft_skills_backend.platform.db.models import (
     CollectionRecord,
     PipelineRunRecord,
     WorkflowEventRecord,

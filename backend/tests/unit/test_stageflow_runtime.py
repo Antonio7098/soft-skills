@@ -4,9 +4,9 @@ import importlib
 
 import pytest
 
-from soft_skills_backend.application.container import build_container
+from soft_skills_backend.platform.container import build_container
 from soft_skills_backend.config import Settings
-from soft_skills_backend.domain.errors import AppError
+from soft_skills_backend.shared.errors import AppError
 
 
 def test_stageflow_runtime_requires_dependency(monkeypatch, tmp_path) -> None:

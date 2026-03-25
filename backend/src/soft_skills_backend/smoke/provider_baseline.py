@@ -15,8 +15,8 @@ from pydantic import BaseModel
 from alembic import command
 from soft_skills_backend.app import create_app
 from soft_skills_backend.config import Settings, get_settings
-from soft_skills_backend.domain.errors import AppError, provider_error, validation_error
-from soft_skills_backend.integrations.llm.openai_compatible import OpenAICompatibleLLMProvider
+from soft_skills_backend.platform.providers.llm.openai_compatible import OpenAICompatibleLLMProvider
+from soft_skills_backend.shared.errors import AppError, provider_error, validation_error
 
 SMOKE_PROVIDER_TIMEOUT_SECONDS = 30.0
 SMOKE_FLOW_TIMEOUT_SECONDS = 120.0
