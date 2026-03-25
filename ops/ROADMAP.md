@@ -1,211 +1,167 @@
-# MVP Roadmap
+# SoftSkills Sprint Roadmap
 
-> **Location:** `soft-skills/ops/ROADMAP.md`
+This document is intentionally lightweight. It names each backend-oriented
+sprint, states the purpose, and defines the exit bar. Detailed execution lives
+in the linked sprint documents under `ops/sprints/`.
 
-Backend-first execution plan for delivering the SoftSkills MVP canon now housed
-in `soft-skills/ops/mvp-spec/`. Each section below translates decisions from the
-canon (product spec, domain model, engines, and observability docs) into build
-work. When in doubt, align scope with the MVP precedence stack: `CONSTITUTION`
-→ `docs/` → `ops/mvp-spec/`.
+---
 
-## 0. Canon Lock
+## Sprint 0: Canon Lock And Delivery Rules
 
-- [ ] Confirm `docs/` as the active MVP source of truth for implementation decisions
-- [ ] Freeze initial MVP skill and competency framework
-- [ ] Freeze initial rubric set and versioning strategy
-- [ ] Freeze initial content types for MVP: collections, interview prompts, scenario prompts, quick practice prompts
-- [ ] Define MVP acceptance criteria for the core loop: practice -> assess -> reflect -> progress -> repeat
+**Purpose:** Freeze the MVP shape, contracts, and non-negotiable delivery rules from the constitution and spec canon.
 
-## 1. Backend Foundation
+**Key Outcomes:**
+- MVP scope frozen
+- Initial taxonomy and rubric set frozen
+- Versioning and error/event conventions agreed
 
-- [ ] Initialize backend service with FastAPI, typed settings, and environment configuration
-- [ ] Establish repository structure for `api`, `domain`, `application`, `orchestration`, `persistence`, `schemas`, `prompts`, and `observability`
-- [ ] Enable strict typing, linting, formatting, and test tooling
-- [ ] Define explicit interfaces and dependency injection patterns for services, repositories, provider adapters, and infrastructure clients
-- [ ] Define base Pydantic request and response conventions
-- [ ] Define base error envelope and stable error code strategy
-- [ ] Implement structured logging with correlation IDs
-- [ ] Implement trace and event primitives for all major workflows
-- [ ] Set up SQLAlchemy models and Alembic migration workflow
-- [ ] Keep database access behind repository or adapter interfaces so database backends can be swapped without domain rewrites
-- [ ] Add health and readiness endpoints
+**Exit Criteria:** The team can build without reopening core MVP semantics each week.
 
-## 2. Identity And Profile Backend
+**Detail:** [ops/sprints/sprint-00-canon-lock.md](ops/sprints/sprint-00-canon-lock.md)
 
-- [ ] Implement user account model and authentication flow
-- [ ] Define an auth provider interface and dependency injection boundary for auth flows
-- [ ] Ensure in-house auth, Google, Clerk, or another provider can be added via adapters and configuration rather than application rewrites
-- [ ] Implement learner profile model with goals, target role, and preferred practice areas
-- [ ] Implement authorization model with standard user accounts plus admin
-- [ ] Ensure any authenticated user can author collections without a separate creator role
-- [ ] Add API contracts for account creation, login, profile read, and profile update
-- [ ] Add tests for auth flows, profile validation, role enforcement, and provider adapter behavior
+---
 
-## 3. Domain And Content Backend
+## Sprint 1: Foundation And Composition Root
 
-- [ ] Implement core domain models for skills, competencies, rubrics, collections, scenarios, mock companies, mock people, prompt items, attempts, assessments, and progress history
-- [ ] Encode domain invariants from `docs/domain-model.md`
-- [ ] Implement versioned rubric storage and retrieval
-- [ ] Implement collection and content item persistence
-- [ ] Implement content lifecycle states: draft, review, published private, published public, archived
-- [ ] Implement collection verification states: unverified, verified, rejected
-- [ ] Implement APIs for browsing collections with filtering by difficulty, skill, competency, format, and verification status
-- [ ] Implement APIs for user-authored content CRUD
-- [ ] Implement validation that all assessable items map to skills and a rubric
-- [ ] Ensure domain and application layers remain database-agnostic behind persistence interfaces
-- [ ] Add tests for content validation, lifecycle transitions, verification transitions, and filtering
+**Purpose:** Establish the backend skeleton, dependency boundaries, persistence discipline, and observability primitives.
 
-## 4. Practice Runtime Backend
+**Key Outcomes:**
+- Service skeleton
+- Migrations, shared schemas/errors
+- Traces/logs/events
+- Provider adapter boundaries
+- Smoke harness baseline
 
-- [ ] Implement session start workflow for interview, scenario, and quick practice modes
-- [ ] Implement prompt delivery contracts for each practice mode
-- [ ] Implement attempt submission endpoint and persistence flow
-- [ ] Implement attempt state transitions: started, submitted, assessment pending, assessed, assessment failed
-- [ ] Persist all attempt metadata required for replay and diagnostics
-- [ ] Emit structured events for session start, prompt delivery, and attempt submission
-- [ ] Add tests for session flows, attempt persistence, and invalid state transitions
+**Exit Criteria:** New features can land on stable contracts and infrastructure instead of ad hoc setup.
 
-## 5. Assessment Pipeline Backend
+**Detail:** [ops/sprints/sprint-01-foundation-and-composition-root.md](ops/sprints/sprint-01-foundation-and-composition-root.md)
 
-- [ ] Define typed assessment input and output schemas
-- [ ] Implement prompt contract versioning and model metadata capture
-- [ ] Implement Stageflow-based assessment orchestration
-- [ ] Validate all LLM outputs before use or persistence
-- [ ] Reject malformed, partial, or contradictory assessment artifacts
-- [ ] Persist validated assessment outputs with rubric version, prompt version, model slug, provider, and trace linkage
-- [ ] Generate learner-facing feedback with strengths, weaknesses, evidence, and next actions
-- [ ] Add benchmark fixtures for scoring consistency checks
-- [ ] Add tests for success, validation failure, provider failure, retry behavior, and trace emission
-- [ ] Add smoke tests for complex assessment and generation flows using real provider calls, not mocks
+---
 
-## 6. Progress And Recommendation Backend
+## Sprint 2: Identity And Content Foundations
 
-- [ ] Implement skill progression aggregation from validated assessments only
-- [ ] Implement competency progression derived from weighted skill evidence
-- [ ] Track proficiency separately from confidence internally
-- [ ] Prevent one-off attempts from causing inflated level changes
-- [ ] Implement recommendation logic based on weak skills, stagnation, and learner goals
-- [ ] Implement dashboard aggregation services for learner progress history
-- [ ] Add tests for progression math, versioned recalculation, and recommendation rules
+**Purpose:** Introduce users, profiles, taxonomy, rubrics, collections, prompts, and core content validation.
 
-## 7. Admin And Content Backend
+**Key Outcomes:**
+- Account/profile APIs
+- Seeded skill and competency model
+- Rubric storage
+- Content lifecycle
+- Collection browse and draft authoring
 
-- [ ] Implement admin APIs for learner progress views
-- [ ] Implement cohort-level analytics APIs
-- [ ] Implement collection usage and assessment trend APIs
-- [ ] Implement user authoring workflows for manual, structured generation, and chat-based draft generation
-- [ ] Implement admin verification workflow to elevate user-created collections
-- [ ] Add tests for admin visibility boundaries, user authoring permissions, and verification rules
+**Exit Criteria:** The system can hold valid users and valid assessable content.
 
-## 8. Observability And Operational Backend
+**Detail:** [ops/sprints/sprint-02-identity-and-content-foundations.md](ops/sprints/sprint-02-identity-and-content-foundations.md)
 
-- [ ] Finalize structured event taxonomy for MVP workflows
-- [ ] Finalize error taxonomy across validation, domain, scoring, orchestration, provider, persistence, auth, and UI-facing API errors
-- [ ] Ensure every critical workflow emits end-to-end traces
-- [ ] Store replayable artifacts for assessment-critical workflows
-- [ ] Implement monitoring for validation failures, prompt failures, retry rates, and incomplete trace coverage
-- [ ] Add operational dashboards or queries for core trust metrics
-- [ ] Document prompt lifecycle, rubric lifecycle, and migration discipline
-- [ ] Document which complex flows require non-negotiable real-provider smoke tests before release
+---
 
-## 9. Backend Hardening
+## Sprint 3: Quick Practice Vertical Slice
 
-- [ ] Complete deterministic domain tests for core business logic
-- [ ] Complete FastAPI contract tests for core endpoints
-- [ ] Complete persistence tests for critical models and migrations
-- [ ] Complete orchestration tests for success and failure paths
-- [ ] Complete regression coverage for scoring semantics and artifact compatibility
-- [ ] Run smoke tests for complex flows against real auth providers, real model providers, and the target database stack where applicable
-- [ ] Verify no critical workflow relies on silent fallbacks
-- [ ] Verify no critical workflow can complete without versioned metadata
-- [ ] Verify infrastructure dependencies are composed through interfaces and dependency injection rather than direct vendor coupling
-- [ ] Mark backend MVP core loop as feature-complete
+**Purpose:** Deliver the first complete text-first learner loop on the smallest viable practice mode.
 
-## 10. Frontend Foundation
+**Key Outcomes:**
+- Quick practice runtime
+- Attempt lifecycle
+- Validated marking
+- Persisted assessment artifact
+- Feedback delivery
+- End-to-end traces
 
-- [ ] Initialize frontend app with React, Vite, strict TypeScript, and test setup
-- [ ] Establish feature-oriented structure plus shared design system foundations
-- [ ] Define design tokens for color, spacing, typography, and motion
-- [ ] Implement reusable primitives for layout, text, buttons, forms, cards, and feedback states
-- [ ] Implement typed API client layer matching backend contracts
-- [ ] Implement global app shell, routing, and session handling
-- [ ] Implement consistent loading, error, empty, and success states
+**Exit Criteria:** One trustworthy backend practice flow works from prompt delivery to scored result.
 
-## 11. Learner Frontend
+**Detail:** [ops/sprints/sprint-03-quick-practice-vertical-slice.md](ops/sprints/sprint-03-quick-practice-vertical-slice.md)
 
-- [ ] Implement onboarding flow for goals, target role, and practice preferences
-- [ ] Implement collection browsing and filtering UI
-- [ ] Implement collection detail and practice entry surfaces
-- [ ] Implement interview practice UI
-- [ ] Implement scenario practice UI
-- [ ] Implement quick practice UI
-- [ ] Implement attempt submission and assessment result surfaces
-- [ ] Implement feedback view with score breakdown, evidence, strengths, weaknesses, and next steps
-- [ ] Implement learner dashboard for recent activity, skill progression, competency progression, and recommended next practice
-- [ ] Ensure async states always show visible progress and never blank waiting states
+---
 
-## 12. Content And Admin Frontend
+## Sprint 4: Scenario And Interview Runtime
 
-- [ ] Implement content authoring workspace for authenticated users
-- [ ] Implement structured generation form UI
-- [ ] Implement chat-based content draft generation UI
-- [ ] Implement publish and verification status flow
-- [ ] Implement admin dashboard for learner and cohort insight
-- [ ] Implement admin views for weak-skill analysis, collection usage, assessment trends, and collection verification
-- [ ] Enforce frontend visibility rules for privileged data access
+**Purpose:** Extend the same trusted loop to richer text modes without weakening contracts or explainability.
 
-## 13. Frontend Hardening
+**Key Outcomes:**
+- Scenario and text interview runtime
+- Richer content payloads
+- Assessment reuse
+- Regression coverage for expanded flows
 
-- [ ] Add tests for critical learner flows
-- [ ] Add tests for typed API integrations and failure states
-- [ ] Add tests for content authoring and admin workflows
-- [ ] Verify consistency of interaction patterns across similar surfaces
-- [ ] Verify loading and transition behavior meets the “app must feel alive” requirement
-- [ ] Mark frontend MVP surfaces as feature-complete
+**Exit Criteria:** All MVP text practice modes run on the same backend assessment backbone.
 
-## 14. MVP Integration And Release Readiness
+**Detail:** [ops/sprints/sprint-04-scenario-and-interview-runtime.md](ops/sprints/sprint-04-scenario-and-interview-runtime.md)
 
-- [ ] Run end-to-end tests for the full learner core loop
-- [ ] Run end-to-end tests for user draft-to-verified-collection flow
-- [ ] Run end-to-end tests for admin progress visibility flow
-- [ ] Run non-negotiable smoke tests for all complex provider-backed flows using real provider calls before release
-- [ ] Verify trace coverage across practice, assessment, progress, generation, and recommendation workflows
-- [ ] Verify all persisted assessment artifacts include rubric version, prompt version, model slug, provider, and trace ID
-- [ ] Verify auth providers can be swapped through adapter wiring without core application changes
-- [ ] Verify database backends can be swapped through persistence adapters without domain rewrites
-- [ ] Verify documentation matches implemented behavior
-- [ ] Review scope against MVP exclusions and remove non-essential work
-- [ ] Prepare release notes or equivalent MVP change summary
-- [ ] Declare MVP ready for internal use
+---
 
-## 15. Live Chat Interview Practice (Post-MVP)
+## Sprint 5: Progression And Recommendation V1
 
-Reference: `ops/post-mvp-spec/live-chat-interview-practice.md`
+**Purpose:** Turn validated assessments into meaningful progress state and next-step guidance.
 
-- [ ] Extend practice runtime and marking engine to accept multi-turn transcripts tagged with `source=live_chat`
-- [ ] Build realtime session service (websocket state machine, timers, fallbacks) with full trace coverage
-- [ ] Ship live chat UI with typing indicators, countdown timers, pause/resume, and graceful disconnect handling
-- [ ] Instrument interviewer agent prompts with version IDs and safeguard rules identical to text flows
-- [ ] Update recommendation/progression engines so live attempt evidence affects next-practice selection
-- [ ] Define scheduling/throttling rules plus admin shadow/takeover workflow
+**Key Outcomes:**
+- Skill progression
+- Competency aggregation
+- Explainable snapshots
+- Recommendation service
+- Replay-ready update path
 
-## 16. Media Archive (Post-MVP)
+**Exit Criteria:** The backend can explain where a learner stands and what they should practice next.
 
-Reference: `ops/post-mvp-spec/media-archive.md`
+**Detail:** [ops/sprints/sprint-05-progression-and-recommendation-v1.md](ops/sprints/sprint-05-progression-and-recommendation-v1.md)
 
-- [ ] Implement client capture SDK for audio/video with resumable uploads and bandwidth fallbacks
-- [ ] Provision ingest gateway, storage policies, and media processing/transcription pipeline with observability hooks
-- [ ] Persist `AttemptMedia` + `Transcript` entities, retention timers, and privacy/consent flags
-- [ ] Wire assessment feedback to surface transcript snippets and playback links with permission checks
-- [ ] Support learner data export/deletion by cascading media tombstones while keeping explainability trails
-- [ ] Track ingestion cost/latency metrics and alert on transcription confidence regressions
+---
 
-## 17. Knowledge Graph Substrate (Post-MVP)
+## Sprint 6: Creator Workflows And Discovery V1
 
-Reference: `ops/post-mvp-spec/knowledge-graph-substrate.md`
+**Purpose:** Make the catalog useful by supporting complete creator flows and trusted publish states.
 
-- [ ] Stand up managed graph store (Neo4j/Neptune/etc.) with schema matching learner, attempt, assessment, media, and skill nodes
-- [ ] Stream canonical events (attempt submitted, assessment validated, recommendation issued) into deterministic graph mutations
-- [ ] Expose internal graph API plus agent-friendly query helpers/embeddings for coaching copilots
-- [ ] Enforce lineage + retention parity: every graph fact links back to trace IDs and respects deletion requests
-- [ ] Document tenant/isolation strategy and SLAs for graph freshness before agents read context
+**Key Outcomes:**
+- Manual authoring maturity
+- Structured generation
+- Chat draft generation
+- Publish states
+- Verified vs. standard catalog behavior
+
+**Exit Criteria:** The backend supports draft-to-published content creation without breaking content quality rules.
+
+**Detail:** [ops/sprints/sprint-06-creator-workflows-and-discovery-v1.md](ops/sprints/sprint-06-creator-workflows-and-discovery-v1.md)
+
+---
+
+## Sprint 7: Admin Verification And Cohort Visibility
+
+**Purpose:** Add the minimum operational and educational controls needed for a credible MVP.
+
+**Key Outcomes:**
+- Admin verification workflow
+- Learner and cohort analytics
+- Usage and trend views
+- Replay and audit support
+
+**Exit Criteria:** Admins can oversee trust, verify content, and inspect learner/cohort performance.
+
+**Detail:** [ops/sprints/sprint-07-admin-verification-and-cohort-visibility.md](ops/sprints/sprint-07-admin-verification-and-cohort-visibility.md)
+
+---
+
+## Sprint 8: Hardening And Release Readiness
+
+**Purpose:** Prove the backend MVP is coherent, traceable, and release-worthy.
+
+**Key Outcomes:**
+- Full backend regression coverage
+- Real-provider smokes across core flows
+- Docs sync
+- Scope trim
+- Release checklist
+
+**Exit Criteria:** The core backend workflows are reliable enough for internal MVP release.
+
+**Detail:** [ops/sprints/sprint-08-hardening-and-release-readiness.md](ops/sprints/sprint-08-hardening-and-release-readiness.md)
+
+---
+
+## Rules For Using This Roadmap
+
+- Frontend is intentionally omitted here and can move on its own cadence.
+- Every sprint must update canonical documentation, add unit tests, add
+  integration tests, and run backend smoke coverage with a real provider. If a
+  sprint does not add a new provider-backed flow, the existing baseline smoke
+  suite must still pass.
+- `CONSTITUTION.yml` and the relevant `ops/mvp-spec/` files are mandatory input
+  to sprint planning and sprint execution.

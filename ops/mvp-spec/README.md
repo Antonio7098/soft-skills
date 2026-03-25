@@ -25,7 +25,7 @@ runtime source of truth once this canon exists.
 The canon is now grouped into subfolders to keep related artifacts together:
 
 - `foundational/`
-  - `PRD.md`, `product-spec.md`, `domain-model.md`, `technical-architecture.md`
+  - `PRD.md`, `product-spec.md`, `domain-model.md`, `technical-architecture.md`, `stageflow-guide.md`
 - `platform/`
   - `assessment-and-progression.md`, `soft-skill-progression.md`, `soft-skill-recommendation.md`
 - `engines/`
