@@ -22,6 +22,11 @@ Stageflow workflows in SoftSkills.
 - **Description:** Live provider runs sometimes returned completion message payloads whose `content` shape was not understood by the current parser. In smoke execution this surfaced as non-retried failures even though the underlying issue was transient provider payload variability rather than deterministic prompt drift.
 - **Recommendations:** Treat malformed-but-retryable provider payload shape errors as retryable in the provider adapter, and make sure smoke and benchmark environments do not disable provider retries when the goal is operational envelope testing.
 
+**Repo-Root Smoke Execution Missed Backend Env Loading** (2026-03-26)
+- **Reference File:** `backend/src/soft_skills_backend/smoke/support/environment.py`
+- **Description:** Assistant real-provider smokes initially appeared unconfigured when run from repo root because the backend runtime expected configuration loading from `backend/.env`. Running from `backend/` resolved the issue and the assistant smoke suites completed successfully.
+- **Recommendations:** Make smoke environment loading independent of caller working directory, or document more explicitly that backend real-provider smokes must run from the backend root when local `.env` files are relied on.
+
 ## DX Improvements
 
 <!-- Format:
@@ -62,6 +67,21 @@ Stageflow workflows in SoftSkills.
 - **Reference File:** `backend/src/soft_skills_backend/modules/catalog/workflows/generation/service.py`
 - **Description:** The default Stageflow per-stage timeout was too small for provider-backed creator generation once corrective validation retries were enabled. The generation pipelines now set an explicit timeout budget instead of inheriting the default.
 - **Recommendations:** Upstream a clearer per-pipeline timeout configuration surface so long-running but legitimate generation stages do not need local context-data overrides.
+
+**Assistant Turns Also Need Explicit Long Timeout Budgets** (2026-03-26)
+- **Reference File:** `backend/src/soft_skills_backend/modules/assistant/workflows/service.py`
+- **Description:** Real-provider assistant generation runs inherited a timeout budget that was too small once the turn included a planning pass, tool execution, child generation subpipelines, and final streamed response generation. The assistant workflow now sets an explicit larger timeout budget for the full turn.
+- **Recommendations:** Timeout sizing should be based on the whole workflow shape, not just the primary LLM stage. Upstream, Stageflow could expose clearer budget composition guidance for parent pipelines that orchestrate child provider-backed work.
+
+**Tool-Required Prompts Improve Deterministic Agent Smokes** (2026-03-26)
+- **Reference File:** `backend/src/soft_skills_backend/modules/assistant/workflows/prompting.py`
+- **Description:** In live provider execution, generation requests could still be answered conversationally unless the system prompt made tool use mandatory for generation asks. Tightening that rule made the smoke path deterministic without changing the bounded tool model.
+- **Recommendations:** For agent smokes, encode mandatory tool-routing rules in the prompt contract rather than depending on model preference. Upstream agent tooling could benefit from a stronger "tool required for intent X" control surface.
+
+**Durable Event Sequences Make Parallel UI Replay Practical** (2026-03-26)
+- **Reference File:** `backend/src/soft_skills_backend/modules/assistant/infra/repository.py`
+- **Description:** Once assistant turns began running parallel enrich stages, parallel tools, and child subpipelines, durable monotonic stream sequence numbers became necessary to give the UI a stable replay and reconnect contract.
+- **Recommendations:** Treat durable sequence assignment as part of the workflow contract whenever Stageflow parallelism feeds a live event stream. Upstream, Stageflow observability could benefit from a built-in ordered projection helper for UI-facing streams.
 
 **PromptSecurityPolicy Fits Chat Generation Well Without Agent Loops** (2026-03-26)
 - **Reference File:** `backend/src/soft_skills_backend/modules/catalog/workflows/generation/service.py`

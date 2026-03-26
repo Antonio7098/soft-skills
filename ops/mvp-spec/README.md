@@ -34,7 +34,7 @@ The canon is now grouped into subfolders to keep related artifacts together:
 - `engines/`
   - `marking-engine.md`, `recommendation-engine.md`, `progression-engine.md`
 - `operations/`
-  - `content-system.md`, `generation.md`, `observability-and-operations.md`
+  - `chat-assistant.md`, `content-system.md`, `generation.md`, `observability-and-operations.md`
 
 Each file keeps the same intent detailed below; only the paths changed.
 

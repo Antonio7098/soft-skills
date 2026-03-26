@@ -444,6 +444,97 @@ class RecommendationArtifactRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class AssistantSessionRecord(Base):
+    """Durable assistant chat session state."""
+
+    __tablename__ = "assistant_sessions"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    metadata_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class AssistantTurnRecord(Base):
+    """Durable assistant turn execution state."""
+
+    __tablename__ = "assistant_turns"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    request_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    workflow_id: Mapped[str] = mapped_column(String(64), index=True)
+    pipeline_run_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    stream_token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    user_message_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    assistant_message_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    last_error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    cancel_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tool_call_count: Mapped[int] = mapped_column(Integer, default=0)
+    metadata_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AssistantMessageRecord(Base):
+    """Durable assistant conversation message."""
+
+    __tablename__ = "assistant_messages"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(32), index=True)
+    turn_id: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    role: Mapped[str] = mapped_column(String(32), index=True)
+    content: Mapped[str] = mapped_column(Text)
+    metadata_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class AssistantToolCallRecord(Base):
+    """Durable assistant tool call lifecycle."""
+
+    __tablename__ = "assistant_tool_calls"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(32), index=True)
+    turn_id: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    tool_name: Mapped[str] = mapped_column(String(128), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    args_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    result_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    child_run_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AssistantStreamEventRecord(Base):
+    """Durable ordered assistant stream event."""
+
+    __tablename__ = "assistant_stream_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    session_id: Mapped[str] = mapped_column(String(32), index=True)
+    turn_id: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    sequence_number: Mapped[int] = mapped_column(Integer)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    emitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class ProgressRecalculationRecord(Base):
     """Replay and recalculation audit run."""
 

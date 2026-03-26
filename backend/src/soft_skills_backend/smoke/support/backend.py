@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import cast
 
 import httpx
@@ -353,6 +354,85 @@ class SmokeBackendClient:
         )
         self.require_ok(response, "list aggregate practice runs")
         return cast(list[JsonObject], response.json()["data"])
+
+    async def create_assistant_session(
+        self,
+        *,
+        user_id: str,
+        title: str | None = None,
+    ) -> JsonObject:
+        response = await self._client.post(
+            "/api/assistant/sessions",
+            headers={"X-User-ID": user_id},
+            json={} if title is None else {"title": title},
+        )
+        self.require_ok(response, "create assistant session")
+        return self.data(response)
+
+    async def create_assistant_turn(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        message: str,
+    ) -> JsonObject:
+        response = await self._client.post(
+            f"/api/assistant/sessions/{session_id}/turns",
+            headers={"X-User-ID": user_id},
+            json={"message": message},
+        )
+        self.require_ok(response, "create assistant turn")
+        return self.data(response)
+
+    async def get_assistant_session(self, *, user_id: str, session_id: str) -> JsonObject:
+        response = await self._client.get(
+            f"/api/assistant/sessions/{session_id}",
+            headers={"X-User-ID": user_id},
+        )
+        self.require_ok(response, "get assistant session")
+        return self.data(response)
+
+    async def list_assistant_sessions(self, *, user_id: str) -> list[JsonObject]:
+        response = await self._client.get(
+            "/api/assistant/sessions",
+            headers={"X-User-ID": user_id},
+        )
+        self.require_ok(response, "list assistant sessions")
+        return cast(list[JsonObject], response.json()["data"])
+
+    async def list_assistant_messages(self, *, user_id: str, session_id: str) -> list[JsonObject]:
+        response = await self._client.get(
+            f"/api/assistant/sessions/{session_id}/messages",
+            headers={"X-User-ID": user_id},
+        )
+        self.require_ok(response, "list assistant messages")
+        return cast(list[JsonObject], response.json()["data"])
+
+    async def wait_for_assistant_turn(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        turn_id: str,
+        timeout_seconds: float = 120.0,
+        poll_interval_seconds: float = 0.5,
+    ) -> JsonObject:
+        deadline = asyncio.get_running_loop().time() + timeout_seconds
+        while True:
+            session_payload = await self.get_assistant_session(user_id=user_id, session_id=session_id)
+            for turn in cast(list[JsonObject], session_payload.get("turns", [])):
+                if str(turn.get("id")) != turn_id:
+                    continue
+                status = str(turn.get("status"))
+                if status in {"completed", "failed", "cancelled"}:
+                    return turn
+            if asyncio.get_running_loop().time() >= deadline:
+                raise provider_error(
+                    "Smoke backend step failed",
+                    code="SS-PROVIDER-011",
+                    details={"operation": "wait for assistant turn", "turn_id": turn_id},
+                )
+            await asyncio.sleep(poll_interval_seconds)
 
     @staticmethod
     def data(response: httpx.Response) -> JsonObject:

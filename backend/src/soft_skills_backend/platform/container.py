@@ -10,6 +10,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from soft_skills_backend.config import Settings
 from soft_skills_backend.entrypoints.http.health import HealthService
 from soft_skills_backend.modules.admin import AdminService
+from soft_skills_backend.modules.assistant import AssistantService
+from soft_skills_backend.modules.assistant.infra.realtime import AssistantRealtimeBroker
+from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
+from soft_skills_backend.modules.assistant.workflows.service import AssistantWorkflowService
 from soft_skills_backend.modules.catalog import CatalogService
 from soft_skills_backend.modules.evaluation import EvaluationService
 from soft_skills_backend.modules.events import EventsService
@@ -58,6 +62,8 @@ class AppContainer:
     identity_service: IdentityService
     admin_service: AdminService
     taxonomy_service: TaxonomyService
+    assistant_service: AssistantService
+    assistant_broker: AssistantRealtimeBroker
     catalog_service: CatalogService
     evaluation_service: EvaluationService
     practice_service: PracticeService
@@ -102,6 +108,7 @@ def build_container(settings: Settings) -> AppContainer:
         session_factory=session_factory,
         workflow_events=workflow_events,
     )
+    assistant_broker = AssistantRealtimeBroker()
     provider_call_logger = DatabaseProviderCallLogger(provider_calls)
     llm_provider = OpenAICompatibleLLMProvider(
         settings=settings,
@@ -142,6 +149,23 @@ def build_container(settings: Settings) -> AppContainer:
         ),
         progression_service=progression_service,
     )
+    assistant_repository = AssistantRepository(
+        session_factory=session_factory,
+        workflow_events=workflow_events,
+    )
+    assistant_service = AssistantService(
+        repository=assistant_repository,
+        workflows=AssistantWorkflowService(
+            llm_provider=llm_provider,
+            repository=assistant_repository,
+            broker=assistant_broker,
+            catalog_service=catalog_service,
+            practice_service=practice_service,
+            progression_service=progression_service,
+            stageflow_runtime=stageflow_runtime,
+            settings=settings,
+        ),
+    )
     health_service = HealthService(
         settings=settings,
         session_factory=session_factory,
@@ -157,6 +181,8 @@ def build_container(settings: Settings) -> AppContainer:
         identity_service=identity_service,
         admin_service=admin_service,
         taxonomy_service=taxonomy_service,
+        assistant_service=assistant_service,
+        assistant_broker=assistant_broker,
         catalog_service=catalog_service,
         evaluation_service=evaluation_service,
         practice_service=practice_service,

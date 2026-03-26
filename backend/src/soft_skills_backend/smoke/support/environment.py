@@ -94,6 +94,10 @@ class SmokeApplicationSessionFactory:
         from alembic import command
 
         alembic_config = Config(str(Path(__file__).resolve().parents[4] / "alembic.ini"))
+        alembic_config.set_main_option(
+            "script_location",
+            str(Path(__file__).resolve().parents[4] / "alembic"),
+        )
         alembic_config.set_main_option("sqlalchemy.url", settings.database_url)
 
         previous_levels = {

@@ -20,12 +20,13 @@ contracts, or sequencing change.
 8. [Sprint 7: Admin Verification And Cohort Visibility](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-07-admin-verification-and-cohort-visibility.md)
 9. [Sprint 8: Hardening And Release Readiness](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-08-hardening-and-release-readiness.md)
 10. [Sprint 9: Generation Orchestration V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-09-generation-orchestration-v1.md)
+11. [Sprint 10: Chat Assistant And Streaming V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-10-chat-assistant-and-streaming-v1.md)
 
 ## Active Sprint
 
 The current active sprint for backend execution is:
 
-- [Sprint 9: Generation Orchestration V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-09-generation-orchestration-v1.md)
+- [Sprint 10: Chat Assistant And Streaming V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-10-chat-assistant-and-streaming-v1.md)
 
 ## Common Rules
 

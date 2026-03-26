@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 from stageflow.api import Pipeline, PipelineContext
 from stageflow.core import StageContext, StageOutput
 from stageflow.observability.wide_events import WideEventEmitter
-from stageflow.pipeline.dag import UnifiedStageExecutionError
+from stageflow.pipeline.dag import UnifiedPipelineCancelled, UnifiedStageExecutionError
 from stageflow.pipeline.guard_retry import GuardRetryStrategy
 from stageflow.pipeline.idempotency import IdempotencyInterceptor, InMemoryIdempotencyStore
 from stageflow.pipeline.results import PipelineResults
@@ -150,6 +150,7 @@ async def run_logged_pipeline(
     idempotency_params: dict[str, Any] | None = None,
     guard_retry_strategy: GuardRetryStrategy | None = None,
     timeout_ms: int | None = None,
+    on_context_ready: Callable[[PipelineContext], None] | None = None,
 ) -> PipelineResults:
     """Run a Stageflow pipeline with shared correlation, logging, and wide-event wiring."""
 
@@ -178,6 +179,8 @@ async def run_logged_pipeline(
         service=service,
         data=ctx_data,
     )
+    if on_context_ready is not None:
+        on_context_ready(ctx)
     await support.pipeline_run_logger.log_run_started(
         pipeline_run_id=pipeline_run_id,
         pipeline_name=pipeline.name,
@@ -196,6 +199,18 @@ async def run_logged_pipeline(
             emit_pipeline_wide_event=True,
             wide_event_emitter=support.wide_event_emitter,
         )
+    except UnifiedPipelineCancelled as exc:
+        finished_at = datetime.now(UTC)
+        await support.pipeline_run_logger.log_run_completed(
+            pipeline_run_id=pipeline_run_id,
+            pipeline_name=pipeline.name,
+            duration_ms=int((finished_at - started_at).total_seconds() * 1000),
+            status="cancelled",
+            stage_results=_stage_summaries(pipeline, exc.results),
+            request_id=request_id,
+            trace_id=trace_id,
+        )
+        return exc.results
     except UnifiedStageExecutionError as exc:
         await support.pipeline_run_logger.log_run_failed(
             pipeline_run_id=pipeline_run_id,
