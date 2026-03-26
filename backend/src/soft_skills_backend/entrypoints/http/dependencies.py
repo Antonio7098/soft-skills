@@ -11,6 +11,7 @@ from soft_skills_backend.modules.admin import AdminService
 from soft_skills_backend.modules.catalog import CatalogService
 from soft_skills_backend.modules.evaluation import EvaluationService
 from soft_skills_backend.modules.identity import IdentityService
+from soft_skills_backend.modules.organisations import OrganisationService
 from soft_skills_backend.modules.practice import PracticeService
 from soft_skills_backend.modules.progression import ProgressionService
 from soft_skills_backend.modules.taxonomy import TaxonomyService
@@ -39,7 +40,27 @@ def require_actor(request: Request) -> Actor:
 
 
 def require_admin_actor(request: Request) -> Actor:
-    return get_auth_provider(request).require_admin(request)
+    return get_auth_provider(request).require_org_admin(request)
+
+
+def require_verification_actor(request: Request, collection_id: str) -> Actor:
+    actor = require_actor(request)
+    if actor.organisation_id is None:
+        return actor
+    if not actor.is_org_admin:
+        from soft_skills_backend.shared.errors import auth_error
+
+        raise auth_error(
+            "Organisation admin access is required",
+            code="SS-AUTH-004",
+            status_code=403,
+            details={"user_id": actor.user_id, "organisation_id": actor.organisation_id},
+        )
+    return actor
+
+
+def require_org_admin_actor(request: Request) -> Actor:
+    return get_auth_provider(request).require_org_admin(request)
 
 
 def optional_actor(request: Request) -> Actor | None:
@@ -72,3 +93,7 @@ def get_practice_service(request: Request) -> PracticeService:
 
 def get_progression_service(request: Request) -> ProgressionService:
     return get_container(request).progression_service
+
+
+def get_organisation_service(request: Request) -> OrganisationService:
+    return get_container(request).organisation_service

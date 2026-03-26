@@ -54,19 +54,31 @@ from soft_skills_backend.shared.errors import auth_error, domain_error, validati
 def discovery_tier_for_collection(record: CollectionRecord) -> str:
     if record.lifecycle_state != "published_public":
         return "private"
-    if record.verification_state == "verified":
-        return "verified_public"
+    if record.organisation_id is None and record.verification_state == "verified":
+        return "global_public"
+    if record.organisation_id is not None:
+        return "org_public"
     return "standard_public"
 
 
 def can_view_collection(
     actor: Actor | None, record: CollectionRecord, include_private: bool
 ) -> bool:
-    if record.lifecycle_state == "published_public":
+    # Global hub published collections are visible to everyone (verified = global_public, not verified = standard_public)
+    if record.organisation_id is None and record.lifecycle_state == "published_public":
         return True
+    # Org published collections are visible to org members only
+    if record.organisation_id is not None and record.lifecycle_state == "published_public":
+        if actor is not None and actor.organisation_id == record.organisation_id:
+            return True
+        return actor is not None and actor.user_id == record.author_user_id
+    # For non-published collections, check auth
     if not include_private or actor is None:
         return False
-    return actor.is_admin or actor.user_id == record.author_user_id
+    # Author can always see their own collection
+    if actor.user_id == record.author_user_id:
+        return True
+    return actor.is_org_admin and actor.organisation_id == record.organisation_id
 
 
 def require_visible_collection(actor: Actor, record: CollectionRecord) -> None:
@@ -81,10 +93,12 @@ def require_visible_collection(actor: Actor, record: CollectionRecord) -> None:
 
 
 def require_collection_owner_or_admin(actor: Actor, collection: CollectionRecord) -> None:
-    if actor.is_admin or actor.user_id == collection.author_user_id:
+    if actor.user_id == collection.author_user_id:
+        return
+    if actor.is_org_admin and actor.organisation_id == collection.organisation_id:
         return
     raise auth_error(
-        "Only the collection owner or an admin can modify this collection",
+        "Only the collection owner or an org admin can modify this collection",
         code="SS-AUTH-005",
         status_code=403,
         details={"collection_id": collection.id},

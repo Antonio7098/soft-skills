@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request
 
 from soft_skills_backend.entrypoints.http.dependencies import (
     get_taxonomy_service,
-    require_admin_actor,
+    require_actor,
 )
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
 from soft_skills_backend.modules.taxonomy import TaxonomySnapshot
@@ -22,6 +22,6 @@ async def get_catalog(request: Request) -> ApiEnvelope[TaxonomySnapshot]:
 
 @router.post("/bootstrap-canon", response_model=ApiEnvelope[TaxonomySnapshot])
 async def bootstrap_catalog(request: Request) -> ApiEnvelope[TaxonomySnapshot]:
-    require_admin_actor(request)
+    require_actor(request)
     service = get_taxonomy_service(request)
     return ok_response(request, service.bootstrap())

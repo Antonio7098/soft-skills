@@ -235,6 +235,10 @@ class CollectionService:
                 query = query.filter(CollectionRecord.difficulty == filters.difficulty)
             if filters.author_user_id is not None:
                 query = query.filter(CollectionRecord.author_user_id == filters.author_user_id)
+            if filters.organisation_id is not None:
+                query = query.filter(CollectionRecord.organisation_id == filters.organisation_id)
+            elif actor is not None and actor.organisation_id is not None:
+                query = query.filter(CollectionRecord.organisation_id == actor.organisation_id)
             records = query.order_by(CollectionRecord.created_at.desc()).all()
             saved_collection_ids = set()
             if actor is not None:
@@ -541,6 +545,7 @@ class CollectionService:
         collection = CollectionRecord(
             id=uuid4().hex,
             author_user_id=actor.user_id,
+            organisation_id=command.organisation_id,
             title=command.title,
             summary=command.summary,
             target_audience=command.target_audience,

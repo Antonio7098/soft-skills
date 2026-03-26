@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Integer, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from soft_skills_backend.platform.db.base import Base
@@ -79,10 +79,34 @@ class UserAccountRecord(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(32), index=True)
     auth_provider: Mapped[str] = mapped_column(String(64))
     auth_subject: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class OrganisationRecord(Base):
+    """Organisation providing tenant isolation."""
+
+    __tablename__ = "organisations"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    slug: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class OrganisationMembershipRecord(Base):
+    """Organisation membership linking users to organisations."""
+
+    __tablename__ = "organisation_memberships"
+
+    organisation_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    role: Mapped[str] = mapped_column(String(32))
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    __table_args__ = (Index("ix_organisation_memberships_user_id", "user_id"),)
 
 
 class LearnerProfileRecord(Base):
@@ -148,6 +172,9 @@ class CollectionRecord(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     author_user_id: Mapped[str] = mapped_column(String(32), index=True)
+    organisation_id: Mapped[str | None] = mapped_column(
+        String(32), ForeignKey("organisations.id"), index=True, nullable=True
+    )
     title: Mapped[str] = mapped_column(String(255))
     summary: Mapped[str] = mapped_column(Text)
     target_audience: Mapped[str] = mapped_column(String(255))

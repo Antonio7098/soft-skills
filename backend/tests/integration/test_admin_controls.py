@@ -20,13 +20,12 @@ def _migrate(test_settings) -> None:
     command.upgrade(alembic_config, "head")
 
 
-async def _register_user(client, *, email: str, display_name: str, role: str = "standard_user"):
+async def _register_user(client, *, email: str, display_name: str):
     response = await client.post(
         "/api/auth/register",
         json={
             "email": email,
             "display_name": display_name,
-            "role": role,
             "target_role": "Consultant",
             "goals": ["Improve stakeholder handling"],
             "practice_preferences": {"session_length": "short"},
@@ -34,6 +33,20 @@ async def _register_user(client, *, email: str, display_name: str, role: str = "
     )
     assert response.status_code == 200
     return response.json()["data"]
+
+
+async def _create_org_and_make_admin(
+    client, *, email: str, display_name: str, org_name: str, org_slug: str
+):
+    user = await _register_user(client, email=email, display_name=display_name)
+    org_response = await client.post(
+        "/api/organisations",
+        headers={"X-User-ID": user["id"]},
+        json={"name": org_name, "slug": org_slug},
+    )
+    assert org_response.status_code == 200
+    org = org_response.json()["data"]
+    return user, org
 
 
 class FakeSuccessMarker:
@@ -86,22 +99,28 @@ class FakeSuccessMarker:
         )
 
 
-async def _seed_public_collection(client):
-    admin = await _register_user(
-        client,
-        email="admin-controls@example.com",
-        display_name="Admin Controls",
-        role="admin",
-    )
-    await client.post("/api/skills/bootstrap-canon", headers={"X-User-ID": admin["id"]})
+async def _seed_public_collection(client, org_id: str):
     learner = await _register_user(
         client,
         email="learner-controls@example.com",
         display_name="Learner Controls",
     )
+    print(f"Learner created: {learner['id']}")
+    bootstrap_resp = await client.post(
+        "/api/skills/bootstrap-canon", headers={"X-User-ID": learner["id"]}
+    )
+    print(f"Bootstrap: {bootstrap_resp.status_code}")
+
+    # Add learner to org as member (needed for visibility when org_id is set on collection)
+    add_member_resp = await client.post(
+        f"/api/organisations/{org_id}/members",
+        headers={"X-User-ID": learner["id"], "X-Organisation-ID": org_id},
+        json={"user_id": learner["id"], "role": "member"},
+    )
+    print(f"Add member: {add_member_resp.status_code}")
     collection_response = await client.post(
         "/api/collections",
-        headers={"X-User-ID": learner["id"]},
+        headers={"X-User-ID": learner["id"], "X-Organisation-ID": org_id},
         json={
             "title": "Admin Review Pack",
             "summary": "Collection used to test admin review flows.",
@@ -111,12 +130,19 @@ async def _seed_public_collection(client):
             "target_skill_slugs": ["active-listening", "expectation-setting"],
             "target_competency_slugs": ["stakeholder-management"],
             "rubric_ids": ["quick_practice_text@v1"],
+            "organisation_id": org_id,
         },
     )
+    if collection_response.status_code != 200:
+        print(f"Collection error: {collection_response.status_code} {collection_response.json()}")
+    assert collection_response.status_code == 200, (
+        f"Collection creation failed: {collection_response.json()}"
+    )
     collection_id = collection_response.json()["data"]["id"]
+    print(f"Collection created: {collection_id}")
     prompt_response = await client.post(
         f"/api/collections/{collection_id}/prompt-items",
-        headers={"X-User-ID": learner["id"]},
+        headers={"X-User-ID": learner["id"], "X-Organisation-ID": org_id},
         json={
             "prompt_type": "quick_practice_prompt",
             "title": "Reset expectations",
@@ -128,15 +154,17 @@ async def _seed_public_collection(client):
     )
     publish_response = await client.patch(
         f"/api/collections/{collection_id}/lifecycle",
-        headers={"X-User-ID": learner["id"]},
+        headers={"X-User-ID": learner["id"], "X-Organisation-ID": org_id},
         json={"lifecycle_state": "published_public"},
     )
+    if publish_response.status_code != 200:
+        print(f"Publish error: {publish_response.status_code} {publish_response.json()}")
     assert publish_response.status_code == 200
-    return admin, learner, collection_response.json()["data"], prompt_response.json()["data"]
+    return learner, collection_response.json()["data"], prompt_response.json()["data"]
 
 
-async def _seed_assessed_attempt(app, client):
-    admin, learner, collection, prompt = await _seed_public_collection(client)
+async def _seed_assessed_attempt(app, client, org_id: str):
+    learner, collection, prompt = await _seed_public_collection(client, org_id)
     app.state.container.practice_service._assessment_marker = FakeSuccessMarker()
     start_response = await client.post(
         "/api/attempts/quick-practice/sessions",
@@ -156,29 +184,38 @@ async def _seed_assessed_attempt(app, client):
         },
     )
     assert submit_response.status_code == 200
-    return admin, learner, collection, prompt, submit_response.json()["data"]
+    return learner, collection, prompt, submit_response.json()["data"]
 
 
 @pytest.mark.asyncio
 async def test_admin_verification_workflow_persists_history(app, client, test_settings) -> None:
     _migrate(test_settings)
-    admin, _learner, collection, _prompt = await _seed_public_collection(client)
+    admin, org = await _create_org_and_make_admin(
+        client,
+        email="admin-controls@example.com",
+        display_name="Admin Controls",
+        org_name="Test Org",
+        org_slug="test-org",
+    )
+    org_id = org["id"]
+
+    _, collection, _prompt = await _seed_public_collection(client, org_id)
 
     queue_response = await client.get(
         "/api/admin/collections/verification-queue",
-        headers={"X-User-ID": admin["id"]},
+        headers={"X-User-ID": admin["id"], "X-Organisation-ID": org_id},
     )
     assert queue_response.status_code == 200
     assert [item["collection_id"] for item in queue_response.json()["data"]] == [collection["id"]]
 
     verify_response = await client.post(
         f"/api/admin/collections/{collection['id']}/verification",
-        headers={"X-User-ID": admin["id"]},
+        headers={"X-User-ID": admin["id"], "X-Organisation-ID": org_id},
         json={"verification_state": "verified", "note": "Strong structure and mapping quality."},
     )
     assert verify_response.status_code == 200
     payload = verify_response.json()["data"]
-    assert payload["collection"]["discovery_tier"] == "verified_public"
+    assert payload["collection"]["discovery_tier"] == "org_public"
     assert payload["latest_review"]["next_verification_state"] == "verified"
 
     with app.state.container.session_factory() as session:
@@ -199,7 +236,16 @@ async def test_admin_analytics_and_audit_are_redacted_and_admin_only(
     app, client, test_settings
 ) -> None:
     _migrate(test_settings)
-    admin, learner, _collection, prompt, attempt = await _seed_assessed_attempt(app, client)
+    admin, org = await _create_org_and_make_admin(
+        client,
+        email="admin-controls@example.com",
+        display_name="Admin Controls",
+        org_name="Test Org Analytics",
+        org_slug="test-org-analytics",
+    )
+    org_id = org["id"]
+
+    learner, _collection, prompt, attempt = await _seed_assessed_attempt(app, client, org_id)
     attempt_id = attempt["id"]
 
     own_attempt_response = await client.get(
@@ -226,7 +272,7 @@ async def test_admin_analytics_and_audit_are_redacted_and_admin_only(
 
     learner_analytics_response = await client.get(
         f"/api/admin/learners/{learner['id']}/analytics",
-        headers={"X-User-ID": admin["id"]},
+        headers={"X-User-ID": admin["id"], "X-Organisation-ID": org_id},
     )
     assert learner_analytics_response.status_code == 200
     learner_payload = learner_analytics_response.json()["data"]
@@ -236,7 +282,7 @@ async def test_admin_analytics_and_audit_are_redacted_and_admin_only(
 
     cohort_analytics_response = await client.get(
         "/api/admin/cohorts/analytics",
-        headers={"X-User-ID": admin["id"]},
+        headers={"X-User-ID": admin["id"], "X-Organisation-ID": org_id},
         params={"target_role": "Consultant"},
     )
     assert cohort_analytics_response.status_code == 200
@@ -244,7 +290,7 @@ async def test_admin_analytics_and_audit_are_redacted_and_admin_only(
 
     audit_response = await client.get(
         f"/api/admin/attempts/{attempt_id}/audit",
-        headers={"X-User-ID": admin["id"]},
+        headers={"X-User-ID": admin["id"], "X-Organisation-ID": org_id},
     )
     assert audit_response.status_code == 200
     audit_payload = audit_response.json()["data"]
@@ -258,7 +304,7 @@ async def test_admin_analytics_and_audit_are_redacted_and_admin_only(
 
     relationship_response = await client.put(
         f"/api/admin/learners/{learner['id']}/relationship",
-        headers={"X-User-ID": admin["id"]},
+        headers={"X-User-ID": admin["id"], "X-Organisation-ID": org_id},
         json={"relationship_type": "manager"},
     )
     assert relationship_response.status_code == 200
@@ -266,7 +312,7 @@ async def test_admin_analytics_and_audit_are_redacted_and_admin_only(
 
     full_audit_response = await client.get(
         f"/api/admin/attempts/{attempt_id}/audit",
-        headers={"X-User-ID": admin["id"]},
+        headers={"X-User-ID": admin["id"], "X-Organisation-ID": org_id},
     )
     assert full_audit_response.status_code == 200
     full_audit_payload = full_audit_response.json()["data"]
@@ -277,6 +323,6 @@ async def test_admin_analytics_and_audit_are_redacted_and_admin_only(
 
     delete_relationship_response = await client.delete(
         f"/api/admin/learners/{learner['id']}/relationship",
-        headers={"X-User-ID": admin["id"]},
+        headers={"X-User-ID": admin["id"], "X-Organisation-ID": org_id},
     )
     assert delete_relationship_response.status_code == 200

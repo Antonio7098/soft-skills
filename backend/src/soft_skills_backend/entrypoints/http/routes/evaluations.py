@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, Request
 
 from soft_skills_backend.entrypoints.http.dependencies import (
     get_evaluation_service,
-    require_admin_actor,
+    require_actor,
 )
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
 from soft_skills_backend.modules.evaluation import (
@@ -22,7 +22,7 @@ router = APIRouter()
 async def list_evaluation_suites(
     request: Request,
 ) -> ApiEnvelope[list[EvaluationSuiteView]]:
-    actor = require_admin_actor(request)
+    actor = require_actor(request)
     service = get_evaluation_service(request)
     return ok_response(request, service.list_suites(actor))
 
@@ -32,7 +32,7 @@ async def list_evaluation_runs(
     request: Request,
     limit: int = Query(default=20, ge=1, le=100),
 ) -> ApiEnvelope[list[EvaluationRunView]]:
-    actor = require_admin_actor(request)
+    actor = require_actor(request)
     service = get_evaluation_service(request)
     return ok_response(request, service.list_runs(actor, limit=limit))
 
@@ -42,7 +42,7 @@ async def get_evaluation_run(
     request: Request,
     run_id: str,
 ) -> ApiEnvelope[EvaluationRunView]:
-    actor = require_admin_actor(request)
+    actor = require_actor(request)
     service = get_evaluation_service(request)
     return ok_response(request, service.get_run(actor, run_id))
 
@@ -52,7 +52,7 @@ async def execute_evaluation_run(
     request: Request,
     command: EvaluationRunCommand,
 ) -> ApiEnvelope[EvaluationRunView]:
-    actor = require_admin_actor(request)
+    actor = require_actor(request)
     service = get_evaluation_service(request)
     payload = await service.execute(
         actor,

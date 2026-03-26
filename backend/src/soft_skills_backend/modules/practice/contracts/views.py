@@ -96,7 +96,9 @@ def build_practice_run_view(session: Session, run: PracticeRunRecord) -> Practic
     )
 
 
-def build_practice_run_list_item(session: Session, run: PracticeRunRecord) -> PracticeRunListItemView:
+def build_practice_run_list_item(
+    session: Session, run: PracticeRunRecord
+) -> PracticeRunListItemView:
     """Build a compact history row for one aggregate run."""
 
     items = _load_practice_run_items(session, run.id)
@@ -157,7 +159,9 @@ def _load_practice_run_items(session: Session, run_id: str) -> list[PracticeRunI
     session_records = (
         session.query(PracticeSessionRecord)
         .filter(PracticeSessionRecord.practice_run_id == run_id)
-        .order_by(PracticeSessionRecord.sequence_index.asc(), PracticeSessionRecord.created_at.asc())
+        .order_by(
+            PracticeSessionRecord.sequence_index.asc(), PracticeSessionRecord.created_at.asc()
+        )
         .all()
     )
     items: list[PracticeRunItemView] = []
@@ -172,7 +176,9 @@ def _load_practice_run_items(session: Session, run_id: str) -> list[PracticeRunI
     return items
 
 
-def _attempt_for_practice_session(session: Session, practice_session: PracticeSessionRecord) -> AttemptRecord:
+def _attempt_for_practice_session(
+    session: Session, practice_session: PracticeSessionRecord
+) -> AttemptRecord:
     attempt: AttemptRecord | None = None
     if practice_session.last_attempt_id is not None:
         attempt = session.get(AttemptRecord, practice_session.last_attempt_id)
@@ -206,7 +212,10 @@ def _build_practice_run_summary(items: list[PracticeRunItemView]) -> PracticeRun
         if attempt.status in {AttemptStatus.ASSESSMENT_REJECTED, AttemptStatus.ASSESSMENT_FAILED}:
             failed_attempt_count += 1
         assessment = attempt.assessment
-        if assessment is None or assessment.validation_status != AssessmentValidationStatus.VALIDATED:
+        if (
+            assessment is None
+            or assessment.validation_status != AssessmentValidationStatus.VALIDATED
+        ):
             continue
         if assessment.overall_score is None:
             continue
@@ -250,7 +259,9 @@ def can_use_collection(actor: Actor, collection: CollectionRecord) -> bool:
 
     if collection.lifecycle_state == "published_public":
         return True
-    return actor.is_admin or collection.author_user_id == actor.user_id
+    if actor.is_org_admin and actor.organisation_id == collection.organisation_id:
+        return True
+    return collection.author_user_id == actor.user_id
 
 
 def utcnow() -> datetime:

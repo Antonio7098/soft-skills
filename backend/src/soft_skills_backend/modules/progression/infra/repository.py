@@ -169,7 +169,9 @@ class ProgressionRepository:
                     goals=list(learner_profile.goals),
                 ),
                 source_assessment=self._to_assessment_signal(assessment_record),
-                assessments=[self._to_assessment_signal(record) for record in validated_assessments],
+                assessments=[
+                    self._to_assessment_signal(record) for record in validated_assessments
+                ],
                 skill_slugs=skill_slugs,
                 competency_definitions=[
                     CompetencyDefinition(
@@ -178,7 +180,9 @@ class ProgressionRepository:
                     )
                     for record in competency_records
                 ],
-                previous_state_payload=None if latest_snapshot is None else latest_snapshot.snapshot_payload,
+                previous_state_payload=None
+                if latest_snapshot is None
+                else latest_snapshot.snapshot_payload,
             )
 
     def load_catalog_candidates(self, learner_id: str) -> list[CatalogCandidate]:
@@ -595,7 +599,7 @@ class ProgressionRepository:
         return len(attempts), last_attempted_at
 
     def _synthetic_actor(self, learner_id: str) -> Actor:
-        return Actor(user_id=learner_id, role="standard_user", email="")
+        return Actor(user_id=learner_id, email="")
 
     def _to_assessment_signal(self, record: AssessmentRecord) -> AssessmentSignal:
         return AssessmentSignal(
@@ -613,7 +617,7 @@ class ProgressionRepository:
         )
 
     def _assert_access(self, actor: Actor, learner_id: str) -> None:
-        if actor.user_id == learner_id or actor.is_admin:
+        if actor.user_id == learner_id or actor.is_org_admin:
             return
         raise auth_error(
             "Progress is not visible to this actor",

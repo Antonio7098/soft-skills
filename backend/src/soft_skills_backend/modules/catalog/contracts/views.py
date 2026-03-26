@@ -136,6 +136,7 @@ def build_collection_view(
     return CollectionView(
         id=record.id,
         author_user_id=record.author_user_id,
+        organisation_id=record.organisation_id,
         title=record.title,
         summary=record.summary,
         target_audience=record.target_audience,

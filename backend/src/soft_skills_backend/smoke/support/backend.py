@@ -354,6 +354,107 @@ class SmokeBackendClient:
         self.require_ok(response, "list aggregate practice runs")
         return cast(list[JsonObject], response.json()["data"])
 
+    async def create_organisation(
+        self,
+        *,
+        user_id: str,
+        name: str,
+        slug: str,
+    ) -> JsonObject:
+        response = await self._client.post(
+            "/api/organisations",
+            headers={"X-User-ID": user_id},
+            json={"name": name, "slug": slug},
+        )
+        self.require_ok(response, f"create organisation {slug}")
+        return self.data(response)
+
+    async def get_organisation(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+    ) -> JsonObject:
+        response = await self._client.get(
+            f"/api/organisations/{organisation_id}",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+        )
+        self.require_ok(response, f"get organisation {organisation_id}")
+        return self.data(response)
+
+    async def update_organisation(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        payload: JsonObject,
+    ) -> JsonObject:
+        response = await self._client.patch(
+            f"/api/organisations/{organisation_id}",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            json=payload,
+        )
+        self.require_ok(response, f"update organisation {organisation_id}")
+        return self.data(response)
+
+    async def list_members(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+    ) -> list[JsonObject]:
+        response = await self._client.get(
+            f"/api/organisations/{organisation_id}/members",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+        )
+        self.require_ok(response, f"list organisation members {organisation_id}")
+        return cast(list[JsonObject], response.json()["data"])
+
+    async def add_member(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        new_member_id: str,
+        role: str = "member",
+    ) -> JsonObject:
+        response = await self._client.post(
+            f"/api/organisations/{organisation_id}/members",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            json={"user_id": new_member_id, "role": role},
+        )
+        self.require_ok(response, f"add member to organisation {organisation_id}")
+        return self.data(response)
+
+    async def update_member(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        member_id: str,
+        role: str,
+    ) -> JsonObject:
+        response = await self._client.patch(
+            f"/api/organisations/{organisation_id}/members/{member_id}",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            json={"role": role},
+        )
+        self.require_ok(response, f"update member role in organisation {organisation_id}")
+        return self.data(response)
+
+    async def remove_member(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        member_id: str,
+    ) -> None:
+        response = await self._client.delete(
+            f"/api/organisations/{organisation_id}/members/{member_id}",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+        )
+        self.require_ok(response, f"remove member from organisation {organisation_id}")
+
     @staticmethod
     def data(response: httpx.Response) -> JsonObject:
         return cast(JsonObject, response.json()["data"])

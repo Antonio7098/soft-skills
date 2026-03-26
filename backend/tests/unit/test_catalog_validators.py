@@ -96,8 +96,9 @@ def test_discovery_tier_and_filter_validation_are_explicit() -> None:
         target_skill_slugs=["active-listening"],
         target_competency_slugs=["stakeholder-management"],
         rubric_ids=["quick_practice_text@v1"],
+        organisation_id=None,
     )
-    assert discovery_tier_for_collection(collection) == "verified_public"
+    assert discovery_tier_for_collection(collection) == "global_public"
 
     with pytest.raises(Exception) as exc_info:
         validate_collection_filters(CollectionListFilters(discovery_tier="unknown"))
