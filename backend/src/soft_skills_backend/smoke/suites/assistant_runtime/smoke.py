@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
-from threading import Thread
+from pathlib import Path
 from typing import cast
 
 import httpx
 import websockets
 
+from soft_skills_backend.app import create_app
 from soft_skills_backend.config import Settings
 from soft_skills_backend.shared.errors import provider_error
 from soft_skills_backend.smoke.contracts import SmokeCase, SmokeContext
@@ -215,76 +216,88 @@ class AssistantStreamRuntimeSmoke(_AssistantRuntimeSmoke):
 
     async def _run(self, settings: Settings) -> AssistantStreamSmokeResult:
         import json
+        import socket
         import tempfile
-        from pathlib import Path
+        import threading
 
-        import uvicorn
         from alembic.config import Config
 
         from alembic import command as alembic_command
-        from soft_skills_backend.app import create_app
+
+        def find_free_port() -> int:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(("127.0.0.1", 0))
+                return s.getsockname()[1]
+
+        def run_migration(db_url: str) -> None:
+            alembic_cfg = Config(str(Path(__file__).resolve().parents[5] / "alembic.ini"))
+            alembic_cfg.set_main_option(
+                "script_location", str(Path(__file__).resolve().parents[5] / "alembic")
+            )
+            alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+            alembic_command.upgrade(alembic_cfg, "head")
 
         with tempfile.TemporaryDirectory(prefix="soft-skills-stream-smoke-") as temp_dir:
+            db_path = Path(temp_dir) / "smoke.db"
+            db_url = f"sqlite+pysqlite:///{db_path}"
+            port = find_free_port()
+
             smoke_settings = settings.model_copy(
                 update={
                     "environment": "test",
-                    "database_url": f"sqlite+pysqlite:///{Path(temp_dir) / 'smoke.db'}",
+                    "database_url": db_url,
                     "smoke_timeout_seconds": 60.0,
                     "provider_max_retries": 0,
                     "assessment_validation_retries": 0,
                 }
             )
-            app = create_app(smoke_settings)
 
-            alembic_config = Config(str(Path(__file__).resolve().parents[5] / "alembic.ini"))
-            alembic_config.set_main_option(
-                "script_location", str(Path(__file__).resolve().parents[5] / "alembic")
+            run_migration(db_url)
+
+            test_app = create_app(smoke_settings)
+
+            import uvicorn
+
+            server_config = uvicorn.Config(
+                test_app,
+                host="127.0.0.1",
+                port=port,
+                log_level="error",
             )
-            alembic_config.set_main_option("sqlalchemy.url", smoke_settings.database_url)
-            alembic_command.upgrade(alembic_config, "head")
+            server = uvicorn.Server(server_config)
 
-            port_queue: list[int] = []
-            config = uvicorn.Config(app, host="127.0.0.1", port=0, log_level="error")
-
-            async def start_server() -> None:
-                config.prepare_server()
-                port_queue.append(config.bind_ports()[0])
-                await server.serve()
-
-            server = uvicorn.Server(config)
-            server_thread = Thread(target=lambda: asyncio.run(start_server()), daemon=True)
+            server_thread = threading.Thread(target=server.run, daemon=True)
             server_thread.start()
 
-            while not port_queue:
-                await asyncio.sleep(0.01)
+            import time
 
-            port = port_queue[0]
-            base_url = f"http://127.0.0.1:{port}"
-
-            transport = httpx.ASGITransport(app=app)
-            async with httpx.AsyncClient(transport=transport, base_url=base_url) as client:
-                backend = SmokeBackendClient(client)
-                actors = await SmokeActorBootstrap(backend).prepare()
-                session_payload = await backend.create_assistant_session(
-                    user_id=actors.learner_id,
-                    title="Assistant Stream Smoke",
-                )
-                turn_payload = await backend.create_assistant_turn(
-                    user_id=actors.learner_id,
-                    session_id=str(session_payload["id"]),
-                    message="Say hello in one short sentence.",
-                )
-                stream_token = str(turn_payload["stream_token"])
-                turn_id = str(turn_payload["id"])
-                session_id = str(session_payload["id"])
-
-            ws_url = f"ws://127.0.0.1:{port}/api/assistant/streams/{stream_token}"
-
-            event_types: list[str] = []
-            delta_count = 0
-            final_content: str | None = None
+            time.sleep(1)
 
             try:
+                base_url = f"http://127.0.0.1:{port}"
+
+                transport = httpx.ASGITransport(app=test_app)
+                async with httpx.AsyncClient(transport=transport, base_url=base_url) as client:
+                    backend = SmokeBackendClient(client)
+                    actors = await SmokeActorBootstrap(backend).prepare()
+                    session_payload = await backend.create_assistant_session(
+                        user_id=actors.learner_id,
+                        title="Assistant Stream Smoke",
+                    )
+                    turn_payload = await backend.create_assistant_turn(
+                        user_id=actors.learner_id,
+                        session_id=str(session_payload["id"]),
+                        message="Say hello in one short sentence.",
+                    )
+                    stream_token = str(turn_payload["stream_token"])
+                    turn_id = str(turn_payload["id"])
+                    session_id = str(session_payload["id"])
+                    ws_url = f"ws://127.0.0.1:{port}/api/assistant/streams/{stream_token}"
+
+                event_types: list[str] = []
+                delta_count = 0
+                final_content: str | None = None
+
                 async with websockets.connect(ws_url) as ws:
                     while True:
                         message = await ws.recv()
@@ -297,41 +310,40 @@ class AssistantStreamRuntimeSmoke(_AssistantRuntimeSmoke):
                             final_content = str(data.get("payload", {}).get("content", ""))
                         if event_type in ("response.completed", "turn.completed", "turn.failed"):
                             break
+
+                async with httpx.AsyncClient(transport=transport, base_url=base_url) as client:
+                    backend = SmokeBackendClient(client)
+                    await backend.wait_for_assistant_turn(
+                        user_id=actors.learner_id,
+                        session_id=session_id,
+                        turn_id=turn_id,
+                    )
+
+                if "response.delta" not in event_types:
+                    raise provider_error(
+                        "Websocket streaming smoke did not receive response.delta events",
+                        code="SS-PROVIDER-011",
+                        details={"event_types": event_types},
+                    )
+                if "response.completed" not in event_types:
+                    raise provider_error(
+                        "Websocket streaming smoke did not receive response.completed event",
+                        code="SS-PROVIDER-011",
+                        details={"event_types": event_types},
+                    )
+
+                return AssistantStreamSmokeResult(
+                    status="ok",
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    stream_token=stream_token,
+                    event_types=event_types,
+                    delta_count=delta_count,
+                    final_content=final_content,
+                )
             finally:
                 server.should_exit = True
                 server_thread.join(timeout=5)
-
-            transport = httpx.ASGITransport(app=app)
-            async with httpx.AsyncClient(transport=transport, base_url=base_url) as client:
-                backend = SmokeBackendClient(client)
-                await backend.wait_for_assistant_turn(
-                    user_id=actors.learner_id,
-                    session_id=session_id,
-                    turn_id=turn_id,
-                )
-
-            if "response.delta" not in event_types:
-                raise provider_error(
-                    "Websocket streaming smoke did not receive response.delta events",
-                    code="SS-PROVIDER-011",
-                    details={"event_types": event_types},
-                )
-            if "response.completed" not in event_types:
-                raise provider_error(
-                    "Websocket streaming smoke did not receive response.completed event",
-                    code="SS-PROVIDER-011",
-                    details={"event_types": event_types},
-                )
-
-            return AssistantStreamSmokeResult(
-                status="ok",
-                session_id=session_id,
-                turn_id=turn_id,
-                stream_token=stream_token,
-                event_types=event_types,
-                delta_count=delta_count,
-                final_content=final_content,
-            )
 
     async def _run_flow(self, backend: SmokeBackendClient, user_id: str) -> JsonObject:
         return {}
