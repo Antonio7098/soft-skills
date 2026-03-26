@@ -23,6 +23,7 @@ from .suites.content_generation import (
     StructuredGenerationSmoke,
     StructuredPromptItemGenerationSmoke,
 )
+from .suites.organisation_smoke import OrganisationSmoke
 from .suites.practice_run_lifecycle import PracticeRunLifecycleSmoke
 from .suites.practice_session_flow import PracticeSessionFlowSmoke
 from .suites.provider_baseline import ProviderBaselineSmoke
@@ -46,6 +47,7 @@ def build_default_registry() -> SmokeRegistry:
             ScenarioMarkingSmoke(),
             PracticeSessionFlowSmoke(),
             PracticeRunLifecycleSmoke(),
+            OrganisationSmoke(),
         ]
     )
 

@@ -60,4 +60,5 @@ def test_default_registry_includes_practice_run_lifecycle_smoke() -> None:
         "marking-scenario",
         "practice-session-flow",
         "practice-run-lifecycle",
+        "organisation-management",
     ]

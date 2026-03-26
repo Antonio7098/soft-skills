@@ -12,7 +12,6 @@ class RegisterUserCommand(BaseModel):
 
     email: str
     display_name: str
-    role: str = "standard_user"
     target_role: str | None = None
     goals: list[str] = Field(default_factory=list)
     practice_preferences: dict[str, str] = Field(default_factory=dict)
@@ -40,7 +39,6 @@ class UserView(BaseModel):
     id: str
     email: str
     display_name: str
-    role: str
     auth_provider: str
     created_at: datetime
     profile: LearnerProfileView

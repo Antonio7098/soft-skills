@@ -47,7 +47,6 @@ class IdentityService:
                 id=uuid4().hex,
                 email=command.email,
                 display_name=command.display_name,
-                role=command.role,
                 auth_provider="internal",
                 auth_subject=command.email,
                 created_at=now,
@@ -66,7 +65,7 @@ class IdentityService:
         self._workflow_events.record(
             WorkflowEvent(
                 event_type="identity.user_registered.v1",
-                payload={"user_id": user.id, "role": user.role},
+                payload={"user_id": user.id},
                 request_id=user.id,
                 workflow_id=user.id,
             )
@@ -95,7 +94,6 @@ class IdentityService:
                 id=user.id,
                 email=user.email,
                 display_name=user.display_name,
-                role=user.role,
                 auth_provider=user.auth_provider,
                 created_at=user.created_at,
                 profile=LearnerProfileView(

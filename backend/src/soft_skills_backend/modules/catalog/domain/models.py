@@ -115,6 +115,7 @@ class CollectionCreateCommand(BaseModel):
     target_skill_slugs: list[str]
     target_competency_slugs: list[str]
     rubric_ids: list[str]
+    organisation_id: str | None = None
 
 
 class CollectionUpdateCommand(CollectionCreateCommand):
@@ -138,11 +139,13 @@ class CollectionListFilters(BaseModel):
     saved_only: bool = False
     discovery_tier: str | None = None
     author_user_id: str | None = None
+    organisation_id: str | None = None
 
 
 class CollectionView(BaseModel):
     id: str
     author_user_id: str
+    organisation_id: str | None = None
     title: str
     summary: str
     target_audience: str
@@ -170,7 +173,10 @@ class CollectionGenerationCounts(BaseModel):
 
     @model_validator(mode="after")
     def validate_non_empty(self) -> CollectionGenerationCounts:
-        if self.quick_practice_prompt_count + self.interview_prompt_count + self.scenario_count <= 0:
+        if (
+            self.quick_practice_prompt_count + self.interview_prompt_count + self.scenario_count
+            <= 0
+        ):
             raise ValueError("At least one generated content item is required")
         return self
 

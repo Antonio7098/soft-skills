@@ -31,7 +31,6 @@ from soft_skills_backend.platform.db.models import (
     ProgressionSnapshotRecord,
     ProviderCallRecord,
     RecommendationArtifactRecord,
-    UserAccountRecord,
     WorkflowEventRecord,
 )
 from soft_skills_backend.shared.errors import domain_error
@@ -199,19 +198,11 @@ class AdminAnalyticsRepository:
             )
 
     def _cohort_learner_ids(self, session: Session, target_role: str | None) -> list[str]:
-        users = {
-            record.id: record
-            for record in session.query(UserAccountRecord)
-            .filter(UserAccountRecord.role != "admin")
-            .all()
-        }
-        profiles = session.query(LearnerProfileRecord).all()
-        return sorted(
-            profile.user_id
-            for profile in profiles
-            if profile.user_id in users
-            and (target_role is None or profile.target_role == target_role)
-        )
+        query = session.query(LearnerProfileRecord)
+        if target_role is not None:
+            query = query.filter(LearnerProfileRecord.target_role == target_role)
+        profiles = query.all()
+        return sorted(profile.user_id for profile in profiles)
 
     def _sessions(self, session: Session, learner_ids: list[str]) -> list[PracticeSessionRecord]:
         if not learner_ids:

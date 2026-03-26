@@ -7,6 +7,7 @@ from fastapi import APIRouter, Query, Request
 from soft_skills_backend.entrypoints.http.dependencies import (
     get_admin_service,
     require_admin_actor,
+    require_verification_actor,
 )
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
 from soft_skills_backend.modules.admin import (
@@ -57,7 +58,7 @@ async def update_collection_verification(
     collection_id: str,
     command: AdminCollectionVerificationCommand,
 ) -> ApiEnvelope[CollectionVerificationAuditView]:
-    actor = require_admin_actor(request)
+    actor = require_verification_actor(request, collection_id)
     service = get_admin_service(request)
     payload = service.update_collection_verification(
         actor,
@@ -104,7 +105,9 @@ async def upsert_learner_relationship(
 ) -> ApiEnvelope[AdminLearnerRelationshipView]:
     actor = require_admin_actor(request)
     service = get_admin_service(request)
-    return ok_response(request, service.upsert_learner_relationship(actor, learner_id=learner_id, command=command))
+    return ok_response(
+        request, service.upsert_learner_relationship(actor, learner_id=learner_id, command=command)
+    )
 
 
 @router.delete("/learners/{learner_id}/relationship", response_model=ApiEnvelope[dict[str, str]])

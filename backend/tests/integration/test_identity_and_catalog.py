@@ -437,7 +437,10 @@ async def test_catalog_supports_updates_save_reuse_and_verified_discovery(
         },
     )
     assert update_scenario_response.status_code == 200
-    assert update_scenario_response.json()["data"]["supporting_artifacts"][0]["artifact_type"] == "brief"
+    assert (
+        update_scenario_response.json()["data"]["supporting_artifacts"][0]["artifact_type"]
+        == "brief"
+    )
 
     publish_response = await client.patch(
         f"/api/collections/{collection_id}/lifecycle",
@@ -476,11 +479,11 @@ async def test_catalog_supports_updates_save_reuse_and_verified_discovery(
         json={"verification_state": "verified", "note": "Strong metadata and mapping quality."},
     )
     assert verify_response.status_code == 200
-    assert verify_response.json()["data"]["collection"]["discovery_tier"] == "verified_public"
+    assert verify_response.json()["data"]["collection"]["discovery_tier"] == "global_public"
 
     verified_discovery_response = await client.get(
         "/api/collections",
-        params={"discovery_tier": "verified_public", "include_private": "false"},
+        params={"discovery_tier": "global_public", "include_private": "false"},
     )
     assert verified_discovery_response.status_code == 200
     assert [item["id"] for item in verified_discovery_response.json()["data"]] == [collection_id]
@@ -893,9 +896,7 @@ async def test_catalog_generates_prompt_items_for_existing_collections(
             .filter(ContentGenerationArtifactRecord.collection_id == collection_id)
             .all()
         )
-        pipeline_names = {
-            record.pipeline_name for record in session.query(PipelineRunRecord).all()
-        }
+        pipeline_names = {record.pipeline_name for record in session.query(PipelineRunRecord).all()}
 
     assert len(prompt_records) == 2
     assert "catalog_prompt_items_structured_generation" in pipeline_names

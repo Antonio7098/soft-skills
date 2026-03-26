@@ -22,7 +22,7 @@ ALLOWED_COLLECTION_SOURCE_TYPES: set[str] = {
     "generated_structured",
     "generated_chat",
 }
-ALLOWED_DISCOVERY_TIERS: set[str] = {"private", "standard_public", "verified_public"}
+ALLOWED_DISCOVERY_TIERS: set[str] = {"private", "global_public", "org_public", "standard_public"}
 ALLOWED_COLLECTION_TRANSITIONS: dict[str, set[str]] = {
     "draft": {"review", "published_private", "published_public", "archived"},
     "review": {"draft", "published_private", "published_public", "archived"},
