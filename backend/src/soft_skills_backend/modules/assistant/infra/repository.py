@@ -93,7 +93,10 @@ class AssistantRepository:
             records = (
                 session.query(AssistantSessionRecord)
                 .filter(AssistantSessionRecord.user_id == actor.user_id)
-                .order_by(AssistantSessionRecord.updated_at.desc(), AssistantSessionRecord.created_at.desc())
+                .order_by(
+                    AssistantSessionRecord.updated_at.desc(),
+                    AssistantSessionRecord.created_at.desc(),
+                )
                 .all()
             )
             return [self._build_session_view(session, record) for record in records]
@@ -223,7 +226,9 @@ class AssistantRepository:
                 for record in records
             ]
 
-    def load_history(self, *, actor: Actor, session_id: str, limit: int = 20) -> list[AssistantMessageView]:
+    def load_history(
+        self, *, actor: Actor, session_id: str, limit: int = 20
+    ) -> list[AssistantMessageView]:
         with self._session_factory() as session:
             self._load_owned_session(session, actor, session_id)
             records = (
@@ -324,11 +329,13 @@ class AssistantRepository:
             session.commit()
             return self._build_turn_view(session, record)
 
-    def request_cancel(self, *, actor: Actor | None, turn_id: str, reason: str) -> AssistantTurnView:
+    def request_cancel(
+        self, *, actor: Actor | None, turn_id: str, reason: str
+    ) -> AssistantTurnView:
         now = datetime.now(UTC)
         with self._session_factory() as session:
             record = self._load_turn(session, turn_id)
-            if actor is not None and record.user_id != actor.user_id and not actor.is_admin:
+            if actor is not None and record.user_id != actor.user_id:
                 raise auth_error(
                     "Assistant turn is not visible to this actor",
                     code="SS-AUTH-201",
@@ -491,7 +498,9 @@ class AssistantRepository:
                 .order_by(AssistantStreamEventRecord.sequence_number.desc())
                 .first()
             )
-            next_sequence = 1 if current_max is None or current_max[0] is None else int(current_max[0]) + 1
+            next_sequence = (
+                1 if current_max is None or current_max[0] is None else int(current_max[0]) + 1
+            )
             record = AssistantStreamEventRecord(
                 event_id=uuid4().hex,
                 session_id=turn.session_id,
@@ -530,7 +539,7 @@ class AssistantRepository:
                 status_code=404,
                 details={"session_id": session_id},
             )
-        if record.user_id != actor.user_id and not actor.is_admin:
+        if record.user_id != actor.user_id:
             raise auth_error(
                 "Assistant session is not visible to this actor",
                 code="SS-AUTH-202",
@@ -541,7 +550,7 @@ class AssistantRepository:
 
     def _load_owned_turn(self, session: Session, actor: Actor, turn_id: str) -> AssistantTurnRecord:
         record = self._load_turn(session, turn_id)
-        if record.user_id != actor.user_id and not actor.is_admin:
+        if record.user_id != actor.user_id:
             raise auth_error(
                 "Assistant turn is not visible to this actor",
                 code="SS-AUTH-201",
@@ -572,7 +581,9 @@ class AssistantRepository:
             )
         return record
 
-    def _build_session_view(self, session: Session, record: AssistantSessionRecord) -> AssistantSessionView:
+    def _build_session_view(
+        self, session: Session, record: AssistantSessionRecord
+    ) -> AssistantSessionView:
         turns = (
             session.query(AssistantTurnRecord)
             .filter(AssistantTurnRecord.session_id == record.id)
