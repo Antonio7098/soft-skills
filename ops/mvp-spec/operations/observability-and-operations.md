@@ -49,6 +49,7 @@ The MVP should emit structured events for:
 - assessment rejected
 - progress updated
 - content draft generated
+- collection saved
 - content published
 - recommendation generated
 - workflow failed
@@ -144,6 +145,7 @@ reinterpret historical artifacts under a new rubric, prompt, or config version.
 Every stored LLM-derived artifact must preserve:
 
 - validated structured payload
+- request-shaping inputs when generation or tool use depends on them
 - prompt version
 - model slug
 - provider

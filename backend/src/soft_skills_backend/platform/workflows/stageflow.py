@@ -148,6 +148,7 @@ async def run_logged_pipeline(
     idempotency_key: str | None = None,
     idempotency_params: dict[str, Any] | None = None,
     guard_retry_strategy: GuardRetryStrategy | None = None,
+    timeout_ms: int | None = None,
 ) -> PipelineResults:
     """Run a Stageflow pipeline with shared correlation, logging, and wide-event wiring."""
 
@@ -158,6 +159,8 @@ async def run_logged_pipeline(
         ctx_data["idempotency_key"] = idempotency_key
     if idempotency_params is not None:
         ctx_data["idempotency_params"] = idempotency_params
+    if timeout_ms is not None:
+        ctx_data["_timeout_ms"] = timeout_ms
 
     ctx = PipelineContext.create(
         pipeline_run_id=cast(Any, pipeline_run_id),

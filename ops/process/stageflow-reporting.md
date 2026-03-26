@@ -47,3 +47,12 @@ Stageflow workflows in SoftSkills.
 - **Reference File:** `backend/src/soft_skills_backend/modules/progression/workflows/service.py`
 - **Description:** Sprint 5 runs progression refresh as an inline Stageflow pipeline immediately after validated assessment persistence. This gave simple and deterministic end-to-end semantics for V1, but it also means the learner submit path now depends on a nested workflow finishing before the request returns.
 - **Recommendations:** Add an async trigger/checkpoint path for heavier progression refresh or replay workloads once operational tooling for background workflow execution is in place.
+
+**Generation Pipelines Need Explicit Timeout Budgets** (2026-03-26)
+- **Reference File:** `backend/src/soft_skills_backend/modules/catalog/workflows/generation/service.py`
+- **Description:** The default Stageflow per-stage timeout was too small for provider-backed creator generation once corrective validation retries were enabled. The generation pipelines now set an explicit timeout budget instead of inheriting the default.
+- **Recommendations:** Upstream a clearer per-pipeline timeout configuration surface so long-running but legitimate generation stages do not need local context-data overrides.
+
+**PromptSecurityPolicy Fits Chat Generation Well Without Agent Loops** (2026-03-26)
+- **Reference File:** `backend/src/soft_skills_backend/modules/catalog/workflows/generation/service.py`
+- **Description:** Sprint 6 used `PromptSecurityPolicy` directly on chat-generation prompts and kept the workflow on a typed single-call path. This covered the trust requirement without introducing `AgentStage` or tools where no real tool loop existed.

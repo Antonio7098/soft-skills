@@ -19,7 +19,7 @@ from soft_skills_backend.platform.providers.llm.openai_compatible import OpenAIC
 from soft_skills_backend.shared.errors import AppError, provider_error, validation_error
 
 SMOKE_PROVIDER_TIMEOUT_SECONDS = 30.0
-SMOKE_FLOW_TIMEOUT_SECONDS = 120.0
+SMOKE_FLOW_TIMEOUT_SECONDS = 180.0
 
 
 class PracticeModeSmokeResult(BaseModel):
@@ -103,9 +103,11 @@ async def _run_text_practice_smoke(settings: Settings) -> ProviderSmokeResult:
             )
             learner_id = str(learner["id"])
 
+            await _generate_structured_collection(client, learner_id)
+            await _generate_chat_collection(client, learner_id)
+            scenario = await _seed_scenario(client, learner_id)
             quick_prompt = await _seed_quick_practice_prompt(client, learner_id)
             interview_prompt = await _seed_interview_prompt(client, learner_id)
-            scenario = await _seed_scenario(client, learner_id)
 
             results = [
                 await _run_quick_practice_mode(client, learner_id, str(quick_prompt["id"])),
@@ -374,6 +376,65 @@ async def _seed_scenario(client: httpx.AsyncClient, user_id: str) -> dict[str, o
     )
     _require_ok(scenario_response, "create scenario")
     return cast(dict[str, object], scenario_response.json()["data"])
+
+
+async def _generate_structured_collection(
+    client: httpx.AsyncClient, user_id: str
+) -> dict[str, object]:
+    response = await client.post(
+        "/api/collections/generate/structured",
+        headers={"X-User-ID": user_id},
+        json={
+            "title_hint": "Smoke Structured Draft",
+            "target_audience": "Early-career consultants",
+            "difficulty": "intermediate",
+            "content_format_mix": ["quick_practice_prompt"],
+            "target_skill_slugs": ["active-listening", "expectation-setting"],
+            "target_competency_slugs": ["stakeholder-management"],
+            "rubric_ids": ["quick_practice_text@v1"],
+            "domain": "Enterprise SaaS",
+            "workplace_context": "A launch is under time pressure after a legal escalation.",
+            "scenario_theme": "Conflicting stakeholder expectations",
+            "realism_notes": ["Keep the scenario specific and realistic."],
+            "counts": {
+                "quick_practice_prompt_count": 1,
+                "interview_prompt_count": 0,
+                "scenario_count": 0,
+                "scenario_artifact_count": 0,
+            },
+        },
+    )
+    _require_ok(response, "generate structured collection")
+    payload = cast(dict[str, object], response.json()["data"])
+    return cast(dict[str, object], payload["collection"])
+
+
+async def _generate_chat_collection(client: httpx.AsyncClient, user_id: str) -> dict[str, object]:
+    response = await client.post(
+        "/api/collections/generate/chat",
+        headers={"X-User-ID": user_id},
+        json={
+            "prompt": (
+                "Create a realistic interview draft about making a decision with incomplete "
+                "information while keeping a senior stakeholder aligned."
+            ),
+            "target_audience": "Early-career consultants",
+            "difficulty": "intermediate",
+            "content_format_mix": ["interview_prompt"],
+            "target_skill_slugs": ["decision-justification"],
+            "target_competency_slugs": ["problem-solving"],
+            "rubric_ids": ["interview_text@v1"],
+            "counts": {
+                "quick_practice_prompt_count": 0,
+                "interview_prompt_count": 1,
+                "scenario_count": 0,
+                "scenario_artifact_count": 0,
+            },
+        },
+    )
+    _require_ok(response, "generate chat collection")
+    payload = cast(dict[str, object], response.json()["data"])
+    return cast(dict[str, object], payload["collection"])
 
 
 def _migrate(settings: Settings) -> None:
