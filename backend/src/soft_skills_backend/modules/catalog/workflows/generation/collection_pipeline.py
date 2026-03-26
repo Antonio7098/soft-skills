@@ -7,7 +7,9 @@ from typing import Any, cast
 from uuid import uuid4
 
 from sqlalchemy.orm import Session, sessionmaker
+from stageflow.agent.security import PromptSecurityPolicy
 from stageflow.api import Pipeline, StageKind, stage
+from stageflow.core import StageContext
 
 from soft_skills_backend.engines.config.models import CatalogGenerationRuntimeConfig
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
@@ -73,7 +75,7 @@ async def generate_collection(
     session_factory: sessionmaker[Session],
     events: CatalogEventRecorder,
     llm_provider: LLMProvider,
-    prompt_security_policy,
+    prompt_security_policy: PromptSecurityPolicy,
     stageflow: StageflowPipelineSupport,
     prompt_library: PromptLibrary,
     config: CatalogGenerationRuntimeConfig,
@@ -89,7 +91,7 @@ async def generate_collection(
     assert structured_command is not None or chat_command is not None
     command = structured_command or cast(ChatCollectionGenerationCommand, chat_command)
 
-    async def input_guard(_ctx) -> Any:
+    async def input_guard(_ctx: StageContext) -> Any:
         with session_factory() as session:
             validate_generation_request(session, command)
         return ok_output(
@@ -99,7 +101,7 @@ async def generate_collection(
             )
         )
 
-    async def blueprint_transform(ctx) -> Any:
+    async def blueprint_transform(ctx: StageContext) -> Any:
         typed_result = await generate_collection_blueprint(
             ctx=ctx,
             prompt_library=prompt_library,
@@ -118,7 +120,7 @@ async def generate_collection(
             )
         )
 
-    async def blueprint_guard(ctx) -> Any:
+    async def blueprint_guard(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_transform"))
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
         validate_collection_blueprint(
@@ -139,7 +141,7 @@ async def generate_collection(
             )
         )
 
-    async def prompt_items_work(ctx) -> Any:
+    async def prompt_items_work(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_guard"))
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
         prompt_item_results = await run_prompt_item_workers(
@@ -163,7 +165,7 @@ async def generate_collection(
             )
         )
 
-    async def scenarios_work(ctx) -> Any:
+    async def scenarios_work(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_guard"))
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
         scenario_results = await run_scenario_workers(
@@ -187,11 +189,15 @@ async def generate_collection(
             )
         )
 
-    async def assemble_transform(ctx) -> Any:
+    async def assemble_transform(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_guard"))
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
-        prompt_item_results = cast(list[WorkerExecutionResult], payload_from_inputs(ctx, "prompt_items_work"))
-        scenario_results = cast(list[WorkerExecutionResult], payload_from_inputs(ctx, "scenarios_work"))
+        prompt_item_results = cast(
+            list[WorkerExecutionResult], payload_from_inputs(ctx, "prompt_items_work")
+        )
+        scenario_results = cast(
+            list[WorkerExecutionResult], payload_from_inputs(ctx, "scenarios_work")
+        )
         draft = GeneratedCollectionDraft(
             prompt_version=blueprint.prompt_version,
             provider=blueprint.provider,
@@ -223,7 +229,7 @@ async def generate_collection(
             )
         )
 
-    async def output_guard(ctx) -> Any:
+    async def output_guard(ctx: StageContext) -> Any:
         draft = cast(GeneratedCollectionDraft, payload_from_inputs(ctx, "assemble_transform"))
         with session_factory() as session:
             validate_generated_collection_draft(
@@ -240,11 +246,15 @@ async def generate_collection(
             )
         )
 
-    async def persistence_work(ctx) -> Any:
+    async def persistence_work(ctx: StageContext) -> Any:
         draft = cast(GeneratedCollectionDraft, payload_from_inputs(ctx, "output_guard"))
         blueprint_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_guard"))
-        prompt_item_results = cast(list[WorkerExecutionResult], payload_from_inputs(ctx, "prompt_items_work"))
-        scenario_results = cast(list[WorkerExecutionResult], payload_from_inputs(ctx, "scenarios_work"))
+        prompt_item_results = cast(
+            list[WorkerExecutionResult], payload_from_inputs(ctx, "prompt_items_work")
+        )
+        scenario_results = cast(
+            list[WorkerExecutionResult], payload_from_inputs(ctx, "scenarios_work")
+        )
         manifest = GenerationManifest(
             planner=build_planner_artifact(
                 provider_name=llm_provider.provider_name,
@@ -298,12 +308,42 @@ async def generate_collection(
 
     pipeline = Pipeline.from_stages(
         stage("input_guard", cast(Any, input_guard), StageKind.GUARD),
-        stage("blueprint_transform", cast(Any, blueprint_transform), StageKind.TRANSFORM, dependencies=("input_guard",)),
-        stage("blueprint_guard", cast(Any, blueprint_guard), StageKind.GUARD, dependencies=("blueprint_transform",)),
-        stage("prompt_items_work", cast(Any, prompt_items_work), StageKind.WORK, dependencies=("blueprint_guard",)),
-        stage("scenarios_work", cast(Any, scenarios_work), StageKind.WORK, dependencies=("blueprint_guard",)),
-        stage("assemble_transform", cast(Any, assemble_transform), StageKind.TRANSFORM, dependencies=("blueprint_guard", "prompt_items_work", "scenarios_work")),
-        stage("output_guard", cast(Any, output_guard), StageKind.GUARD, dependencies=("assemble_transform",)),
+        stage(
+            "blueprint_transform",
+            cast(Any, blueprint_transform),
+            StageKind.TRANSFORM,
+            dependencies=("input_guard",),
+        ),
+        stage(
+            "blueprint_guard",
+            cast(Any, blueprint_guard),
+            StageKind.GUARD,
+            dependencies=("blueprint_transform",),
+        ),
+        stage(
+            "prompt_items_work",
+            cast(Any, prompt_items_work),
+            StageKind.WORK,
+            dependencies=("blueprint_guard",),
+        ),
+        stage(
+            "scenarios_work",
+            cast(Any, scenarios_work),
+            StageKind.WORK,
+            dependencies=("blueprint_guard",),
+        ),
+        stage(
+            "assemble_transform",
+            cast(Any, assemble_transform),
+            StageKind.TRANSFORM,
+            dependencies=("blueprint_guard", "prompt_items_work", "scenarios_work"),
+        ),
+        stage(
+            "output_guard",
+            cast(Any, output_guard),
+            StageKind.GUARD,
+            dependencies=("assemble_transform",),
+        ),
         stage(
             "persistence_work",
             cast(Any, persistence_work),

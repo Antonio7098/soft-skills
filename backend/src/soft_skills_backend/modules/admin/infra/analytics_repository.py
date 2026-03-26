@@ -116,7 +116,12 @@ class AdminAnalyticsRepository:
                 else list(latest_snapshot.snapshot_payload.get("coverage_gap_skill_slugs", [])),
                 usage=usage,
                 recent_attempts=[
-                    self._attempt_summary(record, assessment_by_id.get(record.assessment_id))
+                    self._attempt_summary(
+                        record,
+                        assessment_by_id.get(record.assessment_id)
+                        if record.assessment_id
+                        else None,
+                    )
                     for record in attempts[:5]
                 ],
                 usage_trend=[UsageTrendPointView.model_validate(point) for point in trend_points],
@@ -179,10 +184,7 @@ class AdminAnalyticsRepository:
                 weak_skill_clusters=[
                     SkillClusterView.model_validate(item)
                     for item in build_skill_clusters(
-                        [
-                            list(payload.get("weak_skill_slugs", []))
-                            for payload in snapshot_payloads
-                        ]
+                        [list(payload.get("weak_skill_slugs", [])) for payload in snapshot_payloads]
                     )
                 ],
                 average_skill_scores=[
@@ -207,7 +209,8 @@ class AdminAnalyticsRepository:
         return sorted(
             profile.user_id
             for profile in profiles
-            if profile.user_id in users and (target_role is None or profile.target_role == target_role)
+            if profile.user_id in users
+            and (target_role is None or profile.target_role == target_role)
         )
 
     def _sessions(self, session: Session, learner_ids: list[str]) -> list[PracticeSessionRecord]:

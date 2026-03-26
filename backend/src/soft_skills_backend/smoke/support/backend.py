@@ -126,7 +126,7 @@ class SmokeBackendClient:
                 },
             },
         )
-        return cast(JsonObject, cast(JsonObject, payload["collection"]))
+        return cast(JsonObject, payload["collection"])
 
     async def generate_structured_collection_payload(
         self,
@@ -164,7 +164,7 @@ class SmokeBackendClient:
                 },
             },
         )
-        return cast(JsonObject, cast(JsonObject, payload["collection"]))
+        return cast(JsonObject, payload["collection"])
 
     async def generate_chat_collection_payload(
         self,
@@ -254,7 +254,9 @@ class SmokeBackendClient:
         self.require_ok(response, "generate chat prompt items")
         return self.data(response)
 
-    async def start_quick_practice_session(self, *, user_id: str, prompt_item_id: str) -> JsonObject:
+    async def start_quick_practice_session(
+        self, *, user_id: str, prompt_item_id: str
+    ) -> JsonObject:
         response = await self._client.post(
             "/api/attempts/quick-practice/sessions",
             headers={"X-User-ID": user_id},

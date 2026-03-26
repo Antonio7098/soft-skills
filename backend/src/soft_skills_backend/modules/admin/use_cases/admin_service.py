@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from soft_skills_backend.modules.admin.contracts.commands import AdminCollectionVerificationCommand
-from soft_skills_backend.modules.admin.contracts.commands import AdminLearnerRelationshipCommand
+from soft_skills_backend.modules.admin.contracts.commands import (
+    AdminCollectionVerificationCommand,
+    AdminLearnerRelationshipCommand,
+)
 from soft_skills_backend.modules.admin.contracts.views import (
     AdminLearnerRelationshipView,
     AttemptAuditView,

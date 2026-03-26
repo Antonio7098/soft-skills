@@ -8,6 +8,7 @@ from typing import Any, cast
 from uuid import uuid4
 
 from stageflow.api import Pipeline, StageKind, stage
+from stageflow.core import StageContext
 
 from soft_skills_backend.engines.config.models import CatalogGenerationRuntimeConfig
 from soft_skills_backend.modules.catalog.domain.constants import ALLOWED_SCENARIO_ARTIFACT_TYPES
@@ -149,7 +150,7 @@ async def _run_prompt_item_worker(
 ) -> WorkerExecutionResult:
     correlation_id = uuid4()
 
-    async def input_guard(_ctx) -> Any:
+    async def input_guard(_ctx: StageContext) -> Any:
         return ok_output(
             StageflowStageResult(
                 payload=plan,
@@ -157,7 +158,7 @@ async def _run_prompt_item_worker(
             )
         )
 
-    async def draft_transform(ctx) -> Any:
+    async def draft_transform(ctx: StageContext) -> Any:
         rendered_prompt = prompt_library.render(
             config.prompt_item_worker_prompt_name,
             version=config.prompt_item_worker_prompt_version,
@@ -178,7 +179,10 @@ async def _run_prompt_item_worker(
         typed_result = await prompt_item_worker_output.generate(
             llm_provider,
             messages=[
-                {"role": "system", "content": "Generate one realistic SoftSkills prompt item. Return JSON only."},
+                {
+                    "role": "system",
+                    "content": "Generate one realistic SoftSkills prompt item. Return JSON only.",
+                },
                 {"role": "user", "content": rendered_prompt.content},
             ],
             call_context=ProviderCallContext(
@@ -191,17 +195,22 @@ async def _run_prompt_item_worker(
             ),
         )
         return ok_output(
-            StageflowStageResult(payload=typed_result, summary={"model_slug": typed_result.model_slug})
+            StageflowStageResult(
+                payload=typed_result, summary={"model_slug": typed_result.model_slug}
+            )
         )
 
-    async def output_guard(ctx) -> Any:
+    async def output_guard(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "draft_transform"))
         draft = cast(GeneratedPromptItemDraft, typed_result.parsed)
         if draft.prompt_type != plan.prompt_type or draft.rubric_id != plan.rubric_id:
             raise validation_error(
                 "Generated prompt item drifted from the worker plan metadata",
                 code="SS-VALIDATION-067",
-                details={"expected_prompt_type": plan.prompt_type, "expected_rubric_id": plan.rubric_id},
+                details={
+                    "expected_prompt_type": plan.prompt_type,
+                    "expected_rubric_id": plan.rubric_id,
+                },
             )
         return ok_output(
             StageflowStageResult(
@@ -212,8 +221,18 @@ async def _run_prompt_item_worker(
 
     pipeline = Pipeline.from_stages(
         stage("input_guard", cast(Any, input_guard), StageKind.GUARD),
-        stage("draft_transform", cast(Any, draft_transform), StageKind.TRANSFORM, dependencies=("input_guard",)),
-        stage("output_guard", cast(Any, output_guard), StageKind.GUARD, dependencies=("draft_transform",)),
+        stage(
+            "draft_transform",
+            cast(Any, draft_transform),
+            StageKind.TRANSFORM,
+            dependencies=("input_guard",),
+        ),
+        stage(
+            "output_guard",
+            cast(Any, output_guard),
+            StageKind.GUARD,
+            dependencies=("draft_transform",),
+        ),
         name="catalog_prompt_item_worker",
     )
     result = await run_logged_subpipeline(
@@ -261,10 +280,10 @@ async def _run_scenario_worker(
 ) -> WorkerExecutionResult:
     correlation_id = uuid4()
 
-    async def input_guard(_ctx) -> Any:
+    async def input_guard(_ctx: StageContext) -> Any:
         return ok_output(StageflowStageResult(payload=plan, summary={"rubric_id": plan.rubric_id}))
 
-    async def draft_transform(ctx) -> Any:
+    async def draft_transform(ctx: StageContext) -> Any:
         rendered_prompt = prompt_library.render(
             config.scenario_worker_prompt_name,
             version=config.scenario_worker_prompt_version,
@@ -285,7 +304,10 @@ async def _run_scenario_worker(
         typed_result = await scenario_worker_output.generate(
             llm_provider,
             messages=[
-                {"role": "system", "content": "Generate one realistic SoftSkills scenario draft. Return JSON only."},
+                {
+                    "role": "system",
+                    "content": "Generate one realistic SoftSkills scenario draft. Return JSON only.",
+                },
                 {"role": "user", "content": rendered_prompt.content},
             ],
             call_context=ProviderCallContext(
@@ -298,13 +320,17 @@ async def _run_scenario_worker(
             ),
         )
         return ok_output(
-            StageflowStageResult(payload=typed_result, summary={"model_slug": typed_result.model_slug})
+            StageflowStageResult(
+                payload=typed_result, summary={"model_slug": typed_result.model_slug}
+            )
         )
 
-    async def output_guard(ctx) -> Any:
+    async def output_guard(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "draft_transform"))
         draft = cast(GeneratedScenarioDraft, typed_result.parsed)
-        if draft.rubric_id != plan.rubric_id or list(draft.target_skill_slugs) != list(plan.target_skill_slugs):
+        if draft.rubric_id != plan.rubric_id or list(draft.target_skill_slugs) != list(
+            plan.target_skill_slugs
+        ):
             raise validation_error(
                 "Generated scenario drifted from the worker plan metadata",
                 code="SS-VALIDATION-069",
@@ -314,14 +340,27 @@ async def _run_scenario_worker(
             raise validation_error(
                 "Generated scenario supporting artifact count did not match the worker plan",
                 code="SS-VALIDATION-070",
-                details={"expected": plan.supporting_artifact_count, "actual": len(draft.supporting_artifacts)},
+                details={
+                    "expected": plan.supporting_artifact_count,
+                    "actual": len(draft.supporting_artifacts),
+                },
             )
         return ok_output(StageflowStageResult(payload=typed_result, summary={"title": draft.title}))
 
     pipeline = Pipeline.from_stages(
         stage("input_guard", cast(Any, input_guard), StageKind.GUARD),
-        stage("draft_transform", cast(Any, draft_transform), StageKind.TRANSFORM, dependencies=("input_guard",)),
-        stage("output_guard", cast(Any, output_guard), StageKind.GUARD, dependencies=("draft_transform",)),
+        stage(
+            "draft_transform",
+            cast(Any, draft_transform),
+            StageKind.TRANSFORM,
+            dependencies=("input_guard",),
+        ),
+        stage(
+            "output_guard",
+            cast(Any, output_guard),
+            StageKind.GUARD,
+            dependencies=("draft_transform",),
+        ),
         name="catalog_scenario_worker",
     )
     result = await run_logged_subpipeline(

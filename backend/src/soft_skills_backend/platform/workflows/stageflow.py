@@ -89,7 +89,7 @@ def payload_from_results(results: PipelineResults, stage_name: str, *, expected_
                 "actual_type": type(payload).__name__,
             },
         )
-    return cast(T, payload)
+    return payload
 
 
 def summary_from_output(output: StageOutput) -> dict[str, Any]:
@@ -286,7 +286,11 @@ async def run_logged_subpipeline(
             child_ctx.data.update(dict(parent_data))
         child_run_id = child_ctx.pipeline_run_id
         request_id = None if child_ctx.request_id is None else str(child_ctx.request_id)
-        trace_id = None if child_ctx.metadata.get("trace_id") is None else str(child_ctx.metadata["trace_id"])
+        trace_id = (
+            None
+            if child_ctx.metadata.get("trace_id") is None
+            else str(child_ctx.metadata["trace_id"])
+        )
         await support.pipeline_run_logger.log_run_started(
             pipeline_run_id=child_run_id,
             pipeline_name=pipeline.name,

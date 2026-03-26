@@ -4,8 +4,8 @@ from soft_skills_backend.modules.catalog.domain.models import (
     ChatPromptItemGenerationCommand,
     PromptItemCreateCommand,
     PromptItemGenerationCounts,
-    StructuredPromptItemGenerationCommand,
     PromptItemUpdateCommand,
+    StructuredPromptItemGenerationCommand,
 )
 
 __all__ = [

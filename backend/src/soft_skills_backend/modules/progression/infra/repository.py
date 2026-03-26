@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
 from uuid import uuid4
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -44,8 +43,8 @@ from soft_skills_backend.platform.db.models import (
     CompetencyRecord,
     CompetencySkillMapRecord,
     LearnerProfileRecord,
-    ProgressRecalculationRecord,
     ProgressionSnapshotRecord,
+    ProgressRecalculationRecord,
     PromptItemRecord,
     RecommendationArtifactRecord,
     ScenarioRecord,
@@ -53,12 +52,16 @@ from soft_skills_backend.platform.db.models import (
 )
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
 from soft_skills_backend.platform.workflows.stageflow import (
-    StageflowStageResult,
     metadata_value,
     request_id_from_context,
 )
 from soft_skills_backend.shared.auth import Actor
-from soft_skills_backend.shared.errors import auth_error, domain_error, persistence_error, validation_error
+from soft_skills_backend.shared.errors import (
+    auth_error,
+    domain_error,
+    persistence_error,
+    validation_error,
+)
 
 from .events import ProgressionEventRecorder
 

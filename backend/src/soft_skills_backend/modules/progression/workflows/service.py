@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from stageflow.api import Pipeline, StageKind, stage
+from stageflow.core import StageContext
 
 from soft_skills_backend.modules.progression.contracts.commands import ProgressRecalculationCommand
 from soft_skills_backend.modules.progression.contracts.views import (
@@ -13,6 +14,7 @@ from soft_skills_backend.modules.progression.contracts.views import (
     ProgressRecalculationView,
 )
 from soft_skills_backend.modules.progression.domain.progression import (
+    CatalogCandidate,
     ComputedProgressSnapshot,
     ComputedRecommendation,
     build_prior_progress_state,
@@ -61,7 +63,7 @@ class ProgressionWorkflowService:
         learner_id: str,
         assessment_id: str,
     ) -> ProgressDashboardView:
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             refresh_input = self._repository.load_refresh_input(assessment_id)
             return ok_output(
                 StageflowStageResult(
@@ -73,7 +75,7 @@ class ProgressionWorkflowService:
                 )
             )
 
-        async def snapshot_transform(ctx) -> Any:
+        async def snapshot_transform(ctx: StageContext) -> Any:
             refresh_input = cast(ProgressionRefreshInput, payload_from_inputs(ctx, "input_guard"))
             previous_state = build_prior_progress_state(refresh_input.previous_state_payload)
             computed = compute_progress_snapshot(
@@ -93,9 +95,11 @@ class ProgressionWorkflowService:
                 )
             )
 
-        async def snapshot_work(ctx) -> Any:
+        async def snapshot_work(ctx: StageContext) -> Any:
             refresh_input = cast(ProgressionRefreshInput, payload_from_inputs(ctx, "input_guard"))
-            computed = cast(ComputedProgressSnapshot, payload_from_inputs(ctx, "snapshot_transform"))
+            computed = cast(
+                ComputedProgressSnapshot, payload_from_inputs(ctx, "snapshot_transform")
+            )
             snapshot = self._repository.persist_snapshot(
                 ctx=ctx,
                 learner_id=refresh_input.learner.learner_id,
@@ -109,7 +113,7 @@ class ProgressionWorkflowService:
                 )
             )
 
-        async def recommendation_enrich(ctx) -> Any:
+        async def recommendation_enrich(ctx: StageContext) -> Any:
             refresh_input = cast(ProgressionRefreshInput, payload_from_inputs(ctx, "input_guard"))
             candidates = self._repository.load_catalog_candidates(refresh_input.learner.learner_id)
             return ok_output(
@@ -119,7 +123,7 @@ class ProgressionWorkflowService:
                 )
             )
 
-        async def recommendation_transform(ctx) -> Any:
+        async def recommendation_transform(ctx: StageContext) -> Any:
             refresh_input = cast(ProgressionRefreshInput, payload_from_inputs(ctx, "input_guard"))
             computed_snapshot = cast(
                 ComputedProgressSnapshot,
@@ -129,7 +133,7 @@ class ProgressionWorkflowService:
             computed = compute_recommendation(
                 learner=refresh_input.learner,
                 snapshot=computed_snapshot,
-                candidates=cast(list, candidates),
+                candidates=cast(list[CatalogCandidate], candidates),
                 now=_now(),
             )
             return ok_output(
@@ -139,7 +143,7 @@ class ProgressionWorkflowService:
                 )
             )
 
-        async def recommendation_work(ctx) -> Any:
+        async def recommendation_work(ctx: StageContext) -> Any:
             refresh_input = cast(ProgressionRefreshInput, payload_from_inputs(ctx, "input_guard"))
             snapshot = payload_from_inputs(ctx, "snapshot_work")
             recommendation = self._repository.persist_recommendation(

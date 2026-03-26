@@ -18,8 +18,8 @@ from soft_skills_backend.modules.catalog.contracts.prompt_item_commands import (
     ChatPromptItemGenerationCommand,
     PromptItemCreateCommand,
     PromptItemGenerationCounts,
-    StructuredPromptItemGenerationCommand,
     PromptItemUpdateCommand,
+    StructuredPromptItemGenerationCommand,
 )
 from soft_skills_backend.modules.catalog.contracts.prompt_item_views import (
     PromptItemGenerationView,

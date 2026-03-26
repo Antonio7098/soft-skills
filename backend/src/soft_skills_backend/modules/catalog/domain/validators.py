@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from sqlalchemy.orm import Session
 
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
@@ -203,7 +205,7 @@ def validate_scenario_command(
             code="SS-VALIDATION-038",
             details={"collection_id": collection.id},
         )
-    validate_supporting_artifacts(command.supporting_artifacts)
+    validate_supporting_artifacts(cast(list[object], command.supporting_artifacts))
     validate_mock_world(command)
 
 
@@ -214,7 +216,11 @@ def validate_generation_request(
     validate_collection_command(
         session,
         CollectionCreateCommand(
-            title=command.title_hint if isinstance(command, StructuredCollectionGenerationCommand) else "Generated draft",
+            title=(
+                command.title_hint
+                if isinstance(command, StructuredCollectionGenerationCommand) and command.title_hint
+                else "Generated draft"
+            ),
             summary="Generated draft",
             target_audience=command.target_audience,
             difficulty=command.difficulty,
@@ -224,17 +230,26 @@ def validate_generation_request(
             rubric_ids=command.rubric_ids,
         ),
     )
-    if command.counts.quick_practice_prompt_count and "quick_practice_prompt" not in command.content_format_mix:
+    if (
+        command.counts.quick_practice_prompt_count
+        and "quick_practice_prompt" not in command.content_format_mix
+    ):
         raise validation_error(
             "Quick-practice prompt generation requires the matching content format",
             code="SS-VALIDATION-039",
         )
-    if command.counts.interview_prompt_count and "interview_prompt" not in command.content_format_mix:
+    if (
+        command.counts.interview_prompt_count
+        and "interview_prompt" not in command.content_format_mix
+    ):
         raise validation_error(
             "Interview prompt generation requires the matching content format",
             code="SS-VALIDATION-040",
         )
-    if command.counts.scenario_count and ALLOWED_SCENARIO_CONTENT_TYPE not in command.content_format_mix:
+    if (
+        command.counts.scenario_count
+        and ALLOWED_SCENARIO_CONTENT_TYPE not in command.content_format_mix
+    ):
         raise validation_error(
             "Scenario generation requires the scenario content format",
             code="SS-VALIDATION-041",
@@ -272,7 +287,10 @@ def validate_prompt_item_generation_request(
             code="SS-VALIDATION-060",
             details={"collection_id": collection.id},
         )
-    if command.counts.interview_prompt_count and "interview_prompt" not in collection.content_format_mix:
+    if (
+        command.counts.interview_prompt_count
+        and "interview_prompt" not in collection.content_format_mix
+    ):
         raise validation_error(
             "Interview prompt generation requires the collection to enable interview prompts",
             code="SS-VALIDATION-061",
@@ -309,7 +327,9 @@ def validate_generated_prompt_item_uniqueness(
     generated_commands: list[PromptItemCreateCommand],
 ) -> None:
     existing_titles = {_normalize_prompt_text(record.title) for record in existing_prompt_items}
-    existing_bodies = {_normalize_prompt_text(record.prompt_text) for record in existing_prompt_items}
+    existing_bodies = {
+        _normalize_prompt_text(record.prompt_text) for record in existing_prompt_items
+    }
     seen_titles: set[str] = set()
     seen_bodies: set[str] = set()
 
@@ -381,9 +401,7 @@ def validate_collection_publishability(session: Session, collection: CollectionR
         .all()
     )
     scenario_records = (
-        session.query(ScenarioRecord)
-        .filter(ScenarioRecord.collection_id == collection.id)
-        .all()
+        session.query(ScenarioRecord).filter(ScenarioRecord.collection_id == collection.id).all()
     )
     if len(prompt_records) + len(scenario_records) == 0:
         raise domain_error(
@@ -455,9 +473,15 @@ def validate_difficulty(difficulty: str) -> None:
 def validate_supporting_artifacts(artifacts: list[object]) -> None:
     unsupported_types = sorted(
         {
-            str(getattr(artifact, "artifact_type", None) or artifact["artifact_type"])
+            str(
+                getattr(artifact, "artifact_type", None)
+                or cast(dict[str, object], artifact)["artifact_type"]
+            )
             for artifact in artifacts
-            if (getattr(artifact, "artifact_type", None) or artifact["artifact_type"])
+            if (
+                getattr(artifact, "artifact_type", None)
+                or cast(dict[str, object], artifact)["artifact_type"]
+            )
             not in ALLOWED_SCENARIO_ARTIFACT_TYPES
         }
     )
@@ -558,7 +582,9 @@ def require_rubric_content_alignment(
 ) -> None:
     rubrics = {
         record.rubric_id: record
-        for record in session.query(RubricRecord).filter(RubricRecord.rubric_id.in_(rubric_ids)).all()
+        for record in session.query(RubricRecord)
+        .filter(RubricRecord.rubric_id.in_(rubric_ids))
+        .all()
     }
     expected_types = set(content_format_mix)
     actual_types = {record.content_type for record in rubrics.values()}

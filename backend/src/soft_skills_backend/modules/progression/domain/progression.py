@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import cast
 
 from pydantic import BaseModel, Field
 
@@ -30,6 +31,10 @@ from soft_skills_backend.engines.progression import (
 )
 from soft_skills_backend.engines.progression import (
     compute_progression_snapshot as compute_generic_progression_snapshot,
+)
+from soft_skills_backend.engines.progression.contracts.models import (
+    AggregateState,
+    DimensionState,
 )
 from soft_skills_backend.engines.recommendation import (
     CandidateItem as EngineCandidateItem,
@@ -226,7 +231,9 @@ def compute_recommendation(
     )
 
 
-def build_prior_progress_state(snapshot_payload: dict[str, object] | None) -> PriorProgressState | None:
+def build_prior_progress_state(
+    snapshot_payload: dict[str, object] | None,
+) -> PriorProgressState | None:
     """Normalize a persisted snapshot payload into delta-comparison state."""
 
     if not snapshot_payload:
@@ -234,16 +241,14 @@ def build_prior_progress_state(snapshot_payload: dict[str, object] | None) -> Pr
     snapshot_id = str(snapshot_payload.get("snapshot_id", "")).strip()
     if not snapshot_id:
         return None
-    skill_scores = {
-        str(item["skill_slug"]): float(item["score"])
-        for item in snapshot_payload.get("skill_states", [])
-        if isinstance(item, dict) and "skill_slug" in item and "score" in item
-    }
-    competency_scores = {
-        str(item["competency_slug"]): float(item["score"])
-        for item in snapshot_payload.get("competency_states", [])
-        if isinstance(item, dict) and "competency_slug" in item and "score" in item
-    }
+    skill_scores: dict[str, float] = {}
+    for item in cast(list[object], snapshot_payload.get("skill_states", [])):
+        if isinstance(item, dict) and "skill_slug" in item and "score" in item:
+            skill_scores[str(item["skill_slug"])] = float(item["score"])
+    competency_scores: dict[str, float] = {}
+    for item in cast(list[object], snapshot_payload.get("competency_states", [])):
+        if isinstance(item, dict) and "competency_slug" in item and "score" in item:
+            competency_scores[str(item["competency_slug"])] = float(item["score"])
     return PriorProgressState(
         snapshot_id=snapshot_id,
         skill_scores=skill_scores,
@@ -317,7 +322,9 @@ def _to_engine_assessment(assessment: AssessmentSignal) -> EngineAssessmentEvent
     )
 
 
-def _to_engine_prior_state(previous_state: PriorProgressState | None) -> EnginePriorProgressState | None:
+def _to_engine_prior_state(
+    previous_state: PriorProgressState | None,
+) -> EnginePriorProgressState | None:
     if previous_state is None:
         return None
     return EnginePriorProgressState(
@@ -342,10 +349,9 @@ def _to_engine_snapshot(snapshot: ComputedProgressSnapshot) -> EngineComputedPro
     )
 
 
-def _to_engine_dimension_state(skill_state: SkillProgressView):
+def _to_engine_dimension_state(skill_state: SkillProgressView) -> DimensionState:
     from soft_skills_backend.engines.progression.contracts.models import (
         DimensionContribution,
-        DimensionState,
     )
 
     return DimensionState(
@@ -375,9 +381,7 @@ def _to_engine_dimension_state(skill_state: SkillProgressView):
     )
 
 
-def _to_engine_aggregate_state(competency_state: CompetencyProgressView):
-    from soft_skills_backend.engines.progression.contracts.models import AggregateState
-
+def _to_engine_aggregate_state(competency_state: CompetencyProgressView) -> AggregateState:
     return AggregateState(
         aggregate_ref=competency_state.competency_slug,
         score=competency_state.score,
@@ -390,7 +394,9 @@ def _to_engine_aggregate_state(competency_state: CompetencyProgressView):
     )
 
 
-def _from_engine_progress_snapshot(computed: EngineComputedProgressionSnapshot) -> ComputedProgressSnapshot:
+def _from_engine_progress_snapshot(
+    computed: EngineComputedProgressionSnapshot,
+) -> ComputedProgressSnapshot:
     return ComputedProgressSnapshot(
         weak_skill_slugs=list(computed.weak_dimension_refs),
         stagnating_skill_slugs=list(computed.stagnating_dimension_refs),

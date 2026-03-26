@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query, Request
 
-from soft_skills_backend.entrypoints.http.dependencies import require_admin_actor
+from soft_skills_backend.entrypoints.http.dependencies import get_container, require_admin_actor
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
 from soft_skills_backend.modules.events import EventsService
 from soft_skills_backend.modules.events.contracts import (
@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 def get_events_service(request: Request) -> EventsService:
-    return request.app.state.container.events_service
+    return get_container(request).events_service
 
 
 @router.get("", response_model=ApiEnvelope[PaginatedWorkflowEventsView])

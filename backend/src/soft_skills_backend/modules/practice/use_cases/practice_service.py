@@ -6,6 +6,7 @@ from typing import Any, cast
 from uuid import uuid4
 
 from stageflow.api import Pipeline, StageKind, stage
+from stageflow.core import StageContext
 
 from soft_skills_backend.modules.practice.domain.practice import PracticeType
 from soft_skills_backend.modules.practice.models import (
@@ -103,7 +104,7 @@ class PracticeService:
         workflow_id = run_id
         start_inputs = [self._start_input_from_run_item(item) for item in command.items]
 
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             return ok_output(
                 StageflowStageResult(
                     payload=start_inputs,
@@ -111,10 +112,13 @@ class PracticeService:
                 )
             )
 
-        async def prompt_enrich(ctx) -> Any:
+        async def prompt_enrich(ctx: StageContext) -> Any:
             inputs = cast(list[StartInputPayload], payload_from_inputs(ctx, "input_guard"))
             prompt_payloads = [
-                cast(PromptContextPayload, self._store.load_start_prompt_context(actor, start_input).payload)
+                cast(
+                    PromptContextPayload,
+                    self._store.load_start_prompt_context(actor, start_input).payload,
+                )
                 for start_input in inputs
             ]
             return ok_output(
@@ -124,7 +128,7 @@ class PracticeService:
                 )
             )
 
-        async def run_transform(ctx) -> Any:
+        async def run_transform(ctx: StageContext) -> Any:
             prompt_payloads = cast(
                 list[PromptContextPayload],
                 payload_from_inputs(ctx, "prompt_enrich"),
@@ -149,7 +153,7 @@ class PracticeService:
                 )
             )
 
-        async def persistence_work(ctx) -> Any:
+        async def persistence_work(ctx: StageContext) -> Any:
             return ok_output(
                 self._store.persist_practice_run_start(
                     ctx=ctx,
@@ -260,7 +264,7 @@ class PracticeService:
         attempt_id = uuid4().hex
         workflow_id = session_id
 
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             return ok_output(
                 StageflowStageResult(
                     payload=start_input,
@@ -271,7 +275,7 @@ class PracticeService:
                 )
             )
 
-        async def prompt_enrich(ctx) -> Any:
+        async def prompt_enrich(ctx: StageContext) -> Any:
             return ok_output(
                 self._store.load_start_prompt_context(
                     actor,
@@ -279,10 +283,10 @@ class PracticeService:
                 )
             )
 
-        async def learner_enrich(_ctx) -> Any:
+        async def learner_enrich(_ctx: StageContext) -> Any:
             return ok_output(self._store.load_learner_context(actor.user_id))
 
-        async def session_transform(ctx) -> Any:
+        async def session_transform(ctx: StageContext) -> Any:
             prompt_payload = cast(
                 PromptContextPayload,
                 payload_from_inputs(ctx, "prompt_enrich"),
@@ -299,7 +303,7 @@ class PracticeService:
                 )
             )
 
-        async def persistence_work(ctx) -> Any:
+        async def persistence_work(ctx: StageContext) -> Any:
             return ok_output(
                 self._store.persist_session_start(
                     ctx=ctx,
@@ -387,7 +391,7 @@ class PracticeService:
             )
         self._assessment.set_marker(self._assessment_marker)
 
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             return ok_output(
                 self._store.load_submit_guard(
                     actor=actor,
@@ -396,17 +400,17 @@ class PracticeService:
                 )
             )
 
-        async def prompt_enrich(ctx) -> Any:
+        async def prompt_enrich(ctx: StageContext) -> Any:
             return ok_output(
                 self._store.load_resolved_attempt(
                     cast(AttemptGuardPayload, payload_from_inputs(ctx, "input_guard"))
                 )
             )
 
-        async def learner_enrich(_ctx) -> Any:
+        async def learner_enrich(_ctx: StageContext) -> Any:
             return ok_output(self._store.load_learner_context(actor.user_id))
 
-        async def submission_work(ctx) -> Any:
+        async def submission_work(ctx: StageContext) -> Any:
             return ok_output(
                 self._store.persist_attempt_submission(
                     ctx=ctx,
@@ -414,14 +418,14 @@ class PracticeService:
                 )
             )
 
-        async def assessing_work(ctx) -> Any:
+        async def assessing_work(ctx: StageContext) -> Any:
             return ok_output(
                 self._store.mark_attempt_assessing(
                     cast(AttemptGuardPayload, payload_from_inputs(ctx, "submission_work"))
                 )
             )
 
-        async def assessment_transform(ctx) -> Any:
+        async def assessment_transform(ctx: StageContext) -> Any:
             return ok_output(
                 await self._assessment.run_transform(
                     ctx=ctx,
@@ -436,7 +440,7 @@ class PracticeService:
                 )
             )
 
-        async def output_guard(ctx) -> Any:
+        async def output_guard(ctx: StageContext) -> Any:
             return ok_output(
                 self._assessment.validate_output(
                     prompt_payload=cast(
@@ -450,7 +454,7 @@ class PracticeService:
                 )
             )
 
-        async def persistence_work(ctx) -> Any:
+        async def persistence_work(ctx: StageContext) -> Any:
             return ok_output(
                 self._store.persist_assessment(
                     ctx=ctx,
@@ -532,7 +536,10 @@ class PracticeService:
                 expected_type=AttemptView,
             )
             assessment_view = payload.assessment
-            if assessment_view is not None and assessment_view.validation_status.value == "validated":
+            if (
+                assessment_view is not None
+                and assessment_view.validation_status.value == "validated"
+            ):
                 await self._progression.refresh_from_assessment(
                     request_id=correlation.request_id,
                     trace_id=correlation.trace_id,

@@ -1,8 +1,8 @@
 """Content generation smoke suite."""
 
-from .contracts import ContentGenerationSmokeResult
 from .contracts import (
     ContentGenerationLatencyEnvelopeResult,
+    ContentGenerationSmokeResult,
     ContentGenerationTimingSample,
 )
 from .smoke import (

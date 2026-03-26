@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from pathlib import Path
+from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -17,6 +18,8 @@ from soft_skills_backend.engines.recommendation import RecommendationEngineConfi
 from soft_skills_backend.shared.errors import validation_error
 
 _ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
+
+T = TypeVar("T", bound=BaseModel)
 
 
 @lru_cache(maxsize=1)
@@ -59,7 +62,7 @@ def load_catalog_generation_runtime_config() -> CatalogGenerationRuntimeConfig:
     )
 
 
-def _load_json_artifact(filename: str, model_type: type[BaseModel]) -> BaseModel:
+def _load_json_artifact(filename: str, model_type: type[T]) -> T:
     path = _ARTIFACTS_DIR / filename
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))

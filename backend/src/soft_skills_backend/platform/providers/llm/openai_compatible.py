@@ -176,7 +176,10 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     workflow_id=call_context.workflow_id,
                     user_id=call_context.user_id,
                 )
-                if exc.code in RETRYABLE_PROVIDER_PAYLOAD_CODES and attempt < self._settings.provider_max_retries:
+                if (
+                    exc.code in RETRYABLE_PROVIDER_PAYLOAD_CODES
+                    and attempt < self._settings.provider_max_retries
+                ):
                     await asyncio.sleep(
                         self._settings.provider_retry_backoff_seconds * (attempt + 1)
                     )
@@ -313,7 +316,7 @@ def _extract_message_content(payload: dict[str, Any]) -> str | dict[str, Any]:
         code="SS-PROVIDER-009",
         details={
             "content_type": type(content).__name__,
-            "message_keys": sorted(str(key) for key in message.keys()),
+            "message_keys": sorted(str(key) for key in message),
         },
     )
 

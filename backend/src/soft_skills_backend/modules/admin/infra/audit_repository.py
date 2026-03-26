@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from soft_skills_backend.modules.admin.contracts.views import (
     AdminAssessmentAuditView,
     AdminAssessmentSkillScoreView,
-    AdminLearnerRelationshipView,
     AdminAttemptSummaryView,
+    AdminLearnerRelationshipView,
     AdminPromptAuditView,
     AttemptAuditView,
     PipelineRunAuditView,

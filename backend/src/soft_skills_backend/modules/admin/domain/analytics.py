@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from datetime import datetime
-from typing import Any
+from typing import Any, TypedDict
+
+
+class UsageTrendBucket(TypedDict):
+    bucket_date: str
+    sessions_started: int
+    attempts_submitted: int
+    assessments_validated: int
+    assessments_rejected: int
 
 
 def build_usage_trend_points(
@@ -13,21 +21,21 @@ def build_usage_trend_points(
     submitted_attempt_timestamps: list[datetime],
     validated_assessment_timestamps: list[datetime],
     rejected_assessment_timestamps: list[datetime],
-) -> list[dict[str, int | str]]:
+) -> list[UsageTrendBucket]:
     """Build ordered daily usage trend points."""
 
-    buckets: dict[str, dict[str, int | str]] = {}
+    buckets: dict[str, UsageTrendBucket] = {}
 
-    def ensure_bucket(bucket_date: str) -> dict[str, int | str]:
+    def ensure_bucket(bucket_date: str) -> UsageTrendBucket:
         return buckets.setdefault(
             bucket_date,
-            {
-                "bucket_date": bucket_date,
-                "sessions_started": 0,
-                "attempts_submitted": 0,
-                "assessments_validated": 0,
-                "assessments_rejected": 0,
-            },
+            UsageTrendBucket(
+                bucket_date=bucket_date,
+                sessions_started=0,
+                attempts_submitted=0,
+                assessments_validated=0,
+                assessments_rejected=0,
+            ),
         )
 
     for timestamp in session_timestamps:
@@ -71,7 +79,9 @@ def build_provider_summary(provider_calls: list[Any]) -> list[dict[str, int | fl
     for key in sorted(grouped.keys()):
         summary = grouped[key]
         latencies = summary.pop("latencies")
-        summary["avg_latency_ms"] = None if not latencies else round(sum(latencies) / len(latencies), 2)
+        summary["avg_latency_ms"] = (
+            None if not latencies else round(sum(latencies) / len(latencies), 2)
+        )
         ordered.append(summary)
     return ordered
 
@@ -82,11 +92,15 @@ def build_skill_clusters(weak_skill_lists: list[list[str]]) -> list[dict[str, in
     counts = Counter(skill for items in weak_skill_lists for skill in items)
     return [
         {"skill_slug": skill_slug, "learner_count": learner_count}
-        for skill_slug, learner_count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+        for skill_slug, learner_count in sorted(
+            counts.items(), key=lambda item: (-item[1], item[0])
+        )
     ]
 
 
-def build_average_skill_scores(snapshot_payloads: list[dict[str, Any]]) -> list[dict[str, int | float | str]]:
+def build_average_skill_scores(
+    snapshot_payloads: list[dict[str, Any]],
+) -> list[dict[str, int | float | str]]:
     """Average latest snapshot skill scores across learners."""
 
     scores_by_skill: dict[str, list[float]] = defaultdict(list)

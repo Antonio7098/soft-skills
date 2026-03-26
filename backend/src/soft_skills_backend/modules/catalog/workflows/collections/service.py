@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session, sessionmaker
 from stageflow.api import Pipeline, StageKind, stage
+from stageflow.core import StageContext
 
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
     CollectionCreateCommand,
@@ -74,7 +75,7 @@ class CollectionService:
     ) -> CollectionView:
         validate_collection_source_type(source_type)
 
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 validate_collection_command(session, command)
             return ok_output(
@@ -84,7 +85,7 @@ class CollectionService:
                 )
             )
 
-        async def persistence_work(_ctx) -> Any:
+        async def persistence_work(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 collection_id = self._create_collection_record(
                     session,
@@ -152,7 +153,7 @@ class CollectionService:
         collection_id: str,
         command: CollectionUpdateCommand,
     ) -> CollectionView:
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 record = self._collection_record_or_error(session, collection_id)
                 require_collection_owner_or_admin(actor, record)
@@ -164,7 +165,7 @@ class CollectionService:
                 )
             )
 
-        async def persistence_work(_ctx) -> Any:
+        async def persistence_work(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 record = self._collection_record_or_error(session, collection_id)
                 record.title = command.title
@@ -283,7 +284,7 @@ class CollectionService:
         workflow_id: str | None,
         collection_id: str,
     ) -> CollectionView:
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 record = self._collection_record_or_error(session, collection_id)
                 validate_collection_save(session, actor, record)
@@ -291,7 +292,7 @@ class CollectionService:
                 StageflowStageResult(payload={"collection_id": collection_id}, summary={})
             )
 
-        async def persistence_work(_ctx) -> Any:
+        async def persistence_work(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 session.add(
                     CollectionSaveRecord(
@@ -349,7 +350,7 @@ class CollectionService:
         workflow_id: str | None,
         collection_id: str,
     ) -> CollectionView:
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 record = self._collection_record_or_error(session, collection_id)
                 validate_collection_unsave(session, actor, record)
@@ -357,7 +358,7 @@ class CollectionService:
                 StageflowStageResult(payload={"collection_id": collection_id}, summary={})
             )
 
-        async def persistence_work(_ctx) -> Any:
+        async def persistence_work(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 (
                     session.query(CollectionSaveRecord)
@@ -417,7 +418,7 @@ class CollectionService:
         collection_id: str,
         command: CollectionLifecycleCommand,
     ) -> CollectionView:
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 record = self._collection_record_or_error(session, collection_id)
                 require_collection_owner_or_admin(actor, record)
@@ -432,7 +433,7 @@ class CollectionService:
                 )
             )
 
-        async def persistence_work(_ctx) -> Any:
+        async def persistence_work(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 record = self._collection_record_or_error(session, collection_id)
                 record.lifecycle_state = command.lifecycle_state

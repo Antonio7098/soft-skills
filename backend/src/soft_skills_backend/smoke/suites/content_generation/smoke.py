@@ -17,9 +17,9 @@ from soft_skills_backend.smoke.support.environment import (
     SmokeApplicationSessionFactory,
 )
 
-from .contracts import ContentGenerationSmokeResult
 from .contracts import (
     ContentGenerationLatencyEnvelopeResult,
+    ContentGenerationSmokeResult,
     ContentGenerationTimingSample,
 )
 

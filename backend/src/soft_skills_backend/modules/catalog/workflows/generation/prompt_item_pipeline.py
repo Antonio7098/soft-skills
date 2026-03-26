@@ -7,7 +7,9 @@ from typing import Any, cast
 from uuid import uuid4
 
 from sqlalchemy.orm import Session, sessionmaker
+from stageflow.agent.security import PromptSecurityPolicy
 from stageflow.api import Pipeline, StageKind, stage
+from stageflow.core import StageContext
 
 from soft_skills_backend.engines.config.models import CatalogGenerationRuntimeConfig
 from soft_skills_backend.modules.catalog.contracts.prompt_item_commands import (
@@ -78,7 +80,7 @@ async def generate_prompt_items_for_collection(
     session_factory: sessionmaker[Session],
     events: CatalogEventRecorder,
     llm_provider: LLMProvider,
-    prompt_security_policy,
+    prompt_security_policy: PromptSecurityPolicy,
     stageflow: StageflowPipelineSupport,
     prompt_library: PromptLibrary,
     config: CatalogGenerationRuntimeConfig,
@@ -90,19 +92,24 @@ async def generate_prompt_items_for_collection(
 ) -> PromptItemGenerationView:
     command = structured_command or cast(ChatPromptItemGenerationCommand, chat_command)
 
-    async def input_guard(_ctx) -> Any:
+    async def input_guard(_ctx: StageContext) -> Any:
         with session_factory() as session:
             collection = collection_or_error(session, collection_id)
             require_collection_owner_or_admin(actor, collection)
-            requested_skill_slugs = validate_prompt_item_generation_request(session, collection, command)
+            requested_skill_slugs = validate_prompt_item_generation_request(
+                session, collection, command
+            )
         return ok_output(
             StageflowStageResult(
-                payload={"collection_id": collection_id, "requested_skill_slugs": requested_skill_slugs},
+                payload={
+                    "collection_id": collection_id,
+                    "requested_skill_slugs": requested_skill_slugs,
+                },
                 summary={"collection_id": collection_id, "mode": mode},
             )
         )
 
-    async def plan_transform(ctx) -> Any:
+    async def plan_transform(ctx: StageContext) -> Any:
         with session_factory() as session:
             collection = collection_or_error(session, collection_id)
             existing_prompt_items = (
@@ -122,7 +129,9 @@ async def generate_prompt_items_for_collection(
                 existing_prompt_items=existing_prompt_items,
                 structured_command=structured_command,
                 chat_command=chat_command,
-                requested_skill_slugs=cast(dict[str, Any], payload_from_inputs(ctx, "input_guard"))["requested_skill_slugs"],
+                requested_skill_slugs=cast(dict[str, Any], payload_from_inputs(ctx, "input_guard"))[
+                    "requested_skill_slugs"
+                ],
                 compatible_rubric_ids=compatible_prompt_item_rubric_ids(collection.rubric_ids),
                 sanitize_text=sanitize_text,
             )
@@ -137,7 +146,7 @@ async def generate_prompt_items_for_collection(
             )
         )
 
-    async def plan_guard(ctx) -> Any:
+    async def plan_guard(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "plan_transform"))
         batch = cast(GeneratedPromptItemPlanBatch, typed_result.parsed)
         validate_prompt_item_plan_batch(
@@ -155,7 +164,7 @@ async def generate_prompt_items_for_collection(
             )
         )
 
-    async def prompt_items_work(ctx) -> Any:
+    async def prompt_items_work(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "plan_guard"))
         batch = cast(GeneratedPromptItemPlanBatch, typed_result.parsed)
         with session_factory() as session:
@@ -170,7 +179,9 @@ async def generate_prompt_items_for_collection(
             collection_title=collection.title,
             target_audience=collection.target_audience,
             collection_difficulty=collection.difficulty,
-            workplace_context=structured_command.workplace_context if structured_command is not None else collection.summary,
+            workplace_context=structured_command.workplace_context
+            if structured_command is not None
+            else collection.summary,
             prompt_item_plans=batch.prompt_items,
             timeout_ms=timeout_ms,
         )
@@ -181,8 +192,10 @@ async def generate_prompt_items_for_collection(
             )
         )
 
-    async def output_guard(ctx) -> Any:
-        prompt_item_results = cast(list[WorkerExecutionResult], payload_from_inputs(ctx, "prompt_items_work"))
+    async def output_guard(ctx: StageContext) -> Any:
+        prompt_item_results = cast(
+            list[WorkerExecutionResult], payload_from_inputs(ctx, "prompt_items_work")
+        )
         commands = [
             PromptItemCreateCommand.model_validate(
                 cast(GeneratedPromptItemDraft, result.typed_result.parsed).model_dump()
@@ -210,15 +223,18 @@ async def generate_prompt_items_for_collection(
             )
         )
 
-    async def persistence_work(ctx) -> Any:
+    async def persistence_work(ctx: StageContext) -> Any:
         commands = cast(list[PromptItemCreateCommand], payload_from_inputs(ctx, "output_guard"))
         plan_result = cast(TypedLLMResult, payload_from_inputs(ctx, "plan_guard"))
-        prompt_item_results = cast(list[WorkerExecutionResult], payload_from_inputs(ctx, "prompt_items_work"))
+        plan_batch = cast(GeneratedPromptItemPlanBatch, plan_result.parsed)
+        prompt_item_results = cast(
+            list[WorkerExecutionResult], payload_from_inputs(ctx, "prompt_items_work")
+        )
         manifest = GenerationManifest(
             planner=build_planner_artifact(
                 provider_name=llm_provider.provider_name,
                 pipeline_name=f"catalog_{mode}_planner",
-                prompt_version=plan_result.parsed.prompt_version,
+                prompt_version=plan_batch.prompt_version,
                 correlation_id=str(uuid4()),
                 typed_result=plan_result,
                 child_run_id=pipeline_run_id_from_context(ctx),
@@ -244,8 +260,8 @@ async def generate_prompt_items_for_collection(
             collection_id=collection_id,
             generation_mode=mode,
             commands=commands,
-            planner_prompt_version=plan_result.parsed.prompt_version,
-            planner_provider=plan_result.parsed.provider,
+            planner_prompt_version=plan_batch.prompt_version,
+            planner_provider=plan_batch.provider,
             planner_model_slug=plan_result.model_slug,
             input_payload=command.model_dump(mode="json"),
             manifest=manifest,
@@ -262,10 +278,27 @@ async def generate_prompt_items_for_collection(
 
     pipeline = Pipeline.from_stages(
         stage("input_guard", cast(Any, input_guard), StageKind.GUARD),
-        stage("plan_transform", cast(Any, plan_transform), StageKind.TRANSFORM, dependencies=("input_guard",)),
-        stage("plan_guard", cast(Any, plan_guard), StageKind.GUARD, dependencies=("plan_transform",)),
-        stage("prompt_items_work", cast(Any, prompt_items_work), StageKind.WORK, dependencies=("plan_guard",)),
-        stage("output_guard", cast(Any, output_guard), StageKind.GUARD, dependencies=("prompt_items_work",)),
+        stage(
+            "plan_transform",
+            cast(Any, plan_transform),
+            StageKind.TRANSFORM,
+            dependencies=("input_guard",),
+        ),
+        stage(
+            "plan_guard", cast(Any, plan_guard), StageKind.GUARD, dependencies=("plan_transform",)
+        ),
+        stage(
+            "prompt_items_work",
+            cast(Any, prompt_items_work),
+            StageKind.WORK,
+            dependencies=("plan_guard",),
+        ),
+        stage(
+            "output_guard",
+            cast(Any, output_guard),
+            StageKind.GUARD,
+            dependencies=("prompt_items_work",),
+        ),
         stage(
             "persistence_work",
             cast(Any, persistence_work),
