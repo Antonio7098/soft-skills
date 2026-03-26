@@ -9,6 +9,8 @@ from soft_skills_backend.entrypoints.http.routes import (
     attempts,
     auth,
     collections,
+    evaluations,
+    events,
     health,
     practice_runs,
     progress,
@@ -20,6 +22,8 @@ api_router = APIRouter()
 api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_router.include_router(evaluations.router, prefix="/admin/evaluations", tags=["evaluations"])
+api_router.include_router(events.router, prefix="/events", tags=["events"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(skills.router, prefix="/skills", tags=["skills"])
 api_router.include_router(collections.router, prefix="/collections", tags=["collections"])

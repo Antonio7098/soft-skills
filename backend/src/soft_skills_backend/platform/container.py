@@ -11,6 +11,8 @@ from soft_skills_backend.config import Settings
 from soft_skills_backend.entrypoints.http.health import HealthService
 from soft_skills_backend.modules.admin import AdminService
 from soft_skills_backend.modules.catalog import CatalogService
+from soft_skills_backend.modules.evaluation import EvaluationService
+from soft_skills_backend.modules.events import EventsService
 from soft_skills_backend.modules.identity import IdentityService
 from soft_skills_backend.modules.practice import (
     PracticeRepository,
@@ -57,8 +59,10 @@ class AppContainer:
     admin_service: AdminService
     taxonomy_service: TaxonomyService
     catalog_service: CatalogService
+    evaluation_service: EvaluationService
     practice_service: PracticeService
     progression_service: ProgressionService
+    events_service: EventsService
     workflow_events: SqlAlchemyWorkflowEventRepository
     pipeline_runs: SqlAlchemyPipelineRunRepository
     provider_calls: SqlAlchemyProviderCallRepository
@@ -110,6 +114,13 @@ def build_container(settings: Settings) -> AppContainer:
         llm_provider=llm_provider,
         stageflow_runtime=stageflow_runtime,
     )
+    evaluation_service = EvaluationService(
+        settings=settings,
+        session_factory=session_factory,
+        workflow_events=workflow_events,
+        provider_call_logger=provider_call_logger,
+        stageflow_runtime=stageflow_runtime,
+    )
     progression_service = ProgressionService(
         session_factory=session_factory,
         workflow_events=workflow_events,
@@ -136,6 +147,7 @@ def build_container(settings: Settings) -> AppContainer:
         session_factory=session_factory,
         stageflow_runtime=stageflow_runtime,
     )
+    events_service = EventsService(workflow_events=workflow_events)
     return AppContainer(
         settings=settings,
         engine=engine,
@@ -146,8 +158,10 @@ def build_container(settings: Settings) -> AppContainer:
         admin_service=admin_service,
         taxonomy_service=taxonomy_service,
         catalog_service=catalog_service,
+        evaluation_service=evaluation_service,
         practice_service=practice_service,
         progression_service=progression_service,
+        events_service=events_service,
         workflow_events=workflow_events,
         pipeline_runs=pipeline_runs,
         provider_calls=provider_calls,

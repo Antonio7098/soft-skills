@@ -38,6 +38,91 @@ class SqlAlchemyWorkflowEventRepository:
             )
             session.commit()
 
+    def list_(
+        self,
+        *,
+        event_type: str | None = None,
+        trace_id: str | None = None,
+        workflow_id: str | None = None,
+        request_id: str | None = None,
+        error_code: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[WorkflowEventRecord]:
+        with self._session_factory() as session:
+            query = session.query(WorkflowEventRecord)
+            if event_type is not None:
+                query = query.filter(WorkflowEventRecord.event_type == event_type)
+            if trace_id is not None:
+                query = query.filter(WorkflowEventRecord.trace_id == trace_id)
+            if workflow_id is not None:
+                query = query.filter(WorkflowEventRecord.workflow_id == workflow_id)
+            if request_id is not None:
+                query = query.filter(WorkflowEventRecord.request_id == request_id)
+            if error_code is not None:
+                query = query.filter(WorkflowEventRecord.error_code == error_code)
+            return (
+                query.order_by(WorkflowEventRecord.occurred_at.desc())
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+
+    def count(
+        self,
+        *,
+        event_type: str | None = None,
+        trace_id: str | None = None,
+        workflow_id: str | None = None,
+        request_id: str | None = None,
+        error_code: str | None = None,
+    ) -> int:
+        with self._session_factory() as session:
+            query = session.query(WorkflowEventRecord)
+            if event_type is not None:
+                query = query.filter(WorkflowEventRecord.event_type == event_type)
+            if trace_id is not None:
+                query = query.filter(WorkflowEventRecord.trace_id == trace_id)
+            if workflow_id is not None:
+                query = query.filter(WorkflowEventRecord.workflow_id == workflow_id)
+            if request_id is not None:
+                query = query.filter(WorkflowEventRecord.request_id == request_id)
+            if error_code is not None:
+                query = query.filter(WorkflowEventRecord.error_code == error_code)
+            return query.count()
+
+    def get_by_id(self, event_id: str) -> WorkflowEventRecord | None:
+        with self._session_factory() as session:
+            return session.get(WorkflowEventRecord, event_id)
+
+    def update(
+        self,
+        event_id: str,
+        *,
+        error_code: str | None = None,
+        payload: dict | None = None,
+    ) -> WorkflowEventRecord | None:
+        with self._session_factory() as session:
+            record = session.get(WorkflowEventRecord, event_id)
+            if record is None:
+                return None
+            if error_code is not None:
+                record.error_code = error_code
+            if payload is not None:
+                record.payload = payload
+            session.commit()
+            session.refresh(record)
+            return record
+
+    def delete(self, event_id: str) -> bool:
+        with self._session_factory() as session:
+            record = session.get(WorkflowEventRecord, event_id)
+            if record is None:
+                return False
+            session.delete(record)
+            session.commit()
+            return True
+
 
 class SqlAlchemyPipelineRunRepository:
     """Persist pipeline run lifecycle records."""
