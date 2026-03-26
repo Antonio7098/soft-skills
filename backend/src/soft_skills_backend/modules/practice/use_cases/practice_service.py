@@ -12,17 +12,20 @@ from soft_skills_backend.modules.practice.models import (
     AttemptGuardPayload,
     AttemptView,
     PracticeCorrelation,
+    PracticeSessionView,
     PromptContextPayload,
-    QuickPracticeSessionView,
     SessionTransformPayload,
     StartInputPayload,
     StartInterviewSessionCommand,
-    StartQuickPracticeSessionCommand,
+    StartPracticeSessionCommand,
     StartScenarioSessionCommand,
     SubmitAttemptCommand,
     ValidatedAssessmentPayload,
 )
-from soft_skills_backend.modules.progression import ProgressionService
+from soft_skills_backend.modules.practice.workflows.assessment.marking_provider import (
+    AssessmentMarkingProvider,
+    StructuredOutputRejectionError,
+)
 from soft_skills_backend.modules.practice.workflows.assessment.models import (
     AssessmentTransformPayload,
     InterviewContextView,
@@ -30,10 +33,7 @@ from soft_skills_backend.modules.practice.workflows.assessment.models import (
     PracticeArtifactView,
     ResolvedAttemptPayload,
 )
-from soft_skills_backend.modules.practice.workflows.assessment.quick_practice_marking import (
-    QuickPracticeMarkingProvider,
-    StructuredOutputRejectionError,
-)
+from soft_skills_backend.modules.progression import ProgressionService
 from soft_skills_backend.platform.workflows.stageflow import (
     StageflowPipelineSupport,
     StageflowStageResult,
@@ -46,26 +46,26 @@ from soft_skills_backend.platform.workflows.stageflow_runtime import StageflowRu
 from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import AppError, auth_error
 
-from ..infra.repository import QuickPracticeRepository
-from ..workflows.assessment_service import QuickPracticeAssessmentService
+from ..infra.repository import PracticeRepository
+from ..workflows.assessment_service import AssessmentService
 
 
-class QuickPracticeService:
+class PracticeService:
     """Own the shared text-practice runtime workflow."""
 
     def __init__(
         self,
         *,
         stageflow_runtime: StageflowRuntime,
-        store: QuickPracticeRepository,
-        assessment_marker: QuickPracticeMarkingProvider,
+        store: PracticeRepository,
+        assessment_marker: AssessmentMarkingProvider,
         progression_service: ProgressionService,
     ) -> None:
         self._store = store
         self._assessment_marker = assessment_marker
         self._progression = progression_service
         self._stageflow = StageflowPipelineSupport.from_runtime(stageflow_runtime)
-        self._assessment = QuickPracticeAssessmentService(
+        self._assessment = AssessmentService(
             store=store,
             assessment_marker=assessment_marker,
         )
@@ -74,8 +74,8 @@ class QuickPracticeService:
         self,
         actor: Actor,
         correlation: PracticeCorrelation,
-        command: StartQuickPracticeSessionCommand,
-    ) -> QuickPracticeSessionView:
+        command: StartPracticeSessionCommand,
+    ) -> PracticeSessionView:
         return await self._start_practice_session(
             actor=actor,
             correlation=correlation,
@@ -90,7 +90,7 @@ class QuickPracticeService:
         actor: Actor,
         correlation: PracticeCorrelation,
         command: StartInterviewSessionCommand,
-    ) -> QuickPracticeSessionView:
+    ) -> PracticeSessionView:
         return await self._start_practice_session(
             actor=actor,
             correlation=correlation,
@@ -109,7 +109,7 @@ class QuickPracticeService:
         actor: Actor,
         correlation: PracticeCorrelation,
         command: StartScenarioSessionCommand,
-    ) -> QuickPracticeSessionView:
+    ) -> PracticeSessionView:
         artifacts = [
             PracticeArtifactView(
                 artifact_id=f"{command.scenario_id}-artifact-{index}",
@@ -135,7 +135,7 @@ class QuickPracticeService:
         actor: Actor,
         correlation: PracticeCorrelation,
         start_input: StartInputPayload,
-    ) -> QuickPracticeSessionView:
+    ) -> PracticeSessionView:
         session_id = uuid4().hex
         attempt_id = uuid4().hex
         workflow_id = session_id
@@ -247,7 +247,7 @@ class QuickPracticeService:
         return payload_from_results(
             pipeline_result,
             "persistence_work",
-            expected_type=QuickPracticeSessionView,
+            expected_type=PracticeSessionView,
         )
 
     async def submit_attempt(

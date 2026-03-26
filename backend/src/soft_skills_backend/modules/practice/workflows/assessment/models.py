@@ -4,26 +4,19 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from soft_skills_backend.engines.marking.contracts.models import (
+    PromptTemplate as EnginePromptTemplate,
+)
+from soft_skills_backend.engines.marking.contracts.models import (
+    RenderedPrompt as EngineRenderedPrompt,
+)
 from soft_skills_backend.modules.practice.domain.practice import (
+    AssessmentDraft,
     PracticeType,
-    QuickPracticeAssessmentDraft,
 )
 
-
-class PromptTemplate(BaseModel):
-    """Versioned prompt template."""
-
-    name: str
-    version: str
-    template: str
-
-
-class RenderedPrompt(BaseModel):
-    """Rendered prompt payload with version metadata."""
-
-    name: str
-    version: str
-    content: str
+PromptTemplate = EnginePromptTemplate
+RenderedPrompt = EngineRenderedPrompt
 
 
 class LearnerContextPayload(BaseModel):
@@ -99,7 +92,7 @@ class PracticePromptView(BaseModel):
     interview_context: InterviewContextView | None = None
 
 
-QuickPracticePromptView = PracticePromptView
+AssessmentPromptView = PracticePromptView
 
 
 class ResolvedAttemptPayload(BaseModel):
@@ -115,7 +108,7 @@ class ResolvedAttemptPayload(BaseModel):
 class AssessmentTransformPayload(BaseModel):
     """Typed provider output before domain validation."""
 
-    draft: QuickPracticeAssessmentDraft
+    draft: AssessmentDraft
     raw_payload: dict[str, object]
     model_slug: str
     schema_version: str

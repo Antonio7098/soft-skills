@@ -1,0 +1,26 @@
+{
+  "engine_version": "progression-engine.v1",
+  "schema_version": "progression-snapshot.v1",
+  "evidence_ledger_schema_version": "progression-evidence-ledger.v1",
+  "config_version": "progress-config-2026-03",
+  "decay_profile": {
+    "retention_window_days": 180,
+    "minimum_weight": 0.35
+  },
+  "confidence_profile": {
+    "min_recent_evidence": 2,
+    "min_total_evidence": 3,
+    "recent_window_days": 30
+  },
+  "aggregate_gate_rules": [
+    {
+      "aggregate_ref": "stakeholder-management",
+      "dimension_ref": "expectation-setting",
+      "floor": 0.4,
+      "ceiling": 0.6
+    }
+  ],
+  "weak_dimension_threshold": 0.65,
+  "stagnation_score_threshold": 0.75,
+  "stagnation_delta_threshold": 0.05
+}

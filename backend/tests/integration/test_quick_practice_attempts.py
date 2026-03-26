@@ -6,13 +6,12 @@ import pytest
 from alembic.config import Config
 
 from alembic import command
+from soft_skills_backend.modules.practice.domain.practice import AssessmentDraft
 from soft_skills_backend.modules.practice.workflows.assessment import (
     AssessmentTransformPayload,
     ResolvedAttemptPayload,
     StructuredOutputRejectionError,
 )
-from soft_skills_backend.shared.errors import provider_error, validation_error
-from soft_skills_backend.modules.practice.domain.practice import QuickPracticeAssessmentDraft
 from soft_skills_backend.platform.db.models import (
     AssessmentRecord,
     AttemptRecord,
@@ -22,6 +21,7 @@ from soft_skills_backend.platform.db.models import (
     RecommendationArtifactRecord,
     WorkflowEventRecord,
 )
+from soft_skills_backend.shared.errors import provider_error, validation_error
 
 
 def _migrate(test_settings) -> None:
@@ -113,7 +113,7 @@ class FakeSuccessMarker:
     ) -> AssessmentTransformPayload:
         del learner_payload, call_context
         return AssessmentTransformPayload(
-            draft=QuickPracticeAssessmentDraft.model_validate(
+            draft=AssessmentDraft.model_validate(
                 {
                     "prompt_version": "assessment.quick-practice.v1",
                     "rubric_version": prompt_payload.prompt.rubric_version,

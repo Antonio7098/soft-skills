@@ -1,44 +1,68 @@
-"""Progression and recommendation domain logic."""
+"""Soft-skills adapters over the app-agnostic progression and recommendation engines."""
 
 from __future__ import annotations
 
-import hashlib
-import math
-import re
-from collections import defaultdict
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from soft_skills_backend.engines.config import (
+    load_progression_engine_config,
+    load_recommendation_engine_config,
+)
+from soft_skills_backend.engines.progression import (
+    AggregateDefinition as EngineAggregateDefinition,
+)
+from soft_skills_backend.engines.progression import (
+    AssessmentDimensionScore as EngineAssessmentDimensionScore,
+)
+from soft_skills_backend.engines.progression import (
+    AssessmentEvent as EngineAssessmentEvent,
+)
+from soft_skills_backend.engines.progression import (
+    AssessmentEvidenceReference as EngineAssessmentEvidenceReference,
+)
+from soft_skills_backend.engines.progression import (
+    ComputedProgressionSnapshot as EngineComputedProgressionSnapshot,
+)
+from soft_skills_backend.engines.progression import (
+    PriorProgressState as EnginePriorProgressState,
+)
+from soft_skills_backend.engines.progression import (
+    compute_progression_snapshot as compute_generic_progression_snapshot,
+)
+from soft_skills_backend.engines.recommendation import (
+    CandidateItem as EngineCandidateItem,
+)
+from soft_skills_backend.engines.recommendation import (
+    LearnerContext as EngineLearnerContext,
+)
+from soft_skills_backend.engines.recommendation import (
+    RecommendedCandidate,
+)
+from soft_skills_backend.engines.recommendation import (
+    compute_recommendation as compute_generic_recommendation,
+)
 from soft_skills_backend.modules.progression.contracts.views import (
     CompetencyProgressView,
     RecommendedContentView,
     SkillContributionView,
     SkillProgressView,
 )
-from soft_skills_backend.shared.errors import domain_error, validation_error
 
-PROGRESSION_ENGINE_VERSION = "progression-engine.v1"
-PROGRESSION_SCHEMA_VERSION = "progression-snapshot.v1"
-PROGRESSION_EVIDENCE_LEDGER_SCHEMA_VERSION = "progression-evidence-ledger.v1"
-PROGRESSION_CONFIG_VERSION = "progress-config-2026-03"
+PROGRESSION_ENGINE_CONFIG = load_progression_engine_config()
+RECOMMENDATION_ENGINE_CONFIG = load_recommendation_engine_config()
 
-RECOMMENDATION_ENGINE_VERSION = "recommendation-engine.v1"
-RECOMMENDATION_SCHEMA_VERSION = "recommendation-output.v1"
-RECOMMENDATION_CONFIG_VERSION = "rec-config-2026-03"
+PROGRESSION_ENGINE_VERSION = PROGRESSION_ENGINE_CONFIG.engine_version
+PROGRESSION_SCHEMA_VERSION = PROGRESSION_ENGINE_CONFIG.schema_version
+PROGRESSION_EVIDENCE_LEDGER_SCHEMA_VERSION = (
+    PROGRESSION_ENGINE_CONFIG.evidence_ledger_schema_version
+)
+PROGRESSION_CONFIG_VERSION = PROGRESSION_ENGINE_CONFIG.config_version
 
-MIN_RECENT_EVIDENCE = 2
-MIN_TOTAL_EVIDENCE = 3
-RECENT_WINDOW_DAYS = 30
-RETENTION_WINDOW_DAYS = 180
-COOLDOWN_HOURS = 12
-MAX_RECOMMENDATIONS = 3
-MAX_ALTERNATIVES = 2
-
-COMPETENCY_GATING_RULES: dict[str, tuple[tuple[str, float, float], ...]] = {
-    "stakeholder-management": (("expectation-setting", 0.40, 0.60),),
-}
+RECOMMENDATION_ENGINE_VERSION = RECOMMENDATION_ENGINE_CONFIG.engine_version
+RECOMMENDATION_SCHEMA_VERSION = RECOMMENDATION_ENGINE_CONFIG.schema_version
+RECOMMENDATION_CONFIG_VERSION = RECOMMENDATION_ENGINE_CONFIG.config_version
 
 
 class AssessmentSkillScoreSignal(BaseModel):
@@ -130,18 +154,6 @@ class ComputedRecommendation(BaseModel):
     alternatives: list[RecommendedContentView]
 
 
-@dataclass(frozen=True, slots=True)
-class _SkillAggregate:
-    skill_slug: str
-    score: float
-    confidence: float
-    evidence_count: int
-    recent_evidence_count: int
-    streak: int
-    last_assessment_at: datetime | None
-    contributions: tuple[SkillContributionView, ...]
-
-
 def compute_progress_snapshot(
     *,
     assessments: list[AssessmentSignal],
@@ -152,98 +164,21 @@ def compute_progress_snapshot(
 ) -> ComputedProgressSnapshot:
     """Build deterministic skill and competency state from validated history."""
 
-    if not assessments:
-        raise domain_error(
-            "Progression requires at least one validated assessment",
-            code="SS-DOMAIN-017",
-            status_code=404,
-        )
-
-    skill_state_map = {
-        aggregate.skill_slug: aggregate
-        for aggregate in (
-            _compute_skill_aggregate(
-                skill_slug=skill_slug,
-                assessments=assessments,
-                previous_state=previous_state,
-                now=now,
+    computed = compute_generic_progression_snapshot(
+        assessments=[_to_engine_assessment(assessment) for assessment in assessments],
+        dimension_refs=skill_slugs,
+        aggregate_definitions=[
+            EngineAggregateDefinition(
+                aggregate_ref=definition.competency_slug,
+                dimension_weights=dict(definition.skill_weights),
             )
-            for skill_slug in skill_slugs
-        )
-    }
-    skill_states = [
-        SkillProgressView(
-            skill_slug=skill_slug,
-            score=_round(aggregate.score),
-            confidence=_round(aggregate.confidence),
-            confidence_band=_confidence_band(aggregate.confidence),
-            evidence_count=aggregate.evidence_count,
-            recent_evidence_count=aggregate.recent_evidence_count,
-            streak=aggregate.streak,
-            delta=_round(
-                aggregate.score - (previous_state.skill_scores.get(skill_slug, 0.0) if previous_state else 0.0)
-            ),
-            last_assessment_at=(
-                None if aggregate.last_assessment_at is None else aggregate.last_assessment_at.isoformat()
-            ),
-            contributing_assessments=list(aggregate.contributions),
-        )
-        for skill_slug, aggregate in sorted(skill_state_map.items())
-    ]
-
-    competency_states: list[CompetencyProgressView] = []
-    for definition in competency_definitions:
-        raw_score = 0.0
-        raw_confidence = 0.0
-        gating_reasons: list[str] = []
-        for skill_slug, weight in definition.skill_weights.items():
-            aggregate = skill_state_map[skill_slug]
-            raw_score += aggregate.score * weight
-            raw_confidence += aggregate.confidence * weight
-        score = raw_score
-        for skill_slug, floor, ceiling in COMPETENCY_GATING_RULES.get(definition.competency_slug, ()):
-            aggregate = skill_state_map.get(skill_slug)
-            if aggregate is None:
-                continue
-            if aggregate.score < floor and score > ceiling:
-                score = ceiling
-                gating_reasons.append(f"{skill_slug}_floor")
-        prior_score = previous_state.competency_scores.get(definition.competency_slug, 0.0) if previous_state else 0.0
-        competency_states.append(
-            CompetencyProgressView(
-                competency_slug=definition.competency_slug,
-                score=_round(score),
-                confidence=_round(raw_confidence),
-                confidence_band=_confidence_band(raw_confidence),
-                delta=_round(score - prior_score),
-                gating_applied=bool(gating_reasons),
-                gating_reasons=gating_reasons,
-                supporting_skill_slugs=sorted(definition.skill_weights),
-            )
-        )
-
-    weak_skill_slugs = [
-        state.skill_slug
-        for state in skill_states
-        if state.evidence_count > 0 and state.score < 0.65
-    ]
-    stagnating_skill_slugs = [
-        state.skill_slug
-        for state in skill_states
-        if state.evidence_count >= 2 and state.score < 0.75 and abs(state.delta) < 0.05
-    ]
-    coverage_gap_skill_slugs = [
-        state.skill_slug
-        for state in skill_states
-        if state.evidence_count < MIN_RECENT_EVIDENCE
-    ]
-    return ComputedProgressSnapshot(
-        weak_skill_slugs=weak_skill_slugs,
-        stagnating_skill_slugs=stagnating_skill_slugs,
-        coverage_gap_skill_slugs=coverage_gap_skill_slugs,
-        skill_states=skill_states,
-        competency_states=sorted(competency_states, key=lambda item: item.competency_slug),
+            for definition in competency_definitions
+        ],
+        previous_state=_to_engine_prior_state(previous_state),
+        config=PROGRESSION_ENGINE_CONFIG,
+        now=now,
     )
+    return _from_engine_progress_snapshot(computed)
 
 
 def compute_recommendation(
@@ -255,87 +190,39 @@ def compute_recommendation(
 ) -> ComputedRecommendation:
     """Score visible content candidates against the current snapshot."""
 
-    if not candidates:
-        raise validation_error(
-            "Recommendation generation requires at least one candidate",
-            code="SS-VALIDATION-031",
-            status_code=422,
-        )
-
-    skill_map = {state.skill_slug: state for state in snapshot.skill_states}
-    competency_map = {state.competency_slug: state for state in snapshot.competency_states}
-    goal_tokens = _goal_tokens(learner)
-    ranked: list[tuple[float, RecommendedContentView]] = []
-    for candidate in candidates:
-        if not candidate.rubric_id or not candidate.target_skill_slugs:
-            continue
-        if candidate.lifecycle_state not in {"published_public", "published_private", "draft", "review"}:
-            continue
-        if candidate.difficulty == "advanced" and candidate.target_competency_slugs:
-            readiness = max(
-                (competency_map.get(slug).score for slug in candidate.target_competency_slugs if slug in competency_map),
-                default=0.0,
+    computed = compute_generic_recommendation(
+        learner=EngineLearnerContext(
+            entity_ref=learner.learner_id,
+            target_role=learner.target_role,
+            goals=list(learner.goals),
+        ),
+        snapshot=_to_engine_snapshot(snapshot),
+        candidates=[
+            EngineCandidateItem(
+                content_ref=candidate.content_id,
+                content_type=candidate.content_type,
+                collection_ref=candidate.collection_id,
+                title=candidate.title,
+                summary=candidate.summary,
+                difficulty=candidate.difficulty,
+                verification_state=candidate.verification_state,
+                target_dimension_refs=list(candidate.target_skill_slugs),
+                target_aggregate_refs=list(candidate.target_competency_slugs),
+                lifecycle_state=candidate.lifecycle_state,
+                attempt_count=candidate.attempt_count,
+                last_attempted_at=candidate.last_attempted_at,
             )
-            if readiness < 0.45:
-                continue
-
-        components = _recommendation_components(
-            candidate=candidate,
-            skill_map=skill_map,
-            goal_tokens=goal_tokens,
-            now=now,
-        )
-        total = (
-            0.40 * components["skill_deficit_alignment"]
-            + 0.20 * components["stagnation_relief"]
-            + 0.15 * components["coverage_gap_fit"]
-            + 0.15 * components["goal_alignment"]
-            + 0.10 * components["verification_boost"]
-            - components["recent_repeat_penalty"]
-        )
-        ranked.append(
-            (
-                total,
-                RecommendedContentView(
-                    content_id=candidate.content_id,
-                    content_type=candidate.content_type,
-                    collection_id=candidate.collection_id,
-                    title=candidate.title,
-                    difficulty=candidate.difficulty,
-                    score=_round(total),
-                    component_breakdown={key: _round(value) for key, value in components.items()},
-                    reasons=_reason_codes(candidate, skill_map, goal_tokens),
-                    cooldown_expires_at=_cooldown_expires_at(candidate, now),
-                    verification_state=candidate.verification_state,
-                    target_skill_slugs=list(candidate.target_skill_slugs),
-                    target_competency_slugs=list(candidate.target_competency_slugs),
-                ),
-            )
-        )
-
-    ranked.sort(key=lambda item: (-item[0], item[1].title, item[1].content_id))
-    selected = [item for _, item in ranked if item.score > 0][:MAX_RECOMMENDATIONS]
-    alternatives = [item for _, item in ranked[MAX_RECOMMENDATIONS:] if item.score > 0][:MAX_ALTERNATIVES]
-    if not selected:
-        raise validation_error(
-            "Recommendation generation produced no valid candidates",
-            code="SS-VALIDATION-032",
-            status_code=422,
-        )
-    context_snapshot_id = hashlib.sha256(
-        "|".join(
-            [
-                learner.learner_id,
-                ",".join(sorted(snapshot.weak_skill_slugs)),
-                ",".join(sorted(candidate.content_id for candidate in candidates)),
-            ]
-        ).encode("utf-8")
-    ).hexdigest()[:24]
+            for candidate in candidates
+            if candidate.rubric_id
+        ],
+        config=RECOMMENDATION_ENGINE_CONFIG,
+        now=now,
+    )
     return ComputedRecommendation(
-        context_snapshot_id=context_snapshot_id,
-        candidate_count=len(ranked),
-        items=selected,
-        alternatives=alternatives,
+        context_snapshot_id=computed.context_snapshot_id,
+        candidate_count=computed.candidate_count,
+        items=[_from_engine_recommendation_item(item) for item in computed.items],
+        alternatives=[_from_engine_recommendation_item(item) for item in computed.alternatives],
     )
 
 
@@ -380,16 +267,13 @@ def diff_summary(
     changed_skill_count = sum(
         1
         for state in snapshot.skill_states
-        if not math.isclose(state.score, previous_state.skill_scores.get(state.skill_slug, 0.0), abs_tol=0.001)
+        if abs(state.score - previous_state.skill_scores.get(state.skill_slug, 0.0)) > 0.001
     )
     changed_competency_count = sum(
         1
         for state in snapshot.competency_states
-        if not math.isclose(
-            state.score,
-            previous_state.competency_scores.get(state.competency_slug, 0.0),
-            abs_tol=0.001,
-        )
+        if abs(state.score - previous_state.competency_scores.get(state.competency_slug, 0.0))
+        > 0.001
     )
     top_skill = min(snapshot.skill_states, key=lambda item: item.score).skill_slug
     return {
@@ -400,273 +284,189 @@ def diff_summary(
     }
 
 
-def _compute_skill_aggregate(
-    *,
-    skill_slug: str,
-    assessments: list[AssessmentSignal],
-    previous_state: PriorProgressState | None,
-    now: datetime,
-) -> _SkillAggregate:
-    now = _as_utc(now)
-    matching_scores: list[tuple[AssessmentSignal, AssessmentSkillScoreSignal]] = []
-    for assessment in assessments:
-        for score in assessment.skill_scores:
-            if score.skill_slug == skill_slug:
-                matching_scores.append((assessment, score))
-                break
-    if not matching_scores:
-        return _SkillAggregate(
-            skill_slug=skill_slug,
-            score=0.0,
-            confidence=0.0,
-            evidence_count=0,
-            recent_evidence_count=0,
-            streak=0,
-            last_assessment_at=None,
-            contributions=tuple(),
-        )
-
-    total_weight = 0.0
-    weighted_score = 0.0
-    recent_evidence_count = 0
-    streak = 0
-    contributions: list[SkillContributionView] = []
-    for assessment, score_signal in sorted(matching_scores, key=lambda item: item[0].created_at):
-        assessment_at = _as_utc(assessment.created_at)
-        normalized = normalize_score(score_signal.score)
-        weight = _decay_weight(assessment_at, now)
-        total_weight += weight
-        weighted_score += normalized * weight
-        if assessment_at >= now - timedelta(days=RECENT_WINDOW_DAYS):
-            recent_evidence_count += 1
-        if normalized >= 0.60:
-            streak += 1
-        else:
-            streak = 0
-        contributions.append(
-            SkillContributionView(
-                assessment_id=assessment.assessment_id,
-                attempt_id=assessment.attempt_id,
-                normalized_score=_round(normalized),
-                weight=_round(weight),
-                contributed_at=assessment_at.isoformat(),
-                prompt_version=assessment.prompt_version,
-                rubric_version=assessment.rubric_version,
-                trace_id=assessment.trace_id,
-                quotes=[
-                    evidence.quote
-                    for evidence in assessment.evidence
-                    if evidence.skill_slug == skill_slug
-                ],
-            )
-        )
-    score = weighted_score / total_weight if total_weight else 0.0
-    last_assessment_at = _as_utc(matching_scores[-1][0].created_at)
-    confidence = _confidence(
-        evidence_count=len(matching_scores),
-        recent_evidence_count=recent_evidence_count,
-        last_assessment_at=last_assessment_at,
-        now=now,
-    )
-    return _SkillAggregate(
-        skill_slug=skill_slug,
-        score=score,
-        confidence=confidence,
-        evidence_count=len(matching_scores),
-        recent_evidence_count=recent_evidence_count,
-        streak=streak,
-        last_assessment_at=last_assessment_at,
-        contributions=tuple(reversed(contributions)),
-    )
-
-
 def normalize_score(score: int) -> float:
     """Map rubric 1-5 scores onto the canonical 0-1 scale."""
 
     return max(0.0, min(1.0, (score - 1) / 4))
 
 
-def _decay_weight(assessment_at: datetime, now: datetime) -> float:
-    assessment_at = _as_utc(assessment_at)
-    now = _as_utc(now)
-    age_days = max(0, (now - assessment_at).days)
-    if age_days >= RETENTION_WINDOW_DAYS:
-        return 0.35
-    return max(0.35, 1.0 - (age_days / RETENTION_WINDOW_DAYS) * 0.65)
-
-
-def _confidence(
-    *,
-    evidence_count: int,
-    recent_evidence_count: int,
-    last_assessment_at: datetime,
-    now: datetime,
-) -> float:
-    last_assessment_at = _as_utc(last_assessment_at)
-    now = _as_utc(now)
-    evidence_ratio = min(1.0, evidence_count / MIN_TOTAL_EVIDENCE)
-    recent_ratio = min(1.0, recent_evidence_count / MIN_RECENT_EVIDENCE)
-    age_days = max(0, (now - last_assessment_at).days)
-    recency = max(0.0, 1.0 - (age_days / RETENTION_WINDOW_DAYS))
-    return min(1.0, evidence_ratio * 0.45 + recent_ratio * 0.35 + recency * 0.20)
-
-
-def _confidence_band(confidence: float) -> str:
-    if confidence >= 0.75:
-        return "high"
-    if confidence >= 0.40:
-        return "medium"
-    return "low"
-
-
-def _recommendation_components(
-    *,
-    candidate: CatalogCandidate,
-    skill_map: dict[str, SkillProgressView],
-    goal_tokens: set[str],
-    now: datetime,
-) -> dict[str, float]:
-    now = _as_utc(now)
-    overlapping_states = [
-        skill_map[skill_slug]
-        for skill_slug in candidate.target_skill_slugs
-        if skill_slug in skill_map
-    ]
-    deficit_values = [
-        (1 - state.score) * max(state.confidence, 0.35)
-        for state in overlapping_states
-        if state.evidence_count > 0
-    ]
-    stagnation_values = [
-        1 - state.score
-        for state in overlapping_states
-        if state.skill_slug and state.skill_slug and abs(state.delta) < 0.05 and state.evidence_count >= 2
-    ]
-    coverage_values = [
-        1 - min(1.0, state.evidence_count / MIN_RECENT_EVIDENCE)
-        for state in overlapping_states
-    ]
-    verification_boost = 0.5 if candidate.verification_state == "verified" else 0.0
-    repeat_penalty = 0.0
-    if candidate.last_attempted_at is not None:
-        last_attempted_at = _as_utc(candidate.last_attempted_at)
-        if last_attempted_at >= now - timedelta(hours=COOLDOWN_HOURS):
-            repeat_penalty = 0.08
-        else:
-            repeat_penalty = min(0.08, candidate.attempt_count * 0.02)
-    return {
-        "skill_deficit_alignment": _average(deficit_values),
-        "stagnation_relief": _average(stagnation_values),
-        "coverage_gap_fit": _average(coverage_values),
-        "goal_alignment": _goal_alignment(candidate, goal_tokens),
-        "verification_boost": verification_boost,
-        "recent_repeat_penalty": repeat_penalty,
-    }
-
-
-def _reason_codes(
-    candidate: CatalogCandidate,
-    skill_map: dict[str, SkillProgressView],
-    goal_tokens: set[str],
-) -> list[str]:
-    reasons: list[str] = []
-    weak_overlap = sorted(
-        (
-            state for state in (skill_map.get(skill_slug) for skill_slug in candidate.target_skill_slugs)
-            if state is not None and state.evidence_count > 0 and state.score < 0.65
-        ),
-        key=lambda state: (state.score, state.skill_slug),
+def _to_engine_assessment(assessment: AssessmentSignal) -> EngineAssessmentEvent:
+    return EngineAssessmentEvent(
+        assessment_id=assessment.assessment_id,
+        attempt_ref=assessment.attempt_id,
+        entity_ref=assessment.learner_id,
+        created_at=assessment.created_at,
+        prompt_version=assessment.prompt_version,
+        rubric_version=assessment.rubric_version,
+        trace_id=assessment.trace_id,
+        dimension_scores=[
+            EngineAssessmentDimensionScore(
+                dimension_ref=score.skill_slug,
+                normalized_score=normalize_score(score.score),
+            )
+            for score in assessment.skill_scores
+        ],
+        evidence=[
+            EngineAssessmentEvidenceReference(
+                dimension_ref=evidence.skill_slug,
+                quote=evidence.quote,
+                explanation=evidence.explanation,
+            )
+            for evidence in assessment.evidence
+        ],
     )
-    if weak_overlap:
-        reasons.append(f"weak_skill:{weak_overlap[0].skill_slug}")
-    stagnating_overlap = sorted(
-        (
-            state for state in (skill_map.get(skill_slug) for skill_slug in candidate.target_skill_slugs)
-            if state is not None and state.evidence_count >= 2 and abs(state.delta) < 0.05
-        ),
-        key=lambda state: (state.score, state.skill_slug),
-    )
-    if stagnating_overlap:
-        reasons.append(f"stagnation:{stagnating_overlap[0].skill_slug}")
-    coverage_overlap = sorted(
-        (
-            state for state in (skill_map.get(skill_slug) for skill_slug in candidate.target_skill_slugs)
-            if state is not None and state.evidence_count < MIN_RECENT_EVIDENCE
-        ),
-        key=lambda state: (state.evidence_count, state.skill_slug),
-    )
-    if coverage_overlap:
-        reasons.append(f"coverage_gap:{coverage_overlap[0].skill_slug}")
-    matched_goal_token = _matched_goal_token(candidate, goal_tokens)
-    if matched_goal_token is not None:
-        reasons.append(f"goal_match:{matched_goal_token}")
-    if candidate.verification_state == "verified":
-        reasons.append("verified_content")
-    return reasons
 
 
-def _cooldown_expires_at(candidate: CatalogCandidate, now: datetime) -> str | None:
-    if candidate.last_attempted_at is None:
+def _to_engine_prior_state(previous_state: PriorProgressState | None) -> EnginePriorProgressState | None:
+    if previous_state is None:
         return None
-    expires_at = _as_utc(candidate.last_attempted_at) + timedelta(hours=COOLDOWN_HOURS)
-    now = _as_utc(now)
-    if expires_at <= now:
-        return None
-    return expires_at.isoformat()
-
-
-def _goal_alignment(candidate: CatalogCandidate, goal_tokens: set[str]) -> float:
-    if not goal_tokens:
-        return 0.0
-    haystack = _candidate_text(candidate)
-    matched = goal_tokens & haystack
-    if not matched:
-        return 0.0
-    return min(1.0, len(matched) / max(1, len(goal_tokens)))
-
-
-def _matched_goal_token(candidate: CatalogCandidate, goal_tokens: set[str]) -> str | None:
-    matches = sorted(goal_tokens & _candidate_text(candidate))
-    return matches[0] if matches else None
-
-
-def _candidate_text(candidate: CatalogCandidate) -> set[str]:
-    text = " ".join(
-        [
-            candidate.title,
-            candidate.summary,
-            candidate.difficulty,
-            " ".join(candidate.target_skill_slugs),
-            " ".join(candidate.target_competency_slugs),
-        ]
+    return EnginePriorProgressState(
+        snapshot_id=previous_state.snapshot_id,
+        dimension_scores=dict(previous_state.skill_scores),
+        aggregate_scores=dict(previous_state.competency_scores),
     )
-    return _tokenize(text)
 
 
-def _goal_tokens(learner: LearnerProfileInput) -> set[str]:
-    tokens = set()
-    if learner.target_role:
-        tokens |= _tokenize(learner.target_role)
-    for goal in learner.goals:
-        tokens |= _tokenize(goal)
-    return tokens
+def _to_engine_snapshot(snapshot: ComputedProgressSnapshot) -> EngineComputedProgressionSnapshot:
+    return EngineComputedProgressionSnapshot(
+        weak_dimension_refs=list(snapshot.weak_skill_slugs),
+        stagnating_dimension_refs=list(snapshot.stagnating_skill_slugs),
+        coverage_gap_dimension_refs=list(snapshot.coverage_gap_skill_slugs),
+        dimension_states=[
+            _to_engine_dimension_state(skill_state) for skill_state in snapshot.skill_states
+        ],
+        aggregate_states=[
+            _to_engine_aggregate_state(competency_state)
+            for competency_state in snapshot.competency_states
+        ],
+    )
 
 
-def _tokenize(value: str) -> set[str]:
-    return {token for token in re.split(r"[^a-z0-9]+", value.lower()) if len(token) >= 4}
+def _to_engine_dimension_state(skill_state: SkillProgressView):
+    from soft_skills_backend.engines.progression.contracts.models import (
+        DimensionContribution,
+        DimensionState,
+    )
+
+    return DimensionState(
+        dimension_ref=skill_state.skill_slug,
+        score=skill_state.score,
+        confidence=skill_state.confidence,
+        confidence_band=skill_state.confidence_band,
+        evidence_count=skill_state.evidence_count,
+        recent_evidence_count=skill_state.recent_evidence_count,
+        streak=skill_state.streak,
+        delta=skill_state.delta,
+        last_assessment_at=skill_state.last_assessment_at,
+        contributions=[
+            DimensionContribution(
+                assessment_id=contribution.assessment_id,
+                attempt_ref=contribution.attempt_id,
+                normalized_score=contribution.normalized_score,
+                weight=contribution.weight,
+                contributed_at=contribution.contributed_at,
+                prompt_version=contribution.prompt_version,
+                rubric_version=contribution.rubric_version,
+                trace_id=contribution.trace_id,
+                quotes=list(contribution.quotes),
+            )
+            for contribution in skill_state.contributing_assessments
+        ],
+    )
 
 
-def _average(values: list[float]) -> float:
-    if not values:
-        return 0.0
-    return sum(values) / len(values)
+def _to_engine_aggregate_state(competency_state: CompetencyProgressView):
+    from soft_skills_backend.engines.progression.contracts.models import AggregateState
+
+    return AggregateState(
+        aggregate_ref=competency_state.competency_slug,
+        score=competency_state.score,
+        confidence=competency_state.confidence,
+        confidence_band=competency_state.confidence_band,
+        delta=competency_state.delta,
+        gating_applied=competency_state.gating_applied,
+        gating_reasons=list(competency_state.gating_reasons),
+        supporting_dimension_refs=list(competency_state.supporting_skill_slugs),
+    )
 
 
-def _round(value: float) -> float:
-    return round(value, 4)
+def _from_engine_progress_snapshot(computed: EngineComputedProgressionSnapshot) -> ComputedProgressSnapshot:
+    return ComputedProgressSnapshot(
+        weak_skill_slugs=list(computed.weak_dimension_refs),
+        stagnating_skill_slugs=list(computed.stagnating_dimension_refs),
+        coverage_gap_skill_slugs=list(computed.coverage_gap_dimension_refs),
+        skill_states=[
+            SkillProgressView(
+                skill_slug=state.dimension_ref,
+                score=state.score,
+                confidence=state.confidence,
+                confidence_band=state.confidence_band,
+                evidence_count=state.evidence_count,
+                recent_evidence_count=state.recent_evidence_count,
+                streak=state.streak,
+                delta=state.delta,
+                last_assessment_at=state.last_assessment_at,
+                contributing_assessments=[
+                    SkillContributionView(
+                        assessment_id=contribution.assessment_id,
+                        attempt_id=contribution.attempt_ref,
+                        normalized_score=contribution.normalized_score,
+                        weight=contribution.weight,
+                        contributed_at=contribution.contributed_at,
+                        prompt_version=contribution.prompt_version,
+                        rubric_version=contribution.rubric_version,
+                        trace_id=contribution.trace_id,
+                        quotes=list(contribution.quotes),
+                    )
+                    for contribution in state.contributions
+                ],
+            )
+            for state in computed.dimension_states
+        ],
+        competency_states=[
+            CompetencyProgressView(
+                competency_slug=state.aggregate_ref,
+                score=state.score,
+                confidence=state.confidence,
+                confidence_band=state.confidence_band,
+                delta=state.delta,
+                gating_applied=state.gating_applied,
+                gating_reasons=list(state.gating_reasons),
+                supporting_skill_slugs=list(state.supporting_dimension_refs),
+            )
+            for state in computed.aggregate_states
+        ],
+    )
 
 
-def _as_utc(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=UTC)
-    return value.astimezone(UTC)
+def _from_engine_recommendation_item(item: RecommendedCandidate) -> RecommendedContentView:
+    return RecommendedContentView(
+        content_id=item.content_ref,
+        content_type=item.content_type,
+        collection_id=item.collection_ref,
+        title=item.title,
+        difficulty=item.difficulty,
+        score=item.score,
+        component_breakdown=_rename_component_breakdown(item.component_breakdown),
+        reasons=[_rename_reason(reason) for reason in item.reasons],
+        cooldown_expires_at=item.cooldown_expires_at,
+        verification_state=item.verification_state,
+        target_skill_slugs=list(item.target_dimension_refs),
+        target_competency_slugs=list(item.target_aggregate_refs),
+    )
+
+
+def _rename_component_breakdown(components: dict[str, float]) -> dict[str, float]:
+    renamed: dict[str, float] = {}
+    for key, value in components.items():
+        if key == "dimension_deficit_alignment":
+            renamed["skill_deficit_alignment"] = value
+            continue
+        renamed[key] = value
+    return renamed
+
+
+def _rename_reason(reason: str) -> str:
+    if reason.startswith("weak_dimension:"):
+        return reason.replace("weak_dimension:", "weak_skill:", 1)
+    return reason

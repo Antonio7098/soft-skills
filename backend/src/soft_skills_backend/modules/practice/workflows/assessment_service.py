@@ -6,16 +6,17 @@ import re
 
 from stageflow.core import StageContext
 
+from soft_skills_backend.engines.config import load_marking_runtime_config
 from soft_skills_backend.modules.practice.domain.practice import validate_assessment_draft
 from soft_skills_backend.modules.practice.models import ValidatedAssessmentPayload
+from soft_skills_backend.modules.practice.workflows.assessment.marking_provider import (
+    AssessmentMarkingProvider,
+    StructuredOutputRejectionError,
+)
 from soft_skills_backend.modules.practice.workflows.assessment.models import (
     AssessmentTransformPayload,
     LearnerContextPayload,
     ResolvedAttemptPayload,
-)
-from soft_skills_backend.modules.practice.workflows.assessment.quick_practice_marking import (
-    QuickPracticeMarkingProvider,
-    StructuredOutputRejectionError,
 )
 from soft_skills_backend.platform.workflows.stageflow import (
     StageflowStageResult,
@@ -27,22 +28,22 @@ from soft_skills_backend.platform.workflows.stageflow import (
 from soft_skills_backend.shared.errors import AppError, scoring_error
 from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
-from ..infra.repository import QuickPracticeRepository
+from ..infra.repository import PracticeRepository
 
 
-class QuickPracticeAssessmentService:
+class AssessmentService:
     """Own assessment provider calls and output validation."""
 
     def __init__(
         self,
         *,
-        store: QuickPracticeRepository,
-        assessment_marker: QuickPracticeMarkingProvider,
+        store: PracticeRepository,
+        assessment_marker: AssessmentMarkingProvider,
     ) -> None:
         self._store = store
         self._assessment_marker = assessment_marker
 
-    def set_marker(self, assessment_marker: QuickPracticeMarkingProvider) -> None:
+    def set_marker(self, assessment_marker: AssessmentMarkingProvider) -> None:
         self._assessment_marker = assessment_marker
 
     async def run_transform(
@@ -52,6 +53,7 @@ class QuickPracticeAssessmentService:
         prompt_payload: ResolvedAttemptPayload,
         learner_payload: LearnerContextPayload,
     ) -> StageflowStageResult:
+        config = load_marking_runtime_config()
         self._store.record_event(
             event_type="assessment.started.v1",
             request_id=request_id_from_context(ctx),
@@ -62,7 +64,7 @@ class QuickPracticeAssessmentService:
                 "session_id": prompt_payload.session_id,
                 "practice_type": prompt_payload.prompt.practice_type.value,
                 "prompt_type": prompt_payload.prompt.prompt_type,
-                "prompt_version": self._store.settings.assessment_prompt_version,
+                "prompt_version": config.prompt_version,
                 "rubric_version": prompt_payload.prompt.rubric_version,
                 "provider": self._assessment_marker.provider_name,
                 "model_slug": self._assessment_marker.model_slug,
@@ -96,14 +98,14 @@ class QuickPracticeAssessmentService:
         transform_payload: AssessmentTransformPayload,
     ) -> StageflowStageResult:
         draft = transform_payload.draft
-        settings = self._store.settings
-        if draft.prompt_version != settings.assessment_prompt_version:
+        config = load_marking_runtime_config()
+        if draft.prompt_version != config.prompt_version:
             raise StructuredOutputRejectionError(
                 app_error=scoring_error(
                     "Assessment output prompt version did not match the active contract",
                     code="SS-SCORING-007",
                     details={
-                        "expected_prompt_version": settings.assessment_prompt_version,
+                        "expected_prompt_version": config.prompt_version,
                         "observed_prompt_version": draft.prompt_version,
                     },
                 ),
@@ -162,7 +164,7 @@ class QuickPracticeAssessmentService:
                 provider=draft.provider,
                 model_slug=transform_payload.model_slug,
                 schema_version=transform_payload.schema_version,
-                config_version=settings.scoring_config_version,
+                config_version=config.config_version,
                 overall_score=draft.overall_score,
                 rationale=draft.rationale,
                 skill_scores=draft.skill_scores,

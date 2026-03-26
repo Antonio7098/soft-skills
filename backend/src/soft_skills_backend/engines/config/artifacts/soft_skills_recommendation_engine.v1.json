@@ -1,0 +1,32 @@
+{
+  "engine_version": "recommendation-engine.v1",
+  "schema_version": "recommendation-output.v1",
+  "config_version": "rec-config-2026-03",
+  "weights": {
+    "dimension_deficit_alignment": 0.4,
+    "stagnation_relief": 0.2,
+    "coverage_gap_fit": 0.15,
+    "goal_alignment": 0.15,
+    "verification_boost": 0.1
+  },
+  "cooldown_hours": 12,
+  "max_recommendations": 3,
+  "max_alternatives": 2,
+  "minimum_score": 0.0,
+  "allowed_lifecycle_states": [
+    "published_public",
+    "published_private",
+    "draft",
+    "review"
+  ],
+  "verified_states": [
+    "verified"
+  ],
+  "advanced_difficulty_labels": [
+    "advanced"
+  ],
+  "advanced_readiness_threshold": 0.45,
+  "immediate_repeat_penalty": 0.08,
+  "repeat_penalty_cap": 0.08,
+  "repeat_penalty_per_attempt": 0.02
+}

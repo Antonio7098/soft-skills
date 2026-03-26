@@ -13,11 +13,11 @@ from soft_skills_backend.modules.admin import AdminService
 from soft_skills_backend.modules.catalog import CatalogService
 from soft_skills_backend.modules.identity import IdentityService
 from soft_skills_backend.modules.practice import (
-    QuickPracticeRepository,
-    QuickPracticeService,
+    PracticeRepository,
+    PracticeService,
 )
 from soft_skills_backend.modules.practice.workflows.assessment import (
-    DefaultQuickPracticeMarkingProvider,
+    DefaultAssessmentMarkingProvider,
     build_prompt_library,
     build_typed_output,
 )
@@ -57,7 +57,7 @@ class AppContainer:
     admin_service: AdminService
     taxonomy_service: TaxonomyService
     catalog_service: CatalogService
-    practice_service: QuickPracticeService
+    practice_service: PracticeService
     progression_service: ProgressionService
     workflow_events: SqlAlchemyWorkflowEventRepository
     pipeline_runs: SqlAlchemyPipelineRunRepository
@@ -115,15 +115,15 @@ def build_container(settings: Settings) -> AppContainer:
         workflow_events=workflow_events,
         stageflow_runtime=stageflow_runtime,
     )
-    practice_store = QuickPracticeRepository(
+    practice_store = PracticeRepository(
         settings=settings,
         session_factory=session_factory,
         workflow_events=workflow_events,
     )
-    practice_service = QuickPracticeService(
+    practice_service = PracticeService(
         stageflow_runtime=stageflow_runtime,
         store=practice_store,
-        assessment_marker=DefaultQuickPracticeMarkingProvider(
+        assessment_marker=DefaultAssessmentMarkingProvider(
             settings=settings,
             llm_provider=llm_provider,
             prompt_library=build_prompt_library(settings),

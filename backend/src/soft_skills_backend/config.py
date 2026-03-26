@@ -49,14 +49,7 @@ class Settings(BaseSettings):
     smoke_timeout_seconds: float = Field(default=10.0, gt=0)
     provider_max_retries: int = Field(default=2, ge=0, le=5)
     provider_retry_backoff_seconds: float = Field(default=0.25, gt=0, le=10.0)
-    assessment_prompt_version: str = "assessment.quick-practice.v1"
-    assessment_output_schema_version: str = "quick-practice-assessment-output.v1"
-    scoring_config_version: str = "quick-practice-marking-config.v1"
     assessment_validation_retries: int = Field(default=1, ge=0, le=3)
-    creator_structured_generation_prompt_version: str = "creator.structured-draft.v1"
-    creator_chat_generation_prompt_version: str = "creator.chat-draft.v1"
-    creator_generation_output_schema_version: str = "creator-draft-output.v1"
-    creator_generation_config_version: str = "creator-draft-config.v1"
     creator_generation_validation_retries: int = Field(default=2, ge=0, le=3)
 
     @field_validator("cors_allowed_origins", mode="before")

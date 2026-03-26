@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from stageflow.core import StageContext
 
 from soft_skills_backend.config import Settings
+from soft_skills_backend.engines.config import load_marking_runtime_config
 from soft_skills_backend.modules.practice.domain.practice import (
     AssessmentValidationStatus,
     AttemptStatus,
@@ -37,13 +38,13 @@ from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import AppError, domain_error, persistence_error
 
 from ..contracts.views import build_attempt_view, utcnow, utcnow_iso
-from .events import QuickPracticeEventRecorder
+from .events import PracticeEventRecorder
 
 
 def persist_session_start(
     *,
     session_factory: sessionmaker[Session],
-    events: QuickPracticeEventRecorder,
+    events: PracticeEventRecorder,
     ctx: StageContext,
     actor: Actor,
     transform_payload: SessionTransformPayload,
@@ -138,7 +139,7 @@ def persist_session_start(
 def persist_attempt_submission(
     *,
     session_factory: sessionmaker[Session],
-    events: QuickPracticeEventRecorder,
+    events: PracticeEventRecorder,
     ctx: StageContext,
     guard: AttemptGuardPayload,
 ) -> StageflowStageResult:
@@ -212,7 +213,7 @@ def mark_attempt_assessing(
 def persist_assessment(
     *,
     session_factory: sessionmaker[Session],
-    events: QuickPracticeEventRecorder,
+    events: PracticeEventRecorder,
     ctx: StageContext,
     guard: AttemptGuardPayload,
     assessment: ValidatedAssessmentPayload,
@@ -301,7 +302,7 @@ def persist_rejected_assessment(
     *,
     session_factory: sessionmaker[Session],
     settings: Settings,
-    events: QuickPracticeEventRecorder,
+    events: PracticeEventRecorder,
     attempt_id: str,
     request_id: str,
     trace_id: str,
@@ -310,6 +311,8 @@ def persist_rejected_assessment(
     rejection_code: str,
     raw_payload: dict[str, Any],
 ) -> None:
+    del settings
+    config = load_marking_runtime_config()
     with session_factory() as session:
         attempt = session.get(AttemptRecord, attempt_id)
         if attempt is None:
@@ -327,11 +330,11 @@ def persist_rejected_assessment(
                 workflow_id=attempt.workflow_id,
                 practice_type=attempt.practice_type,
                 validation_status=AssessmentValidationStatus.REJECTED.value,
-                prompt_version=settings.assessment_prompt_version,
+                prompt_version=config.prompt_version,
                 rubric_id=attempt.rubric_id,
                 rubric_version=attempt.rubric_version,
-                schema_version=settings.assessment_output_schema_version,
-                config_version=settings.scoring_config_version,
+                schema_version=config.output_schema_version,
+                config_version=config.config_version,
                 provider=provider_name,
                 model_slug=model_slug,
                 overall_score=None,
@@ -373,7 +376,7 @@ def persist_rejected_assessment(
 def mark_attempt_failed(
     *,
     session_factory: sessionmaker[Session],
-    events: QuickPracticeEventRecorder,
+    events: PracticeEventRecorder,
     attempt_id: str,
     request_id: str,
     trace_id: str,

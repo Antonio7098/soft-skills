@@ -12,6 +12,9 @@ from stageflow.agent.security import PromptSecurityError, PromptSecurityPolicy
 from stageflow.api import Pipeline, StageKind, stage
 
 from soft_skills_backend.config import Settings
+from soft_skills_backend.engines.config import (
+    load_catalog_generation_runtime_config,
+)
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
     ChatCollectionGenerationCommand,
     CollectionCreateCommand,
@@ -53,10 +56,8 @@ from soft_skills_backend.platform.db.models import (
 )
 from soft_skills_backend.platform.providers.llm.prompts import (
     CREATOR_CHAT_GENERATION_PROMPT,
-    CREATOR_CHAT_GENERATION_PROMPT_NAME,
     CREATOR_DRAFT_OUTPUT_FORMAT,
     CREATOR_STRUCTURED_GENERATION_PROMPT,
-    CREATOR_STRUCTURED_GENERATION_PROMPT_NAME,
 )
 from soft_skills_backend.platform.workflows.stageflow import (
     StageflowPipelineSupport,
@@ -120,6 +121,7 @@ class CatalogGenerationService:
             )
 
         async def generate_transform(ctx) -> Any:
+            config = load_catalog_generation_runtime_config()
             hardened_brief = self._sanitize_generation_text(
                 json.dumps(
                     {
@@ -133,8 +135,8 @@ class CatalogGenerationService:
                 )
             )
             rendered_prompt = self._prompt_library.render(
-                CREATOR_STRUCTURED_GENERATION_PROMPT_NAME,
-                version=self._settings.creator_structured_generation_prompt_version,
+                config.structured_prompt_name,
+                version=config.structured_prompt_version,
                 variables={
                     "title_hint": command.title_hint or "none",
                     "target_audience": command.target_audience,
@@ -158,11 +160,11 @@ class CatalogGenerationService:
                     "scenario_artifact_count": command.counts.scenario_artifact_count,
                     "allowed_prompt_types": ", ".join(sorted(ALLOWED_PROMPT_TYPES)),
                     "allowed_artifact_types": ", ".join(sorted(ALLOWED_SCENARIO_ARTIFACT_TYPES)),
-                    "prompt_version": self._settings.creator_structured_generation_prompt_version,
+                    "prompt_version": config.structured_prompt_version,
                     "provider": self._llm_provider.provider_name,
                     "model_slug": self._llm_provider.model_slug,
                     "output_format": CREATOR_DRAFT_OUTPUT_FORMAT.format(
-                        prompt_version=self._settings.creator_structured_generation_prompt_version,
+                        prompt_version=config.structured_prompt_version,
                         provider=self._llm_provider.provider_name,
                         model_slug=self._llm_provider.model_slug,
                     ),
@@ -301,6 +303,7 @@ class CatalogGenerationService:
             )
 
         async def generate_transform(ctx) -> Any:
+            config = load_catalog_generation_runtime_config()
             try:
                 user_message, report = self._prompt_security_policy.build_user_message(command.prompt)
             except PromptSecurityError as exc:
@@ -311,8 +314,8 @@ class CatalogGenerationService:
                 ) from exc
 
             rendered_prompt = self._prompt_library.render(
-                CREATOR_CHAT_GENERATION_PROMPT_NAME,
-                version=self._settings.creator_chat_generation_prompt_version,
+                config.chat_prompt_name,
+                version=config.chat_prompt_version,
                 variables={
                     "target_audience": command.target_audience,
                     "difficulty": command.difficulty,
@@ -324,11 +327,11 @@ class CatalogGenerationService:
                     "allowed_prompt_types": ", ".join(sorted(ALLOWED_PROMPT_TYPES)),
                     "allowed_artifact_types": ", ".join(sorted(ALLOWED_SCENARIO_ARTIFACT_TYPES)),
                     "user_prompt": user_message["content"],
-                    "prompt_version": self._settings.creator_chat_generation_prompt_version,
+                    "prompt_version": config.chat_prompt_version,
                     "provider": self._llm_provider.provider_name,
                     "model_slug": self._llm_provider.model_slug,
                     "output_format": CREATOR_DRAFT_OUTPUT_FORMAT.format(
-                        prompt_version=self._settings.creator_chat_generation_prompt_version,
+                        prompt_version=config.chat_prompt_version,
                         provider=self._llm_provider.provider_name,
                         model_slug=self._llm_provider.model_slug,
                     ),
@@ -458,11 +461,12 @@ class CatalogGenerationService:
         draft: GeneratedCollectionDraft,
         resolved_model_slug: str,
     ) -> None:
+        config = load_catalog_generation_runtime_config()
         validate_collection_command(session, collection_command)
         if structured_command is not None:
             self._validate_generation_metadata(
                 draft=draft,
-                prompt_version=self._settings.creator_structured_generation_prompt_version,
+                prompt_version=config.structured_prompt_version,
                 provider=self._llm_provider.provider_name,
                 model_slug=resolved_model_slug,
                 content_format_mix=structured_command.content_format_mix,
@@ -476,7 +480,7 @@ class CatalogGenerationService:
         if chat_command is not None:
             self._validate_generation_metadata(
                 draft=draft,
-                prompt_version=self._settings.creator_chat_generation_prompt_version,
+                prompt_version=config.chat_prompt_version,
                 provider=self._llm_provider.provider_name,
                 model_slug=resolved_model_slug,
                 content_format_mix=chat_command.content_format_mix,
@@ -595,6 +599,7 @@ class CatalogGenerationService:
         raw_payload: dict[str, Any],
         input_payload: dict[str, Any],
     ) -> CollectionGenerationView:
+        config = load_catalog_generation_runtime_config()
         source_type = "generated_structured" if generation_mode == "structured" else "generated_chat"
         now = datetime.now(UTC)
         with self._session_factory() as session:
@@ -666,8 +671,8 @@ class CatalogGenerationService:
                 author_user_id=actor.user_id,
                 generation_mode=generation_mode,
                 prompt_version=draft.prompt_version,
-                schema_version=self._settings.creator_generation_output_schema_version,
-                config_version=self._settings.creator_generation_config_version,
+                schema_version=config.output_schema_version,
+                config_version=config.config_version,
                 provider=draft.provider,
                 model_slug=draft.model_slug,
                 request_id=request_id,
@@ -801,19 +806,21 @@ class CatalogGenerationService:
 def build_catalog_generation_prompt_library(settings: Settings) -> PromptLibrary:
     """Build the versioned prompt library for creator generation."""
 
+    del settings
+    config = load_catalog_generation_runtime_config()
     library = PromptLibrary()
     library.register(
         PromptTemplate(
-            name=CREATOR_STRUCTURED_GENERATION_PROMPT_NAME,
-            version=settings.creator_structured_generation_prompt_version,
+            name=config.structured_prompt_name,
+            version=config.structured_prompt_version,
             template=CREATOR_STRUCTURED_GENERATION_PROMPT,
         ),
         make_default=True,
     )
     library.register(
         PromptTemplate(
-            name=CREATOR_CHAT_GENERATION_PROMPT_NAME,
-            version=settings.creator_chat_generation_prompt_version,
+            name=config.chat_prompt_name,
+            version=config.chat_prompt_version,
             template=CREATOR_CHAT_GENERATION_PROMPT,
         ),
         make_default=True,
@@ -824,8 +831,9 @@ def build_catalog_generation_prompt_library(settings: Settings) -> PromptLibrary
 def build_catalog_generation_typed_output(settings: Settings) -> TypedLLMOutput:
     """Build the typed output parser for creator generation."""
 
+    config = load_catalog_generation_runtime_config()
     return TypedLLMOutput(
         GeneratedCollectionDraft,
-        schema_version=settings.creator_generation_output_schema_version,
+        schema_version=config.output_schema_version,
         max_validation_retries=settings.creator_generation_validation_retries,
     )

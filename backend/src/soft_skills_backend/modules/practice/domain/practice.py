@@ -4,11 +4,23 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, Field, field_validator
 
-from soft_skills_backend.shared.errors import domain_error, scoring_error
+from soft_skills_backend.engines.marking import (
+    CandidateResponse,
+    CriterionResultInput,
+    EvidenceReference,
+    PromptContract,
+    RubricCriterion,
+    RubricDefinition,
+    RubricScale,
+    build_marking_decision,
+    validate_marking_decision,
+)
+from soft_skills_backend.shared.errors import AppError, domain_error, scoring_error
 
 
 class PracticeType(StrEnum):
@@ -98,7 +110,7 @@ class EvidenceItem(BaseModel):
         return cleaned
 
 
-class QuickPracticeAssessmentDraft(BaseModel):
+class AssessmentDraft(BaseModel):
     """Structured assessment payload expected from the marking model."""
 
     prompt_version: str
@@ -167,63 +179,131 @@ def validate_assessment_draft(
     *,
     response_text: str,
     required_skill_slugs: Iterable[str],
-    draft: QuickPracticeAssessmentDraft,
+    draft: AssessmentDraft,
 ) -> None:
     """Enforce explainability and scoring guards before persistence."""
 
     expected_skills = list(dict.fromkeys(required_skill_slugs))
-    observed_skills = [score.skill_slug for score in draft.skill_scores]
-    if len(set(observed_skills)) != len(observed_skills):
-        raise scoring_error(
-            "Assessment output repeated a skill score",
-            code="SS-SCORING-001",
-            details={"observed_skills": observed_skills},
-        )
-    if set(observed_skills) != set(expected_skills):
-        raise scoring_error(
-            "Assessment output did not cover the expected skills",
-            code="SS-SCORING-002",
-            details={
-                "expected_skills": expected_skills,
-                "observed_skills": observed_skills,
-            },
-        )
-
     response_normalized = _normalize_text(response_text)
-    for item in draft.evidence:
-        if item.skill_slug not in expected_skills:
+    evidence_by_skill: dict[str, list[EvidenceReference]] = {}
+    prompt = PromptContract(
+        prompt_id="quick-practice-prompt",
+        prompt_version=draft.prompt_version,
+        prompt_type="quick_practice_prompt",
+        prompt_text="validation-only",
+        response_mode="text",
+        rubric_id="quick-practice-rubric",
+    )
+    rubric = RubricDefinition(
+        rubric_id="quick-practice-rubric",
+        rubric_version=draft.rubric_version,
+        scale=RubricScale(minimum_score=1, maximum_score=5),
+        criteria=[
+            RubricCriterion(
+                criterion_ref=skill_slug,
+                description=f"Validate criterion coverage for {skill_slug}.",
+            )
+            for skill_slug in expected_skills
+        ],
+    )
+    for evidence in draft.evidence:
+        if evidence.skill_slug not in expected_skills:
             raise scoring_error(
                 "Evidence referenced an unexpected skill",
                 code="SS-SCORING-003",
-                details={"skill_slug": item.skill_slug},
+                details={"skill_slug": evidence.skill_slug},
             )
-        if len(item.quote.strip()) < 6 or _normalize_text(item.quote) not in response_normalized:
+        if len(evidence.quote.strip()) < 6 or _normalize_text(evidence.quote) not in response_normalized:
             raise scoring_error(
                 "Evidence must quote the learner response directly",
                 code="SS-SCORING-004",
-                details={"quote": item.quote},
+                details={"quote": evidence.quote},
             )
-
-    overlapping_feedback = _normalized_overlap(draft.strengths, draft.weaknesses)
-    if overlapping_feedback:
+        evidence_by_skill.setdefault(evidence.skill_slug, []).append(
+            EvidenceReference(
+                criterion_ref=evidence.skill_slug,
+                quote=evidence.quote,
+                explanation=evidence.explanation,
+            )
+        )
+    try:
+        decision = build_marking_decision(
+            marking_id="assessment-draft",
+            prompt=prompt,
+            response_id="candidate-response",
+            rubric=rubric,
+            engine_version="marking-engine.v1",
+            provider=draft.provider,
+            model_slug=draft.model_slug,
+            overall_score=draft.overall_score,
+            criterion_results=[
+                CriterionResultInput(
+                    criterion_ref=skill_score.skill_slug,
+                    score=skill_score.score,
+                    rationale=skill_score.rationale,
+                )
+                for skill_score in draft.skill_scores
+            ],
+            evidence=[item for group in evidence_by_skill.values() for item in group],
+            rationale=draft.rationale,
+            strengths=list(draft.strengths),
+            weaknesses=list(draft.weaknesses),
+            next_actions=list(draft.next_actions),
+            trace_id="draft-validation",
+            created_at=datetime.now(UTC),
+        )
+        validate_marking_decision(
+            prompt=prompt,
+            response=CandidateResponse(
+                response_id="candidate-response",
+                prompt_id="quick-practice-prompt",
+                actor_id="learner",
+                response_mode="text",
+                content=response_text,
+                submitted_at=datetime.now(UTC),
+            ),
+            rubric=rubric,
+            decision=decision,
+        )
+    except ValueError as exc:
         raise scoring_error(
+            "Assessment output did not satisfy the canonical marking contract",
+            code="SS-SCORING-018",
+            details={"reason": str(exc)},
+        ) from exc
+    except AppError as exc:
+        raise _map_marking_validation_error(exc) from exc
+
+
+def _map_marking_validation_error(exc: AppError) -> AppError:
+    mapping = {
+        "SS-SCORING-010": ("Assessment output repeated a skill score", "SS-SCORING-001"),
+        "SS-SCORING-011": (
+            "Assessment output did not cover the expected skills",
+            "SS-SCORING-002",
+        ),
+        "SS-SCORING-014": (
+            "Evidence must quote the learner response directly",
+            "SS-SCORING-004",
+        ),
+        "SS-SCORING-016": (
             "Assessment strengths and weaknesses contradicted each other",
-            code="SS-SCORING-005",
-            details={"overlap": sorted(overlapping_feedback)},
-        )
-
-    average_score = sum(score.score for score in draft.skill_scores) / len(draft.skill_scores)
-    if abs(draft.overall_score - round(average_score)) > 1:
-        raise scoring_error(
+            "SS-SCORING-005",
+        ),
+        "SS-SCORING-017": (
             "Overall score was inconsistent with skill-level scores",
-            code="SS-SCORING-006",
-            details={"overall_score": draft.overall_score, "average_skill_score": average_score},
-        )
+            "SS-SCORING-006",
+        ),
+    }
+    message, code = mapping.get(exc.code, (exc.message, exc.code))
+    return scoring_error(
+        message,
+        code=code,
+        status_code=exc.status_code,
+        details=exc.details,
+    )
 
 
 def _normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip().lower())
 
-
-def _normalized_overlap(left: Iterable[str], right: Iterable[str]) -> set[str]:
-    return {_normalize_text(value) for value in left} & {_normalize_text(value) for value in right}

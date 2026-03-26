@@ -80,7 +80,7 @@ class ValidatedAssessmentPayload(BaseModel):
     raw_payload: dict[str, object]
 
 
-class QuickPracticeSessionView(BaseModel):
+class PracticeSessionView(BaseModel):
     """Session start response."""
 
     session_id: str
@@ -92,7 +92,7 @@ class QuickPracticeSessionView(BaseModel):
     trace_id: str
 
 
-class QuickPracticeAssessmentView(BaseModel):
+class PracticeAssessmentView(BaseModel):
     """Learner-facing assessment artifact."""
 
     assessment_id: str
@@ -119,7 +119,7 @@ class QuickPracticeAssessmentView(BaseModel):
     created_at: str
 
 
-class QuickPracticeAttemptView(BaseModel):
+class PracticeAttemptView(BaseModel):
     """Attempt API view."""
 
     id: str
@@ -132,10 +132,10 @@ class QuickPracticeAttemptView(BaseModel):
     submitted_at: str | None = None
     assessed_at: str | None = None
     prompt: PracticePromptView
-    assessment: QuickPracticeAssessmentView | None = None
+    assessment: PracticeAssessmentView | None = None
 
 
-class StartQuickPracticeSessionCommand(BaseModel):
+class StartPracticeSessionCommand(BaseModel):
     """Quick-practice session start payload."""
 
     prompt_item_id: str
@@ -217,8 +217,4 @@ class SubmitAttemptCommand(BaseModel):
             raise ValueError("response_text must not be blank")
         return cleaned
 
-
-PracticeSessionView = QuickPracticeSessionView
-PracticeAssessmentView = QuickPracticeAssessmentView
-PracticeAttemptView = QuickPracticeAttemptView
-AttemptView = QuickPracticeAttemptView
+AttemptView = PracticeAttemptView

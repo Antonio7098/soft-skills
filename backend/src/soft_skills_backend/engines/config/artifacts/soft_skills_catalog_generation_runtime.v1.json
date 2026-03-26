@@ -1,0 +1,8 @@
+{
+  "structured_prompt_name": "creator-structured-draft",
+  "structured_prompt_version": "creator.structured-draft.v1",
+  "chat_prompt_name": "creator-chat-draft",
+  "chat_prompt_version": "creator.chat-draft.v1",
+  "output_schema_version": "creator-draft-output.v1",
+  "config_version": "creator-draft-config.v1"
+}

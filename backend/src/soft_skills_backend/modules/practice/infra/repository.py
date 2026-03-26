@@ -26,7 +26,7 @@ from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import AppError, auth_error, domain_error
 
 from ..contracts.views import build_attempt_view
-from .events import QuickPracticeEventRecorder
+from .events import PracticeEventRecorder
 from .persistence import (
     mark_attempt_assessing,
     mark_attempt_failed,
@@ -46,7 +46,7 @@ from .queries import (
 DELIVERY_VERSION = PRACTICE_DELIVERY_VERSIONS[PracticeType.QUICK_PRACTICE]
 
 
-class QuickPracticeRepository:
+class PracticeRepository:
     """Coordinate focused practice persistence helpers."""
 
     def __init__(
@@ -58,7 +58,7 @@ class QuickPracticeRepository:
     ) -> None:
         self._settings = settings
         self._session_factory = session_factory
-        self._events = QuickPracticeEventRecorder(workflow_events)
+        self._events = PracticeEventRecorder(workflow_events)
 
     def load_start_prompt_context(
         self,

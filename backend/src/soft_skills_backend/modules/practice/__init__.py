@@ -1,10 +1,10 @@
 """Practice feature package."""
 
 from soft_skills_backend.modules.practice.infra.repository import (
-    QuickPracticeRepository,
+    PracticeRepository,
 )
-from soft_skills_backend.modules.practice.use_cases.text_practice_service import (
-    QuickPracticeService,
+from soft_skills_backend.modules.practice.use_cases.practice_service import (
+    PracticeService,
 )
 
-__all__ = ["QuickPracticeRepository", "QuickPracticeService"]
+__all__ = ["PracticeRepository", "PracticeService"]

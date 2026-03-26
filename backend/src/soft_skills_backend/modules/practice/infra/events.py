@@ -1,4 +1,4 @@
-"""Quick-practice event recording helpers."""
+"""Practice event recording helpers."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from soft_skills_backend.platform.observability.events import WorkflowEvent
 from soft_skills_backend.platform.observability.logging import get_logger
 
 
-class QuickPracticeEventRecorder:
-    """Structured event recorder for quick-practice workflows."""
+class PracticeEventRecorder:
+    """Structured event recorder for practice workflows."""
 
     def __init__(self, workflow_events: SqlAlchemyWorkflowEventRepository) -> None:
         self._workflow_events = workflow_events

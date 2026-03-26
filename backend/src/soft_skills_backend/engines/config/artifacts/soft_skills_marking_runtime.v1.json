@@ -1,0 +1,7 @@
+{
+  "prompt_name": "quick-practice-assessment",
+  "prompt_version": "assessment.quick-practice.v1",
+  "output_schema_version": "quick-practice-assessment-output.v1",
+  "config_version": "quick-practice-marking-config.v1",
+  "engine_version": "marking-engine.v1"
+}

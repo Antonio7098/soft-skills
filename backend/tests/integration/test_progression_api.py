@@ -3,13 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from alembic import command
 from alembic.config import Config
 
+from alembic import command
 from soft_skills_backend.platform.db.models import (
     PipelineRunRecord,
-    ProgressRecalculationRecord,
     ProgressionSnapshotRecord,
+    ProgressRecalculationRecord,
     RecommendationArtifactRecord,
     WorkflowEventRecord,
 )
@@ -95,12 +95,14 @@ class FakeSuccessMarker:
     model_slug = "gpt-4.1-mini"
 
     async def mark_attempt(self, *, prompt_payload, learner_payload, call_context):
-        from soft_skills_backend.modules.practice.domain.practice import QuickPracticeAssessmentDraft
-        from soft_skills_backend.modules.practice.workflows.assessment import AssessmentTransformPayload
+        from soft_skills_backend.modules.practice.domain.practice import AssessmentDraft
+        from soft_skills_backend.modules.practice.workflows.assessment import (
+            AssessmentTransformPayload,
+        )
 
         del learner_payload, call_context
         return AssessmentTransformPayload(
-            draft=QuickPracticeAssessmentDraft.model_validate(
+            draft=AssessmentDraft.model_validate(
                 {
                     "prompt_version": "assessment.quick-practice.v1",
                     "rubric_version": prompt_payload.prompt.rubric_version,

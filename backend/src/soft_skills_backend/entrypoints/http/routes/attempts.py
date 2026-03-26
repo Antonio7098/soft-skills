@@ -9,9 +9,9 @@ from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_respons
 from soft_skills_backend.modules.practice.models import (
     AttemptView,
     PracticeCorrelation,
-    QuickPracticeSessionView,
+    PracticeSessionView,
     StartInterviewSessionCommand,
-    StartQuickPracticeSessionCommand,
+    StartPracticeSessionCommand,
     StartScenarioSessionCommand,
     SubmitAttemptCommand,
 )
@@ -27,22 +27,22 @@ def _correlation_from_request(request: Request) -> PracticeCorrelation:
     )
 
 
-@router.post("/quick-practice/sessions", response_model=ApiEnvelope[QuickPracticeSessionView])
+@router.post("/quick-practice/sessions", response_model=ApiEnvelope[PracticeSessionView])
 async def start_quick_practice_session(
     request: Request,
-    command: StartQuickPracticeSessionCommand,
-) -> ApiEnvelope[QuickPracticeSessionView]:
+    command: StartPracticeSessionCommand,
+) -> ApiEnvelope[PracticeSessionView]:
     actor = require_actor(request)
     service = get_practice_service(request)
     payload = await service.start_session(actor, _correlation_from_request(request), command)
     return ok_response(request, payload)
 
 
-@router.post("/interview/sessions", response_model=ApiEnvelope[QuickPracticeSessionView])
+@router.post("/interview/sessions", response_model=ApiEnvelope[PracticeSessionView])
 async def start_interview_session(
     request: Request,
     command: StartInterviewSessionCommand,
-) -> ApiEnvelope[QuickPracticeSessionView]:
+) -> ApiEnvelope[PracticeSessionView]:
     actor = require_actor(request)
     service = get_practice_service(request)
     payload = await service.start_interview_session(
@@ -53,11 +53,11 @@ async def start_interview_session(
     return ok_response(request, payload)
 
 
-@router.post("/scenario/sessions", response_model=ApiEnvelope[QuickPracticeSessionView])
+@router.post("/scenario/sessions", response_model=ApiEnvelope[PracticeSessionView])
 async def start_scenario_session(
     request: Request,
     command: StartScenarioSessionCommand,
-) -> ApiEnvelope[QuickPracticeSessionView]:
+) -> ApiEnvelope[PracticeSessionView]:
     actor = require_actor(request)
     service = get_practice_service(request)
     payload = await service.start_scenario_session(

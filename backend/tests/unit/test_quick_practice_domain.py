@@ -2,18 +2,17 @@ from __future__ import annotations
 
 import pytest
 
+from soft_skills_backend.modules.practice.domain.practice import (
+    AssessmentDraft,
+    AttemptStatus,
+    ensure_attempt_transition,
+    validate_assessment_draft,
+)
 from soft_skills_backend.modules.practice.workflows.assessment import TypedLLMOutput
+from soft_skills_backend.shared.errors import AppError
 from soft_skills_backend.shared.ports.llm import (
     ProviderCallContext,
     ProviderCompletion,
-)
-
-from soft_skills_backend.shared.errors import AppError
-from soft_skills_backend.modules.practice.domain.practice import (
-    AttemptStatus,
-    QuickPracticeAssessmentDraft,
-    ensure_attempt_transition,
-    validate_assessment_draft,
 )
 
 
@@ -37,7 +36,7 @@ class FakeProvider:
         )
 
 
-def _draft(**overrides: object) -> QuickPracticeAssessmentDraft:
+def _draft(**overrides: object) -> AssessmentDraft:
     payload: dict[str, object] = {
         "prompt_version": "assessment.quick-practice.v1",
         "rubric_version": "v1",
@@ -74,7 +73,7 @@ def _draft(**overrides: object) -> QuickPracticeAssessmentDraft:
         "next_actions": ["Practice pairing empathy with one backup option."],
     }
     payload.update(overrides)
-    return QuickPracticeAssessmentDraft.model_validate(payload)
+    return AssessmentDraft.model_validate(payload)
 
 
 def test_attempt_transition_rejects_invalid_resubmission() -> None:
@@ -158,7 +157,7 @@ def test_model_slug_match_accepts_provider_normalized_slug() -> None:
 @pytest.mark.asyncio
 async def test_typed_llm_output_retries_invalid_json_once() -> None:
     typed_output = TypedLLMOutput(
-        QuickPracticeAssessmentDraft,
+        AssessmentDraft,
         schema_version="quick-practice-assessment-output.v1",
         max_validation_retries=1,
     )
