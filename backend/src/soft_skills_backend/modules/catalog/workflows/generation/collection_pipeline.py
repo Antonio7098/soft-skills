@@ -295,6 +295,7 @@ async def generate_collection(
             draft=draft,
             input_payload=command.model_dump(mode="json"),
             manifest=manifest,
+            organisation_id=getattr(command, "organisation_id", None) or actor.organisation_id,
         )
         return ok_output(
             StageflowStageResult(

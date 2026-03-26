@@ -50,6 +50,8 @@ def test_default_registry_includes_practice_run_lifecycle_smoke() -> None:
 
     assert registry.names() == [
         "provider-baseline",
+        "assistant-read-runtime",
+        "assistant-generation-runtime",
         "generation-structured",
         "generation-chat",
         "generation-prompt-items-structured",

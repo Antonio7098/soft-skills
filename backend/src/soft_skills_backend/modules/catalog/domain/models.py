@@ -194,6 +194,7 @@ class StructuredCollectionGenerationCommand(BaseModel):
     scenario_theme: str
     realism_notes: list[str] = Field(default_factory=list)
     counts: CollectionGenerationCounts
+    organisation_id: str | None = None
 
 
 class ChatCollectionGenerationCommand(BaseModel):
@@ -205,6 +206,7 @@ class ChatCollectionGenerationCommand(BaseModel):
     target_competency_slugs: list[str]
     rubric_ids: list[str]
     counts: CollectionGenerationCounts
+    organisation_id: str | None = None
 
 
 class PromptItemGenerationCounts(BaseModel):
@@ -231,6 +233,7 @@ class ChatPromptItemGenerationCommand(BaseModel):
     prompt: str
     target_skill_slugs: list[str] = Field(default_factory=list)
     counts: PromptItemGenerationCounts
+    organisation_id: str | None = None
 
 
 class GeneratedPromptItemPlan(BaseModel):

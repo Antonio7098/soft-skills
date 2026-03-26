@@ -50,6 +50,7 @@ def persist_generated_collection(
     draft: GeneratedCollectionDraft,
     input_payload: dict[str, Any],
     manifest: GenerationManifest,
+    organisation_id: str | None = None,
 ) -> CollectionGenerationView:
     source_type = "generated_structured" if generation_mode == "structured" else "generated_chat"
     now = datetime.now(UTC)
@@ -57,6 +58,7 @@ def persist_generated_collection(
         collection = CollectionRecord(
             id=uuid4().hex,
             author_user_id=actor.user_id,
+            organisation_id=organisation_id,
             title=draft.title,
             summary=draft.summary,
             target_audience=draft.target_audience,
