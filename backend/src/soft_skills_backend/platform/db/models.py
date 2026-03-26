@@ -190,6 +190,9 @@ class CollectionRecord(Base):
     target_skill_slugs: Mapped[list[str]] = mapped_column(JSON, default=list)
     target_competency_slugs: Mapped[list[str]] = mapped_column(JSON, default=list)
     rubric_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    avg_rating: Mapped[float | None] = mapped_column(Integer, nullable=True)
+    rating_count: Mapped[int] = mapped_column(Integer, default=0)
+    featured: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
@@ -281,6 +284,18 @@ class CollectionSaveRecord(Base):
     user_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     collection_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class CollectionRatingRecord(Base):
+    """User rating for a collection."""
+
+    __tablename__ = "collection_ratings"
+
+    user_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    collection_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    rating: Mapped[int] = mapped_column(Integer, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class CollectionVerificationReviewRecord(Base):

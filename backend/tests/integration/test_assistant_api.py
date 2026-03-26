@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from alembic import command as alembic_command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 
+from alembic import command as alembic_command
 from soft_skills_backend.platform.db.models import (
     AssistantMessageRecord,
     AssistantToolCallRecord,

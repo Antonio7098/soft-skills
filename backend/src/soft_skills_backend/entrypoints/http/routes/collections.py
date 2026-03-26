@@ -17,6 +17,7 @@ from soft_skills_backend.modules.catalog import (
     CollectionGenerationView,
     CollectionLifecycleCommand,
     CollectionListFilters,
+    CollectionRateCommand,
     CollectionUpdateCommand,
     CollectionView,
     PromptItemCreateCommand,
@@ -144,9 +145,7 @@ async def update_collection(
 
 
 @router.post("/{collection_id}/save", response_model=ApiEnvelope[CollectionView])
-async def save_collection(
-    request: Request, collection_id: str
-) -> ApiEnvelope[CollectionView]:
+async def save_collection(request: Request, collection_id: str) -> ApiEnvelope[CollectionView]:
     actor = require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
@@ -161,9 +160,7 @@ async def save_collection(
 
 
 @router.delete("/{collection_id}/save", response_model=ApiEnvelope[CollectionView])
-async def unsave_collection(
-    request: Request, collection_id: str
-) -> ApiEnvelope[CollectionView]:
+async def unsave_collection(request: Request, collection_id: str) -> ApiEnvelope[CollectionView]:
     actor = require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
@@ -175,6 +172,58 @@ async def unsave_collection(
         collection_id=collection_id,
     )
     return ok_response(request, payload)
+
+
+@router.post("/{collection_id}/rate", response_model=ApiEnvelope[CollectionView])
+async def rate_collection(
+    request: Request, collection_id: str, command: CollectionRateCommand
+) -> ApiEnvelope[CollectionView]:
+    actor = require_actor(request)
+    service = get_catalog_service(request)
+    correlation = _correlation_from_request(request)
+    payload = await service.rate_collection(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        collection_id=collection_id,
+        command=command,
+    )
+    return ok_response(request, payload)
+
+
+@router.delete("/{collection_id}/rate", response_model=ApiEnvelope[CollectionView])
+async def unrate_collection(request: Request, collection_id: str) -> ApiEnvelope[CollectionView]:
+    actor = require_actor(request)
+    service = get_catalog_service(request)
+    correlation = _correlation_from_request(request)
+    payload = await service.unrate_collection(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        collection_id=collection_id,
+    )
+    return ok_response(request, payload)
+
+
+@router.get("/discover", response_model=ApiEnvelope[list[CollectionView]])
+async def discover_collections(
+    request: Request,
+    difficulty: str | None = Query(default=None),
+    skill_slug: str | None = Query(default=None),
+    competency_slug: str | None = Query(default=None),
+) -> ApiEnvelope[list[CollectionView]]:
+    service = get_catalog_service(request)
+    actor = optional_actor(request)
+    filters = CollectionListFilters(
+        difficulty=difficulty,
+        skill_slug=skill_slug,
+        competency_slug=competency_slug,
+        include_private=False,
+        discovery_tier="global_public",
+    )
+    return ok_response(request, service.list_collections(actor, filters))
 
 
 @router.patch("/{collection_id}/lifecycle", response_model=ApiEnvelope[CollectionView])

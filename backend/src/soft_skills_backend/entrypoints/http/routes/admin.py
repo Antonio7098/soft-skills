@@ -12,6 +12,7 @@ from soft_skills_backend.entrypoints.http.dependencies import (
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
 from soft_skills_backend.modules.admin import (
     AdminCollectionVerificationCommand,
+    AdminFeatureCollectionCommand,
     AdminLearnerRelationshipCommand,
     AdminLearnerRelationshipView,
     AttemptAuditView,
@@ -20,6 +21,7 @@ from soft_skills_backend.modules.admin import (
     CollectionVerificationQueueItemView,
     LearnerAnalyticsView,
 )
+from soft_skills_backend.modules.catalog import CollectionView
 
 router = APIRouter()
 
@@ -139,3 +141,19 @@ async def get_attempt_audit(
     actor = require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.get_attempt_audit(actor, attempt_id))
+
+
+@router.patch("/collections/{collection_id}/feature", response_model=ApiEnvelope[CollectionView])
+async def feature_collection(
+    request: Request,
+    collection_id: str,
+    command: AdminFeatureCollectionCommand,
+) -> ApiEnvelope[CollectionView]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    payload = service.feature_collection(
+        actor,
+        collection_id=collection_id,
+        command=command,
+    )
+    return ok_response(request, payload)

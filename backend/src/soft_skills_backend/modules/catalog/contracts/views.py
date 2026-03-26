@@ -14,6 +14,7 @@ from soft_skills_backend.modules.catalog.contracts.scenario_views import (
 )
 from soft_skills_backend.modules.catalog.domain.validators import discovery_tier_for_collection
 from soft_skills_backend.platform.db.models import (
+    CollectionRatingRecord,
     CollectionRecord,
     CollectionSaveRecord,
     MockCompanyRecord,
@@ -122,6 +123,7 @@ def build_collection_view(
         .count()
     )
     saved_by_actor = False
+    rated_by_actor = None
     if actor is not None:
         saved_by_actor = (
             session.query(CollectionSaveRecord)
@@ -132,6 +134,16 @@ def build_collection_view(
             .count()
             > 0
         )
+        rating_record = (
+            session.query(CollectionRatingRecord)
+            .filter(
+                CollectionRatingRecord.collection_id == record.id,
+                CollectionRatingRecord.user_id == actor.user_id,
+            )
+            .one_or_none()
+        )
+        if rating_record is not None:
+            rated_by_actor = rating_record.rating
 
     return CollectionView(
         id=record.id,
@@ -151,6 +163,9 @@ def build_collection_view(
         rubric_ids=list(record.rubric_ids),
         save_count=save_count,
         saved_by_actor=saved_by_actor,
+        avg_rating=record.avg_rating,
+        rating_count=record.rating_count,
+        rated_by_actor=rated_by_actor,
         last_generation_artifact_id=record.last_generation_artifact_id,
         prompt_items=prompt_items,
         scenarios=scenarios,

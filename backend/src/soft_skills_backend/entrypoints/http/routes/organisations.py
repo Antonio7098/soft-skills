@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from soft_skills_backend.entrypoints.http.dependencies import (
+    get_catalog_service,
     get_organisation_service,
     require_actor,
     require_org_admin_actor,
 )
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
+from soft_skills_backend.modules.catalog import CollectionListFilters, CollectionView
 from soft_skills_backend.modules.organisations import (
     AddMemberCommand,
     CreateOrganisationCommand,
@@ -139,3 +141,23 @@ async def remove_member(request: Request, organisation_id: str, user_id: str) ->
         user_id=user_id,
     )
     return ok_response(request, None)
+
+
+@router.get("/{organisation_id}/collections", response_model=ApiEnvelope[list[CollectionView]])
+async def list_org_collections(
+    request: Request,
+    organisation_id: str,
+    difficulty: str | None = Query(default=None),
+    skill_slug: str | None = Query(default=None),
+    competency_slug: str | None = Query(default=None),
+) -> ApiEnvelope[list[CollectionView]]:
+    actor = require_actor(request)
+    service = get_catalog_service(request)
+    filters = CollectionListFilters(
+        difficulty=difficulty,
+        skill_slug=skill_slug,
+        competency_slug=competency_slug,
+        include_private=False,
+        organisation_id=organisation_id,
+    )
+    return ok_response(request, service.list_collections(actor, filters))

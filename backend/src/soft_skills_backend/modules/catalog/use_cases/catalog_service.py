@@ -11,6 +11,7 @@ from soft_skills_backend.modules.catalog.contracts.collection_commands import (
     CollectionCreateCommand,
     CollectionLifecycleCommand,
     CollectionListFilters,
+    CollectionRateCommand,
     CollectionUpdateCommand,
     StructuredCollectionGenerationCommand,
 )
@@ -156,6 +157,42 @@ class CatalogService:
         collection_id: str,
     ) -> CollectionView:
         return await self._collections.unsave_collection(
+            actor,
+            request_id=request_id,
+            trace_id=trace_id,
+            workflow_id=workflow_id,
+            collection_id=collection_id,
+        )
+
+    async def rate_collection(
+        self,
+        actor: Actor,
+        *,
+        request_id: str,
+        trace_id: str,
+        workflow_id: str | None,
+        collection_id: str,
+        command: CollectionRateCommand,
+    ) -> CollectionView:
+        return await self._collections.rate_collection(
+            actor,
+            request_id=request_id,
+            trace_id=trace_id,
+            workflow_id=workflow_id,
+            collection_id=collection_id,
+            command=command,
+        )
+
+    async def unrate_collection(
+        self,
+        actor: Actor,
+        *,
+        request_id: str,
+        trace_id: str,
+        workflow_id: str | None,
+        collection_id: str,
+    ) -> CollectionView:
+        return await self._collections.unrate_collection(
             actor,
             request_id=request_id,
             trace_id=trace_id,

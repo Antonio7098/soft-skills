@@ -131,6 +131,10 @@ class CollectionSaveCommand(BaseModel):
     saved: bool
 
 
+class CollectionRateCommand(BaseModel):
+    rating: int = Field(ge=1, le=5)
+
+
 class CollectionListFilters(BaseModel):
     difficulty: str | None = None
     skill_slug: str | None = None
@@ -160,6 +164,9 @@ class CollectionView(BaseModel):
     rubric_ids: list[str]
     save_count: int = 0
     saved_by_actor: bool = False
+    avg_rating: float | None = None
+    rating_count: int = 0
+    rated_by_actor: int | None = None
     last_generation_artifact_id: str | None = None
     prompt_items: list[PromptItemView] = Field(default_factory=list)
     scenarios: list[ScenarioView] = Field(default_factory=list)

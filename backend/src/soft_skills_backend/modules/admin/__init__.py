@@ -2,6 +2,7 @@
 
 from soft_skills_backend.modules.admin.contracts.commands import (
     AdminCollectionVerificationCommand,
+    AdminFeatureCollectionCommand,
     AdminLearnerRelationshipCommand,
 )
 from soft_skills_backend.modules.admin.contracts.views import (
@@ -17,6 +18,7 @@ from soft_skills_backend.modules.admin.use_cases.admin_service import AdminServi
 
 __all__ = [
     "AdminCollectionVerificationCommand",
+    "AdminFeatureCollectionCommand",
     "AdminLearnerRelationshipCommand",
     "AdminLearnerRelationshipView",
     "AdminService",

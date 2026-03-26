@@ -40,3 +40,9 @@ class AdminLearnerRelationshipCommand(BaseModel):
         if not cleaned:
             raise ValueError("relationship_type must not be blank")
         return cleaned
+
+
+class AdminFeatureCollectionCommand(BaseModel):
+    """Admin feature/highlight collection request."""
+
+    featured: bool

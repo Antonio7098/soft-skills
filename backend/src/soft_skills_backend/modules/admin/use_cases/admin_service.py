@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.modules.admin.contracts.commands import (
     AdminCollectionVerificationCommand,
+    AdminFeatureCollectionCommand,
     AdminLearnerRelationshipCommand,
 )
 from soft_skills_backend.modules.admin.contracts.views import (
@@ -24,6 +25,9 @@ from soft_skills_backend.modules.admin.infra.relationship_repository import (
 from soft_skills_backend.modules.admin.infra.verification_repository import (
     AdminVerificationRepository,
 )
+from soft_skills_backend.modules.catalog.contracts.collection_views import CollectionView
+from soft_skills_backend.modules.catalog.contracts.views import build_collection_view
+from soft_skills_backend.platform.db.models import CollectionRecord
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
 from soft_skills_backend.shared.auth import Actor
 
@@ -120,3 +124,33 @@ class AdminService:
 
     def delete_learner_relationship(self, actor: Actor, *, learner_id: str) -> None:
         self._relationships.delete_relationship(actor, learner_user_id=learner_id)
+
+    def feature_collection(
+        self,
+        actor: Actor,
+        collection_id: str,
+        command: AdminFeatureCollectionCommand,
+    ) -> CollectionView:
+        with self._verification._session_factory() as session:
+            record = session.get(CollectionRecord, collection_id)
+            if record is None:
+                from soft_skills_backend.shared.errors import domain_error
+
+                raise domain_error(
+                    "Collection was not found",
+                    code="SS-DOMAIN-005",
+                    status_code=404,
+                    details={"collection_id": collection_id},
+                )
+            if record.organisation_id != actor.organisation_id:
+                from soft_skills_backend.shared.errors import auth_error
+
+                raise auth_error(
+                    "Collection does not belong to this organisation",
+                    code="SS-AUTH-008",
+                    status_code=403,
+                    details={"collection_id": collection_id},
+                )
+            record.featured = command.featured
+            session.commit()
+            return build_collection_view(session, record, actor=actor)

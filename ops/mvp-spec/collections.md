@@ -6,7 +6,7 @@ Collections are curated groups of soft skill learning materials (prompts and sce
 
 ## Current State
 
-Collections are user-authored with flat bookmarking only. No nesting, organisation scoping, or rating system exists.
+Collections are user-authored with flat bookmarking, rating system, global and org-scoped discovery hubs. Organisation scoping exists.
 
 ## Target Features
 

@@ -11,6 +11,7 @@ from soft_skills_backend.modules.catalog.contracts.collection_commands import (
     CollectionCreateCommand,
     CollectionLifecycleCommand,
     CollectionListFilters,
+    CollectionRateCommand,
     CollectionUpdateCommand,
     StructuredCollectionGenerationCommand,
 )
@@ -471,6 +472,39 @@ def validate_collection_unsave(
         raise domain_error(
             "Collection is not currently saved",
             code="SS-DOMAIN-026",
+            details={"collection_id": collection.id},
+        )
+
+
+def validate_collection_rate(
+    session: Session,
+    actor: Actor,
+    collection: CollectionRecord,
+    command: CollectionRateCommand,
+) -> None:
+    if command.rating < 1 or command.rating > 5:
+        raise validation_error(
+            "Rating must be between 1 and 5",
+            code="SS-VALIDATION-066",
+            details={"rating": command.rating},
+        )
+
+
+def validate_collection_unrate(
+    session: Session,
+    actor: Actor,
+    collection: CollectionRecord,
+) -> None:
+    from soft_skills_backend.platform.db.models import CollectionRatingRecord
+
+    existing = session.get(
+        CollectionRatingRecord,
+        {"user_id": actor.user_id, "collection_id": collection.id},
+    )
+    if existing is None:
+        raise domain_error(
+            "Collection is not currently rated by this user",
+            code="SS-DOMAIN-027",
             details={"collection_id": collection.id},
         )
 

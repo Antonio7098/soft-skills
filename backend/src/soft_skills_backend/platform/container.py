@@ -30,12 +30,12 @@ from soft_skills_backend.modules.practice.workflows.assessment import (
 )
 from soft_skills_backend.modules.progression import ProgressionService
 from soft_skills_backend.modules.taxonomy import TaxonomyService
+from soft_skills_backend.platform.background_tasks import BackgroundTaskRunner
 from soft_skills_backend.platform.db.repositories import (
     SqlAlchemyPipelineRunRepository,
     SqlAlchemyProviderCallRepository,
     SqlAlchemyWorkflowEventRepository,
 )
-from soft_skills_backend.platform.background_tasks import BackgroundTaskRunner
 from soft_skills_backend.platform.db.session import (
     create_engine_from_settings,
     create_session_factory,

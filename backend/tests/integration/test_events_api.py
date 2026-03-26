@@ -5,12 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from alembic import command as alembic_command
 from alembic.config import Config
 from httpx import AsyncClient
 
+from alembic import command as alembic_command
 from soft_skills_backend.platform.db.models import WorkflowEventRecord
-from soft_skills_backend.platform.observability.events import WorkflowEvent
 
 
 def _migrate(test_settings) -> None:

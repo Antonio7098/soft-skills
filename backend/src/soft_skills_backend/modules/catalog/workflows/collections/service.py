@@ -14,6 +14,7 @@ from soft_skills_backend.modules.catalog.contracts.collection_commands import (
     CollectionCreateCommand,
     CollectionLifecycleCommand,
     CollectionListFilters,
+    CollectionRateCommand,
     CollectionUpdateCommand,
 )
 from soft_skills_backend.modules.catalog.contracts.collection_views import CollectionView
@@ -24,13 +25,16 @@ from soft_skills_backend.modules.catalog.domain.validators import (
     validate_collection_command,
     validate_collection_filters,
     validate_collection_publishability,
+    validate_collection_rate,
     validate_collection_save,
     validate_collection_source_type,
+    validate_collection_unrate,
     validate_collection_unsave,
     validate_lifecycle_transition,
 )
 from soft_skills_backend.modules.catalog.infra.events import CatalogEventRecorder
 from soft_skills_backend.platform.db.models import (
+    CollectionRatingRecord,
     CollectionRecord,
     CollectionSaveRecord,
     PromptItemRecord,
@@ -518,6 +522,177 @@ class CollectionService:
             service="soft_skills_backend.catalog",
             idempotency_key=f"catalog_collection_lifecycle_update:{actor.user_id}:{request_id}:{collection_id}",
             idempotency_params=command.model_dump(mode="json"),
+        )
+        return payload_from_results(results, "persistence_work", expected_type=CollectionView)
+
+    async def rate_collection(
+        self,
+        actor: Actor,
+        *,
+        request_id: str,
+        trace_id: str,
+        workflow_id: str | None,
+        collection_id: str,
+        command: CollectionRateCommand,
+    ) -> CollectionView:
+        async def input_guard(_ctx: StageContext) -> Any:
+            with self._session_factory() as session:
+                record = self._collection_record_or_error(session, collection_id)
+                validate_collection_rate(session, actor, record, command)
+            return ok_output(
+                StageflowStageResult(payload={"collection_id": collection_id}, summary={})
+            )
+
+        async def persistence_work(_ctx: StageContext) -> Any:
+            with self._session_factory() as session:
+                record = self._collection_record_or_error(session, collection_id)
+                existing = session.get(
+                    CollectionRatingRecord,
+                    {"user_id": actor.user_id, "collection_id": collection_id},
+                )
+                now = datetime.now(UTC)
+                if existing is not None:
+                    existing.rating = command.rating
+                    existing.updated_at = now
+                else:
+                    session.add(
+                        CollectionRatingRecord(
+                            user_id=actor.user_id,
+                            collection_id=collection_id,
+                            rating=command.rating,
+                            created_at=now,
+                            updated_at=now,
+                        )
+                    )
+                ratings = (
+                    session.query(CollectionRatingRecord)
+                    .filter(CollectionRatingRecord.collection_id == collection_id)
+                    .all()
+                )
+                total = sum(r.rating for r in ratings)
+                count = len(ratings)
+                record.avg_rating = total / count if count > 0 else None
+                record.rating_count = count
+                record.updated_at = now
+                session.commit()
+
+            self._events.record(
+                "catalog.collection.rated.v1",
+                request_id=request_id,
+                trace_id=trace_id,
+                workflow_id=workflow_id or collection_id,
+                payload={
+                    "collection_id": collection_id,
+                    "user_id": actor.user_id,
+                    "rating": command.rating,
+                },
+            )
+            return ok_output(
+                StageflowStageResult(
+                    payload=self.get_collection(actor, collection_id),
+                    summary={"collection_id": collection_id},
+                )
+            )
+
+        pipeline = Pipeline.from_stages(
+            stage("input_guard", cast(Any, input_guard), StageKind.GUARD),
+            stage(
+                "persistence_work",
+                cast(Any, persistence_work),
+                StageKind.WORK,
+                dependencies=("input_guard",),
+            ),
+            name="catalog_collection_rate",
+        )
+        results = await run_logged_pipeline(
+            self._stageflow,
+            pipeline,
+            request_id=request_id,
+            trace_id=trace_id,
+            workflow_id=workflow_id or collection_id,
+            user_id=actor.user_id,
+            execution_mode="catalog_discovery",
+            service="soft_skills_backend.catalog",
+            idempotency_key=f"catalog_collection_rate:{actor.user_id}:{collection_id}",
+            idempotency_params={"collection_id": collection_id, "rating": command.rating},
+        )
+        return payload_from_results(results, "persistence_work", expected_type=CollectionView)
+
+    async def unrate_collection(
+        self,
+        actor: Actor,
+        *,
+        request_id: str,
+        trace_id: str,
+        workflow_id: str | None,
+        collection_id: str,
+    ) -> CollectionView:
+        async def input_guard(_ctx: StageContext) -> Any:
+            with self._session_factory() as session:
+                record = self._collection_record_or_error(session, collection_id)
+                validate_collection_unrate(session, actor, record)
+            return ok_output(
+                StageflowStageResult(payload={"collection_id": collection_id}, summary={})
+            )
+
+        async def persistence_work(_ctx: StageContext) -> Any:
+            with self._session_factory() as session:
+                record = self._collection_record_or_error(session, collection_id)
+                (
+                    session.query(CollectionRatingRecord)
+                    .filter(
+                        CollectionRatingRecord.collection_id == collection_id,
+                        CollectionRatingRecord.user_id == actor.user_id,
+                    )
+                    .delete()
+                )
+                ratings = (
+                    session.query(CollectionRatingRecord)
+                    .filter(CollectionRatingRecord.collection_id == collection_id)
+                    .all()
+                )
+                total = sum(r.rating for r in ratings) if ratings else 0
+                count = len(ratings)
+                record.avg_rating = total / count if count > 0 else None
+                record.rating_count = count
+                record.updated_at = datetime.now(UTC)
+                session.commit()
+
+            self._events.record(
+                "catalog.collection.unrated.v1",
+                request_id=request_id,
+                trace_id=trace_id,
+                workflow_id=workflow_id or collection_id,
+                payload={"collection_id": collection_id, "user_id": actor.user_id},
+            )
+            return ok_output(
+                StageflowStageResult(
+                    payload=self.get_collection(actor, collection_id),
+                    summary={"collection_id": collection_id},
+                )
+            )
+
+        pipeline = Pipeline.from_stages(
+            stage("input_guard", cast(Any, input_guard), StageKind.GUARD),
+            stage(
+                "persistence_work",
+                cast(Any, persistence_work),
+                StageKind.WORK,
+                dependencies=("input_guard",),
+            ),
+            name="catalog_collection_unrate",
+        )
+        results = await run_logged_pipeline(
+            self._stageflow,
+            pipeline,
+            request_id=request_id,
+            trace_id=trace_id,
+            workflow_id=workflow_id or collection_id,
+            user_id=actor.user_id,
+            execution_mode="catalog_discovery",
+            service="soft_skills_backend.catalog",
+            idempotency_key=f"catalog_collection_unrate:{actor.user_id}:{collection_id}",
+            idempotency_params={"collection_id": collection_id},
         )
         return payload_from_results(results, "persistence_work", expected_type=CollectionView)
 

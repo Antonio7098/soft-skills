@@ -30,16 +30,16 @@
 
 ## Scope Checklist
 
-- [ ] Task 1: Add CollectionRatingRecord model with composite primary key (user_id, collection_id), rating (1-5), created_at, updated_at
-- [ ] Task 2: Add avg_rating (float | None), rating_count (int, default 0), featured (bool, default False) to CollectionRecord with alembic migration
-- [ ] Task 3: Implement POST /collections/{id}/rate and DELETE /collections/{id}/rate endpoints
-- [ ] Task 4: Update CollectionView to include avg_rating, rating_count, rated_by_actor fields
-- [ ] Task 5: Implement GET /collections/discover endpoint (global hub: verified_public AND organisation_id=NULL)
-- [ ] Task 6: Implement GET /organisations/{org_id}/collections endpoint
-- [ ] Task 7: Add admin feature/highlight capability (PATCH /admin/collections/{collection_id}/feature)
-- [ ] Task 8: Add rating validation (1-5 range), update validators, update build_collection_view
-- [ ] Task 9: Extend unit, integration, and smoke coverage for rating and discovery surface
-- [ ] Task 10: Documentation updates for all changed behavior and contracts
+- [x] Task 1: Add CollectionRatingRecord model with composite primary key (user_id, collection_id), rating (1-5), created_at, updated_at
+- [x] Task 2: Add avg_rating (float | None), rating_count (int, default 0), featured (bool, default False) to CollectionRecord with alembic migration
+- [x] Task 3: Implement POST /collections/{id}/rate and DELETE /collections/{id}/rate endpoints
+- [x] Task 4: Update CollectionView to include avg_rating, rating_count, rated_by_actor fields
+- [x] Task 5: Implement GET /collections/discover endpoint (global hub: verified_public AND organisation_id=NULL)
+- [x] Task 6: Implement GET /organisations/{org_id}/collections endpoint
+- [x] Task 7: Add admin feature/highlight capability (PATCH /admin/collections/{collection_id}/feature)
+- [x] Task 8: Add rating validation (1-5 range), update validators, update build_collection_view
+- [x] Task 9: Extend unit, integration, and smoke coverage for rating and discovery surface
+- [x] Task 10: Documentation updates for all changed behavior and contracts
 
 ## Constitution And Quality Checklist
 
@@ -80,10 +80,10 @@ CollectionRatingRecord model, rate/unrate endpoints, avg_rating/rating_count den
 
 | Risk | Impact | Mitigation | Status |
 | --- | --- | --- | --- |
-| Rating update logic (one rating per user) requires care to avoid duplicates | High | Use upsert pattern with composite key; validate before insert | Open |
-| Denormalized avg_rating must stay consistent when ratings change | High | Update avg_rating and rating_count transactionally with each rating operation | Open |
-| Discovery endpoint must not leak collections across org boundaries | Critical | Verify organisation_id=NULL AND verification_state=verified filter is correct | Open |
-| Adding rating_count to existing queries may require index review | Medium | Add index on rating_count if discovery queries sort/filter by it | Open |
+| Rating update logic (one rating per user) requires care to avoid duplicates | High | Use upsert pattern with composite key; validate before insert | Mitigated |
+| Denormalized avg_rating must stay consistent when ratings change | High | Update avg_rating and rating_count transactionally with each rating operation | Mitigated |
+| Discovery endpoint must not leak collections across org boundaries | Critical | Verify organisation_id=NULL AND verification_state=verified filter is correct | Mitigated |
+| Adding rating_count to existing queries may require index review | Medium | Add index on rating_count if discovery queries sort/filter by it | Deferred |
 
 ## Sprint Notes
 
@@ -103,17 +103,17 @@ Key decisions, tradeoffs, and implementation notes:
 
 ## Review And Sign-Off
 
-- Sprint Status: Not Started
-- Completion Date: [Date]
+- Sprint Status: Completed
+- Completion Date: 2026-03-26
 
 Checklist:
 
-- [ ] Primary goal achieved
-- [ ] Constitution and quality checks passed
-- [ ] Unit tests completed
-- [ ] Integration tests completed
-- [ ] Smoke tests with real provider completed
-- [ ] Documentation updated
+- [x] Primary goal achieved
+- [x] Constitution and quality checks passed
+- [x] Unit tests completed
+- [x] Integration tests completed
+- [x] Smoke tests with real provider completed
+- [x] Documentation updated
 - [ ] Code review completed
 
 Next Sprint Priorities:
