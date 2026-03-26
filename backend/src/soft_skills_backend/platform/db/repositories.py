@@ -64,7 +64,11 @@ class SqlAlchemyWorkflowEventRepository:
             if error_code is not None:
                 query = query.filter(WorkflowEventRecord.error_code == error_code)
             if organisation_id is not None:
-                query = query.filter(WorkflowEventRecord.organisation_id == organisation_id)
+                # Include events for this org AND global events (organisation_id IS NULL)
+                query = query.filter(
+                    (WorkflowEventRecord.organisation_id == organisation_id)
+                    | (WorkflowEventRecord.organisation_id.is_(None))
+                )
             return (
                 query.order_by(WorkflowEventRecord.occurred_at.desc())
                 .offset(offset)
@@ -95,12 +99,20 @@ class SqlAlchemyWorkflowEventRepository:
             if error_code is not None:
                 query = query.filter(WorkflowEventRecord.error_code == error_code)
             if organisation_id is not None:
-                query = query.filter(WorkflowEventRecord.organisation_id == organisation_id)
+                # Include events for this org AND global events (organisation_id IS NULL)
+                query = query.filter(
+                    (WorkflowEventRecord.organisation_id == organisation_id)
+                    | (WorkflowEventRecord.organisation_id.is_(None))
+                )
             return query.count()
 
     def get_by_id(self, event_id: str) -> WorkflowEventRecord | None:
         with self._session_factory() as session:
-            return session.get(WorkflowEventRecord, event_id)
+            return (
+                session.query(WorkflowEventRecord)
+                .filter(WorkflowEventRecord.event_id == event_id)
+                .first()
+            )
 
     def update(
         self,
@@ -110,7 +122,11 @@ class SqlAlchemyWorkflowEventRepository:
         payload: dict[str, object] | None = None,
     ) -> WorkflowEventRecord | None:
         with self._session_factory() as session:
-            record = session.get(WorkflowEventRecord, event_id)
+            record = (
+                session.query(WorkflowEventRecord)
+                .filter(WorkflowEventRecord.event_id == event_id)
+                .first()
+            )
             if record is None:
                 return None
             if error_code is not None:
@@ -123,7 +139,11 @@ class SqlAlchemyWorkflowEventRepository:
 
     def delete(self, event_id: str) -> bool:
         with self._session_factory() as session:
-            record = session.get(WorkflowEventRecord, event_id)
+            record = (
+                session.query(WorkflowEventRecord)
+                .filter(WorkflowEventRecord.event_id == event_id)
+                .first()
+            )
             if record is None:
                 return False
             session.delete(record)
