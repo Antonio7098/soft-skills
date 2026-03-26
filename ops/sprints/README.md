@@ -19,6 +19,13 @@ contracts, or sequencing change.
 7. [Sprint 6: Creator Workflows And Discovery V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-06-creator-workflows-and-discovery-v1.md)
 8. [Sprint 7: Admin Verification And Cohort Visibility](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-07-admin-verification-and-cohort-visibility.md)
 9. [Sprint 8: Hardening And Release Readiness](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-08-hardening-and-release-readiness.md)
+10. [Sprint 9: Generation Orchestration V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-09-generation-orchestration-v1.md)
+
+## Active Sprint
+
+The current active sprint for backend execution is:
+
+- [Sprint 9: Generation Orchestration V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-09-generation-orchestration-v1.md)
 
 ## Common Rules
 

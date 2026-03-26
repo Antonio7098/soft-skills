@@ -12,6 +12,13 @@ from .suites.assessment_marking import (
     QuickPracticeMarkingSmoke,
     ScenarioMarkingSmoke,
 )
+from .suites.content_generation import (
+    ChatGenerationSmoke,
+    ChatPromptItemGenerationSmoke,
+    GenerationLatencyEnvelopeSmoke,
+    StructuredGenerationSmoke,
+    StructuredPromptItemGenerationSmoke,
+)
 from .suites.practice_run_lifecycle import PracticeRunLifecycleSmoke
 from .suites.practice_session_flow import PracticeSessionFlowSmoke
 from .suites.provider_baseline import ProviderBaselineSmoke
@@ -23,6 +30,11 @@ def build_default_registry() -> SmokeRegistry:
     return SmokeRegistry(
         [
             ProviderBaselineSmoke(),
+            StructuredGenerationSmoke(),
+            ChatGenerationSmoke(),
+            StructuredPromptItemGenerationSmoke(),
+            ChatPromptItemGenerationSmoke(),
+            GenerationLatencyEnvelopeSmoke(),
             QuickPracticeMarkingSmoke(),
             InterviewMarkingSmoke(),
             ScenarioMarkingSmoke(),

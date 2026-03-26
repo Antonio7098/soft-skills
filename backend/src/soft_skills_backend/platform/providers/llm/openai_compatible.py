@@ -10,7 +10,7 @@ from typing import Any, cast
 import httpx
 
 from soft_skills_backend.config import Settings
-from soft_skills_backend.shared.errors import provider_error, validation_error
+from soft_skills_backend.shared.errors import AppError, provider_error, validation_error
 from soft_skills_backend.shared.ports.llm import (
     LLMProvider,
     ProviderCallContext,
@@ -18,6 +18,11 @@ from soft_skills_backend.shared.ports.llm import (
 )
 
 TRANSIENT_PROVIDER_STATUS_CODES = {408, 429, 500, 502, 503, 504}
+RETRYABLE_PROVIDER_PAYLOAD_CODES = {
+    "SS-PROVIDER-007",
+    "SS-PROVIDER-008",
+    "SS-PROVIDER-009",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +138,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                             "reason": error_message,
                         },
                     )
+                content = _extract_message_content(response_payload)
                 usage = _extract_usage(response_payload)
                 await self._provider_call_logger.log_call_end(
                     call_id,
@@ -149,11 +155,33 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     usage=usage,
                 )
                 return ProviderCompletion(
-                    content=_extract_message_content(response_payload),
+                    content=content,
                     model_slug=str(response_payload.get("model", active_model_slug)),
                     usage=usage,
                     raw_response=response_payload,
                 )
+            except AppError as exc:
+                latency_ms = int((perf_counter() - start) * 1000)
+                await self._provider_call_logger.log_call_end(
+                    call_id,
+                    success=False,
+                    latency_ms=latency_ms,
+                    error=str(exc),
+                    operation=call_context.operation,
+                    provider=self._resolved.provider_name,
+                    model_id=active_model_slug,
+                    pipeline_run_id=call_context.pipeline_run_id,
+                    request_id=call_context.request_id,
+                    trace_id=call_context.trace_id,
+                    workflow_id=call_context.workflow_id,
+                    user_id=call_context.user_id,
+                )
+                if exc.code in RETRYABLE_PROVIDER_PAYLOAD_CODES and attempt < self._settings.provider_max_retries:
+                    await asyncio.sleep(
+                        self._settings.provider_retry_backoff_seconds * (attempt + 1)
+                    )
+                    continue
+                raise
             except TimeoutError as exc:
                 latency_ms = int((perf_counter() - start) * 1000)
                 timeout_error = "Provider completion request exceeded the configured timeout budget"
@@ -283,6 +311,10 @@ def _extract_message_content(payload: dict[str, Any]) -> str | dict[str, Any]:
     raise provider_error(
         "Provider completion response content was not understood",
         code="SS-PROVIDER-009",
+        details={
+            "content_type": type(content).__name__,
+            "message_keys": sorted(str(key) for key in message.keys()),
+        },
     )
 
 

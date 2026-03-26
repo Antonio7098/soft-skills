@@ -104,10 +104,9 @@ class SmokeBackendClient:
         return self.data(response)
 
     async def generate_structured_collection(self, *, user_id: str) -> JsonObject:
-        response = await self._client.post(
-            "/api/collections/generate/structured",
-            headers={"X-User-ID": user_id},
-            json={
+        payload = await self.generate_structured_collection_payload(
+            user_id=user_id,
+            payload={
                 "title_hint": "Smoke Structured Draft",
                 "target_audience": "Early-career consultants",
                 "difficulty": "intermediate",
@@ -127,15 +126,26 @@ class SmokeBackendClient:
                 },
             },
         )
+        return cast(JsonObject, cast(JsonObject, payload["collection"]))
+
+    async def generate_structured_collection_payload(
+        self,
+        *,
+        user_id: str,
+        payload: JsonObject,
+    ) -> JsonObject:
+        response = await self._client.post(
+            "/api/collections/generate/structured",
+            headers={"X-User-ID": user_id},
+            json=payload,
+        )
         self.require_ok(response, "generate structured collection")
-        payload = self.data(response)
-        return cast(JsonObject, payload["collection"])
+        return self.data(response)
 
     async def generate_chat_collection(self, *, user_id: str) -> JsonObject:
-        response = await self._client.post(
-            "/api/collections/generate/chat",
-            headers={"X-User-ID": user_id},
-            json={
+        payload = await self.generate_chat_collection_payload(
+            user_id=user_id,
+            payload={
                 "prompt": (
                     "Create a realistic interview draft about making a decision with incomplete "
                     "information while keeping a senior stakeholder aligned."
@@ -154,9 +164,95 @@ class SmokeBackendClient:
                 },
             },
         )
+        return cast(JsonObject, cast(JsonObject, payload["collection"]))
+
+    async def generate_chat_collection_payload(
+        self,
+        *,
+        user_id: str,
+        payload: JsonObject,
+    ) -> JsonObject:
+        response = await self._client.post(
+            "/api/collections/generate/chat",
+            headers={"X-User-ID": user_id},
+            json=payload,
+        )
         self.require_ok(response, "generate chat collection")
-        payload = self.data(response)
-        return cast(JsonObject, payload["collection"])
+        return self.data(response)
+
+    async def generate_structured_prompt_items(
+        self,
+        *,
+        user_id: str,
+        collection_id: str,
+    ) -> JsonObject:
+        return await self.generate_structured_prompt_items_payload(
+            user_id=user_id,
+            collection_id=collection_id,
+            payload={
+                "title_hint": "Smoke Prompt Expansion",
+                "workplace_context": "A senior stakeholder is escalating delivery risk after new legal feedback.",
+                "generation_focus": "Generate one realistic quick practice prompt about resetting expectations.",
+                "realism_notes": ["Keep the conflict concrete and business-relevant."],
+                "target_skill_slugs": ["active-listening"],
+                "counts": {
+                    "quick_practice_prompt_count": 1,
+                    "interview_prompt_count": 0,
+                },
+            },
+        )
+
+    async def generate_structured_prompt_items_payload(
+        self,
+        *,
+        user_id: str,
+        collection_id: str,
+        payload: JsonObject,
+    ) -> JsonObject:
+        response = await self._client.post(
+            f"/api/collections/{collection_id}/generate/prompt-items/structured",
+            headers={"X-User-ID": user_id},
+            json=payload,
+        )
+        self.require_ok(response, "generate structured prompt items")
+        return self.data(response)
+
+    async def generate_chat_prompt_items(
+        self,
+        *,
+        user_id: str,
+        collection_id: str,
+    ) -> JsonObject:
+        return await self.generate_chat_prompt_items_payload(
+            user_id=user_id,
+            collection_id=collection_id,
+            payload={
+                "prompt": (
+                    "Add an interview prompt about defending a decision made with incomplete "
+                    "information while keeping a senior stakeholder aligned."
+                ),
+                "target_skill_slugs": ["decision-justification"],
+                "counts": {
+                    "quick_practice_prompt_count": 0,
+                    "interview_prompt_count": 1,
+                },
+            },
+        )
+
+    async def generate_chat_prompt_items_payload(
+        self,
+        *,
+        user_id: str,
+        collection_id: str,
+        payload: JsonObject,
+    ) -> JsonObject:
+        response = await self._client.post(
+            f"/api/collections/{collection_id}/generate/prompt-items/chat",
+            headers={"X-User-ID": user_id},
+            json=payload,
+        )
+        self.require_ok(response, "generate chat prompt items")
+        return self.data(response)
 
     async def start_quick_practice_session(self, *, user_id: str, prompt_item_id: str) -> JsonObject:
         response = await self._client.post(

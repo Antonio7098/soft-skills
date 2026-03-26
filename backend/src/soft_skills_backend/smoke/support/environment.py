@@ -51,6 +51,15 @@ class ProviderSmokePreflight:
 class SmokeApplicationSessionFactory:
     """Builds an isolated backend application session for smoke execution."""
 
+    def __init__(
+        self,
+        *,
+        provider_max_retries: int = 0,
+        assessment_validation_retries: int = 0,
+    ) -> None:
+        self._provider_max_retries = provider_max_retries
+        self._assessment_validation_retries = assessment_validation_retries
+
     @asynccontextmanager
     async def open(self, settings: Settings) -> AsyncIterator[SmokeBackendClient]:
         from soft_skills_backend.app import create_app
@@ -74,8 +83,8 @@ class SmokeApplicationSessionFactory:
                 "environment": "test",
                 "database_url": f"sqlite+pysqlite:///{database_path}",
                 "smoke_timeout_seconds": SMOKE_PROVIDER_TIMEOUT_SECONDS,
-                "provider_max_retries": 0,
-                "assessment_validation_retries": 0,
+                "provider_max_retries": self._provider_max_retries,
+                "assessment_validation_retries": self._assessment_validation_retries,
             }
         )
 

@@ -157,6 +157,23 @@ in the linked sprint documents under `ops/sprints/`.
 
 ---
 
+## Sprint 9: Generation Orchestration V1
+
+**Purpose:** Replace the monolithic collection-generation call with a modular Stageflow-backed generation system and add prompt-item generation inside existing collections.
+
+**Key Outcomes:**
+- Existing-collection prompt-item generation endpoints
+- Modular generation contracts, prompts, validators, and persistence
+- Stageflow parent pipelines with child generation workers
+- Manifest-style generation artifacts for multi-call workflows
+- Real-provider coverage for the new generation surface
+
+**Exit Criteria:** The backend can generate prompt items inside existing collections and generate collections through a modular, replayable, multi-call architecture without weakening validation or observability.
+
+**Detail:** [ops/sprints/sprint-09-generation-orchestration-v1.md](ops/sprints/sprint-09-generation-orchestration-v1.md)
+
+---
+
 ## Rules For Using This Roadmap
 
 - Frontend is intentionally omitted here and can move on its own cadence.

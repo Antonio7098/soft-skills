@@ -58,7 +58,7 @@ Scenario realism matters more than narrative complexity.
 
 ## Authoring Flows
 
-The MVP supports three authoring flows:
+The MVP supports four authoring flows:
 
 ### Manual Authoring
 
@@ -73,13 +73,23 @@ Any authenticated user can fill a form that constrains generation around
 audience, domain, difficulty, scenario type, and skill targets. Structured
 generation must persist a versioned generation artifact with prompt version,
 schema version, provider, model slug, validated output payload, and the
-request inputs that shaped the draft.
+request inputs that shaped the draft. The generation backend may use a
+planner-plus-workers multi-call workflow, but persistence and validation stay
+at the parent workflow boundary.
 
 ### Chat-Based Generation
 
 Any authenticated user can use natural language prompts to generate drafts,
 then review and edit before publication. Chat prompts must go through
 prompt-security inspection before provider execution.
+
+### Existing Collection Expansion
+
+Collection owners and admins may generate new prompt items inside an existing
+collection without regenerating the full collection. Generated prompt items
+must stay within the collection's enabled prompt types, rubric compatibility,
+and skill subset rules, and they must persist as editable draft content with a
+versioned generation artifact.
 
 ## Publication Workflow
 

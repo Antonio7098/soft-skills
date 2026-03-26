@@ -15,10 +15,16 @@ from soft_skills_backend.modules.catalog.contracts.collection_views import (
     CollectionView,
 )
 from soft_skills_backend.modules.catalog.contracts.prompt_item_commands import (
+    ChatPromptItemGenerationCommand,
     PromptItemCreateCommand,
+    PromptItemGenerationCounts,
+    StructuredPromptItemGenerationCommand,
     PromptItemUpdateCommand,
 )
-from soft_skills_backend.modules.catalog.contracts.prompt_item_views import PromptItemView
+from soft_skills_backend.modules.catalog.contracts.prompt_item_views import (
+    PromptItemGenerationView,
+    PromptItemView,
+)
 from soft_skills_backend.modules.catalog.contracts.scenario_commands import (
     MockCompanyInput,
     MockPersonInput,
@@ -36,6 +42,7 @@ from soft_skills_backend.modules.catalog.use_cases.catalog_service import Catalo
 
 __all__ = [
     "CatalogService",
+    "ChatPromptItemGenerationCommand",
     "ChatCollectionGenerationCommand",
     "CollectionCreateCommand",
     "CollectionGenerationCounts",
@@ -51,6 +58,9 @@ __all__ = [
     "MockPersonInput",
     "MockPersonView",
     "PromptItemCreateCommand",
+    "PromptItemGenerationCounts",
+    "PromptItemGenerationView",
+    "StructuredPromptItemGenerationCommand",
     "PromptItemUpdateCommand",
     "PromptItemView",
     "PromptItemService",

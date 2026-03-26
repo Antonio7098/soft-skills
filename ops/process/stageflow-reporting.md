@@ -12,6 +12,16 @@ Stageflow workflows in SoftSkills.
 - **Recommendations:** How to fix or mitigate
 -->
 
+**Subpipeline Fork Dropped Timeout And Idempotency Data** (2026-03-26)
+- **Reference File:** `backend/src/soft_skills_backend/platform/workflows/stageflow.py`
+- **Description:** `run_logged_subpipeline(...)` set `_timeout_ms`, `idempotency_key`, and related controls on the pre-spawn `PipelineContext`, but `SubpipelineSpawner.spawn()` forks child contexts with a fresh `data={}` and only preserves the original values in `_parent_data`. That meant child generation workers silently fell back to Stageflow's default 30-second timeout even when the parent pipeline had a larger explicit budget.
+- **Recommendations:** Rehydrate child `PipelineContext.data` from `_parent_data` before `Pipeline.run(...)`. Upstream, Stageflow should offer a first-class way to preserve selected context-data keys across subpipeline forks.
+
+**Provider Payload Shape Failures Need Local Retry Policy** (2026-03-26)
+- **Reference File:** `backend/src/soft_skills_backend/platform/providers/llm/openai_compatible.py`
+- **Description:** Live provider runs sometimes returned completion message payloads whose `content` shape was not understood by the current parser. In smoke execution this surfaced as non-retried failures even though the underlying issue was transient provider payload variability rather than deterministic prompt drift.
+- **Recommendations:** Treat malformed-but-retryable provider payload shape errors as retryable in the provider adapter, and make sure smoke and benchmark environments do not disable provider retries when the goal is operational envelope testing.
+
 ## DX Improvements
 
 <!-- Format:
@@ -61,3 +71,13 @@ Stageflow workflows in SoftSkills.
 - **Reference File:** `backend/src/soft_skills_backend/modules/evaluation/workflows/service.py`
 - **Description:** The first real provider-backed golden-dataset marking benchmark exceeded the default Stageflow stage timeout and needed an explicit longer pipeline timeout budget. Model benchmarking is materially slower than local validation-only evals.
 - **Recommendations:** Derive evaluation timeouts from `case_count x model_count x provider_timeout` instead of inheriting the default stage timeout.
+
+**Subpipelines Need Parent Metadata Rehydration** (2026-03-26)
+- **Reference File:** `backend/src/soft_skills_backend/platform/workflows/stageflow.py`
+- **Description:** Sprint 9 needed child generation pipelines with their own run IDs, persisted pipeline-run records, and provider-call correlation. That required a local `run_logged_subpipeline(...)` helper that reconstructs `PipelineContext` from the parent `StageContext` before spawning the child pipeline.
+- **Recommendations:** Add a first-class Stageflow helper for parent-to-child pipeline spawning that carries request metadata, logging, and correlation without application-level context reconstruction.
+
+**Subpipeline Data Does Not Survive Fork By Default** (2026-03-26)
+- **Reference File:** `backend/src/soft_skills_backend/platform/workflows/stageflow.py`
+- **Description:** Stageflow subpipeline forks preserve parent `data` in `_parent_data` and give the child a fresh mutable `data` dict. That is easy to miss, and it matters for any application-level controls stored in context data, including timeout budgets and idempotency keys.
+- **Recommendations:** Treat child `data` rehydration as mandatory in local wrappers today. Upstream, Stageflow should document this more prominently or add an opt-in mode that copies a safe subset of parent data into the child.

@@ -19,10 +19,15 @@ from soft_skills_backend.modules.catalog.contracts.collection_views import (
     CollectionView,
 )
 from soft_skills_backend.modules.catalog.contracts.prompt_item_commands import (
+    ChatPromptItemGenerationCommand,
     PromptItemCreateCommand,
     PromptItemUpdateCommand,
+    StructuredPromptItemGenerationCommand,
 )
-from soft_skills_backend.modules.catalog.contracts.prompt_item_views import PromptItemView
+from soft_skills_backend.modules.catalog.contracts.prompt_item_views import (
+    PromptItemGenerationView,
+    PromptItemView,
+)
 from soft_skills_backend.modules.catalog.contracts.scenario_commands import (
     ScenarioCreateCommand,
     ScenarioUpdateCommand,
@@ -32,8 +37,6 @@ from soft_skills_backend.modules.catalog.infra.events import CatalogEventRecorde
 from soft_skills_backend.modules.catalog.workflows.collections.service import CollectionService
 from soft_skills_backend.modules.catalog.workflows.generation.service import (
     CatalogGenerationService,
-    build_catalog_generation_prompt_library,
-    build_catalog_generation_typed_output,
 )
 from soft_skills_backend.modules.catalog.workflows.prompt_items.service import PromptItemService
 from soft_skills_backend.modules.catalog.workflows.scenarios.service import ScenarioService
@@ -78,8 +81,6 @@ class CatalogService:
             session_factory=session_factory,
             events=events,
             llm_provider=llm_provider,
-            prompt_library=build_catalog_generation_prompt_library(settings),
-            typed_output=build_catalog_generation_typed_output(settings),
             prompt_security_policy=PromptSecurityPolicy(),
             stageflow_runtime=stageflow_runtime,
         )
@@ -218,6 +219,44 @@ class CatalogService:
             workflow_id=workflow_id,
             collection_id=collection_id,
             prompt_item_id=prompt_item_id,
+            command=command,
+        )
+
+    async def generate_prompt_items_structured(
+        self,
+        actor: Actor,
+        *,
+        request_id: str,
+        trace_id: str,
+        workflow_id: str | None,
+        collection_id: str,
+        command: StructuredPromptItemGenerationCommand,
+    ) -> PromptItemGenerationView:
+        return await self._generation.generate_prompt_items_structured(
+            actor,
+            request_id=request_id,
+            trace_id=trace_id,
+            workflow_id=workflow_id,
+            collection_id=collection_id,
+            command=command,
+        )
+
+    async def generate_prompt_items_chat(
+        self,
+        actor: Actor,
+        *,
+        request_id: str,
+        trace_id: str,
+        workflow_id: str | None,
+        collection_id: str,
+        command: ChatPromptItemGenerationCommand,
+    ) -> PromptItemGenerationView:
+        return await self._generation.generate_prompt_items_chat(
+            actor,
+            request_id=request_id,
+            trace_id=trace_id,
+            workflow_id=workflow_id,
+            collection_id=collection_id,
             command=command,
         )
 

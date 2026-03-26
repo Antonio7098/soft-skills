@@ -12,6 +12,7 @@ from soft_skills_backend.entrypoints.http.dependencies import (
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
 from soft_skills_backend.modules.catalog import (
     ChatCollectionGenerationCommand,
+    ChatPromptItemGenerationCommand,
     CollectionCreateCommand,
     CollectionGenerationView,
     CollectionLifecycleCommand,
@@ -19,12 +20,14 @@ from soft_skills_backend.modules.catalog import (
     CollectionUpdateCommand,
     CollectionView,
     PromptItemCreateCommand,
+    PromptItemGenerationView,
     PromptItemUpdateCommand,
     PromptItemView,
     ScenarioCreateCommand,
     ScenarioUpdateCommand,
     ScenarioView,
     StructuredCollectionGenerationCommand,
+    StructuredPromptItemGenerationCommand,
 )
 from soft_skills_backend.modules.practice.models import PracticeCorrelation
 
@@ -200,6 +203,52 @@ async def add_prompt_item(
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.add_prompt_item(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        collection_id=collection_id,
+        command=command,
+    )
+    return ok_response(request, payload)
+
+
+@router.post(
+    "/{collection_id}/generate/prompt-items/structured",
+    response_model=ApiEnvelope[PromptItemGenerationView],
+)
+async def generate_prompt_items_structured(
+    request: Request,
+    collection_id: str,
+    command: StructuredPromptItemGenerationCommand,
+) -> ApiEnvelope[PromptItemGenerationView]:
+    actor = require_actor(request)
+    service = get_catalog_service(request)
+    correlation = _correlation_from_request(request)
+    payload = await service.generate_prompt_items_structured(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        collection_id=collection_id,
+        command=command,
+    )
+    return ok_response(request, payload)
+
+
+@router.post(
+    "/{collection_id}/generate/prompt-items/chat",
+    response_model=ApiEnvelope[PromptItemGenerationView],
+)
+async def generate_prompt_items_chat(
+    request: Request,
+    collection_id: str,
+    command: ChatPromptItemGenerationCommand,
+) -> ApiEnvelope[PromptItemGenerationView]:
+    actor = require_actor(request)
+    service = get_catalog_service(request)
+    correlation = _correlation_from_request(request)
+    payload = await service.generate_prompt_items_chat(
         actor,
         request_id=correlation.request_id,
         trace_id=correlation.trace_id,
