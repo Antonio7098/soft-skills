@@ -14,12 +14,26 @@ class CatalogEventRecorder:
     def __init__(self, workflow_events: SqlAlchemyWorkflowEventRepository) -> None:
         self._workflow_events = workflow_events
 
-    def record(self, event_type: str, request_id: str, payload: dict[str, Any]) -> None:
+    def record(
+        self,
+        event_type: str,
+        *,
+        request_id: str | None,
+        trace_id: str | None,
+        workflow_id: str | None,
+        payload: dict[str, Any],
+        error_code: str | None = None,
+    ) -> None:
         self._workflow_events.record(
             WorkflowEvent(
                 event_type=event_type,
                 request_id=request_id,
-                workflow_id=payload.get("collection_id") or payload.get("scenario_id"),
+                trace_id=trace_id,
+                workflow_id=workflow_id
+                or payload.get("collection_id")
+                or payload.get("scenario_id")
+                or payload.get("generation_artifact_id"),
+                error_code=error_code,
                 payload=payload,
             )
         )

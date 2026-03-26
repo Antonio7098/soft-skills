@@ -92,9 +92,16 @@ def build_container(settings: Settings) -> AppContainer:
         session_factory=session_factory,
         workflow_events=workflow_events,
     )
+    provider_call_logger = DatabaseProviderCallLogger(provider_calls)
+    llm_provider = OpenAICompatibleLLMProvider(
+        settings=settings,
+        provider_call_logger=provider_call_logger,
+    )
     catalog_service = CatalogService(
+        settings=settings,
         session_factory=session_factory,
         workflow_events=workflow_events,
+        llm_provider=llm_provider,
         stageflow_runtime=stageflow_runtime,
     )
     progression_service = ProgressionService(
@@ -102,7 +109,6 @@ def build_container(settings: Settings) -> AppContainer:
         workflow_events=workflow_events,
         stageflow_runtime=stageflow_runtime,
     )
-    provider_call_logger = DatabaseProviderCallLogger(provider_calls)
     practice_store = QuickPracticeRepository(
         settings=settings,
         session_factory=session_factory,
@@ -113,10 +119,7 @@ def build_container(settings: Settings) -> AppContainer:
         store=practice_store,
         assessment_marker=DefaultQuickPracticeMarkingProvider(
             settings=settings,
-            llm_provider=OpenAICompatibleLLMProvider(
-                settings=settings,
-                provider_call_logger=provider_call_logger,
-            ),
+            llm_provider=llm_provider,
             prompt_library=build_prompt_library(settings),
             typed_output=build_typed_output(settings),
         ),

@@ -154,6 +154,10 @@ class CollectionRecord(Base):
     difficulty: Mapped[str] = mapped_column(String(32), index=True)
     lifecycle_state: Mapped[str] = mapped_column(String(32), index=True)
     verification_state: Mapped[str] = mapped_column(String(32), index=True)
+    source_type: Mapped[str] = mapped_column(String(32), index=True, default="manual")
+    last_generation_artifact_id: Mapped[str | None] = mapped_column(
+        String(32), index=True, nullable=True
+    )
     content_format_mix: Mapped[list[str]] = mapped_column(JSON, default=list)
     target_skill_slugs: Mapped[list[str]] = mapped_column(JSON, default=list)
     target_competency_slugs: Mapped[list[str]] = mapped_column(JSON, default=list)
@@ -178,6 +182,7 @@ class PromptItemRecord(Base):
     target_skill_slugs: Mapped[list[str]] = mapped_column(JSON, default=list)
     rubric_id: Mapped[str] = mapped_column(String(128), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class ScenarioRecord(Base):
@@ -197,6 +202,7 @@ class ScenarioRecord(Base):
     target_skill_slugs: Mapped[list[str]] = mapped_column(JSON, default=list)
     rubric_id: Mapped[str] = mapped_column(String(128), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class MockCompanyRecord(Base):
@@ -224,6 +230,52 @@ class MockPersonRecord(Base):
     goals: Mapped[list[str]] = mapped_column(JSON, default=list)
     communication_style: Mapped[str] = mapped_column(Text)
     relationship_to_scenario: Mapped[str] = mapped_column(Text)
+
+
+class ScenarioSupportingArtifactRecord(Base):
+    """Scenario supporting artifacts persisted for authoring and replay."""
+
+    __tablename__ = "scenario_supporting_artifacts"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    scenario_id: Mapped[str] = mapped_column(String(32), index=True)
+    artifact_type: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class CollectionSaveRecord(Base):
+    """Saved collection state for later reuse."""
+
+    __tablename__ = "collection_saves"
+
+    user_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    collection_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class ContentGenerationArtifactRecord(Base):
+    """Validated LLM generation artifact for creator workflows."""
+
+    __tablename__ = "content_generation_artifacts"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    collection_id: Mapped[str] = mapped_column(String(32), index=True)
+    author_user_id: Mapped[str] = mapped_column(String(32), index=True)
+    generation_mode: Mapped[str] = mapped_column(String(32), index=True)
+    prompt_version: Mapped[str] = mapped_column(String(64), index=True)
+    schema_version: Mapped[str] = mapped_column(String(64))
+    config_version: Mapped[str] = mapped_column(String(64), index=True)
+    provider: Mapped[str] = mapped_column(String(64), index=True)
+    model_slug: Mapped[str] = mapped_column(String(128))
+    request_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    workflow_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    input_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    output_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    raw_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class PracticeSessionRecord(Base):

@@ -9,19 +9,29 @@ from soft_skills_backend.modules.catalog.contracts.prompt_item_views import Prom
 from soft_skills_backend.modules.catalog.contracts.scenario_views import (
     MockCompanyView,
     MockPersonView,
+    ScenarioSupportingArtifactView,
     ScenarioView,
 )
+from soft_skills_backend.modules.catalog.domain.validators import discovery_tier_for_collection
 from soft_skills_backend.platform.db.models import (
     CollectionRecord,
+    CollectionSaveRecord,
     MockCompanyRecord,
     MockPersonRecord,
     PromptItemRecord,
     ScenarioRecord,
+    ScenarioSupportingArtifactRecord,
 )
+from soft_skills_backend.shared.auth import Actor
 
 
-def build_collection_view(session: Session, record: CollectionRecord) -> CollectionView:
-    """Build a collection view with prompt items and scenarios."""
+def build_collection_view(
+    session: Session,
+    record: CollectionRecord,
+    *,
+    actor: Actor | None,
+) -> CollectionView:
+    """Build a collection view with prompt items, scenarios, and actor-specific discovery state."""
 
     prompt_items = [
         PromptItemView(
@@ -58,6 +68,12 @@ def build_collection_view(session: Session, record: CollectionRecord) -> Collect
             .order_by(MockPersonRecord.name)
             .all()
         )
+        artifact_records = (
+            session.query(ScenarioSupportingArtifactRecord)
+            .filter(ScenarioSupportingArtifactRecord.scenario_id == scenario.id)
+            .order_by(ScenarioSupportingArtifactRecord.created_at)
+            .all()
+        )
         scenarios.append(
             ScenarioView(
                 id=scenario.id,
@@ -69,6 +85,15 @@ def build_collection_view(session: Session, record: CollectionRecord) -> Collect
                 lifecycle_state=scenario.lifecycle_state,
                 target_skill_slugs=list(scenario.target_skill_slugs),
                 rubric_id=scenario.rubric_id,
+                supporting_artifacts=[
+                    ScenarioSupportingArtifactView(
+                        id=artifact.id,
+                        artifact_type=artifact.artifact_type,
+                        title=artifact.title,
+                        body=artifact.body,
+                    )
+                    for artifact in artifact_records
+                ],
                 mock_company=None
                 if company_record is None
                 else MockCompanyView(
@@ -91,6 +116,23 @@ def build_collection_view(session: Session, record: CollectionRecord) -> Collect
             )
         )
 
+    save_count = (
+        session.query(CollectionSaveRecord)
+        .filter(CollectionSaveRecord.collection_id == record.id)
+        .count()
+    )
+    saved_by_actor = False
+    if actor is not None:
+        saved_by_actor = (
+            session.query(CollectionSaveRecord)
+            .filter(
+                CollectionSaveRecord.collection_id == record.id,
+                CollectionSaveRecord.user_id == actor.user_id,
+            )
+            .count()
+            > 0
+        )
+
     return CollectionView(
         id=record.id,
         author_user_id=record.author_user_id,
@@ -100,10 +142,15 @@ def build_collection_view(session: Session, record: CollectionRecord) -> Collect
         difficulty=record.difficulty,
         lifecycle_state=record.lifecycle_state,
         verification_state=record.verification_state,
+        discovery_tier=discovery_tier_for_collection(record),
+        source_type=record.source_type,
         content_format_mix=list(record.content_format_mix),
         target_skill_slugs=list(record.target_skill_slugs),
         target_competency_slugs=list(record.target_competency_slugs),
         rubric_ids=list(record.rubric_ids),
+        save_count=save_count,
+        saved_by_actor=saved_by_actor,
+        last_generation_artifact_id=record.last_generation_artifact_id,
         prompt_items=prompt_items,
         scenarios=scenarios,
     )

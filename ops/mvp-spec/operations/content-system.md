@@ -63,17 +63,23 @@ The MVP supports three authoring flows:
 ### Manual Authoring
 
 Any authenticated user can write or edit content directly and assign skills,
-competencies, difficulty, and rubric metadata.
+competencies, difficulty, and rubric metadata. Manual authoring must support
+draft updates for collections, prompt items, scenarios, mock-world artifacts,
+and scenario supporting artifacts without bypassing validation.
 
 ### Structured Generation
 
 Any authenticated user can fill a form that constrains generation around
-audience, domain, difficulty, scenario type, and skill targets.
+audience, domain, difficulty, scenario type, and skill targets. Structured
+generation must persist a versioned generation artifact with prompt version,
+schema version, provider, model slug, validated output payload, and the
+request inputs that shaped the draft.
 
 ### Chat-Based Generation
 
 Any authenticated user can use natural language prompts to generate drafts,
-then review and edit before publication.
+then review and edit before publication. Chat prompts must go through
+prompt-security inspection before provider execution.
 
 ## Publication Workflow
 
@@ -85,6 +91,8 @@ then review and edit before publication.
 5. Admins can verify a user-created public collection and elevate it for broader discovery.
 
 Elevation must not bypass admin verification controls in MVP.
+Public standard collections and verified public collections must remain
+distinct discovery tiers in the backend contract.
 
 ## Authoring Guardrails
 
@@ -92,6 +100,7 @@ Elevation must not bypass admin verification controls in MVP.
 - Users cannot publish incomplete or unmapped content.
 - AI-generated drafts must remain editable before publication.
 - Supporting artifacts must stay consistent with the scenario context.
+- Save and reuse behavior must not override content visibility rules.
 
 ## Realism Rules
 
@@ -107,6 +116,7 @@ Learners should be able to:
 
 - browse collections
 - filter by difficulty, skill, competency, and format
+- filter by discovery tier where relevant
 - save collections
 - revisit previously used content
 

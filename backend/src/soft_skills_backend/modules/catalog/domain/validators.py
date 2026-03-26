@@ -5,33 +5,55 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
+    ChatCollectionGenerationCommand,
     CollectionCreateCommand,
     CollectionLifecycleCommand,
+    CollectionListFilters,
+    CollectionUpdateCommand,
+    StructuredCollectionGenerationCommand,
 )
 from soft_skills_backend.modules.catalog.contracts.prompt_item_commands import (
     PromptItemCreateCommand,
+    PromptItemUpdateCommand,
 )
-from soft_skills_backend.modules.catalog.contracts.scenario_commands import ScenarioCreateCommand
+from soft_skills_backend.modules.catalog.contracts.scenario_commands import (
+    ScenarioCreateCommand,
+    ScenarioUpdateCommand,
+)
+from soft_skills_backend.modules.catalog.domain.constants import (
+    ALLOWED_COLLECTION_SOURCE_TYPES,
+    ALLOWED_COLLECTION_STATES,
+    ALLOWED_COLLECTION_TRANSITIONS,
+    ALLOWED_DIFFICULTIES,
+    ALLOWED_DISCOVERY_TIERS,
+    ALLOWED_PROMPT_TYPES,
+    ALLOWED_SCENARIO_ARTIFACT_TYPES,
+    ALLOWED_SCENARIO_CONTENT_TYPE,
+    ALLOWED_VERIFICATION_STATES,
+)
 from soft_skills_backend.platform.db.models import (
     CollectionRecord,
+    CollectionSaveRecord,
     CompetencyRecord,
     CompetencySkillMapRecord,
+    MockCompanyRecord,
+    MockPersonRecord,
     PromptItemRecord,
     RubricRecord,
     ScenarioRecord,
+    ScenarioSupportingArtifactRecord,
     SkillRecord,
 )
 from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import auth_error, domain_error, validation_error
 
-from .constants import (
-    ALLOWED_COLLECTION_STATES,
-    ALLOWED_COLLECTION_TRANSITIONS,
-    ALLOWED_DIFFICULTIES,
-    ALLOWED_PROMPT_TYPES,
-    ALLOWED_SCENARIO_CONTENT_TYPE,
-    ALLOWED_VERIFICATION_STATES,
-)
+
+def discovery_tier_for_collection(record: CollectionRecord) -> str:
+    if record.lifecycle_state != "published_public":
+        return "private"
+    if record.verification_state == "verified":
+        return "verified_public"
+    return "standard_public"
 
 
 def can_view_collection(
@@ -42,6 +64,17 @@ def can_view_collection(
     if not include_private or actor is None:
         return False
     return actor.is_admin or actor.user_id == record.author_user_id
+
+
+def require_visible_collection(actor: Actor, record: CollectionRecord) -> None:
+    if can_view_collection(actor, record, include_private=True):
+        return
+    raise auth_error(
+        "Collection is not visible to this actor",
+        code="SS-AUTH-004",
+        status_code=403,
+        details={"collection_id": record.id},
+    )
 
 
 def require_collection_owner_or_admin(actor: Actor, collection: CollectionRecord) -> None:
@@ -55,8 +88,37 @@ def require_collection_owner_or_admin(actor: Actor, collection: CollectionRecord
     )
 
 
-def validate_collection_command(session: Session, command: CollectionCreateCommand) -> None:
+def validate_collection_filters(filters: CollectionListFilters) -> None:
+    if filters.discovery_tier is not None and filters.discovery_tier not in ALLOWED_DISCOVERY_TIERS:
+        raise validation_error(
+            "Unsupported discovery tier",
+            code="SS-VALIDATION-034",
+            details={"discovery_tier": filters.discovery_tier},
+        )
+
+
+def validate_collection_command(
+    session: Session, command: CollectionCreateCommand | CollectionUpdateCommand
+) -> None:
     validate_difficulty(command.difficulty)
+    if not command.content_format_mix:
+        raise validation_error(
+            "Collections must declare at least one content format",
+            code="SS-VALIDATION-035",
+        )
+    unsupported_formats = sorted(
+        {
+            format_slug
+            for format_slug in command.content_format_mix
+            if format_slug not in {*ALLOWED_PROMPT_TYPES.values(), ALLOWED_SCENARIO_CONTENT_TYPE}
+        }
+    )
+    if unsupported_formats:
+        raise validation_error(
+            "Unsupported content format",
+            code="SS-VALIDATION-036",
+            details={"unsupported_formats": unsupported_formats},
+        )
     if not command.target_skill_slugs:
         raise validation_error(
             "Collections must target at least one skill",
@@ -73,10 +135,13 @@ def validate_collection_command(session: Session, command: CollectionCreateComma
     require_skill_competency_alignment(
         session, command.target_skill_slugs, command.target_competency_slugs
     )
+    require_rubric_content_alignment(session, command.content_format_mix, command.rubric_ids)
 
 
 def validate_prompt_command(
-    session: Session, collection: CollectionRecord, command: PromptItemCreateCommand
+    session: Session,
+    collection: CollectionRecord,
+    command: PromptItemCreateCommand | PromptItemUpdateCommand,
 ) -> None:
     validate_difficulty(command.difficulty)
     if command.prompt_type not in ALLOWED_PROMPT_TYPES:
@@ -102,10 +167,18 @@ def validate_prompt_command(
             "Prompt item skills must be a subset of the collection skills",
             code="SS-VALIDATION-007",
         )
+    if command.prompt_type not in collection.content_format_mix:
+        raise validation_error(
+            "Prompt item type must be enabled on the collection",
+            code="SS-VALIDATION-037",
+            details={"prompt_type": command.prompt_type, "collection_id": collection.id},
+        )
 
 
 def validate_scenario_command(
-    session: Session, collection: CollectionRecord, command: ScenarioCreateCommand
+    session: Session,
+    collection: CollectionRecord,
+    command: ScenarioCreateCommand | ScenarioUpdateCommand,
 ) -> None:
     require_existing_skills(session, command.target_skill_slugs)
     require_existing_rubrics(session, [command.rubric_id])
@@ -122,6 +195,62 @@ def validate_scenario_command(
         raise validation_error(
             "Scenario skills must be a subset of the collection skills",
             code="SS-VALIDATION-009",
+        )
+    if ALLOWED_SCENARIO_CONTENT_TYPE not in collection.content_format_mix:
+        raise validation_error(
+            "Scenario content must be enabled on the collection",
+            code="SS-VALIDATION-038",
+            details={"collection_id": collection.id},
+        )
+    validate_supporting_artifacts(command.supporting_artifacts)
+    validate_mock_world(command)
+
+
+def validate_generation_request(
+    session: Session,
+    command: StructuredCollectionGenerationCommand | ChatCollectionGenerationCommand,
+) -> None:
+    validate_collection_command(
+        session,
+        CollectionCreateCommand(
+            title=command.title_hint if isinstance(command, StructuredCollectionGenerationCommand) else "Generated draft",
+            summary="Generated draft",
+            target_audience=command.target_audience,
+            difficulty=command.difficulty,
+            content_format_mix=command.content_format_mix,
+            target_skill_slugs=command.target_skill_slugs,
+            target_competency_slugs=command.target_competency_slugs,
+            rubric_ids=command.rubric_ids,
+        ),
+    )
+    if command.counts.quick_practice_prompt_count and "quick_practice_prompt" not in command.content_format_mix:
+        raise validation_error(
+            "Quick-practice prompt generation requires the matching content format",
+            code="SS-VALIDATION-039",
+        )
+    if command.counts.interview_prompt_count and "interview_prompt" not in command.content_format_mix:
+        raise validation_error(
+            "Interview prompt generation requires the matching content format",
+            code="SS-VALIDATION-040",
+        )
+    if command.counts.scenario_count and ALLOWED_SCENARIO_CONTENT_TYPE not in command.content_format_mix:
+        raise validation_error(
+            "Scenario generation requires the scenario content format",
+            code="SS-VALIDATION-041",
+        )
+    if command.counts.scenario_artifact_count and command.counts.scenario_count == 0:
+        raise validation_error(
+            "Scenario supporting artifacts require at least one scenario",
+            code="SS-VALIDATION-042",
+        )
+
+
+def validate_collection_source_type(source_type: str) -> None:
+    if source_type not in ALLOWED_COLLECTION_SOURCE_TYPES:
+        raise validation_error(
+            "Unsupported collection source type",
+            code="SS-VALIDATION-043",
+            details={"source_type": source_type},
         )
 
 
@@ -163,22 +292,83 @@ def validate_lifecycle_transition(
                 code="SS-AUTH-006",
                 status_code=403,
             )
-    if command.lifecycle_state == "published_public":
-        prompt_count = (
-            session.query(PromptItemRecord)
-            .filter(PromptItemRecord.collection_id == collection.id)
-            .count()
-        )
-        scenario_count = (
-            session.query(ScenarioRecord)
-            .filter(ScenarioRecord.collection_id == collection.id)
-            .count()
-        )
-        if prompt_count + scenario_count == 0:
+        if command.verification_state == "verified" and command.lifecycle_state != "published_public":
             raise domain_error(
-                "Collections cannot be published without at least one content item",
-                code="SS-DOMAIN-007",
+                "Verified collections must remain publicly published",
+                code="SS-DOMAIN-022",
+                details={"collection_id": collection.id},
             )
+    if command.lifecycle_state == "published_public":
+        validate_collection_publishability(session, collection)
+
+
+def validate_collection_publishability(session: Session, collection: CollectionRecord) -> None:
+    prompt_records = (
+        session.query(PromptItemRecord)
+        .filter(PromptItemRecord.collection_id == collection.id)
+        .all()
+    )
+    scenario_records = (
+        session.query(ScenarioRecord)
+        .filter(ScenarioRecord.collection_id == collection.id)
+        .all()
+    )
+    if len(prompt_records) + len(scenario_records) == 0:
+        raise domain_error(
+            "Collections cannot be published without at least one content item",
+            code="SS-DOMAIN-007",
+        )
+    available_formats = {record.prompt_type for record in prompt_records}
+    if scenario_records:
+        available_formats.add(ALLOWED_SCENARIO_CONTENT_TYPE)
+    missing_formats = sorted(set(collection.content_format_mix) - available_formats)
+    if missing_formats:
+        raise domain_error(
+            "Collections cannot be published while declared formats are missing content",
+            code="SS-DOMAIN-023",
+            details={"missing_formats": missing_formats, "collection_id": collection.id},
+        )
+
+
+def validate_collection_save(
+    session: Session,
+    actor: Actor,
+    collection: CollectionRecord,
+) -> None:
+    require_visible_collection(actor, collection)
+    if actor.user_id == collection.author_user_id:
+        raise domain_error(
+            "Authors do not need to save their own collections",
+            code="SS-DOMAIN-024",
+            details={"collection_id": collection.id},
+        )
+    existing = session.get(
+        CollectionSaveRecord,
+        {"user_id": actor.user_id, "collection_id": collection.id},
+    )
+    if existing is not None:
+        raise domain_error(
+            "Collection is already saved",
+            code="SS-DOMAIN-025",
+            details={"collection_id": collection.id},
+        )
+
+
+def validate_collection_unsave(
+    session: Session,
+    actor: Actor,
+    collection: CollectionRecord,
+) -> None:
+    existing = session.get(
+        CollectionSaveRecord,
+        {"user_id": actor.user_id, "collection_id": collection.id},
+    )
+    if existing is None:
+        raise domain_error(
+            "Collection is not currently saved",
+            code="SS-DOMAIN-026",
+            details={"collection_id": collection.id},
+        )
 
 
 def validate_difficulty(difficulty: str) -> None:
@@ -187,6 +377,39 @@ def validate_difficulty(difficulty: str) -> None:
             "Unsupported difficulty level",
             code="SS-VALIDATION-012",
             details={"difficulty": difficulty},
+        )
+
+
+def validate_supporting_artifacts(artifacts: list[object]) -> None:
+    unsupported_types = sorted(
+        {
+            str(getattr(artifact, "artifact_type", None) or artifact["artifact_type"])
+            for artifact in artifacts
+            if (getattr(artifact, "artifact_type", None) or artifact["artifact_type"])
+            not in ALLOWED_SCENARIO_ARTIFACT_TYPES
+        }
+    )
+    if unsupported_types:
+        raise validation_error(
+            "Unsupported scenario supporting artifact type",
+            code="SS-VALIDATION-044",
+            details={"unsupported_artifact_types": unsupported_types},
+        )
+
+
+def validate_mock_world(command: ScenarioCreateCommand | ScenarioUpdateCommand) -> None:
+    if command.mock_people and command.mock_company is None:
+        raise validation_error(
+            "Scenario mock people require a mock company context",
+            code="SS-VALIDATION-045",
+        )
+    people_names = [person.name.strip().lower() for person in command.mock_people]
+    duplicates = sorted({name for name in people_names if people_names.count(name) > 1})
+    if duplicates:
+        raise validation_error(
+            "Scenario mock people must be unique",
+            code="SS-VALIDATION-046",
+            details={"duplicate_people": duplicates},
         )
 
 
@@ -256,3 +479,29 @@ def require_skill_competency_alignment(
             code="SS-VALIDATION-016",
             details={"uncovered_skills": uncovered},
         )
+
+
+def require_rubric_content_alignment(
+    session: Session, content_format_mix: list[str], rubric_ids: list[str]
+) -> None:
+    rubrics = {
+        record.rubric_id: record
+        for record in session.query(RubricRecord).filter(RubricRecord.rubric_id.in_(rubric_ids)).all()
+    }
+    expected_types = set(content_format_mix)
+    actual_types = {record.content_type for record in rubrics.values()}
+    missing_types = sorted(expected_types - actual_types)
+    if missing_types:
+        raise validation_error(
+            "Collection rubrics must cover every declared content format",
+            code="SS-VALIDATION-047",
+            details={"missing_rubric_content_types": missing_types},
+        )
+
+
+def clear_scenario_children(session: Session, scenario_id: str) -> None:
+    session.query(ScenarioSupportingArtifactRecord).filter(
+        ScenarioSupportingArtifactRecord.scenario_id == scenario_id
+    ).delete()
+    session.query(MockPersonRecord).filter(MockPersonRecord.scenario_id == scenario_id).delete()
+    session.query(MockCompanyRecord).filter(MockCompanyRecord.scenario_id == scenario_id).delete()
