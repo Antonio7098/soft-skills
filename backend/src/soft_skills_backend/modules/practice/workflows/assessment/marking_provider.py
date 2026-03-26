@@ -117,6 +117,7 @@ class DefaultAssessmentMarkingProvider:
             raw_payload=typed_result.raw_payload,
             model_slug=typed_result.model_slug,
             schema_version=typed_result.schema_version,
+            usage=typed_result.usage,
         )
 
 

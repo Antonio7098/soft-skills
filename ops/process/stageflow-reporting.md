@@ -56,3 +56,8 @@ Stageflow workflows in SoftSkills.
 **PromptSecurityPolicy Fits Chat Generation Well Without Agent Loops** (2026-03-26)
 - **Reference File:** `backend/src/soft_skills_backend/modules/catalog/workflows/generation/service.py`
 - **Description:** Sprint 6 used `PromptSecurityPolicy` directly on chat-generation prompts and kept the workflow on a typed single-call path. This covered the trust requirement without introducing `AgentStage` or tools where no real tool loop existed.
+
+**Provider-Backed Eval Pipelines Need Explicit Long Timeouts** (2026-03-26)
+- **Reference File:** `backend/src/soft_skills_backend/modules/evaluation/workflows/service.py`
+- **Description:** The first real provider-backed golden-dataset marking benchmark exceeded the default Stageflow stage timeout and needed an explicit longer pipeline timeout budget. Model benchmarking is materially slower than local validation-only evals.
+- **Recommendations:** Derive evaluation timeouts from `case_count x model_count x provider_timeout` instead of inheriting the default stage timeout.

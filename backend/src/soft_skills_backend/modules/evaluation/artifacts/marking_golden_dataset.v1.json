@@ -1,0 +1,115 @@
+{
+  "dataset_id": "marking-golden-dataset",
+  "dataset_version": "marking-golden-dataset.v1",
+  "schema_version": "marking-golden-dataset.schema.v1",
+  "cases": [
+    {
+      "case_id": "stakeholder-reset-01",
+      "label": "Reset an impossible stakeholder deadline with empathy and a realistic boundary",
+      "prompt": {
+        "practice_type": "quick_practice",
+        "prompt_type": "quick_practice_prompt",
+        "title": "Reset the timeline",
+        "prompt_text": "A client asks for an impossible delivery date. Respond with empathy and a realistic next step.",
+        "difficulty": "intermediate",
+        "target_skill_slugs": ["active-listening", "expectation-setting"],
+        "rubric_id": "quick_practice_text@v1",
+        "rubric_version": "v1"
+      },
+      "response_text": "I hear why the date matters to you. The earliest realistic delivery date is next Friday, and I can confirm any scope tradeoffs with the team by tomorrow afternoon.",
+      "learner_context": {
+        "target_role": "Consultant",
+        "goals": ["Improve stakeholder handling"],
+        "prior_assessed_attempts": 2
+      },
+      "expected_overall_score": {
+        "minimum": 4,
+        "maximum": 5
+      },
+      "expected_skill_scores": {
+        "active-listening": {
+          "minimum": 4,
+          "maximum": 5
+        },
+        "expectation-setting": {
+          "minimum": 3,
+          "maximum": 4
+        }
+      },
+      "minimum_evidence_coverage": 1.0,
+      "tags": ["stakeholder", "boundary-setting", "quick-practice"]
+    },
+    {
+      "case_id": "scope-tradeoff-02",
+      "label": "Explain a scope tradeoff while keeping the stakeholder aligned",
+      "prompt": {
+        "practice_type": "quick_practice",
+        "prompt_type": "quick_practice_prompt",
+        "title": "Trade scope for certainty",
+        "prompt_text": "A sponsor wants all features by Friday. Respond with a realistic tradeoff and preserve trust.",
+        "difficulty": "intermediate",
+        "target_skill_slugs": ["active-listening", "expectation-setting"],
+        "rubric_id": "quick_practice_text@v1",
+        "rubric_version": "v1"
+      },
+      "response_text": "I understand why you want the full scope this week. To hit Friday with confidence, we should ship the core reporting flow first and commit the remaining items once engineering confirms the dependency risk tomorrow.",
+      "learner_context": {
+        "target_role": "Consultant",
+        "goals": ["Improve prioritization under pressure"],
+        "prior_assessed_attempts": 4
+      },
+      "expected_overall_score": {
+        "minimum": 4,
+        "maximum": 5
+      },
+      "expected_skill_scores": {
+        "active-listening": {
+          "minimum": 3,
+          "maximum": 5
+        },
+        "expectation-setting": {
+          "minimum": 4,
+          "maximum": 5
+        }
+      },
+      "minimum_evidence_coverage": 1.0,
+      "tags": ["scope", "tradeoff", "quick-practice"]
+    },
+    {
+      "case_id": "weak-response-03",
+      "label": "Weak response that offers reassurance without a concrete delivery boundary",
+      "prompt": {
+        "practice_type": "quick_practice",
+        "prompt_type": "quick_practice_prompt",
+        "title": "Vague reassurance",
+        "prompt_text": "A client pushes for a date you cannot commit to. Respond in a way that manages expectations.",
+        "difficulty": "intermediate",
+        "target_skill_slugs": ["active-listening", "expectation-setting"],
+        "rubric_id": "quick_practice_text@v1",
+        "rubric_version": "v1"
+      },
+      "response_text": "I know this is important and I will do my best to make it happen. We should have something soon and I will keep you posted.",
+      "learner_context": {
+        "target_role": "Consultant",
+        "goals": ["Set firmer expectations"],
+        "prior_assessed_attempts": 1
+      },
+      "expected_overall_score": {
+        "minimum": 1,
+        "maximum": 2
+      },
+      "expected_skill_scores": {
+        "active-listening": {
+          "minimum": 2,
+          "maximum": 3
+        },
+        "expectation-setting": {
+          "minimum": 1,
+          "maximum": 2
+        }
+      },
+      "minimum_evidence_coverage": 1.0,
+      "tags": ["negative", "expectation-setting", "quick-practice"]
+    }
+  ]
+}

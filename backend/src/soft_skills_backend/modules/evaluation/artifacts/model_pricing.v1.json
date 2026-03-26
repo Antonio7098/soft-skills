@@ -1,0 +1,10 @@
+{
+  "registry_version": "model-pricing.v1",
+  "entries": [
+    {
+      "model_slug": "openai/gpt-oss-20b:free",
+      "input_cost_per_1k_usd": 0.0,
+      "output_cost_per_1k_usd": 0.0
+    }
+  ]
+}

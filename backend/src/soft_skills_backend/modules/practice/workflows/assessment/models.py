@@ -112,3 +112,4 @@ class AssessmentTransformPayload(BaseModel):
     raw_payload: dict[str, object]
     model_slug: str
     schema_version: str
+    usage: dict[str, int] = Field(default_factory=dict)

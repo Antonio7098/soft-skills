@@ -65,6 +65,26 @@ class Settings(BaseSettings):
     def is_sqlite(self) -> bool:
         return self.database_url.startswith("sqlite")
 
+    @property
+    def creator_structured_generation_prompt_version(self) -> str:
+        """Compatibility alias for the reviewed structured creator prompt version."""
+
+        from soft_skills_backend.engines.config.loader import (
+            load_catalog_generation_runtime_config,
+        )
+
+        return load_catalog_generation_runtime_config().structured_prompt_version
+
+    @property
+    def creator_chat_generation_prompt_version(self) -> str:
+        """Compatibility alias for the reviewed chat creator prompt version."""
+
+        from soft_skills_backend.engines.config.loader import (
+            load_catalog_generation_runtime_config,
+        )
+
+        return load_catalog_generation_runtime_config().chat_prompt_version
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

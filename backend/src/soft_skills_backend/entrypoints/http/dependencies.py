@@ -9,6 +9,7 @@ from fastapi import Request
 from soft_skills_backend.entrypoints.http.health import HealthService
 from soft_skills_backend.modules.admin import AdminService
 from soft_skills_backend.modules.catalog import CatalogService
+from soft_skills_backend.modules.evaluation import EvaluationService
 from soft_skills_backend.modules.identity import IdentityService
 from soft_skills_backend.modules.practice import PracticeService
 from soft_skills_backend.modules.progression import ProgressionService
@@ -59,6 +60,10 @@ def get_taxonomy_service(request: Request) -> TaxonomyService:
 
 def get_catalog_service(request: Request) -> CatalogService:
     return get_container(request).catalog_service
+
+
+def get_evaluation_service(request: Request) -> EvaluationService:
+    return get_container(request).evaluation_service
 
 
 def get_practice_service(request: Request) -> PracticeService:

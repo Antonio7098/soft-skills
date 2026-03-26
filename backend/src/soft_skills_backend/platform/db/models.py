@@ -420,6 +420,7 @@ class ProgressionSnapshotRecord(Base):
     schema_version: Mapped[str] = mapped_column(String(64))
     config_version: Mapped[str] = mapped_column(String(64), index=True)
     evidence_ledger_schema_version: Mapped[str] = mapped_column(String(64))
+    previous_snapshot_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     snapshot_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
@@ -461,3 +462,80 @@ class ProgressRecalculationRecord(Base):
     diff_summary: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EvaluationSuiteRecord(Base):
+    """Registered evaluation suite metadata."""
+
+    __tablename__ = "evaluation_suites"
+
+    suite_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    suite_type: Mapped[str] = mapped_column(String(64), index=True)
+    suite_version: Mapped[str] = mapped_column(String(128))
+    benchmark_set_version: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    description: Mapped[str] = mapped_column(Text)
+    requires_learner_id: Mapped[bool]
+    definition_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class EvaluationRunRecord(Base):
+    """Persisted evaluation execution."""
+
+    __tablename__ = "evaluation_runs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    suite_id: Mapped[str] = mapped_column(String(128), index=True)
+    suite_type: Mapped[str] = mapped_column(String(64), index=True)
+    suite_version: Mapped[str] = mapped_column(String(128))
+    benchmark_set_version: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    triggered_by_user_id: Mapped[str] = mapped_column(String(32), index=True)
+    learner_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    workflow_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    pipeline_run_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    subject_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    subject_ref: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    passed: Mapped[bool]
+    aggregate_metrics: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    summary: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EvaluationCaseResultRecord(Base):
+    """Per-case evaluation result persistence."""
+
+    __tablename__ = "evaluation_case_results"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    evaluation_run_id: Mapped[str] = mapped_column(String(32), index=True)
+    case_id: Mapped[str] = mapped_column(String(128), index=True)
+    case_label: Mapped[str] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    metrics: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    detail_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class ReleaseGateDecisionRecord(Base):
+    """Persisted release decision linked to an evaluation run."""
+
+    __tablename__ = "release_gate_decisions"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    evaluation_run_id: Mapped[str] = mapped_column(String(32), index=True)
+    decided_by_user_id: Mapped[str] = mapped_column(String(32), index=True)
+    request_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    workflow_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    subject_type: Mapped[str] = mapped_column(String(64), index=True)
+    subject_ref: Mapped[str] = mapped_column(String(128), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    summary: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    reason: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
