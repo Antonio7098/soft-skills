@@ -21,6 +21,11 @@ import type {
   PracticeSessionView,
   StartPracticeRunCommand,
   PracticeRunItemSummary,
+  StructuredCollectionGenerationCommand,
+  ChatCollectionGenerationCommand,
+  CollectionGenerationView,
+  PromptItemView,
+  ScenarioView,
 } from './types';
 import {
   SEED_SKILLS,
@@ -301,6 +306,185 @@ export const mockDataProvider: DataProvider = {
     };
     _collections = _collections.map((c, i) => (i === colIdx ? updated : c));
     return updated;
+  },
+
+  // --- Content Generation --------------------------------------------------
+
+  async generateStructuredCollection(
+    cmd: StructuredCollectionGenerationCommand,
+  ): Promise<CollectionGenerationView> {
+    await delay(2500); // simulate LLM generation latency
+    const collectionId = `col-${uid()}`;
+    const artifactId = `gen-${uid()}`;
+
+    const promptItems: PromptItemView[] = [];
+    const totalPrompts = (cmd.counts.quick_practice_prompt_count ?? 0) + (cmd.counts.interview_prompt_count ?? 0);
+    const skillLabel = cmd.target_skill_slugs[0]?.replace(/-/g, ' ') ?? 'skill';
+
+    for (let i = 0; i < totalPrompts; i++) {
+      const promptType = i < (cmd.counts.quick_practice_prompt_count ?? 0) ? 'quick_practice_prompt' : 'interview_prompt';
+      const typeLabel = promptType === 'quick_practice_prompt' ? 'quick practice' : 'interview';
+      promptItems.push({
+        id: `pi-${uid()}`,
+        prompt_type: promptType,
+        title: `${cmd.title_hint ?? 'Generated'} - ${typeLabel} ${i + 1}`,
+        prompt_text: `Given the ${cmd.domain.toLowerCase()} context where ${cmd.workplace_context.toLowerCase()}, demonstrate your ability to ${skillLabel} when facing ${cmd.scenario_theme.toLowerCase()}.`,
+        difficulty: cmd.difficulty,
+        lifecycle_state: 'draft',
+        target_skill_slugs: cmd.target_skill_slugs,
+        rubric_id: cmd.rubric_ids[0] ?? 'default',
+      });
+    }
+
+    const scenarios: ScenarioView[] = [];
+    for (let i = 0; i < (cmd.counts.scenario_count ?? 0); i++) {
+      scenarios.push({
+        id: `sc-${uid()}`,
+        title: `${cmd.title_hint ?? 'Generated Scenario'} ${i + 1}`,
+        business_context: cmd.workplace_context,
+        learner_objective: `Navigate ${cmd.scenario_theme.toLowerCase()} using ${cmd.target_skill_slugs.map((s) => s.replace(/-/g, ' ')).join(', ')}.`,
+        constraints: ['Time-sensitive decision required', 'Multiple stakeholder perspectives to consider'],
+        stakeholder_tensions: [cmd.scenario_theme],
+        lifecycle_state: 'draft',
+        target_skill_slugs: cmd.target_skill_slugs,
+        rubric_id: cmd.rubric_ids[0] ?? 'default',
+        mock_company: {
+          id: `mc-${uid()}`,
+          name: 'Acme Corp',
+          industry: cmd.domain,
+          operating_context: cmd.workplace_context,
+        },
+        mock_people: [
+          {
+            id: `mp-${uid()}`,
+            name: 'Alex Rivera',
+            role: 'Senior Manager',
+            goals: ['Keep the project on track', 'Satisfy all stakeholders'],
+            communication_style: 'Direct and pragmatic',
+            relationship_to_scenario: 'Project sponsor managing competing priorities',
+          },
+          {
+            id: `mp-${uid()}`,
+            name: 'Jordan Lee',
+            role: 'Technical Lead',
+            goals: ['Ensure quality', 'Meet technical constraints'],
+            communication_style: 'Analytical and thorough',
+            relationship_to_scenario: 'Constraints owner providing technical perspective',
+          },
+        ],
+      });
+    }
+
+    const col: CollectionView = {
+      id: collectionId,
+      author_user_id: _user.id,
+      title: cmd.title_hint ?? `Generated Collection - ${new Date().toLocaleDateString()}`,
+      summary: `AI-generated ${cmd.target_audience} content for ${cmd.target_skill_slugs.map((s) => s.replace(/-/g, ' ')).join(', ')} practice.`,
+      target_audience: cmd.target_audience,
+      difficulty: cmd.difficulty,
+      lifecycle_state: 'draft',
+      verification_state: 'unverified',
+      content_format_mix: cmd.content_format_mix,
+      target_skill_slugs: cmd.target_skill_slugs,
+      target_competency_slugs: cmd.target_competency_slugs,
+      rubric_ids: cmd.rubric_ids,
+      prompt_items: promptItems,
+      scenarios,
+    };
+
+    _collections = [..._collections, col];
+
+    return {
+      collection: col,
+      generation_artifact_id: artifactId,
+      generation_mode: 'structured',
+      prompt_version: 'creator.structured-draft.v1',
+      provider: 'mock',
+      model_slug: 'mock-v1',
+    };
+  },
+
+  async generateChatCollection(cmd: ChatCollectionGenerationCommand): Promise<CollectionGenerationView> {
+    await delay(2500); // simulate LLM generation latency
+    const collectionId = `col-${uid()}`;
+    const artifactId = `gen-${uid()}`;
+
+    const promptItems: PromptItemView[] = [];
+    const totalPrompts = (cmd.counts.quick_practice_prompt_count ?? 0) + (cmd.counts.interview_prompt_count ?? 0);
+
+    for (let i = 0; i < totalPrompts; i++) {
+      const promptType = i < (cmd.counts.quick_practice_prompt_count ?? 0) ? 'quick_practice_prompt' : 'interview_prompt';
+      const typeLabel = promptType === 'quick_practice_prompt' ? 'practice' : 'interview';
+      promptItems.push({
+        id: `pi-${uid()}`,
+        prompt_type: promptType,
+        title: `AI Generated ${typeLabel} ${i + 1}`,
+        prompt_text: cmd.prompt,
+        difficulty: cmd.difficulty,
+        lifecycle_state: 'draft',
+        target_skill_slugs: cmd.target_skill_slugs,
+        rubric_id: cmd.rubric_ids[0] ?? 'default',
+      });
+    }
+
+    const scenarios: ScenarioView[] = [];
+    for (let i = 0; i < (cmd.counts.scenario_count ?? 0); i++) {
+      scenarios.push({
+        id: `sc-${uid()}`,
+        title: `AI Generated Scenario ${i + 1}`,
+        business_context: `Based on your prompt about: ${cmd.prompt.slice(0, 100)}...`,
+        learner_objective: `Address the scenario using ${cmd.target_skill_slugs.map((s) => s.replace(/-/g, ' ')).join(', ')}.`,
+        constraints: ['Multiple perspectives to balance', 'Decision required'],
+        stakeholder_tensions: ['Competing priorities'],
+        lifecycle_state: 'draft',
+        target_skill_slugs: cmd.target_skill_slugs,
+        rubric_id: cmd.rubric_ids[0] ?? 'default',
+        mock_company: {
+          id: `mc-${uid()}`,
+          name: 'Nexus Industries',
+          industry: 'Professional Services',
+          operating_context: 'Dynamic environment requiring rapid decision-making',
+        },
+        mock_people: [
+          {
+            id: `mp-${uid()}`,
+            name: 'Sam Torres',
+            role: 'Director',
+            goals: ['Drive resolution', 'Maintain relationships'],
+            communication_style: 'Collaborative and diplomatic',
+            relationship_to_scenario: 'Decision facilitator balancing multiple interests',
+          },
+        ],
+      });
+    }
+
+    const col: CollectionView = {
+      id: collectionId,
+      author_user_id: _user.id,
+      title: `Generated from prompt - ${new Date().toLocaleDateString()}`,
+      summary: `AI-generated content based on your input: "${cmd.prompt.slice(0, 80)}..."`,
+      target_audience: cmd.target_audience,
+      difficulty: cmd.difficulty,
+      lifecycle_state: 'draft',
+      verification_state: 'unverified',
+      content_format_mix: cmd.content_format_mix,
+      target_skill_slugs: cmd.target_skill_slugs,
+      target_competency_slugs: cmd.target_competency_slugs,
+      rubric_ids: cmd.rubric_ids,
+      prompt_items: promptItems,
+      scenarios,
+    };
+
+    _collections = [..._collections, col];
+
+    return {
+      collection: col,
+      generation_artifact_id: artifactId,
+      generation_mode: 'chat',
+      prompt_version: 'creator.chat-draft.v1',
+      provider: 'mock',
+      model_slug: 'mock-v1',
+    };
   },
 
   // --- Practice ------------------------------------------------------------

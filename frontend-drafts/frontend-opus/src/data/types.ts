@@ -414,3 +414,58 @@ export interface StartPracticeRunCommand {
 export interface SubmitAttemptCommand {
   readonly response_text: string;
 }
+
+// --- Content Generation -----------------------------------------------------
+
+export interface GenerationCounts {
+  readonly quick_practice_prompt_count: number;
+  readonly interview_prompt_count: number;
+  readonly scenario_count: number;
+  readonly scenario_artifact_count: number;
+}
+
+export interface StructuredCollectionGenerationCommand {
+  readonly title_hint: string | null;
+  readonly target_audience: string;
+  readonly difficulty: Difficulty;
+  readonly content_format_mix: string[];
+  readonly target_skill_slugs: string[];
+  readonly target_competency_slugs: string[];
+  readonly rubric_ids: string[];
+  readonly domain: string;
+  readonly workplace_context: string;
+  readonly scenario_theme: string;
+  readonly realism_notes?: string[];
+  readonly counts: GenerationCounts;
+}
+
+export interface ChatCollectionGenerationCommand {
+  readonly prompt: string;
+  readonly target_audience: string;
+  readonly difficulty: Difficulty;
+  readonly content_format_mix: string[];
+  readonly target_skill_slugs: string[];
+  readonly target_competency_slugs: string[];
+  readonly rubric_ids: string[];
+  readonly counts: GenerationCounts;
+}
+
+export interface ContentGenerationArtifactView {
+  readonly id: string;
+  readonly generation_mode: string;
+  readonly prompt_version: string;
+  readonly schema_version: string;
+  readonly config_version: string;
+  readonly provider: string;
+  readonly model_slug: string;
+  readonly created_at: string;
+}
+
+export interface CollectionGenerationView {
+  readonly collection: CollectionView;
+  readonly generation_artifact_id: string;
+  readonly generation_mode: string;
+  readonly prompt_version: string;
+  readonly provider: string;
+  readonly model_slug: string;
+}

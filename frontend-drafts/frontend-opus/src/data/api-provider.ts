@@ -10,6 +10,7 @@ import type {
   ScenarioSessionView,
   PracticeRunView,
   PracticeSessionView,
+  CollectionGenerationView,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -62,6 +63,12 @@ export const apiDataProvider: DataProvider = {
     request<CollectionView>(`/collections/${collectionId}/prompt-items`, { method: 'POST', body: JSON.stringify(cmd) }),
   addScenario: (collectionId, cmd) =>
     request<CollectionView>(`/collections/${collectionId}/scenarios`, { method: 'POST', body: JSON.stringify(cmd) }),
+
+  // --- Content Generation --------------------------------------------------
+  generateStructuredCollection: (cmd) =>
+    request<CollectionGenerationView>('/collections/generate/structured', { method: 'POST', body: JSON.stringify(cmd) }),
+  generateChatCollection: (cmd) =>
+    request<CollectionGenerationView>('/collections/generate/chat', { method: 'POST', body: JSON.stringify(cmd) }),
 
   // --- Practice ------------------------------------------------------------
   startQuickPracticeSession: (cmd) =>

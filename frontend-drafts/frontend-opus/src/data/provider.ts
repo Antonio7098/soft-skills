@@ -19,6 +19,9 @@ import type {
   PracticeRunView,
   PracticeSessionView,
   StartPracticeRunCommand,
+  StructuredCollectionGenerationCommand,
+  ChatCollectionGenerationCommand,
+  CollectionGenerationView,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -41,6 +44,10 @@ export interface DataProvider {
   createCollection(cmd: CollectionCreateCommand): Promise<CollectionView>;
   addPromptItem(collectionId: string, cmd: PromptItemCreateCommand): Promise<CollectionView>;
   addScenario(collectionId: string, cmd: ScenarioCreateCommand): Promise<CollectionView>;
+
+  // --- Content Generation --------------------------------------------------
+  generateStructuredCollection(cmd: StructuredCollectionGenerationCommand): Promise<CollectionGenerationView>;
+  generateChatCollection(cmd: ChatCollectionGenerationCommand): Promise<CollectionGenerationView>;
 
   // --- Practice ------------------------------------------------------------
   startQuickPracticeSession(cmd: StartQuickPracticeSessionCommand): Promise<QuickPracticeSessionView>;
