@@ -32,6 +32,7 @@ class SqlAlchemyWorkflowEventRepository:
                     trace_id=event.trace_id,
                     workflow_id=event.workflow_id,
                     error_code=event.error_code,
+                    organisation_id=event.organisation_id,
                     payload=event.payload,
                     occurred_at=event.occurred_at,
                 )
@@ -46,6 +47,7 @@ class SqlAlchemyWorkflowEventRepository:
         workflow_id: str | None = None,
         request_id: str | None = None,
         error_code: str | None = None,
+        organisation_id: str | None = None,
         offset: int = 0,
         limit: int = 50,
     ) -> list[WorkflowEventRecord]:
@@ -61,6 +63,8 @@ class SqlAlchemyWorkflowEventRepository:
                 query = query.filter(WorkflowEventRecord.request_id == request_id)
             if error_code is not None:
                 query = query.filter(WorkflowEventRecord.error_code == error_code)
+            if organisation_id is not None:
+                query = query.filter(WorkflowEventRecord.organisation_id == organisation_id)
             return (
                 query.order_by(WorkflowEventRecord.occurred_at.desc())
                 .offset(offset)
@@ -76,6 +80,7 @@ class SqlAlchemyWorkflowEventRepository:
         workflow_id: str | None = None,
         request_id: str | None = None,
         error_code: str | None = None,
+        organisation_id: str | None = None,
     ) -> int:
         with self._session_factory() as session:
             query = session.query(WorkflowEventRecord)
@@ -89,6 +94,8 @@ class SqlAlchemyWorkflowEventRepository:
                 query = query.filter(WorkflowEventRecord.request_id == request_id)
             if error_code is not None:
                 query = query.filter(WorkflowEventRecord.error_code == error_code)
+            if organisation_id is not None:
+                query = query.filter(WorkflowEventRecord.organisation_id == organisation_id)
             return query.count()
 
     def get_by_id(self, event_id: str) -> WorkflowEventRecord | None:

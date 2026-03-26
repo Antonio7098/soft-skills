@@ -31,11 +31,12 @@ async def list_events(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> ApiEnvelope[PaginatedWorkflowEventsView]:
-    require_admin_actor(request)
+    actor = require_admin_actor(request)
     service = get_events_service(request)
     return ok_response(
         request,
         service.list_events(
+            actor,
             event_type=event_type,
             trace_id=trace_id,
             workflow_id=workflow_id,
@@ -49,9 +50,9 @@ async def list_events(
 
 @router.get("/{event_id}", response_model=ApiEnvelope[WorkflowEventView])
 async def get_event(request: Request, event_id: str) -> ApiEnvelope[WorkflowEventView]:
-    require_admin_actor(request)
+    actor = require_admin_actor(request)
     service = get_events_service(request)
-    result = service.get_event(event_id)
+    result = service.get_event(actor, event_id)
     if result is None:
         from fastapi import HTTPException
 
@@ -65,9 +66,9 @@ async def update_event(
     event_id: str,
     command: UpdateWorkflowEventCommand,
 ) -> ApiEnvelope[WorkflowEventView]:
-    require_admin_actor(request)
+    actor = require_admin_actor(request)
     service = get_events_service(request)
-    result = service.update_event(event_id, command)
+    result = service.update_event(actor, event_id, command)
     if result is None:
         from fastapi import HTTPException
 
@@ -77,9 +78,9 @@ async def update_event(
 
 @router.delete("/{event_id}", response_model=ApiEnvelope[dict[str, str]])
 async def delete_event(request: Request, event_id: str) -> ApiEnvelope[dict[str, str]]:
-    require_admin_actor(request)
+    actor = require_admin_actor(request)
     service = get_events_service(request)
-    deleted = service.delete_event(event_id)
+    deleted = service.delete_event(actor, event_id)
     if not deleted:
         from fastapi import HTTPException
 

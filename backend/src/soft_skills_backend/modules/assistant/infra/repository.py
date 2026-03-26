@@ -267,7 +267,9 @@ class AssistantRepository:
                     "id": user.id,
                     "display_name": user.display_name,
                     "email": user.email,
-                    "role": user.role,
+                    # User accounts no longer carry a first-class role; mirror the
+                    # learner profile target role for prompt compatibility.
+                    "role": profile.target_role,
                 },
                 "profile": LearnerProfileView(
                     target_role=profile.target_role,

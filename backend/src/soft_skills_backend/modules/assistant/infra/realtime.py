@@ -29,6 +29,12 @@ class ActiveTurnExecution:
             self.pipeline_context.mark_canceled()
 
 
+@dataclass(frozen=True, slots=True)
+class _Subscriber:
+    queue: asyncio.Queue[AssistantStreamEvent]
+    loop: asyncio.AbstractEventLoop
+
+
 class AssistantRealtimeBroker:
     """Process-local publish/subscribe broker for assistant stream events."""
 
@@ -37,7 +43,9 @@ class AssistantRealtimeBroker:
         self._backlog: dict[str, deque[AssistantStreamEvent]] = defaultdict(
             lambda: deque(maxlen=self._backlog_size)
         )
-        self._subscribers: dict[str, set[asyncio.Queue[AssistantStreamEvent]]] = defaultdict(set)
+        self._subscribers: dict[str, dict[asyncio.Queue[AssistantStreamEvent], _Subscriber]] = (
+            defaultdict(dict)
+        )
         self._executions: dict[str, ActiveTurnExecution] = {}
 
     def backlog(self, stream_token: str, *, after_sequence: int | None = None) -> list[AssistantStreamEvent]:
@@ -48,21 +56,29 @@ class AssistantRealtimeBroker:
 
     def subscribe(self, stream_token: str) -> asyncio.Queue[AssistantStreamEvent]:
         queue: asyncio.Queue[AssistantStreamEvent] = asyncio.Queue()
-        self._subscribers[stream_token].add(queue)
+        self._subscribers[stream_token][queue] = _Subscriber(
+            queue=queue,
+            loop=asyncio.get_running_loop(),
+        )
         return queue
 
     def unsubscribe(self, stream_token: str, queue: asyncio.Queue[AssistantStreamEvent]) -> None:
         subscribers = self._subscribers.get(stream_token)
         if subscribers is None:
             return
-        subscribers.discard(queue)
+        subscribers.pop(queue, None)
         if not subscribers:
             self._subscribers.pop(stream_token, None)
 
     async def publish(self, stream_token: str, event: AssistantStreamEvent) -> None:
         self._backlog[stream_token].append(event)
-        for queue in list(self._subscribers.get(stream_token, ())):
-            await queue.put(event)
+        current_loop = asyncio.get_running_loop()
+        for subscriber in list(self._subscribers.get(stream_token, {}).values()):
+            if subscriber.loop is current_loop:
+                await subscriber.queue.put(event)
+                continue
+            future = asyncio.run_coroutine_threadsafe(subscriber.queue.put(event), subscriber.loop)
+            await asyncio.wrap_future(future)
 
     def register_execution(self, execution: ActiveTurnExecution) -> None:
         self._executions[execution.turn_id] = execution

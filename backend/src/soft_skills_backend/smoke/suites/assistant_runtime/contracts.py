@@ -15,3 +15,15 @@ class AssistantRuntimeSmokeResult(BaseModel):
     tool_names: list[str] = Field(default_factory=list)
     message_count: int = 0
     assistant_message_preview: str | None = None
+
+
+class AssistantStreamSmokeResult(BaseModel):
+    """Result of an assistant websocket streaming smoke flow."""
+
+    status: str
+    session_id: str
+    turn_id: str
+    stream_token: str
+    event_types: list[str]
+    delta_count: int
+    final_content: str | None = None

@@ -22,6 +22,7 @@ from soft_skills_backend.modules.assistant.workflows.service import (
     AssistantTurnExecutionInput,
     AssistantWorkflowService,
 )
+from soft_skills_backend.platform.background_tasks import BackgroundTaskRunner
 from soft_skills_backend.shared.auth import Actor
 
 
@@ -33,9 +34,11 @@ class AssistantService:
         *,
         repository: AssistantRepository,
         workflows: AssistantWorkflowService,
+        background_tasks: BackgroundTaskRunner | None = None,
     ) -> None:
         self._repository = repository
         self._workflows = workflows
+        self._background_tasks = background_tasks
 
     def create_session(
         self,
@@ -92,19 +95,23 @@ class AssistantService:
             workflow_id=workflow_id,
             message_text=command.message,
         )
-        asyncio.get_running_loop().create_task(
-            self._workflows.run_turn(
-                AssistantTurnExecutionInput(
-                    actor=actor,
-                    request_id=correlation.request_id,
-                    trace_id=correlation.trace_id,
-                    workflow_id=workflow_id,
-                    session_id=session_id,
-                    turn_id=turn.id,
-                    stream_token=turn.stream_token,
+        execution = AssistantTurnExecutionInput(
+            actor=actor,
+            request_id=correlation.request_id,
+            trace_id=correlation.trace_id,
+            workflow_id=workflow_id,
+            session_id=session_id,
+            turn_id=turn.id,
+            stream_token=turn.stream_token,
+        )
+        if self._background_tasks is not None:
+            self._background_tasks.start(self._workflows.run_turn(execution))
+        else:
+            asyncio.get_running_loop().create_task(
+                self._workflows.run_turn(
+                    execution
                 )
             )
-        )
         return turn
 
     async def cancel_turn(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -26,6 +27,7 @@ def create_app(settings: Settings | None = None, container: AppContainer | None 
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        resolved_container.background_tasks.attach(asyncio.get_running_loop())
         logger.info(
             "application.startup",
             environment=resolved_settings.environment,
@@ -35,6 +37,7 @@ def create_app(settings: Settings | None = None, container: AppContainer | None 
         try:
             yield
         finally:
+            await resolved_container.background_tasks.shutdown()
             resolved_container.dispose()
             logger.info("application.shutdown")
 

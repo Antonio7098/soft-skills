@@ -27,6 +27,7 @@ class WorkflowEventRecord(Base):
     trace_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
     workflow_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    organisation_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

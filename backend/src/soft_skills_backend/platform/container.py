@@ -35,6 +35,7 @@ from soft_skills_backend.platform.db.repositories import (
     SqlAlchemyProviderCallRepository,
     SqlAlchemyWorkflowEventRepository,
 )
+from soft_skills_backend.platform.background_tasks import BackgroundTaskRunner
 from soft_skills_backend.platform.db.session import (
     create_engine_from_settings,
     create_session_factory,
@@ -75,6 +76,7 @@ class AppContainer:
     pipeline_runs: SqlAlchemyPipelineRunRepository
     provider_calls: SqlAlchemyProviderCallRepository
     stageflow_runtime: StageflowRuntime
+    background_tasks: BackgroundTaskRunner
 
     def dispose(self) -> None:
         """Clean up infrastructure resources."""
@@ -90,6 +92,7 @@ def build_container(settings: Settings) -> AppContainer:
     workflow_events = SqlAlchemyWorkflowEventRepository(session_factory)
     pipeline_runs = SqlAlchemyPipelineRunRepository(session_factory)
     provider_calls = SqlAlchemyProviderCallRepository(session_factory)
+    background_tasks = BackgroundTaskRunner()
     durable_event_sink = DurableEventSink(workflow_events)
     stageflow_runtime = build_stageflow_runtime(
         settings,
@@ -167,6 +170,7 @@ def build_container(settings: Settings) -> AppContainer:
             stageflow_runtime=stageflow_runtime,
             settings=settings,
         ),
+        background_tasks=background_tasks,
     )
     health_service = HealthService(
         settings=settings,
@@ -199,4 +203,5 @@ def build_container(settings: Settings) -> AppContainer:
         pipeline_runs=pipeline_runs,
         provider_calls=provider_calls,
         stageflow_runtime=stageflow_runtime,
+        background_tasks=background_tasks,
     )
