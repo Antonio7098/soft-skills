@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-soft-skills-provider-smoke = "soft_skills_backend.smoke.provider_baseline:main"
+soft-skills-provider-smoke = "soft_skills_backend.smoke.__main__:main"
 
 [project.optional-dependencies]
 dev = [
