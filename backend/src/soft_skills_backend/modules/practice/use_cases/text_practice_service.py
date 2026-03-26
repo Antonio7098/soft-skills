@@ -258,10 +258,10 @@ class QuickPracticeService:
         command: SubmitAttemptCommand,
     ) -> AttemptView:
         ownership = self._store.load_attempt_ownership(attempt_id)
-        if ownership.user_id != actor.user_id and not actor.is_admin:
+        if ownership.user_id != actor.user_id:
             raise auth_error(
-                "Attempt is not visible to this actor",
-                code="SS-AUTH-007",
+                "Attempt submission is only allowed for the owning learner",
+                code="SS-AUTH-012",
                 status_code=403,
                 details={"attempt_id": attempt_id},
             )

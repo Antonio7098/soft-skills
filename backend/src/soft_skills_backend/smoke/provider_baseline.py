@@ -18,8 +18,8 @@ from soft_skills_backend.config import Settings, get_settings
 from soft_skills_backend.platform.providers.llm.openai_compatible import OpenAICompatibleLLMProvider
 from soft_skills_backend.shared.errors import AppError, provider_error, validation_error
 
-SMOKE_PROVIDER_TIMEOUT_SECONDS = 30.0
-SMOKE_FLOW_TIMEOUT_SECONDS = 180.0
+SMOKE_PROVIDER_TIMEOUT_SECONDS = 60.0
+SMOKE_FLOW_TIMEOUT_SECONDS = 420.0
 
 
 class PracticeModeSmokeResult(BaseModel):

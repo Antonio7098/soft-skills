@@ -28,39 +28,39 @@
 
 ## Scope Checklist
 
-- [ ] Task 1: Implement admin verification workflow and status transitions for user-created collections
-- [ ] Task 2: Implement learner-level and cohort-level analytics APIs for progress, weak skills, and usage trends; lean on pipeline run logs, provider-call logs, and wide events for audit-friendly aggregation
-- [ ] Task 3: Enforce visibility boundaries around learner attempt and assessment data
-- [ ] Task 4: Implement replay/audit access to assessment-critical traces and artifacts; preserve Stageflow correlation IDs and trace lineage in admin-facing diagnostics
-- [ ] Task 5: Documentation updates for all changed behavior and contracts
+- [x] Task 1: Implement admin verification workflow and status transitions for user-created collections
+- [x] Task 2: Implement learner-level and cohort-level analytics APIs for progress, weak skills, and usage trends; lean on pipeline run logs, provider-call logs, and wide events for audit-friendly aggregation
+- [x] Task 3: Enforce visibility boundaries around learner attempt and assessment data
+- [x] Task 4: Implement replay/audit access to assessment-critical traces and artifacts; preserve Stageflow correlation IDs and trace lineage in admin-facing diagnostics
+- [x] Task 5: Documentation updates for all changed behavior and contracts
 
 ## Constitution And Quality Checklist
 
-- [ ] Competency growth remains the product outcome, not activity theater
-- [ ] All new external boundaries are typed and schema-validated
-- [ ] Fail-fast and fail-loud behavior is preserved with stable error codes
-- [ ] Route handlers remain thin; business rules stay out of transport layers
-- [ ] Dependency injection and adapter boundaries remain explicit
-- [ ] Critical workflow artifacts are durably persisted where required
-- [ ] Traces, logs, and events cover all changed workflow steps
-- [ ] Prompt, rubric, model, and config versions are preserved where applicable
-- [ ] Assessment and progression behavior remains explainable
-- [ ] No silent fallback is introduced in scoring, progression, generation, or recommendation paths
+- [x] Competency growth remains the product outcome, not activity theater
+- [x] All new external boundaries are typed and schema-validated
+- [x] Fail-fast and fail-loud behavior is preserved with stable error codes
+- [x] Route handlers remain thin; business rules stay out of transport layers
+- [x] Dependency injection and adapter boundaries remain explicit
+- [x] Critical workflow artifacts are durably persisted where required
+- [x] Traces, logs, and events cover all changed workflow steps
+- [x] Prompt, rubric, model, and config versions are preserved where applicable
+- [x] Assessment and progression behavior remains explainable
+- [x] No silent fallback is introduced in scoring, progression, generation, or recommendation paths
 
 ## Testing And Documentation Checklist
 
-- [ ] Unit Tests: verification rules, access-control rules, analytics aggregation helpers, and audit query guards
-- [ ] Integration Tests: admin APIs, verification transitions, cohort analytics, replay endpoints, and observability query behavior
-- [ ] Smoke Tests With Real Provider: run the existing backend real-provider smoke suite and confirm no regressions in assessment/generation workflows
-- [ ] Failure Path Coverage: forbidden access, invalid verification transitions, incomplete trace artifacts, and broken analytics inputs tested
-- [ ] Documentation Updates: update canonical docs in `ops/`, the roadmap/sprint docs, and any affected contracts
+- [x] Unit Tests: verification rules, access-control rules, analytics aggregation helpers, and audit query guards
+- [x] Integration Tests: admin APIs, verification transitions, cohort analytics, replay endpoints, and observability query behavior
+- [x] Smoke Tests With Real Provider: passed on 2026-03-26 via `PYTHONPATH=src python -m soft_skills_backend.smoke`
+- [x] Failure Path Coverage: forbidden access, invalid verification transitions, incomplete trace artifacts, and broken analytics inputs tested
+- [x] Documentation Updates: update canonical docs in `ops/`, the roadmap/sprint docs, and any affected contracts
 
 ## Success Criteria
 
-- [ ] Admins can verify collections and elevate trust status through explicit backend workflows
-- [ ] Learner and cohort analytics are available from versioned, explainable backend data
-- [ ] Replay and audit paths exist for critical assessment-relevant workflows
-- [ ] Existing provider-backed smoke flows still pass after admin and analytics changes
+- [x] Admins can verify collections and elevate trust status through explicit backend workflows
+- [x] Learner and cohort analytics are available from versioned, explainable backend data
+- [x] Replay and audit paths exist for critical assessment-relevant workflows
+- [x] Existing provider-backed smoke flows still pass after admin and analytics changes
 
 Minimum Viable Sprint:
 Admin verification and core analytics work for the main MVP entities even if deeper cohort tooling remains limited.
@@ -77,26 +77,43 @@ Admin verification and core analytics work for the main MVP entities even if dee
 Key decisions, tradeoffs, and implementation notes:
 
 ```text
-[Notes go here]
+- Added explicit admin endpoints under /api/admin for collection verification,
+  verification queue inspection, learner analytics, cohort analytics,
+  relationship management, and relationship-aware attempt audit/replay.
+- Persisted verification history in collection_verification_reviews so
+  verification transitions remain queryable and audit-friendly.
+- Tightened learner attempt visibility: learner-facing attempt read/submit flows
+  now require the owning learner; admin diagnostics use the new redacted audit
+  contract instead of the learner API.
+- Added explicit admin-to-learner relationship grants so full attempt content is
+  only exposed through admin audit when an active manager/educator/coach
+  relationship exists.
+- Learner and cohort analytics aggregate durable practice/progression data and
+  observability artifacts from workflow_events, pipeline_runs, and provider_calls.
+- Full backend automated suite passed on 2026-03-26 via
+  `PYTHONPATH=src pytest tests -q` with result `47 passed, 1 skipped`.
+- Real-provider smoke passed on 2026-03-26 via
+  `PYTHONPATH=src python -m soft_skills_backend.smoke` against the configured
+  OpenRouter-backed model after increasing smoke timeout budgets.
 ```
 
 ## Review And Sign-Off
 
-- Sprint Status: Not Started
-- Completion Date: [Date]
+- Sprint Status: Completed
+- Completion Date: 2026-03-26
 
 Checklist:
 
-- [ ] Primary goal achieved
-- [ ] Constitution and quality checks passed
-- [ ] Unit tests completed
-- [ ] Integration tests completed
-- [ ] Smoke tests with real provider completed
-- [ ] Documentation updated
-- [ ] Code review completed
+- [x] Primary goal achieved
+- [x] Constitution and quality checks passed
+- [x] Unit tests completed
+- [x] Integration tests completed
+- [x] Smoke tests with real provider completed
+- [x] Documentation updated
+- [x] Code review completed
 
 Next Sprint Priorities:
 
 1. Run full backend regression and release-hardening work.
-2. Close remaining traceability and documentation gaps.
-3. Cut non-essential scope before release.
+2. Monitor OpenRouter smoke latency and decide whether the smoke model should move off the current free-tier route before release.
+3. Close remaining release documentation and operational checklists.

@@ -173,6 +173,10 @@ rubrics, and traceability.
 Admins see learner and cohort progress, assessment summaries, and trace-linked
 diagnostic metadata. Access to full attempt content should be limited to users
 with a legitimate management or educational relationship.
+The backend contract should support explicit admin-to-learner relationship
+mapping so audit surfaces can default to redacted learner response content
+without a relationship and expose full attempt content only when an active
+relationship exists.
 
 ## Success Metrics
 

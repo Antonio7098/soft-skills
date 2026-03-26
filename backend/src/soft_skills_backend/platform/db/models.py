@@ -255,6 +255,35 @@ class CollectionSaveRecord(Base):
     saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class CollectionVerificationReviewRecord(Base):
+    """Durable admin verification transition audit."""
+
+    __tablename__ = "collection_verification_reviews"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    collection_id: Mapped[str] = mapped_column(String(32), index=True)
+    reviewer_user_id: Mapped[str] = mapped_column(String(32), index=True)
+    previous_verification_state: Mapped[str] = mapped_column(String(32))
+    next_verification_state: Mapped[str] = mapped_column(String(32), index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    workflow_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class AdminLearnerRelationshipRecord(Base):
+    """Explicit admin-to-learner access relationship."""
+
+    __tablename__ = "admin_learner_relationships"
+
+    learner_user_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    admin_user_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    relationship_type: Mapped[str] = mapped_column(String(32), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class ContentGenerationArtifactRecord(Base):
     """Validated LLM generation artifact for creator workflows."""
 

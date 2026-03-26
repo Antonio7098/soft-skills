@@ -7,6 +7,7 @@ from typing import cast
 from fastapi import Request
 
 from soft_skills_backend.entrypoints.http.health import HealthService
+from soft_skills_backend.modules.admin import AdminService
 from soft_skills_backend.modules.catalog import CatalogService
 from soft_skills_backend.modules.identity import IdentityService
 from soft_skills_backend.modules.practice import QuickPracticeService
@@ -46,6 +47,10 @@ def optional_actor(request: Request) -> Actor | None:
 
 def get_identity_service(request: Request) -> IdentityService:
     return get_container(request).identity_service
+
+
+def get_admin_service(request: Request) -> AdminService:
+    return get_container(request).admin_service
 
 
 def get_taxonomy_service(request: Request) -> TaxonomyService:

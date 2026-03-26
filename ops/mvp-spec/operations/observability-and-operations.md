@@ -19,6 +19,9 @@ Every major workflow must emit an end-to-end trace, including:
 - recommendation generation where applicable
 
 Each trace should preserve step-level execution metadata.
+Admin diagnostics should be able to join workflow events, pipeline runs, and
+provider calls by `trace_id`, `workflow_id`, and `pipeline_run_id` without
+depending on informal logs.
 
 ## Required Correlation Fields
 

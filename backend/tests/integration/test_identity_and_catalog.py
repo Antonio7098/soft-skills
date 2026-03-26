@@ -465,13 +465,13 @@ async def test_catalog_supports_updates_save_reuse_and_verified_discovery(
     assert standard_discovery_response.status_code == 200
     assert [item["id"] for item in standard_discovery_response.json()["data"]] == [collection_id]
 
-    verify_response = await client.patch(
-        f"/api/collections/{collection_id}/lifecycle",
+    verify_response = await client.post(
+        f"/api/admin/collections/{collection_id}/verification",
         headers={"X-User-ID": admin["id"]},
-        json={"lifecycle_state": "published_public", "verification_state": "verified"},
+        json={"verification_state": "verified", "note": "Strong metadata and mapping quality."},
     )
     assert verify_response.status_code == 200
-    assert verify_response.json()["data"]["discovery_tier"] == "verified_public"
+    assert verify_response.json()["data"]["collection"]["discovery_tier"] == "verified_public"
 
     verified_discovery_response = await client.get(
         "/api/collections",

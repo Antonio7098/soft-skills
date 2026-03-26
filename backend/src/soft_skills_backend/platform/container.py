@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.config import Settings
 from soft_skills_backend.entrypoints.http.health import HealthService
+from soft_skills_backend.modules.admin import AdminService
 from soft_skills_backend.modules.catalog import CatalogService
 from soft_skills_backend.modules.identity import IdentityService
 from soft_skills_backend.modules.practice import (
@@ -53,6 +54,7 @@ class AppContainer:
     health_service: HealthService
     auth_provider: HeaderAuthProvider
     identity_service: IdentityService
+    admin_service: AdminService
     taxonomy_service: TaxonomyService
     catalog_service: CatalogService
     practice_service: QuickPracticeService
@@ -85,6 +87,10 @@ def build_container(settings: Settings) -> AppContainer:
     )
     auth_provider = HeaderAuthProvider(session_factory)
     identity_service = IdentityService(
+        session_factory=session_factory,
+        workflow_events=workflow_events,
+    )
+    admin_service = AdminService(
         session_factory=session_factory,
         workflow_events=workflow_events,
     )
@@ -137,6 +143,7 @@ def build_container(settings: Settings) -> AppContainer:
         health_service=health_service,
         auth_provider=auth_provider,
         identity_service=identity_service,
+        admin_service=admin_service,
         taxonomy_service=taxonomy_service,
         catalog_service=catalog_service,
         practice_service=practice_service,

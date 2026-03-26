@@ -280,24 +280,11 @@ def validate_lifecycle_transition(
             },
         )
     if command.verification_state is not None:
-        if command.verification_state not in ALLOWED_VERIFICATION_STATES:
-            raise validation_error(
-                "Unsupported verification state",
-                code="SS-VALIDATION-011",
-                details={"verification_state": command.verification_state},
-            )
-        if command.verification_state == "verified" and not actor.is_admin:
-            raise auth_error(
-                "Only admins can verify collections",
-                code="SS-AUTH-006",
-                status_code=403,
-            )
-        if command.verification_state == "verified" and command.lifecycle_state != "published_public":
-            raise domain_error(
-                "Verified collections must remain publicly published",
-                code="SS-DOMAIN-022",
-                details={"collection_id": collection.id},
-            )
+        raise validation_error(
+            "Collection verification must use the admin verification workflow",
+            code="SS-VALIDATION-048",
+            details={"collection_id": collection.id},
+        )
     if command.lifecycle_state == "published_public":
         validate_collection_publishability(session, collection)
 
