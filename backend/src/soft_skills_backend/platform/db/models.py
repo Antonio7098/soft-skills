@@ -307,6 +307,23 @@ class ContentGenerationArtifactRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class PracticeRunRecord(Base):
+    """Durable aggregate practice run state."""
+
+    __tablename__ = "practice_runs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    workflow_id: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    total_items: Mapped[int] = mapped_column(Integer)
+    completed_items: Mapped[int] = mapped_column(Integer, default=0)
+    validated_items: Mapped[int] = mapped_column(Integer, default=0)
+    failed_items: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class PracticeSessionRecord(Base):
     """Durable practice session state."""
 
@@ -317,6 +334,8 @@ class PracticeSessionRecord(Base):
     practice_type: Mapped[str] = mapped_column(String(32), index=True)
     content_item_id: Mapped[str] = mapped_column(String(32), index=True)
     content_item_type: Mapped[str] = mapped_column(String(32))
+    practice_run_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    sequence_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
     workflow_id: Mapped[str] = mapped_column(String(64), index=True)
     status: Mapped[str] = mapped_column(String(32), index=True)
     delivery_version: Mapped[str] = mapped_column(String(64))

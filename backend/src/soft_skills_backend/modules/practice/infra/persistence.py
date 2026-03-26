@@ -14,11 +14,13 @@ from soft_skills_backend.engines.config import load_marking_runtime_config
 from soft_skills_backend.modules.practice.domain.practice import (
     AssessmentValidationStatus,
     AttemptStatus,
+    PracticeRunStatus,
     SessionStatus,
     ensure_attempt_transition,
 )
 from soft_skills_backend.modules.practice.models import (
     AttemptGuardPayload,
+    PracticeRunTransformPayload,
     PracticeSessionView,
     SessionTransformPayload,
     ValidatedAssessmentPayload,
@@ -26,6 +28,7 @@ from soft_skills_backend.modules.practice.models import (
 from soft_skills_backend.platform.db.models import (
     AssessmentRecord,
     AttemptRecord,
+    PracticeRunRecord,
     PracticeSessionRecord,
 )
 from soft_skills_backend.platform.workflows.stageflow import (
@@ -37,7 +40,7 @@ from soft_skills_backend.platform.workflows.stageflow import (
 from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import AppError, domain_error, persistence_error
 
-from ..contracts.views import build_attempt_view, utcnow, utcnow_iso
+from ..contracts.views import build_attempt_view, build_practice_run_view, utcnow, utcnow_iso
 from .events import PracticeEventRecorder
 
 
@@ -133,6 +136,132 @@ def persist_session_start(
     return StageflowStageResult(
         payload=view,
         summary={"session_id": view.session_id, "attempt_id": view.attempt_id},
+    )
+
+
+def persist_practice_run_start(
+    *,
+    session_factory: sessionmaker[Session],
+    events: PracticeEventRecorder,
+    ctx: StageContext,
+    actor: Actor,
+    transform_payload: PracticeRunTransformPayload,
+) -> StageflowStageResult:
+    try:
+        with session_factory() as session:
+            session.add(
+                PracticeRunRecord(
+                    id=transform_payload.run_id,
+                    user_id=actor.user_id,
+                    workflow_id=transform_payload.workflow_id,
+                    status=PracticeRunStatus.ACTIVE.value,
+                    total_items=len(transform_payload.items),
+                    completed_items=0,
+                    validated_items=0,
+                    failed_items=0,
+                )
+            )
+            for item in transform_payload.items:
+                session.add(
+                    PracticeSessionRecord(
+                        id=item.session_id,
+                        user_id=actor.user_id,
+                        practice_type=item.prompt.practice_type.value,
+                        content_item_id=item.prompt.content_item_id,
+                        content_item_type=item.prompt.content_item_type,
+                        practice_run_id=transform_payload.run_id,
+                        sequence_index=item.position,
+                        workflow_id=transform_payload.workflow_id,
+                        status=SessionStatus.ACTIVE.value,
+                        delivery_version=item.prompt.delivery_version,
+                        rubric_id=item.prompt.rubric_id,
+                        rubric_version=item.prompt.rubric_version,
+                        prompt_payload=item.prompt.model_dump(mode="json"),
+                        last_attempt_id=item.attempt_id,
+                    )
+                )
+                session.add(
+                    AttemptRecord(
+                        id=item.attempt_id,
+                        session_id=item.session_id,
+                        user_id=actor.user_id,
+                        workflow_id=transform_payload.workflow_id,
+                        practice_type=item.prompt.practice_type.value,
+                        content_item_id=item.prompt.content_item_id,
+                        content_item_type=item.prompt.content_item_type,
+                        status=AttemptStatus.PROMPT_DELIVERED.value,
+                        response_mode=item.prompt.response_mode,
+                        delivery_version=item.prompt.delivery_version,
+                        rubric_id=item.prompt.rubric_id,
+                        rubric_version=item.prompt.rubric_version,
+                    )
+                )
+            session.commit()
+            run = session.get(PracticeRunRecord, transform_payload.run_id)
+            if run is None:
+                raise domain_error(
+                    "Practice run was not found after persistence",
+                    code="SS-DOMAIN-018",
+                    status_code=500,
+                    details={"run_id": transform_payload.run_id},
+                )
+            view = build_practice_run_view(session, run)
+    except SQLAlchemyError as exc:
+        raise persistence_error(
+            "Practice run could not be persisted",
+            code="SS-PERSISTENCE-006",
+            details={"run_id": transform_payload.run_id},
+        ) from exc
+
+    events.record(
+        event_type="practice.run_started.v1",
+        request_id=request_id_from_context(ctx),
+        trace_id=metadata_value(ctx, "trace_id"),
+        workflow_id=metadata_value(ctx, "workflow_id"),
+        payload={
+            "run_id": transform_payload.run_id,
+            "user_id": actor.user_id,
+            "total_items": len(transform_payload.items),
+        },
+    )
+    for item in transform_payload.items:
+        events.record(
+            event_type="practice.session_started.v1",
+            request_id=request_id_from_context(ctx),
+            trace_id=metadata_value(ctx, "trace_id"),
+            workflow_id=metadata_value(ctx, "workflow_id"),
+            payload={
+                "run_id": transform_payload.run_id,
+                "session_id": item.session_id,
+                "attempt_id": item.attempt_id,
+                "user_id": actor.user_id,
+                "practice_type": item.prompt.practice_type.value,
+                "content_item_id": item.prompt.content_item_id,
+                "content_item_type": item.prompt.content_item_type,
+                "prompt_version": item.prompt.delivery_version,
+                "rubric_version": item.prompt.rubric_version,
+                "sequence_index": item.position,
+            },
+        )
+        events.record(
+            event_type="practice.prompt_delivered.v1",
+            request_id=request_id_from_context(ctx),
+            trace_id=metadata_value(ctx, "trace_id"),
+            workflow_id=metadata_value(ctx, "workflow_id"),
+            payload={
+                "run_id": transform_payload.run_id,
+                "session_id": item.session_id,
+                "attempt_id": item.attempt_id,
+                "practice_type": item.prompt.practice_type.value,
+                "content_item_id": item.prompt.content_item_id,
+                "content_item_type": item.prompt.content_item_type,
+                "prompt_version": item.prompt.delivery_version,
+                "sequence_index": item.position,
+            },
+        )
+    return StageflowStageResult(
+        payload=view,
+        summary={"run_id": view.run_id, "total_items": view.total_items},
     )
 
 
@@ -266,6 +395,8 @@ def persist_assessment(
             attempt.last_error_code = None
             practice_session.status = SessionStatus.COMPLETED.value
             practice_session.completed_at = utcnow()
+            if practice_session.practice_run_id is not None:
+                _refresh_practice_run_progress(session, practice_session.practice_run_id)
             session.commit()
             attempt_view = build_attempt_view(session, attempt)
     except SQLAlchemyError as exc:
@@ -356,6 +487,8 @@ def persist_rejected_assessment(
         attempt.last_error_code = rejection_code
         practice_session.status = SessionStatus.FAILED.value
         practice_session.completed_at = utcnow()
+        if practice_session.practice_run_id is not None:
+            _refresh_practice_run_progress(session, practice_session.practice_run_id)
         session.commit()
 
     events.record(
@@ -395,6 +528,8 @@ def mark_attempt_failed(
         attempt.trace_id = trace_id
         practice_session.status = SessionStatus.FAILED.value
         practice_session.completed_at = utcnow()
+        if practice_session.practice_run_id is not None:
+            _refresh_practice_run_progress(session, practice_session.practice_run_id)
         session.commit()
 
     events.record(
@@ -410,3 +545,43 @@ def mark_attempt_failed(
         },
         error_code=error.code,
     )
+
+
+def _refresh_practice_run_progress(session: Session, run_id: str) -> None:
+    run = session.get(PracticeRunRecord, run_id)
+    if run is None:
+        return
+    session_records = (
+        session.query(PracticeSessionRecord)
+        .filter(PracticeSessionRecord.practice_run_id == run_id)
+        .all()
+    )
+    attempt_statuses = [
+        attempt.status
+        for practice_session in session_records
+        if (attempt := session.get(AttemptRecord, practice_session.last_attempt_id)) is not None
+    ]
+    completed_items = sum(
+        status
+        in {
+            AttemptStatus.ASSESSED.value,
+            AttemptStatus.ASSESSMENT_REJECTED.value,
+            AttemptStatus.ASSESSMENT_FAILED.value,
+        }
+        for status in attempt_statuses
+    )
+    validated_items = sum(status == AttemptStatus.ASSESSED.value for status in attempt_statuses)
+    failed_items = sum(
+        status in {AttemptStatus.ASSESSMENT_REJECTED.value, AttemptStatus.ASSESSMENT_FAILED.value}
+        for status in attempt_statuses
+    )
+    run.completed_items = completed_items
+    run.validated_items = validated_items
+    run.failed_items = failed_items
+    if completed_items >= run.total_items:
+        run.status = PracticeRunStatus.COMPLETED.value
+        if run.completed_at is None:
+            run.completed_at = utcnow()
+    else:
+        run.status = PracticeRunStatus.ACTIVE.value
+        run.completed_at = None

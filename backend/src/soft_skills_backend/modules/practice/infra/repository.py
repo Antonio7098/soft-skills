@@ -15,23 +15,31 @@ from soft_skills_backend.modules.practice.domain.practice import (
 from soft_skills_backend.modules.practice.models import (
     AttemptGuardPayload,
     AttemptView,
+    PracticeRunListItemView,
+    PracticeRunTransformPayload,
+    PracticeRunView,
     SessionTransformPayload,
     StartInputPayload,
     ValidatedAssessmentPayload,
 )
-from soft_skills_backend.platform.db.models import AttemptRecord
+from soft_skills_backend.platform.db.models import AttemptRecord, PracticeRunRecord
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
 from soft_skills_backend.platform.workflows.stageflow import StageflowStageResult
 from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import AppError, auth_error, domain_error
 
-from ..contracts.views import build_attempt_view
+from ..contracts.views import (
+    build_attempt_view,
+    build_practice_run_list_item,
+    build_practice_run_view,
+)
 from .events import PracticeEventRecorder
 from .persistence import (
     mark_attempt_assessing,
     mark_attempt_failed,
     persist_assessment,
     persist_attempt_submission,
+    persist_practice_run_start,
     persist_rejected_assessment,
     persist_session_start,
 )
@@ -78,6 +86,21 @@ class PracticeRepository:
         transform_payload: SessionTransformPayload,
     ) -> StageflowStageResult:
         return persist_session_start(
+            session_factory=self._session_factory,
+            events=self._events,
+            ctx=ctx,
+            actor=actor,
+            transform_payload=transform_payload,
+        )
+
+    def persist_practice_run_start(
+        self,
+        *,
+        ctx: StageContext,
+        actor: Actor,
+        transform_payload: PracticeRunTransformPayload,
+    ) -> StageflowStageResult:
+        return persist_practice_run_start(
             session_factory=self._session_factory,
             events=self._events,
             ctx=ctx,
@@ -198,6 +221,35 @@ class PracticeRepository:
                     details={"attempt_id": attempt_id},
                 )
             return build_attempt_view(session, attempt)
+
+    def get_practice_run(self, actor: Actor, run_id: str) -> PracticeRunView:
+        with self._session_factory() as session:
+            run = session.get(PracticeRunRecord, run_id)
+            if run is None:
+                raise domain_error(
+                    "Practice run was not found",
+                    code="SS-DOMAIN-019",
+                    status_code=404,
+                    details={"run_id": run_id},
+                )
+            if run.user_id != actor.user_id:
+                raise auth_error(
+                    "Practice run content is only visible to the owning learner",
+                    code="SS-AUTH-013",
+                    status_code=403,
+                    details={"run_id": run_id},
+                )
+            return build_practice_run_view(session, run)
+
+    def list_practice_runs(self, actor: Actor) -> list[PracticeRunListItemView]:
+        with self._session_factory() as session:
+            runs = (
+                session.query(PracticeRunRecord)
+                .filter(PracticeRunRecord.user_id == actor.user_id)
+                .order_by(PracticeRunRecord.created_at.desc())
+                .all()
+            )
+            return [build_practice_run_list_item(session, run) for run in runs]
 
     def record_event(
         self,

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from typing import Annotated, Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 from soft_skills_backend.modules.practice.domain.practice import (
     AssessmentValidationStatus,
     AttemptStatus,
     EvidenceItem,
+    PracticeRunStatus,
     PracticeType,
     SessionStatus,
     SkillScore,
@@ -49,6 +52,23 @@ class SessionTransformPayload(BaseModel):
     attempt_id: str
     workflow_id: str
     prompt: PracticePromptView
+
+
+class PracticeRunItemTransformPayload(BaseModel):
+    """Child session payload prepared for run persistence."""
+
+    position: int
+    session_id: str
+    attempt_id: str
+    prompt: PracticePromptView
+
+
+class PracticeRunTransformPayload(BaseModel):
+    """Aggregate run payload prepared for persistence."""
+
+    run_id: str
+    workflow_id: str
+    items: list[PracticeRunItemTransformPayload]
 
 
 class AttemptGuardPayload(BaseModel):
@@ -135,6 +155,73 @@ class PracticeAttemptView(BaseModel):
     assessment: PracticeAssessmentView | None = None
 
 
+class PracticeRunItemView(BaseModel):
+    """One question inside a practice run."""
+
+    position: int
+    attempt: PracticeAttemptView
+
+
+class PracticeRunSkillBreakdownView(BaseModel):
+    """Aggregate score per skill across validated attempts."""
+
+    skill_slug: str
+    average_score: float
+    count: int = Field(ge=1)
+
+
+class PracticeRunTypeBreakdownView(BaseModel):
+    """Aggregate score per practice type across validated attempts."""
+
+    practice_type: PracticeType
+    average_score: float
+    count: int = Field(ge=1)
+
+
+class PracticeRunSummaryView(BaseModel):
+    """Aggregate summary for a completed or in-progress run."""
+
+    validated_attempt_count: int = Field(default=0, ge=0)
+    failed_attempt_count: int = Field(default=0, ge=0)
+    overall_score_average: float | None = None
+    score_distribution: dict[str, int] = Field(default_factory=dict)
+    skill_breakdown: list[PracticeRunSkillBreakdownView] = Field(default_factory=list)
+    practice_type_breakdown: list[PracticeRunTypeBreakdownView] = Field(default_factory=list)
+
+
+class PracticeRunView(BaseModel):
+    """Full aggregate run view."""
+
+    run_id: str
+    workflow_id: str
+    status: PracticeRunStatus
+    total_items: int = Field(ge=1)
+    completed_items: int = Field(default=0, ge=0)
+    validated_items: int = Field(default=0, ge=0)
+    failed_items: int = Field(default=0, ge=0)
+    current_attempt_id: str | None = None
+    started_at: str
+    completed_at: str | None = None
+    items: list[PracticeRunItemView] = Field(default_factory=list)
+    summary: PracticeRunSummaryView
+
+
+class PracticeRunListItemView(BaseModel):
+    """History row for one aggregate run."""
+
+    run_id: str
+    workflow_id: str
+    status: PracticeRunStatus
+    total_items: int = Field(ge=1)
+    completed_items: int = Field(default=0, ge=0)
+    validated_items: int = Field(default=0, ge=0)
+    failed_items: int = Field(default=0, ge=0)
+    overall_score_average: float | None = None
+    practice_types: list[PracticeType] = Field(default_factory=list)
+    started_at: str
+    completed_at: str | None = None
+
+
 class StartPracticeSessionCommand(BaseModel):
     """Quick-practice session start payload."""
 
@@ -202,6 +289,76 @@ class StartScenarioSessionCommand(BaseModel):
         if not cleaned:
             raise ValueError("scenario_id must not be blank")
         return cleaned
+
+
+class StartQuickPracticeRunItemCommand(BaseModel):
+    """Quick-practice item selected for an aggregate run."""
+
+    practice_type: Literal["quick_practice"]
+    prompt_item_id: str
+
+    @field_validator("prompt_item_id")
+    @classmethod
+    def _require_prompt_item_id(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("prompt_item_id must not be blank")
+        return cleaned
+
+
+class StartInterviewRunItemCommand(BaseModel):
+    """Interview item selected for an aggregate run."""
+
+    practice_type: Literal["interview"]
+    prompt_item_id: str
+    competency_context: str | None = None
+    interviewer_perspective: str | None = None
+
+    @field_validator("prompt_item_id")
+    @classmethod
+    def _require_prompt_item_id(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("prompt_item_id must not be blank")
+        return cleaned
+
+    @field_validator("competency_context", "interviewer_perspective")
+    @classmethod
+    def _normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class StartScenarioRunItemCommand(BaseModel):
+    """Scenario item selected for an aggregate run."""
+
+    practice_type: Literal["scenario"]
+    scenario_id: str
+    artifacts: list[ScenarioArtifactInput] = Field(default_factory=list)
+
+    @field_validator("scenario_id")
+    @classmethod
+    def _require_scenario_id(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("scenario_id must not be blank")
+        return cleaned
+
+
+PracticeRunItemCommand = Annotated[
+    StartQuickPracticeRunItemCommand
+    | StartInterviewRunItemCommand
+    | StartScenarioRunItemCommand,
+    Field(discriminator="practice_type"),
+]
+
+
+class StartPracticeRunCommand(BaseModel):
+    """Aggregate run start payload."""
+
+    items: list[PracticeRunItemCommand] = Field(min_length=1)
 
 
 class SubmitAttemptCommand(BaseModel):

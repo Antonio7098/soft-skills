@@ -46,6 +46,13 @@ class SessionStatus(StrEnum):
     FAILED = "failed"
 
 
+class PracticeRunStatus(StrEnum):
+    """Aggregate practice run lifecycle."""
+
+    ACTIVE = "active"
+    COMPLETED = "completed"
+
+
 class AttemptStatus(StrEnum):
     """Attempt lifecycle for the first vertical slice."""
 
@@ -69,6 +76,15 @@ ALLOWED_ATTEMPT_TRANSITIONS: dict[AttemptStatus, set[AttemptStatus]] = {
     AttemptStatus.ASSESSMENT_REJECTED: set(),
     AttemptStatus.ASSESSMENT_FAILED: set(),
 }
+
+
+TERMINAL_ATTEMPT_STATUSES: frozenset[AttemptStatus] = frozenset(
+    {
+        AttemptStatus.ASSESSED,
+        AttemptStatus.ASSESSMENT_REJECTED,
+        AttemptStatus.ASSESSMENT_FAILED,
+    }
+)
 
 
 class AssessmentValidationStatus(StrEnum):
@@ -307,3 +323,9 @@ def _map_marking_validation_error(exc: AppError) -> AppError:
 def _normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip().lower())
 
+
+def is_attempt_terminal(status: str | AttemptStatus) -> bool:
+    """Return whether an attempt lifecycle state is terminal."""
+
+    resolved = status if isinstance(status, AttemptStatus) else AttemptStatus(status)
+    return resolved in TERMINAL_ATTEMPT_STATUSES

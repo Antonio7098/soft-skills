@@ -12,12 +12,20 @@ from soft_skills_backend.modules.practice.models import (
     AttemptGuardPayload,
     AttemptView,
     PracticeCorrelation,
+    PracticeRunItemTransformPayload,
+    PracticeRunListItemView,
+    PracticeRunTransformPayload,
+    PracticeRunView,
     PracticeSessionView,
     PromptContextPayload,
     SessionTransformPayload,
     StartInputPayload,
+    StartInterviewRunItemCommand,
     StartInterviewSessionCommand,
+    StartPracticeRunCommand,
     StartPracticeSessionCommand,
+    StartQuickPracticeRunItemCommand,
+    StartScenarioRunItemCommand,
     StartScenarioSessionCommand,
     SubmitAttemptCommand,
     ValidatedAssessmentPayload,
@@ -83,6 +91,118 @@ class PracticeService:
                 practice_type=PracticeType.QUICK_PRACTICE,
                 content_item_id=command.prompt_item_id,
             ),
+        )
+
+    async def start_practice_run(
+        self,
+        actor: Actor,
+        correlation: PracticeCorrelation,
+        command: StartPracticeRunCommand,
+    ) -> PracticeRunView:
+        run_id = uuid4().hex
+        workflow_id = run_id
+        start_inputs = [self._start_input_from_run_item(item) for item in command.items]
+
+        async def input_guard(_ctx) -> Any:
+            return ok_output(
+                StageflowStageResult(
+                    payload=start_inputs,
+                    summary={"total_items": len(start_inputs)},
+                )
+            )
+
+        async def prompt_enrich(ctx) -> Any:
+            inputs = cast(list[StartInputPayload], payload_from_inputs(ctx, "input_guard"))
+            prompt_payloads = [
+                cast(PromptContextPayload, self._store.load_start_prompt_context(actor, start_input).payload)
+                for start_input in inputs
+            ]
+            return ok_output(
+                StageflowStageResult(
+                    payload=prompt_payloads,
+                    summary={"total_items": len(prompt_payloads)},
+                )
+            )
+
+        async def run_transform(ctx) -> Any:
+            prompt_payloads = cast(
+                list[PromptContextPayload],
+                payload_from_inputs(ctx, "prompt_enrich"),
+            )
+            items = [
+                PracticeRunItemTransformPayload(
+                    position=index,
+                    session_id=uuid4().hex,
+                    attempt_id=uuid4().hex,
+                    prompt=prompt_payload.prompt,
+                )
+                for index, prompt_payload in enumerate(prompt_payloads, start=1)
+            ]
+            return ok_output(
+                StageflowStageResult(
+                    payload=PracticeRunTransformPayload(
+                        run_id=run_id,
+                        workflow_id=workflow_id,
+                        items=items,
+                    ),
+                    summary={"run_id": run_id, "total_items": len(items)},
+                )
+            )
+
+        async def persistence_work(ctx) -> Any:
+            return ok_output(
+                self._store.persist_practice_run_start(
+                    ctx=ctx,
+                    actor=actor,
+                    transform_payload=cast(
+                        PracticeRunTransformPayload,
+                        payload_from_inputs(ctx, "run_transform"),
+                    ),
+                )
+            )
+
+        pipeline = Pipeline.from_stages(
+            stage("input_guard", cast(Any, input_guard), StageKind.GUARD),
+            stage(
+                "prompt_enrich",
+                cast(Any, prompt_enrich),
+                StageKind.ENRICH,
+                dependencies=("input_guard",),
+            ),
+            stage(
+                "run_transform",
+                cast(Any, run_transform),
+                StageKind.TRANSFORM,
+                dependencies=("prompt_enrich",),
+            ),
+            stage(
+                "persistence_work",
+                cast(Any, persistence_work),
+                StageKind.WORK,
+                dependencies=("run_transform",),
+            ),
+            name="practice_run_start",
+        )
+
+        pipeline_result = await run_logged_pipeline(
+            self._stageflow,
+            pipeline,
+            request_id=correlation.request_id,
+            trace_id=correlation.trace_id,
+            workflow_id=workflow_id,
+            user_id=actor.user_id,
+            session_id=run_id,
+            execution_mode="practice_runtime",
+            service="soft_skills_backend.practice",
+            idempotency_key=f"practice_run_start:{actor.user_id}:{correlation.request_id}",
+            idempotency_params={
+                "items": [item.model_dump(mode="json") for item in command.items],
+            },
+        )
+        return payload_from_results(
+            pipeline_result,
+            "persistence_work",
+            expected_type=PracticeRunView,
         )
 
     async def start_interview_session(
@@ -444,3 +564,43 @@ class PracticeService:
 
     def get_attempt(self, actor: Actor, attempt_id: str) -> AttemptView:
         return self._store.get_attempt(actor, attempt_id)
+
+    def get_practice_run(self, actor: Actor, run_id: str) -> PracticeRunView:
+        return self._store.get_practice_run(actor, run_id)
+
+    def list_practice_runs(self, actor: Actor) -> list[PracticeRunListItemView]:
+        return self._store.list_practice_runs(actor)
+
+    @staticmethod
+    def _start_input_from_run_item(
+        item: StartQuickPracticeRunItemCommand
+        | StartInterviewRunItemCommand
+        | StartScenarioRunItemCommand,
+    ) -> StartInputPayload:
+        if isinstance(item, StartQuickPracticeRunItemCommand):
+            return StartInputPayload(
+                practice_type=PracticeType.QUICK_PRACTICE,
+                content_item_id=item.prompt_item_id,
+            )
+        if isinstance(item, StartInterviewRunItemCommand):
+            return StartInputPayload(
+                practice_type=PracticeType.INTERVIEW,
+                content_item_id=item.prompt_item_id,
+                interview_context=InterviewContextView(
+                    competency_context=item.competency_context,
+                    interviewer_perspective=item.interviewer_perspective,
+                ),
+            )
+        return StartInputPayload(
+            practice_type=PracticeType.SCENARIO,
+            content_item_id=item.scenario_id,
+            artifacts=[
+                PracticeArtifactView(
+                    artifact_id=f"{item.scenario_id}-artifact-{index}",
+                    artifact_type=artifact.artifact_type,
+                    title=artifact.title,
+                    body=artifact.body,
+                )
+                for index, artifact in enumerate(item.artifacts, start=1)
+            ],
+        )
