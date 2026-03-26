@@ -22,6 +22,7 @@ from soft_skills_backend.modules.practice.models import (
     SubmitAttemptCommand,
     ValidatedAssessmentPayload,
 )
+from soft_skills_backend.modules.progression import ProgressionService
 from soft_skills_backend.modules.practice.workflows.assessment.models import (
     AssessmentTransformPayload,
     InterviewContextView,
@@ -58,9 +59,11 @@ class QuickPracticeService:
         stageflow_runtime: StageflowRuntime,
         store: QuickPracticeRepository,
         assessment_marker: QuickPracticeMarkingProvider,
+        progression_service: ProgressionService,
     ) -> None:
         self._store = store
         self._assessment_marker = assessment_marker
+        self._progression = progression_service
         self._stageflow = StageflowPipelineSupport.from_runtime(stageflow_runtime)
         self._assessment = QuickPracticeAssessmentService(
             store=store,
@@ -403,11 +406,21 @@ class QuickPracticeService:
                     "response_text": command.response_text,
                 },
             )
-            return payload_from_results(
+            payload = payload_from_results(
                 pipeline_result,
                 "persistence_work",
                 expected_type=AttemptView,
             )
+            assessment_view = payload.assessment
+            if assessment_view is not None and assessment_view.validation_status.value == "validated":
+                await self._progression.refresh_from_assessment(
+                    request_id=correlation.request_id,
+                    trace_id=correlation.trace_id,
+                    workflow_id=ownership.workflow_id,
+                    learner_id=ownership.user_id,
+                    assessment_id=assessment_view.assessment_id,
+                )
+            return payload
         except StructuredOutputRejectionError as exc:
             self._store.persist_rejected_assessment(
                 attempt_id=attempt_id,

@@ -18,6 +18,8 @@ from soft_skills_backend.platform.db.models import (
     AttemptRecord,
     PipelineRunRecord,
     PracticeSessionRecord,
+    ProgressionSnapshotRecord,
+    RecommendationArtifactRecord,
     WorkflowEventRecord,
 )
 
@@ -222,6 +224,16 @@ async def test_quick_practice_start_submit_and_persist(app, client, test_setting
         assessment_record = session.get(
             AssessmentRecord, attempt_payload["assessment"]["assessment_id"]
         )
+        snapshot_record = (
+            session.query(ProgressionSnapshotRecord)
+            .filter(ProgressionSnapshotRecord.learner_id == learner["id"])
+            .one_or_none()
+        )
+        recommendation_record = (
+            session.query(RecommendationArtifactRecord)
+            .filter(RecommendationArtifactRecord.learner_id == learner["id"])
+            .one_or_none()
+        )
         pipeline_run_names = {
             record.pipeline_name for record in session.query(PipelineRunRecord).all()
         }
@@ -230,13 +242,18 @@ async def test_quick_practice_start_submit_and_persist(app, client, test_setting
     assert session_record is not None and session_record.status == "completed"
     assert attempt_record is not None and attempt_record.status == "assessed"
     assert assessment_record is not None and assessment_record.validation_status == "validated"
+    assert snapshot_record is not None
+    assert recommendation_record is not None
     assert "quick_practice_session_start" in pipeline_run_names
     assert "quick_practice_assessment" in pipeline_run_names
+    assert "progression_refresh" in pipeline_run_names
     assert "practice.session_started.v1" in event_types
     assert "practice.prompt_delivered.v1" in event_types
     assert "practice.attempt_submitted.v1" in event_types
     assert "assessment.started.v1" in event_types
     assert "assessment.validated.v1" in event_types
+    assert "progression.snapshot.created.v1" in event_types
+    assert "recommendation.generated.v1" in event_types
 
 
 @pytest.mark.asyncio

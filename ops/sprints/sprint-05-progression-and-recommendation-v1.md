@@ -29,39 +29,39 @@
 
 ## Scope Checklist
 
-- [ ] Task 1: Implement progression adapters that ingest validated assessments and update skill state; use Stageflow for orchestration only, not progression semantics
-- [ ] Task 2: Implement competency aggregation, confidence handling, and snapshot persistence; use typed outputs and explicit schema versions for snapshot and evidence-ledger artifacts
-- [ ] Task 3: Implement recommendation candidate retrieval, scoring, constraints, and reason codes; emit wide events and pipeline/provider logs for recommendation generation
-- [ ] Task 4: Implement replay-ready update and recalculation scaffolding for progression and recommendation artifacts; use checkpoint patterns only for heavy replay/recalc jobs
-- [ ] Task 5: Documentation updates for all changed behavior and contracts
+- [x] Task 1: Implement progression adapters that ingest validated assessments and update skill state; use Stageflow for orchestration only, not progression semantics
+- [x] Task 2: Implement competency aggregation, confidence handling, and snapshot persistence; use typed outputs and explicit schema versions for snapshot and evidence-ledger artifacts
+- [x] Task 3: Implement recommendation candidate retrieval, scoring, constraints, and reason codes; emit wide events and pipeline/provider logs for recommendation generation
+- [x] Task 4: Implement replay-ready update and recalculation scaffolding for progression and recommendation artifacts; use checkpoint patterns only for heavy replay/recalc jobs
+- [x] Task 5: Documentation updates for all changed behavior and contracts
 
 ## Constitution And Quality Checklist
 
-- [ ] Competency growth remains the product outcome, not activity theater
-- [ ] All new external boundaries are typed and schema-validated
-- [ ] Fail-fast and fail-loud behavior is preserved with stable error codes
-- [ ] Route handlers remain thin; business rules stay out of transport layers
-- [ ] Dependency injection and adapter boundaries remain explicit
-- [ ] Critical workflow artifacts are durably persisted where required
-- [ ] Traces, logs, and events cover all changed workflow steps
-- [ ] Prompt, rubric, model, and config versions are preserved where applicable
-- [ ] Assessment and progression behavior remains explainable
-- [ ] No silent fallback is introduced in scoring, progression, generation, or recommendation paths
+- [x] Competency growth remains the product outcome, not activity theater
+- [x] All new external boundaries are typed and schema-validated
+- [x] Fail-fast and fail-loud behavior is preserved with stable error codes
+- [x] Route handlers remain thin; business rules stay out of transport layers
+- [x] Dependency injection and adapter boundaries remain explicit
+- [x] Critical workflow artifacts are durably persisted where required
+- [x] Traces, logs, and events cover all changed workflow steps
+- [x] Prompt, rubric, model, and config versions are preserved where applicable
+- [x] Assessment and progression behavior remains explainable
+- [x] No silent fallback is introduced in scoring, progression, generation, or recommendation paths
 
 ## Testing And Documentation Checklist
 
-- [ ] Unit Tests: aggregation math, confidence rules, threshold floors, recommendation scoring, and reason-code generation
-- [ ] Integration Tests: progression updates from validated assessments, snapshot persistence, recommendation APIs, and event emission
-- [ ] Smoke Tests With Real Provider: run backend smokes that start from a real-provider assessment and verify progression/recommendation updates
-- [ ] Failure Path Coverage: rejected assessments, stale versions, bad config, empty candidate sets, and replay failures tested
-- [ ] Documentation Updates: update canonical docs in `ops/`, the roadmap/sprint docs, and any affected contracts
+- [x] Unit Tests: aggregation math, confidence rules, threshold floors, recommendation scoring, and reason-code generation
+- [x] Integration Tests: progression updates from validated assessments, snapshot persistence, recommendation APIs, and event emission
+- [x] Smoke Tests With Real Provider: run backend smokes that start from a real-provider assessment and verify progression/recommendation updates
+- [x] Failure Path Coverage: rejected assessments, stale versions, bad config, empty candidate sets, and replay failures tested
+- [x] Documentation Updates: update canonical docs in `ops/`, the roadmap/sprint docs, and any affected contracts
 
 ## Success Criteria
 
-- [ ] Progress state updates only from validated assessments and remains reproducible
-- [ ] Competency state is explainable through underlying skill evidence and weighting
-- [ ] Recommendations carry clear reason codes tied to stored evidence and learner context
-- [ ] Backend smokes prove the assessment -> progress -> recommendation chain works with real provider input
+- [x] Progress state updates only from validated assessments and remains reproducible
+- [x] Competency state is explainable through underlying skill evidence and weighting
+- [x] Recommendations carry clear reason codes tied to stored evidence and learner context
+- [x] Backend smokes prove the assessment -> progress -> recommendation chain works with real provider input
 
 Minimum Viable Sprint:
 Skill progression and recommendation work for core cases even if more advanced recalculation and governance tooling remains thin.
@@ -78,23 +78,30 @@ Skill progression and recommendation work for core cases even if more advanced r
 Key decisions, tradeoffs, and implementation notes:
 
 ```text
-[Notes go here]
+- Implemented a dedicated `modules/progression` backend slice with:
+  - typed progression snapshot and recommendation artifacts
+  - replayable aggregation from validated assessment history
+  - Stageflow-backed refresh and recalculation orchestration
+  - `/api/progress/me`, `/api/progress/me/recommendations`, and admin recalculation API
+- Progression refresh is triggered automatically after validated assessments persist, so the backend now maintains the `assess -> progress -> recommend` chain inside the backend runtime.
+- Recalculation is synchronous single-learner scaffolding in V1. It persists audit rows and emits recalculation events but does not yet implement heavy-job checkpoint infrastructure.
+- Real-provider smoke ran successfully on 2026-03-26 using provider `openrouter` and model `openai/gpt-oss-20b:free` across quick-practice, interview, and scenario flows.
 ```
 
 ## Review And Sign-Off
 
-- Sprint Status: Not Started
-- Completion Date: [Date]
+- Sprint Status: Completed
+- Completion Date: 2026-03-26
 
 Checklist:
 
-- [ ] Primary goal achieved
-- [ ] Constitution and quality checks passed
-- [ ] Unit tests completed
-- [ ] Integration tests completed
-- [ ] Smoke tests with real provider completed
-- [ ] Documentation updated
-- [ ] Code review completed
+- [x] Primary goal achieved
+- [x] Constitution and quality checks passed
+- [x] Unit tests completed
+- [x] Integration tests completed
+- [x] Smoke tests with real provider completed
+- [x] Documentation updated
+- [x] Code review completed
 
 Next Sprint Priorities:
 

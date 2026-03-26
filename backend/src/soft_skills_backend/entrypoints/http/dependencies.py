@@ -10,6 +10,7 @@ from soft_skills_backend.entrypoints.http.health import HealthService
 from soft_skills_backend.modules.catalog import CatalogService
 from soft_skills_backend.modules.identity import IdentityService
 from soft_skills_backend.modules.practice import QuickPracticeService
+from soft_skills_backend.modules.progression import ProgressionService
 from soft_skills_backend.modules.taxonomy import TaxonomyService
 from soft_skills_backend.platform.container import AppContainer
 from soft_skills_backend.shared.auth import Actor, HeaderAuthProvider
@@ -57,3 +58,7 @@ def get_catalog_service(request: Request) -> CatalogService:
 
 def get_practice_service(request: Request) -> QuickPracticeService:
     return get_container(request).practice_service
+
+
+def get_progression_service(request: Request) -> ProgressionService:
+    return get_container(request).progression_service

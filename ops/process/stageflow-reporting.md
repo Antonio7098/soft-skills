@@ -42,3 +42,8 @@ Stageflow workflows in SoftSkills.
 - **Reference File:** `backend/src/soft_skills_backend/application/_shared/stageflow.py`
 - **Description:** The default idempotency interceptor keying is not sufficient for multi-stage DAGs because the same request-level key can collide across different stages in one pipeline. SoftSkills now scopes idempotency by `stage_name:idempotency_key` before using the Stageflow cache.
 - **Recommendations:** Upstream a stage-aware idempotency mode or key extractor shape in Stageflow so multi-stage application pipelines do not need a local wrapper interceptor.
+
+**Inline Progression Refresh Couples Submit Latency** (2026-03-26)
+- **Reference File:** `backend/src/soft_skills_backend/modules/progression/workflows/service.py`
+- **Description:** Sprint 5 runs progression refresh as an inline Stageflow pipeline immediately after validated assessment persistence. This gave simple and deterministic end-to-end semantics for V1, but it also means the learner submit path now depends on a nested workflow finishing before the request returns.
+- **Recommendations:** Add an async trigger/checkpoint path for heavier progression refresh or replay workloads once operational tooling for background workflow execution is in place.

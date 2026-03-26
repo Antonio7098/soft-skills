@@ -20,6 +20,7 @@ from soft_skills_backend.modules.practice.workflows.assessment import (
     build_prompt_library,
     build_typed_output,
 )
+from soft_skills_backend.modules.progression import ProgressionService
 from soft_skills_backend.modules.taxonomy import TaxonomyService
 from soft_skills_backend.platform.db.repositories import (
     SqlAlchemyPipelineRunRepository,
@@ -55,6 +56,7 @@ class AppContainer:
     taxonomy_service: TaxonomyService
     catalog_service: CatalogService
     practice_service: QuickPracticeService
+    progression_service: ProgressionService
     workflow_events: SqlAlchemyWorkflowEventRepository
     pipeline_runs: SqlAlchemyPipelineRunRepository
     provider_calls: SqlAlchemyProviderCallRepository
@@ -95,6 +97,11 @@ def build_container(settings: Settings) -> AppContainer:
         workflow_events=workflow_events,
         stageflow_runtime=stageflow_runtime,
     )
+    progression_service = ProgressionService(
+        session_factory=session_factory,
+        workflow_events=workflow_events,
+        stageflow_runtime=stageflow_runtime,
+    )
     provider_call_logger = DatabaseProviderCallLogger(provider_calls)
     practice_store = QuickPracticeRepository(
         settings=settings,
@@ -113,6 +120,7 @@ def build_container(settings: Settings) -> AppContainer:
             prompt_library=build_prompt_library(settings),
             typed_output=build_typed_output(settings),
         ),
+        progression_service=progression_service,
     )
     health_service = HealthService(
         settings=settings,
@@ -129,6 +137,7 @@ def build_container(settings: Settings) -> AppContainer:
         taxonomy_service=taxonomy_service,
         catalog_service=catalog_service,
         practice_service=practice_service,
+        progression_service=progression_service,
         workflow_events=workflow_events,
         pipeline_runs=pipeline_runs,
         provider_calls=provider_calls,
