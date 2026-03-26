@@ -43,6 +43,7 @@ from soft_skills_backend.platform.db.models import (
     CompetencyRecord,
     CompetencySkillMapRecord,
     LearnerProfileRecord,
+    OrganisationMembershipRecord,
     ProgressionSnapshotRecord,
     ProgressRecalculationRecord,
     PromptItemRecord,
@@ -190,7 +191,7 @@ class ProgressionRepository:
             collections = session.query(CollectionRecord).all()
             candidates: list[CatalogCandidate] = []
             for collection in collections:
-                actor = self._synthetic_actor(learner_id)
+                actor = self._synthetic_actor(learner_id, session)
                 if not can_view_collection(actor, collection, include_private=True):
                     continue
                 prompt_items = (
@@ -598,8 +599,24 @@ class ProgressionRepository:
         last_attempted_at = attempts[0].assessed_at if attempts else None
         return len(attempts), last_attempted_at
 
-    def _synthetic_actor(self, learner_id: str) -> Actor:
-        return Actor(user_id=learner_id, email="")
+    def _synthetic_actor(self, learner_id: str, session: Session | None = None) -> Actor:
+        organisation_id = None
+        organisation_role = None
+        if session is not None:
+            membership = (
+                session.query(OrganisationMembershipRecord)
+                .filter(OrganisationMembershipRecord.user_id == learner_id)
+                .first()
+            )
+            if membership is not None:
+                organisation_id = membership.organisation_id
+                organisation_role = membership.role
+        return Actor(
+            user_id=learner_id,
+            email="",
+            organisation_id=organisation_id,
+            organisation_role=organisation_role,
+        )
 
     def _to_assessment_signal(self, record: AssessmentRecord) -> AssessmentSignal:
         return AssessmentSignal(
@@ -617,8 +634,20 @@ class ProgressionRepository:
         )
 
     def _assert_access(self, actor: Actor, learner_id: str) -> None:
-        if actor.user_id == learner_id or actor.is_org_admin:
+        if actor.user_id == learner_id:
             return
+        if actor.is_org_admin and actor.organisation_id is not None:
+            with self._session_factory() as session:
+                learner_membership = (
+                    session.query(OrganisationMembershipRecord)
+                    .filter(
+                        OrganisationMembershipRecord.user_id == learner_id,
+                        OrganisationMembershipRecord.organisation_id == actor.organisation_id,
+                    )
+                    .first()
+                )
+                if learner_membership is not None:
+                    return
         raise auth_error(
             "Progress is not visible to this actor",
             code="SS-AUTH-010",

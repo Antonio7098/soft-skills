@@ -26,6 +26,7 @@ from soft_skills_backend.platform.db.models import (
     AssessmentRecord,
     AttemptRecord,
     LearnerProfileRecord,
+    OrganisationMembershipRecord,
     PipelineRunRecord,
     PracticeSessionRecord,
     ProgressionSnapshotRecord,
@@ -42,7 +43,9 @@ class AdminAnalyticsRepository:
     def __init__(self, *, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
 
-    def get_learner_analytics(self, learner_id: str) -> LearnerAnalyticsView:
+    def get_learner_analytics(
+        self, learner_id: str, organisation_id: str | None = None
+    ) -> LearnerAnalyticsView:
         with self._session_factory() as session:
             learner = session.get(LearnerProfileRecord, learner_id)
             if learner is None:
@@ -52,6 +55,22 @@ class AdminAnalyticsRepository:
                     status_code=404,
                     details={"learner_id": learner_id},
                 )
+            if organisation_id is not None:
+                membership = (
+                    session.query(OrganisationMembershipRecord)
+                    .filter(
+                        OrganisationMembershipRecord.user_id == learner_id,
+                        OrganisationMembershipRecord.organisation_id == organisation_id,
+                    )
+                    .first()
+                )
+                if membership is None:
+                    raise domain_error(
+                        "Learner is not in your organisation",
+                        code="SS-AUTH-004",
+                        status_code=403,
+                        details={"learner_id": learner_id, "organisation_id": organisation_id},
+                    )
             sessions = self._sessions(session, [learner_id])
             attempts = self._attempts(session, [learner_id])
             assessments = self._assessments(session, [learner_id])
@@ -130,9 +149,11 @@ class AdminAnalyticsRepository:
                 ],
             )
 
-    def get_cohort_analytics(self, target_role: str | None) -> CohortAnalyticsView:
+    def get_cohort_analytics(
+        self, target_role: str | None, organisation_id: str | None = None
+    ) -> CohortAnalyticsView:
         with self._session_factory() as session:
-            learner_ids = self._cohort_learner_ids(session, target_role)
+            learner_ids = self._cohort_learner_ids(session, target_role, organisation_id)
             sessions = self._sessions(session, learner_ids)
             attempts = self._attempts(session, learner_ids)
             assessments = self._assessments(session, learner_ids)
@@ -197,12 +218,26 @@ class AdminAnalyticsRepository:
                 ],
             )
 
-    def _cohort_learner_ids(self, session: Session, target_role: str | None) -> list[str]:
+    def _cohort_learner_ids(
+        self, session: Session, target_role: str | None, organisation_id: str | None = None
+    ) -> list[str]:
         query = session.query(LearnerProfileRecord)
         if target_role is not None:
             query = query.filter(LearnerProfileRecord.target_role == target_role)
         profiles = query.all()
-        return sorted(profile.user_id for profile in profiles)
+        learner_ids = [profile.user_id for profile in profiles]
+        if organisation_id is not None:
+            memberships = (
+                session.query(OrganisationMembershipRecord.user_id)
+                .filter(
+                    OrganisationMembershipRecord.organisation_id == organisation_id,
+                    OrganisationMembershipRecord.user_id.in_(learner_ids),
+                )
+                .all()
+            )
+            org_member_ids = {m.user_id for m in memberships}
+            learner_ids = [lid for lid in learner_ids if lid in org_member_ids]
+        return sorted(learner_ids)
 
     def _sessions(self, session: Session, learner_ids: list[str]) -> list[PracticeSessionRecord]:
         if not learner_ids:

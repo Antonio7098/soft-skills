@@ -19,7 +19,6 @@ class SmokeActorBootstrap:
         admin = await self._backend.register_user(
             email=f"admin-smoke-{suffix}@example.com",
             display_name="Smoke Admin",
-            role="admin",
         )
         await self._backend.bootstrap_canon(str(admin["id"]))
 

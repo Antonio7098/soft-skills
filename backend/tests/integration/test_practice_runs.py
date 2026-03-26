@@ -27,13 +27,12 @@ def _migrate(test_settings) -> None:
     command.upgrade(alembic_config, "head")
 
 
-async def _register_user(client, *, email: str, display_name: str, role: str = "standard_user"):
+async def _register_user(client, *, email: str, display_name: str):
     response = await client.post(
         "/api/auth/register",
         json={
             "email": email,
             "display_name": display_name,
-            "role": role,
             "target_role": "Consultant",
             "goals": ["Improve stakeholder handling"],
             "practice_preferences": {"session_length": "short"},
@@ -50,7 +49,6 @@ async def _bootstrap_admin_and_learner(
         client,
         email="admin-practice-run@example.com",
         display_name="Admin Practice Run",
-        role="admin",
     )
     bootstrap_response = await client.post(
         "/api/skills/bootstrap-canon",
@@ -460,7 +458,9 @@ async def test_practice_run_start_submit_review_and_history(app, client, test_se
     assert run_record.failed_items == 0
     assert [record.sequence_index for record in session_records] == [1, 2, 3]
     assert all(record.status == "completed" for record in session_records)
-    assert len(attempt_records) == 3 and all(record.status == "assessed" for record in attempt_records)
+    assert len(attempt_records) == 3 and all(
+        record.status == "assessed" for record in attempt_records
+    )
     assert len(assessment_records) == 3
     assert "practice.run_started.v1" in event_types
     assert "practice.session_started.v1" in event_types

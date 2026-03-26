@@ -20,13 +20,12 @@ def _migrate(test_settings) -> None:
     command.upgrade(alembic_config, "head")
 
 
-async def _register_user(client, *, email: str, display_name: str, role: str = "standard_user"):
+async def _register_user(client, *, email: str, display_name: str):
     response = await client.post(
         "/api/auth/register",
         json={
             "email": email,
             "display_name": display_name,
-            "role": role,
             "target_role": "Consultant",
             "goals": ["Improve stakeholder handling"],
             "practice_preferences": {"session_length": "short"},
@@ -187,7 +186,6 @@ async def test_admin_evaluation_run_persists_provider_backed_golden_results(
         client,
         email="admin-evaluation@example.com",
         display_name="Admin Evaluation",
-        role="admin",
     )
     app.state.container.evaluation_service.set_provider_factory(_fake_provider_factory)
 
@@ -196,9 +194,7 @@ async def test_admin_evaluation_run_persists_provider_backed_golden_results(
         headers={"X-User-ID": admin["id"]},
     )
     assert suites_response.status_code == 200
-    assert {item["suite_id"] for item in suites_response.json()["data"]} == {
-        "marking_benchmark_v1"
-    }
+    assert {item["suite_id"] for item in suites_response.json()["data"]} == {"marking_benchmark_v1"}
 
     run_response = await client.post(
         "/api/admin/evaluations/runs",

@@ -49,14 +49,18 @@ class AdminVerificationRepository:
         self._session_factory = session_factory
         self._workflow_events = workflow_events
 
-    def list_verification_queue(self) -> list[CollectionVerificationQueueItemView]:
+    def list_verification_queue(
+        self, organisation_id: str | None = None
+    ) -> list[CollectionVerificationQueueItemView]:
         with self._session_factory() as session:
-            records = (
-                session.query(CollectionRecord)
-                .filter(CollectionRecord.lifecycle_state == "published_public")
-                .order_by(CollectionRecord.updated_at.desc(), CollectionRecord.created_at.desc())
-                .all()
+            query = session.query(CollectionRecord).filter(
+                CollectionRecord.lifecycle_state == "published_public"
             )
+            if organisation_id is not None:
+                query = query.filter(CollectionRecord.organisation_id == organisation_id)
+            records = query.order_by(
+                CollectionRecord.updated_at.desc(), CollectionRecord.created_at.desc()
+            ).all()
             latest_reviews = self._latest_reviews_by_collection(
                 session, [record.id for record in records]
             )
@@ -87,7 +91,9 @@ class AdminVerificationRepository:
                 )
             return items
 
-    def get_collection_verification(self, collection_id: str) -> CollectionVerificationAuditView:
+    def get_collection_verification(
+        self, collection_id: str, organisation_id: str | None = None
+    ) -> CollectionVerificationAuditView:
         with self._session_factory() as session:
             collection = session.get(CollectionRecord, collection_id)
             if collection is None:
@@ -96,6 +102,13 @@ class AdminVerificationRepository:
                     code="SS-DOMAIN-005",
                     status_code=404,
                     details={"collection_id": collection_id},
+                )
+            if organisation_id is not None and collection.organisation_id != organisation_id:
+                raise domain_error(
+                    "Collection is not in your organisation",
+                    code="SS-AUTH-004",
+                    status_code=403,
+                    details={"collection_id": collection_id, "organisation_id": organisation_id},
                 )
             history = self._history(session, collection_id)
             return CollectionVerificationAuditView(

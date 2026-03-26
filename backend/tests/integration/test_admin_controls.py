@@ -99,7 +99,7 @@ class FakeSuccessMarker:
         )
 
 
-async def _seed_public_collection(client, org_id: str):
+async def _seed_public_collection(client, org_id: str, admin_id: str | None = None):
     learner = await _register_user(
         client,
         email="learner-controls@example.com",
@@ -111,10 +111,13 @@ async def _seed_public_collection(client, org_id: str):
     )
     print(f"Bootstrap: {bootstrap_resp.status_code}")
 
-    # Add learner to org as member (needed for visibility when org_id is set on collection)
+    # Add learner to org as member (only admins can add members)
+    if admin_id is None:
+        # Fallback: assume the learner is already an admin (for backwards compatibility)
+        admin_id = learner["id"]
     add_member_resp = await client.post(
         f"/api/organisations/{org_id}/members",
-        headers={"X-User-ID": learner["id"], "X-Organisation-ID": org_id},
+        headers={"X-User-ID": admin_id, "X-Organisation-ID": org_id},
         json={"user_id": learner["id"], "role": "member"},
     )
     print(f"Add member: {add_member_resp.status_code}")
@@ -163,8 +166,8 @@ async def _seed_public_collection(client, org_id: str):
     return learner, collection_response.json()["data"], prompt_response.json()["data"]
 
 
-async def _seed_assessed_attempt(app, client, org_id: str):
-    learner, collection, prompt = await _seed_public_collection(client, org_id)
+async def _seed_assessed_attempt(app, client, org_id: str, admin_id: str | None = None):
+    learner, collection, prompt = await _seed_public_collection(client, org_id, admin_id=admin_id)
     app.state.container.practice_service._assessment_marker = FakeSuccessMarker()
     start_response = await client.post(
         "/api/attempts/quick-practice/sessions",
@@ -199,7 +202,7 @@ async def test_admin_verification_workflow_persists_history(app, client, test_se
     )
     org_id = org["id"]
 
-    _, collection, _prompt = await _seed_public_collection(client, org_id)
+    _, collection, _prompt = await _seed_public_collection(client, org_id, admin_id=admin["id"])
 
     queue_response = await client.get(
         "/api/admin/collections/verification-queue",
@@ -245,7 +248,9 @@ async def test_admin_analytics_and_audit_are_redacted_and_admin_only(
     )
     org_id = org["id"]
 
-    learner, _collection, prompt, attempt = await _seed_assessed_attempt(app, client, org_id)
+    learner, _collection, prompt, attempt = await _seed_assessed_attempt(
+        app, client, org_id, admin_id=admin["id"]
+    )
     attempt_id = attempt["id"]
 
     own_attempt_response = await client.get(

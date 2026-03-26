@@ -26,13 +26,12 @@ def _migrate(test_settings) -> None:
     command.upgrade(alembic_config, "head")
 
 
-async def _register_user(client, *, email: str, display_name: str, role: str = "standard_user"):
+async def _register_user(client, *, email: str, display_name: str):
     response = await client.post(
         "/api/auth/register",
         json={
             "email": email,
             "display_name": display_name,
-            "role": role,
             "target_role": "Consultant",
             "goals": ["Improve stakeholder handling"],
             "practice_preferences": {"session_length": "short"},
@@ -47,7 +46,6 @@ async def _bootstrap_admin_and_learner(client) -> tuple[dict[str, object], dict[
         client,
         email="admin-runtime@example.com",
         display_name="Admin Runtime",
-        role="admin",
     )
     bootstrap_response = await client.post(
         "/api/skills/bootstrap-canon",

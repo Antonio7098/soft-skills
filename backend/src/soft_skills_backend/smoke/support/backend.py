@@ -23,14 +23,12 @@ class SmokeBackendClient:
         *,
         email: str,
         display_name: str,
-        role: str = "standard_user",
     ) -> JsonObject:
         response = await self._client.post(
             "/api/auth/register",
             json={
                 "email": email,
                 "display_name": display_name,
-                "role": role,
                 "target_role": "Consultant",
                 "goals": ["Improve stakeholder handling"],
                 "practice_preferences": {"session_length": "short"},

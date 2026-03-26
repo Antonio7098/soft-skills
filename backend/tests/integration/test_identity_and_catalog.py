@@ -24,13 +24,12 @@ def _migrate(test_settings) -> None:
     command.upgrade(alembic_config, "head")
 
 
-async def _register_user(client, *, email: str, display_name: str, role: str = "standard_user"):
+async def _register_user(client, *, email: str, display_name: str):
     response = await client.post(
         "/api/auth/register",
         json={
             "email": email,
             "display_name": display_name,
-            "role": role,
             "target_role": "Consultant",
             "goals": ["Improve stakeholder handling"],
             "practice_preferences": {"session_length": "short"},
@@ -73,7 +72,6 @@ async def test_identity_bootstrap_and_private_draft_authoring(app, client, test_
         client,
         email="admin@example.com",
         display_name="Admin",
-        role="admin",
     )
     bootstrap_response = await client.post(
         "/api/skills/bootstrap-canon",
@@ -198,9 +196,7 @@ async def test_identity_bootstrap_and_private_draft_authoring(app, client, test_
 @pytest.mark.asyncio
 async def test_catalog_rejects_invalid_mappings_and_requires_auth(client, test_settings) -> None:
     _migrate(test_settings)
-    admin = await _register_user(
-        client, email="admin2@example.com", display_name="Admin", role="admin"
-    )
+    admin = await _register_user(client, email="admin2@example.com", display_name="Admin")
     await client.post("/api/skills/bootstrap-canon", headers={"X-User-ID": admin["id"]})
     learner = await _register_user(client, email="learner2@example.com", display_name="Learner")
 
@@ -242,9 +238,7 @@ async def test_catalog_create_collection_is_idempotent_per_request_id(
     app, client, test_settings
 ) -> None:
     _migrate(test_settings)
-    admin = await _register_user(
-        client, email="admin3@example.com", display_name="Admin", role="admin"
-    )
+    admin = await _register_user(client, email="admin3@example.com", display_name="Admin")
     await client.post("/api/skills/bootstrap-canon", headers={"X-User-ID": admin["id"]})
     learner = await _register_user(client, email="learner3@example.com", display_name="Learner")
 
@@ -293,9 +287,7 @@ async def test_catalog_supports_updates_save_reuse_and_verified_discovery(
     app, client, test_settings
 ) -> None:
     _migrate(test_settings)
-    admin = await _register_user(
-        client, email="admin4@example.com", display_name="Admin", role="admin"
-    )
+    admin = await _register_user(client, email="admin4@example.com", display_name="Admin")
     await client.post("/api/skills/bootstrap-canon", headers={"X-User-ID": admin["id"]})
     author = await _register_user(client, email="author@example.com", display_name="Author")
     saver = await _register_user(client, email="saver@example.com", display_name="Saver")
@@ -513,9 +505,7 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
     app, client, test_settings
 ) -> None:
     _migrate(test_settings)
-    admin = await _register_user(
-        client, email="admin5@example.com", display_name="Admin", role="admin"
-    )
+    admin = await _register_user(client, email="admin5@example.com", display_name="Admin")
     await client.post("/api/skills/bootstrap-canon", headers={"X-User-ID": admin["id"]})
     creator = await _register_user(client, email="creator@example.com", display_name="Creator")
 
@@ -725,9 +715,7 @@ async def test_catalog_generates_prompt_items_for_existing_collections(
 ) -> None:
     _migrate(test_settings)
     generation_config = load_catalog_generation_runtime_config()
-    admin = await _register_user(
-        client, email="admin6@example.com", display_name="Admin", role="admin"
-    )
+    admin = await _register_user(client, email="admin6@example.com", display_name="Admin")
     await client.post("/api/skills/bootstrap-canon", headers={"X-User-ID": admin["id"]})
     creator = await _register_user(client, email="creator2@example.com", display_name="Creator")
 

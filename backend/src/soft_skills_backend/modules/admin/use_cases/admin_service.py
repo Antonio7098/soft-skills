@@ -49,17 +49,19 @@ class AdminService:
             relationships=relationships,
         )
 
-    def list_collection_verification_queue(self, actor: Actor) -> list[CollectionVerificationQueueItemView]:
-        del actor
-        return self._verification.list_verification_queue()
+    def list_collection_verification_queue(
+        self, actor: Actor
+    ) -> list[CollectionVerificationQueueItemView]:
+        return self._verification.list_verification_queue(organisation_id=actor.organisation_id)
 
     def get_collection_verification(
         self,
         actor: Actor,
         collection_id: str,
     ) -> CollectionVerificationAuditView:
-        del actor
-        return self._verification.get_collection_verification(collection_id)
+        return self._verification.get_collection_verification(
+            collection_id, organisation_id=actor.organisation_id
+        )
 
     def update_collection_verification(
         self,
@@ -81,12 +83,14 @@ class AdminService:
         )
 
     def get_learner_analytics(self, actor: Actor, learner_id: str) -> LearnerAnalyticsView:
-        del actor
-        return self._analytics.get_learner_analytics(learner_id)
+        return self._analytics.get_learner_analytics(
+            learner_id, organisation_id=actor.organisation_id
+        )
 
     def get_cohort_analytics(self, actor: Actor, target_role: str | None) -> CohortAnalyticsView:
-        del actor
-        return self._analytics.get_cohort_analytics(target_role)
+        return self._analytics.get_cohort_analytics(
+            target_role, organisation_id=actor.organisation_id
+        )
 
     def get_attempt_audit(self, actor: Actor, attempt_id: str) -> AttemptAuditView:
         return self._audit.get_attempt_audit(actor, attempt_id)

@@ -1,4 +1,11 @@
-"""Events service."""
+"""Events service.
+
+Note: Events are currently platform-wide (not org-scoped). To add org scoping:
+1. Add organisation_id to WorkflowEventRecord
+2. Filter queries by organisation_id in list_(), get_by_id(), update(), delete()
+
+This requires a migration and is deferred to a follow-up sprint.
+"""
 
 from __future__ import annotations
 
