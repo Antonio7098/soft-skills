@@ -7,6 +7,7 @@ import { MainLayout } from './components/layout/MainLayout';
 import { SessionLayout } from './components/layout/SessionLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Practice } from './pages/Practice';
+import { Generate } from './pages/Generate';
 import { Collections } from './pages/Collections';
 import { Progress } from './pages/Progress';
 import { Settings } from './pages/Settings';
@@ -27,6 +28,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'practice', element: <Practice /> },
+      { path: 'generate', element: <Generate /> },
       { path: 'collections', element: <Collections /> },
       { path: 'collections/:collectionId', element: <CollectionDetail /> },
       { path: 'collections/:collectionId/scenario/:scenarioId', element: <ScenarioDetail /> },
