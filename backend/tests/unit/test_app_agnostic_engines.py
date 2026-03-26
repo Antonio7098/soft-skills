@@ -53,7 +53,10 @@ def test_engine_configs_load_from_reviewed_json_artifacts() -> None:
     assert progression.config_version == "progress-config-2026-03"
     assert recommendation.config_version == "rec-config-2026-03"
     assert marking.config_version == "quick-practice-marking-config.v1"
-    assert generation.config_version == "creator-draft-config.v1"
+    assert generation.config_version == "creator-generation-config.v2"
+    assert generation.structured_prompt_version == "creator.collection.structured-blueprint.v2"
+    assert generation.prompt_item_worker_prompt_version == "creator.prompt-item.worker.v1"
+    assert generation.max_parallel_prompt_item_children == 4
 
 
 def test_progression_engine_computes_dimension_and_aggregate_state() -> None:

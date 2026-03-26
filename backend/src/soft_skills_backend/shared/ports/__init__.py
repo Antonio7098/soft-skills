@@ -4,6 +4,7 @@ from soft_skills_backend.shared.ports.llm import (
     LLMProvider,
     ProviderCallContext,
     ProviderCompletion,
+    ProviderTextChunk,
 )
 from soft_skills_backend.shared.ports.repositories import (
     PipelineRunRepository,
@@ -17,5 +18,6 @@ __all__ = [
     "ProviderCallContext",
     "ProviderCallRepository",
     "ProviderCompletion",
+    "ProviderTextChunk",
     "WorkflowEventRepository",
 ]

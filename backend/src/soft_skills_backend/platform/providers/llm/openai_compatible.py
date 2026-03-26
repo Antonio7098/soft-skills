@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Any, cast
@@ -10,14 +12,20 @@ from typing import Any, cast
 import httpx
 
 from soft_skills_backend.config import Settings
-from soft_skills_backend.shared.errors import provider_error, validation_error
+from soft_skills_backend.shared.errors import AppError, provider_error, validation_error
 from soft_skills_backend.shared.ports.llm import (
     LLMProvider,
     ProviderCallContext,
     ProviderCompletion,
+    ProviderTextChunk,
 )
 
 TRANSIENT_PROVIDER_STATUS_CODES = {408, 429, 500, 502, 503, 504}
+RETRYABLE_PROVIDER_PAYLOAD_CODES = {
+    "SS-PROVIDER-007",
+    "SS-PROVIDER-008",
+    "SS-PROVIDER-009",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +141,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                             "reason": error_message,
                         },
                     )
+                content = _extract_message_content(response_payload)
                 usage = _extract_usage(response_payload)
                 await self._provider_call_logger.log_call_end(
                     call_id,
@@ -149,11 +158,36 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     usage=usage,
                 )
                 return ProviderCompletion(
-                    content=_extract_message_content(response_payload),
+                    content=content,
                     model_slug=str(response_payload.get("model", active_model_slug)),
                     usage=usage,
                     raw_response=response_payload,
                 )
+            except AppError as exc:
+                latency_ms = int((perf_counter() - start) * 1000)
+                await self._provider_call_logger.log_call_end(
+                    call_id,
+                    success=False,
+                    latency_ms=latency_ms,
+                    error=str(exc),
+                    operation=call_context.operation,
+                    provider=self._resolved.provider_name,
+                    model_id=active_model_slug,
+                    pipeline_run_id=call_context.pipeline_run_id,
+                    request_id=call_context.request_id,
+                    trace_id=call_context.trace_id,
+                    workflow_id=call_context.workflow_id,
+                    user_id=call_context.user_id,
+                )
+                if (
+                    exc.code in RETRYABLE_PROVIDER_PAYLOAD_CODES
+                    and attempt < self._settings.provider_max_retries
+                ):
+                    await asyncio.sleep(
+                        self._settings.provider_retry_backoff_seconds * (attempt + 1)
+                    )
+                    continue
+                raise
             except TimeoutError as exc:
                 latency_ms = int((perf_counter() - start) * 1000)
                 timeout_error = "Provider completion request exceeded the configured timeout budget"
@@ -214,6 +248,211 @@ class OpenAICompatibleLLMProvider(LLMProvider):
 
         raise provider_error(
             "Provider completion request exhausted retries",
+            code="SS-PROVIDER-006",
+        )
+
+    async def stream_text(
+        self,
+        *,
+        messages: list[dict[str, str]],
+        call_context: ProviderCallContext,
+    ) -> AsyncIterator[ProviderTextChunk]:
+        self.assert_configured()
+
+        url = f"{self._resolved.base_url.rstrip('/')}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self._resolved.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        for attempt in range(self._settings.provider_max_retries + 1):
+            active_model_slug = self._model_slug_for_attempt(attempt)
+            payload = {
+                "model": active_model_slug,
+                "messages": messages,
+                "temperature": 0.2,
+                "stream": True,
+                "stream_options": {"include_usage": True},
+            }
+            call_id = await self._provider_call_logger.log_call_start(
+                operation=call_context.operation,
+                provider=self._resolved.provider_name,
+                model_id=active_model_slug,
+                pipeline_run_id=call_context.pipeline_run_id,
+                request_id=call_context.request_id,
+                trace_id=call_context.trace_id,
+                workflow_id=call_context.workflow_id,
+                user_id=call_context.user_id,
+            )
+            start = perf_counter()
+            try:
+                async with asyncio.timeout(self._settings.smoke_timeout_seconds):
+                    async with httpx.AsyncClient(
+                        timeout=self._settings.smoke_timeout_seconds
+                    ) as client:
+                        async with client.stream(
+                            "POST",
+                            url,
+                            headers=headers,
+                            json=payload,
+                        ) as response:
+                            if response.status_code >= 400:
+                                response_payload = json.loads(await response.aread())
+                                error_message = _provider_error_message(response_payload)
+                                latency_ms = int((perf_counter() - start) * 1000)
+                                await self._provider_call_logger.log_call_end(
+                                    call_id,
+                                    success=False,
+                                    latency_ms=latency_ms,
+                                    error=error_message,
+                                    operation=call_context.operation,
+                                    provider=self._resolved.provider_name,
+                                    model_id=active_model_slug,
+                                    pipeline_run_id=call_context.pipeline_run_id,
+                                    request_id=call_context.request_id,
+                                    trace_id=call_context.trace_id,
+                                    workflow_id=call_context.workflow_id,
+                                    user_id=call_context.user_id,
+                                    http_status=response.status_code,
+                                )
+                                if (
+                                    response.status_code in TRANSIENT_PROVIDER_STATUS_CODES
+                                    and attempt < self._settings.provider_max_retries
+                                ):
+                                    await asyncio.sleep(
+                                        self._settings.provider_retry_backoff_seconds * (attempt + 1)
+                                    )
+                                    continue
+                                raise provider_error(
+                                    "Provider stream request failed",
+                                    code="SS-PROVIDER-004",
+                                    details={
+                                        "status_code": response.status_code,
+                                        "reason": error_message,
+                                    },
+                                )
+
+                            usage: dict[str, int] = {}
+                            streamed_any = False
+                            async for line in response.aiter_lines():
+                                if not line.startswith("data:"):
+                                    continue
+                                event_text = line.removeprefix("data:").strip()
+                                if not event_text:
+                                    continue
+                                if event_text == "[DONE]":
+                                    break
+                                event_payload = json.loads(event_text)
+                                usage = _extract_usage(event_payload) or usage
+                                delta = _extract_stream_delta(event_payload)
+                                if not delta:
+                                    continue
+                                streamed_any = True
+                                yield ProviderTextChunk(
+                                    delta=delta,
+                                    model_slug=str(event_payload.get("model", active_model_slug)),
+                                    usage=usage,
+                                    raw_event=event_payload,
+                                    done=False,
+                                )
+                            latency_ms = int((perf_counter() - start) * 1000)
+                            await self._provider_call_logger.log_call_end(
+                                call_id,
+                                success=True,
+                                latency_ms=latency_ms,
+                                operation=call_context.operation,
+                                provider=self._resolved.provider_name,
+                                model_id=active_model_slug,
+                                pipeline_run_id=call_context.pipeline_run_id,
+                                request_id=call_context.request_id,
+                                trace_id=call_context.trace_id,
+                                workflow_id=call_context.workflow_id,
+                                user_id=call_context.user_id,
+                                usage=usage,
+                            )
+                            yield ProviderTextChunk(
+                                delta="",
+                                model_slug=active_model_slug,
+                                usage=usage,
+                                raw_event={},
+                                done=True,
+                            )
+                            if streamed_any:
+                                return
+                            raise provider_error(
+                                "Provider stream response did not include text deltas",
+                                code="SS-PROVIDER-009",
+                            )
+            except AppError as exc:
+                if (
+                    exc.code in RETRYABLE_PROVIDER_PAYLOAD_CODES
+                    and attempt < self._settings.provider_max_retries
+                ):
+                    await asyncio.sleep(
+                        self._settings.provider_retry_backoff_seconds * (attempt + 1)
+                    )
+                    continue
+                raise
+            except TimeoutError as exc:
+                latency_ms = int((perf_counter() - start) * 1000)
+                timeout_error = "Provider stream request exceeded the configured timeout budget"
+                await self._provider_call_logger.log_call_end(
+                    call_id,
+                    success=False,
+                    latency_ms=latency_ms,
+                    error=timeout_error,
+                    operation=call_context.operation,
+                    provider=self._resolved.provider_name,
+                    model_id=active_model_slug,
+                    pipeline_run_id=call_context.pipeline_run_id,
+                    request_id=call_context.request_id,
+                    trace_id=call_context.trace_id,
+                    workflow_id=call_context.workflow_id,
+                    user_id=call_context.user_id,
+                )
+                if attempt < self._settings.provider_max_retries:
+                    await asyncio.sleep(
+                        self._settings.provider_retry_backoff_seconds * (attempt + 1)
+                    )
+                    continue
+                raise provider_error(
+                    "Provider stream request failed",
+                    code="SS-PROVIDER-005",
+                    details={
+                        "reason": timeout_error,
+                        "timeout_seconds": self._settings.smoke_timeout_seconds,
+                        "url": url,
+                    },
+                ) from exc
+            except httpx.HTTPError as exc:
+                latency_ms = int((perf_counter() - start) * 1000)
+                await self._provider_call_logger.log_call_end(
+                    call_id,
+                    success=False,
+                    latency_ms=latency_ms,
+                    error=str(exc),
+                    operation=call_context.operation,
+                    provider=self._resolved.provider_name,
+                    model_id=active_model_slug,
+                    pipeline_run_id=call_context.pipeline_run_id,
+                    request_id=call_context.request_id,
+                    trace_id=call_context.trace_id,
+                    workflow_id=call_context.workflow_id,
+                    user_id=call_context.user_id,
+                )
+                if attempt < self._settings.provider_max_retries:
+                    await asyncio.sleep(
+                        self._settings.provider_retry_backoff_seconds * (attempt + 1)
+                    )
+                    continue
+                raise provider_error(
+                    "Provider stream request failed",
+                    code="SS-PROVIDER-005",
+                    details={"reason": str(exc), "url": url},
+                ) from exc
+
+        raise provider_error(
+            "Provider stream request exhausted retries",
             code="SS-PROVIDER-006",
         )
 
@@ -283,6 +522,10 @@ def _extract_message_content(payload: dict[str, Any]) -> str | dict[str, Any]:
     raise provider_error(
         "Provider completion response content was not understood",
         code="SS-PROVIDER-009",
+        details={
+            "content_type": type(content).__name__,
+            "message_keys": sorted(str(key) for key in message),
+        },
     )
 
 
@@ -307,3 +550,25 @@ def _provider_error_message(payload: dict[str, Any]) -> str:
     if isinstance(message, str) and message.strip():
         return message
     return "Provider returned an error response"
+
+
+def _extract_stream_delta(payload: dict[str, Any]) -> str:
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+    delta = choices[0].get("delta")
+    if not isinstance(delta, dict):
+        return ""
+    content = delta.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        text_parts = [
+            str(item.get("text"))
+            for item in content
+            if isinstance(item, dict)
+            and item.get("type") == "text"
+            and item.get("text") is not None
+        ]
+        return "".join(text_parts)
+    return ""

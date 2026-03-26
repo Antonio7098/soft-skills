@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session, sessionmaker
 from stageflow.api import Pipeline, StageKind, stage
+from stageflow.core import StageContext
 
 from soft_skills_backend.modules.catalog.contracts.scenario_commands import (
     ScenarioCreateCommand,
@@ -66,7 +67,7 @@ class ScenarioService:
         collection_id: str,
         command: ScenarioCreateCommand,
     ) -> ScenarioView:
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 collection = self._collection_or_error(session, collection_id)
                 require_collection_owner_or_admin(actor, collection)
@@ -78,7 +79,7 @@ class ScenarioService:
                 )
             )
 
-        async def persistence_work(_ctx) -> Any:
+        async def persistence_work(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 collection = self._collection_or_error(session, collection_id)
                 scenario = ScenarioRecord(
@@ -152,7 +153,7 @@ class ScenarioService:
         scenario_id: str,
         command: ScenarioUpdateCommand,
     ) -> ScenarioView:
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 collection = self._collection_or_error(session, collection_id)
                 scenario = self._scenario_or_error(session, scenario_id)
@@ -171,7 +172,7 @@ class ScenarioService:
                 )
             )
 
-        async def persistence_work(_ctx) -> Any:
+        async def persistence_work(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 collection = self._collection_or_error(session, collection_id)
                 scenario = self._scenario_or_error(session, scenario_id)

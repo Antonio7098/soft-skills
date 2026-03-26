@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from time import perf_counter
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 from stageflow.core import StageContext
 
@@ -16,6 +17,7 @@ from soft_skills_backend.modules.evaluation.domain.evaluation import (
     EvaluationComputation,
     GoldenDataset,
     GoldenMarkingCase,
+    ScoreBand,
     build_marking_computation,
     estimate_cost_usd,
     load_marking_golden_dataset,
@@ -47,6 +49,7 @@ from soft_skills_backend.platform.workflows.stageflow import (
 )
 from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import AppError, scoring_error
+from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
 ProviderFactory = Callable[[Settings, Any], Any]
 
@@ -139,7 +142,12 @@ class MarkingBenchmarkRunner:
             raw_payload = cast(dict[str, Any], transform_payload.raw_payload)
             usage = dict(transform_payload.usage)
             observed_model_slug = transform_payload.model_slug
-            self._accept_output(marker=marker, prompt_payload=prompt_payload, case=case, transform_payload=transform_payload)
+            self._accept_output(
+                marker=marker,
+                prompt_payload=prompt_payload,
+                case=case,
+                transform_payload=transform_payload,
+            )
             draft = transform_payload.draft
             actual_skill_scores = {
                 skill_score.skill_slug: skill_score.score for skill_score in draft.skill_scores
@@ -193,7 +201,9 @@ class MarkingBenchmarkRunner:
                         completion_tokens=completion_tokens,
                     ),
                     "overall_score_abs_error": float(overall_score_abs_error),
-                    "skill_score_abs_error_mean": round(sum(skill_errors) / max(1, len(skill_errors)), 4),
+                    "skill_score_abs_error_mean": round(
+                        sum(skill_errors) / max(1, len(skill_errors)), 4
+                    ),
                     "skill_band_pass_rate": round(skill_band_pass_rate, 4),
                     "evidence_coverage_rate": round(evidence_coverage_rate, 4),
                 },
@@ -319,9 +329,7 @@ class MarkingBenchmarkRunner:
         ctx: StageContext,
         actor: Actor,
         case_id: str,
-    ):
-        from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
-
+    ) -> ProviderCallContext:
         return ProviderCallContext(
             operation=f"evaluation_marking_benchmark:{case_id}",
             request_id=request_id_from_context(ctx),
@@ -359,13 +367,10 @@ class MarkingBenchmarkRunner:
                     "observed_rubric_version": draft.rubric_version,
                 },
             )
-        if (
-            draft.provider != marker.provider_name
-            or not model_slug_matches_execution_source(
-                executed_slug=transform_payload.model_slug,
-                output_slug=draft.model_slug,
-                configured_slug=marker.model_slug,
-            )
+        if draft.provider != marker.provider_name or not model_slug_matches_execution_source(
+            executed_slug=transform_payload.model_slug,
+            output_slug=draft.model_slug,
+            configured_slug=marker.model_slug,
         ):
             raise scoring_error(
                 "Assessment output provider metadata did not match the execution source",
@@ -415,7 +420,7 @@ def _evidence_coverage_rate(
 
 def _skill_band_pass_rate(
     *,
-    expected_skill_scores,
+    expected_skill_scores: dict[str, ScoreBand],
     actual_skill_scores: dict[str, int],
 ) -> float:
     if not expected_skill_scores:

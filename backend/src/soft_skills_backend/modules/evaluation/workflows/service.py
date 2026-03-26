@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from stageflow.api import Pipeline, StageKind, stage
+from stageflow.core import StageContext
 
 from soft_skills_backend.modules.evaluation.contracts.commands import EvaluationRunCommand
 from soft_skills_backend.modules.evaluation.contracts.views import EvaluationRunView
@@ -75,7 +76,7 @@ class EvaluationWorkflowService:
             case_ids=command.case_ids,
         )
 
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             return ok_output(
                 StageflowStageResult(
                     payload=PreparedEvaluationRequest(actor=actor, command=command, suite=suite),
@@ -83,7 +84,7 @@ class EvaluationWorkflowService:
                 )
             )
 
-        async def transform(ctx) -> Any:
+        async def transform(ctx: StageContext) -> Any:
             prepared = cast(PreparedEvaluationRequest, payload_from_inputs(ctx, "input_guard"))
             computation = await self._marking_benchmark.execute(
                 ctx=ctx,
@@ -102,7 +103,7 @@ class EvaluationWorkflowService:
                 )
             )
 
-        async def work(ctx) -> Any:
+        async def work(ctx: StageContext) -> Any:
             prepared = cast(PreparedEvaluationRequest, payload_from_inputs(ctx, "input_guard"))
             computation = payload_from_inputs(ctx, "transform")
             persisted = self._repository.persist_run(

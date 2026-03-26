@@ -4,8 +4,8 @@ import importlib
 
 import pytest
 
-from soft_skills_backend.platform.container import build_container
 from soft_skills_backend.config import Settings
+from soft_skills_backend.platform.container import build_container
 from soft_skills_backend.shared.errors import AppError
 
 

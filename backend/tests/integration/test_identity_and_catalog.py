@@ -7,6 +7,7 @@ import pytest
 from alembic.config import Config
 
 from alembic import command
+from soft_skills_backend.engines.config import load_catalog_generation_runtime_config
 from soft_skills_backend.platform.db.models import (
     CollectionRecord,
     CollectionSaveRecord,
@@ -48,8 +49,12 @@ class _FakeCatalogLLMProvider:
     async def complete_json(self, *, messages, call_context) -> ProviderCompletion:
         assert messages
         assert call_context.operation in {
-            "catalog_structured_generation",
-            "catalog_chat_generation",
+            "catalog_structured_blueprint_generation",
+            "catalog_chat_blueprint_generation",
+            "catalog_prompt_item_worker_generation",
+            "catalog_scenario_worker_generation",
+            "catalog_prompt_item_structured_planning",
+            "catalog_prompt_item_chat_planning",
         }
         payload = self._payloads.pop(0)
         return ProviderCompletion(
@@ -519,17 +524,11 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
                 "model_slug": "test-model",
                 "title": "Generated Stakeholder Collection",
                 "summary": "Generated content for stakeholder pressure practice.",
-                "target_audience": "Consultants",
-                "difficulty": "intermediate",
-                "content_format_mix": ["quick_practice_prompt", "scenario_step"],
-                "target_skill_slugs": ["active-listening", "expectation-setting"],
-                "target_competency_slugs": ["stakeholder-management"],
-                "rubric_ids": ["quick_practice_text@v1", "scenario_text@v1"],
                 "prompt_items": [
                     {
                         "prompt_type": "quick_practice_prompt",
-                        "title": "Generated prompt",
-                        "prompt_text": "A sponsor wants an impossible timeline. Respond.",
+                        "title_hint": "Generated prompt",
+                        "generation_brief": "A sponsor wants an impossible timeline. The learner must reset expectations while preserving trust.",
                         "difficulty": "intermediate",
                         "target_skill_slugs": ["active-listening", "expectation-setting"],
                         "rubric_id": "quick_practice_text@v1",
@@ -537,34 +536,49 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
                 ],
                 "scenarios": [
                     {
-                        "title": "Generated scenario",
-                        "business_context": "A launch is at risk after legal review.",
-                        "learner_objective": "Reset expectations without damaging trust.",
-                        "constraints": ["Board review tomorrow"],
-                        "stakeholder_tensions": ["Sales wants speed", "Legal wants certainty"],
+                        "title_hint": "Generated scenario",
+                        "generation_brief": "A launch is at risk after legal review and conflicting stakeholder expectations.",
                         "target_skill_slugs": ["expectation-setting"],
                         "rubric_id": "scenario_text@v1",
-                        "mock_company": {
-                            "name": "Northstar AI",
-                            "industry": "Enterprise SaaS",
-                            "operating_context": "Scaling under board scrutiny.",
-                        },
-                        "mock_people": [
-                            {
-                                "name": "Jordan Singh",
-                                "role": "Legal Counsel",
-                                "goals": ["Reduce regulatory exposure"],
-                                "communication_style": "Precise and cautious",
-                                "relationship_to_scenario": "Risk owner",
-                            }
-                        ],
-                        "supporting_artifacts": [
-                            {
-                                "artifact_type": "email",
-                                "title": "Escalation note",
-                                "body": "The board expects a recommendation by 9am.",
-                            }
-                        ],
+                        "supporting_artifact_count": 1,
+                    }
+                ],
+            },
+            {
+                "prompt_type": "quick_practice_prompt",
+                "title": "Generated prompt",
+                "prompt_text": "A sponsor wants an impossible timeline. Respond.",
+                "difficulty": "intermediate",
+                "target_skill_slugs": ["active-listening", "expectation-setting"],
+                "rubric_id": "quick_practice_text@v1",
+            },
+            {
+                "title": "Generated scenario",
+                "business_context": "A launch is at risk after legal review.",
+                "learner_objective": "Reset expectations without damaging trust.",
+                "constraints": ["Board review tomorrow"],
+                "stakeholder_tensions": ["Sales wants speed", "Legal wants certainty"],
+                "target_skill_slugs": ["expectation-setting"],
+                "rubric_id": "scenario_text@v1",
+                "mock_company": {
+                    "name": "Northstar AI",
+                    "industry": "Enterprise SaaS",
+                    "operating_context": "Scaling under board scrutiny.",
+                },
+                "mock_people": [
+                    {
+                        "name": "Jordan Singh",
+                        "role": "Legal Counsel",
+                        "goals": ["Reduce regulatory exposure"],
+                        "communication_style": "Precise and cautious",
+                        "relationship_to_scenario": "Risk owner",
+                    }
+                ],
+                "supporting_artifacts": [
+                    {
+                        "artifact_type": "email",
+                        "title": "Escalation note",
+                        "body": "The board expects a recommendation by 9am.",
                     }
                 ],
             },
@@ -574,17 +588,11 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
                 "model_slug": "test-model",
                 "title": "Generated Interview Collection",
                 "summary": "Generated interview content.",
-                "target_audience": "Consultants",
-                "difficulty": "advanced",
-                "content_format_mix": ["interview_prompt"],
-                "target_skill_slugs": ["decision-justification"],
-                "target_competency_slugs": ["problem-solving"],
-                "rubric_ids": ["interview_text@v1"],
                 "prompt_items": [
                     {
                         "prompt_type": "interview_prompt",
-                        "title": "Generated interview prompt",
-                        "prompt_text": "Tell me about a time you made a decision with incomplete data.",
+                        "title_hint": "Generated interview prompt",
+                        "generation_brief": "Tell me about a time you made a decision with incomplete data and had to justify the tradeoffs.",
                         "difficulty": "advanced",
                         "target_skill_slugs": ["decision-justification"],
                         "rubric_id": "interview_text@v1",
@@ -593,19 +601,29 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
                 "scenarios": [],
             },
             {
+                "prompt_type": "interview_prompt",
+                "title": "Generated interview prompt",
+                "prompt_text": "Tell me about a time you made a decision with incomplete data.",
+                "difficulty": "advanced",
+                "target_skill_slugs": ["decision-justification"],
+                "rubric_id": "interview_text@v1",
+            },
+            {
                 "prompt_version": test_settings.creator_chat_generation_prompt_version,
                 "provider": "test-provider",
                 "model_slug": "test-model",
                 "title": "Bad draft",
                 "summary": "Bad metadata drift.",
-                "target_audience": "Consultants",
-                "difficulty": "advanced",
-                "content_format_mix": ["interview_prompt"],
-                "target_skill_slugs": ["executive-summary"],
-                "target_competency_slugs": ["problem-solving"],
-                "rubric_ids": ["interview_text@v1"],
                 "prompt_items": [],
                 "scenarios": [],
+            },
+            {
+                "prompt_type": "interview_prompt",
+                "title": "Bad interview prompt",
+                "prompt_text": "Summarize an executive decision in one sentence.",
+                "difficulty": "advanced",
+                "target_skill_slugs": ["executive-summary"],
+                "rubric_id": "interview_text@v1",
             },
         ]
     )
@@ -683,7 +701,7 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
         },
     )
     assert drift_response.status_code == 422
-    assert drift_response.json()["error"]["code"] == "SS-VALIDATION-051"
+    assert drift_response.json()["error"]["code"] == "SS-VALIDATION-054"
 
     with app.state.container.session_factory() as session:
         generation_artifacts = session.query(ContentGenerationArtifactRecord).all()
@@ -694,3 +712,192 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
     assert "content.draft.generated.v1" in event_types
     assert "catalog_structured_generation" in pipeline_names
     assert "catalog_chat_generation" in pipeline_names
+    assert "catalog_prompt_item_worker" in pipeline_names
+    assert "catalog_scenario_worker" in pipeline_names
+
+
+@pytest.mark.asyncio
+async def test_catalog_generates_prompt_items_for_existing_collections(
+    app, client, test_settings
+) -> None:
+    _migrate(test_settings)
+    generation_config = load_catalog_generation_runtime_config()
+    admin = await _register_user(
+        client, email="admin6@example.com", display_name="Admin", role="admin"
+    )
+    await client.post("/api/skills/bootstrap-canon", headers={"X-User-ID": admin["id"]})
+    creator = await _register_user(client, email="creator2@example.com", display_name="Creator")
+
+    collection_response = await client.post(
+        "/api/collections",
+        headers={"X-User-ID": creator["id"]},
+        json={
+            "title": "Existing Interview Collection",
+            "summary": "Practice tough stakeholder and interview conversations.",
+            "target_audience": "Consultants",
+            "difficulty": "advanced",
+            "content_format_mix": ["quick_practice_prompt", "interview_prompt"],
+            "target_skill_slugs": ["active-listening", "decision-justification"],
+            "target_competency_slugs": ["stakeholder-management", "problem-solving"],
+            "rubric_ids": ["quick_practice_text@v1", "interview_text@v1"],
+        },
+    )
+    assert collection_response.status_code == 200
+    collection_id = collection_response.json()["data"]["id"]
+
+    existing_prompt_response = await client.post(
+        f"/api/collections/{collection_id}/prompt-items",
+        headers={"X-User-ID": creator["id"]},
+        json={
+            "prompt_type": "quick_practice_prompt",
+            "title": "Existing reset expectations prompt",
+            "prompt_text": "A client asks for an unrealistic deadline. Respond with empathy and a boundary.",
+            "difficulty": "advanced",
+            "target_skill_slugs": ["active-listening"],
+            "rubric_id": "quick_practice_text@v1",
+        },
+    )
+    assert existing_prompt_response.status_code == 200
+
+    app.state.container.catalog_service._generation._llm_provider = _FakeCatalogLLMProvider(
+        [
+            {
+                "prompt_version": generation_config.prompt_item_structured_prompt_version,
+                "provider": "test-provider",
+                "model_slug": "test-model",
+                "prompt_items": [
+                    {
+                        "prompt_type": "quick_practice_prompt",
+                        "title_hint": "Escalation reset",
+                        "generation_brief": "A sponsor escalates a timeline conflict and the learner must reset expectations while staying collaborative.",
+                        "difficulty": "advanced",
+                        "target_skill_slugs": ["active-listening"],
+                        "rubric_id": "quick_practice_text@v1",
+                    }
+                ],
+            },
+            {
+                "prompt_type": "quick_practice_prompt",
+                "title": "Escalation reset",
+                "prompt_text": "A sponsor escalates a timeline conflict. Respond with empathy, clarity, and a credible next step.",
+                "difficulty": "advanced",
+                "target_skill_slugs": ["active-listening"],
+                "rubric_id": "quick_practice_text@v1",
+            },
+            {
+                "prompt_version": generation_config.prompt_item_chat_prompt_version,
+                "provider": "test-provider",
+                "model_slug": "test-model",
+                "prompt_items": [
+                    {
+                        "prompt_type": "interview_prompt",
+                        "title_hint": "Tradeoff interview",
+                        "generation_brief": "Ask for a concrete story about making a decision with incomplete data and defending the tradeoffs.",
+                        "difficulty": "advanced",
+                        "target_skill_slugs": ["decision-justification"],
+                        "rubric_id": "interview_text@v1",
+                    }
+                ],
+            },
+            {
+                "prompt_type": "interview_prompt",
+                "title": "Tradeoff interview",
+                "prompt_text": "Tell me about a time you made a decision with incomplete data and had to defend the tradeoffs.",
+                "difficulty": "advanced",
+                "target_skill_slugs": ["decision-justification"],
+                "rubric_id": "interview_text@v1",
+            },
+            {
+                "prompt_version": generation_config.prompt_item_chat_prompt_version,
+                "provider": "test-provider",
+                "model_slug": "test-model",
+                "prompt_items": [
+                    {
+                        "prompt_type": "interview_prompt",
+                        "title_hint": "Duplicate interview",
+                        "generation_brief": "Ask for the same decision story again.",
+                        "difficulty": "advanced",
+                        "target_skill_slugs": ["decision-justification"],
+                        "rubric_id": "interview_text@v1",
+                    }
+                ],
+            },
+            {
+                "prompt_type": "interview_prompt",
+                "title": "Tradeoff interview",
+                "prompt_text": "Tell me about a time you made a decision with incomplete data and had to defend the tradeoffs.",
+                "difficulty": "advanced",
+                "target_skill_slugs": ["decision-justification"],
+                "rubric_id": "interview_text@v1",
+            },
+        ]
+    )
+
+    structured_generation_response = await client.post(
+        f"/api/collections/{collection_id}/generate/prompt-items/structured",
+        headers={"X-User-ID": creator["id"]},
+        json={
+            "title_hint": "Escalation realism pack",
+            "workplace_context": "The engagement is slipping and sponsor patience is thin.",
+            "generation_focus": "Generate one realistic quick practice prompt about resetting expectations.",
+            "realism_notes": ["Keep the stakes concrete"],
+            "target_skill_slugs": ["active-listening"],
+            "counts": {
+                "quick_practice_prompt_count": 1,
+                "interview_prompt_count": 0,
+            },
+        },
+    )
+    assert structured_generation_response.status_code == 200
+    structured_generation_payload = structured_generation_response.json()["data"]
+    assert structured_generation_payload["generation_mode"] == "prompt_items_structured"
+    assert len(structured_generation_payload["prompt_items"]) == 1
+    assert structured_generation_payload["prompt_items"][0]["title"] == "Escalation reset"
+
+    chat_generation_response = await client.post(
+        f"/api/collections/{collection_id}/generate/prompt-items/chat",
+        headers={"X-User-ID": creator["id"]},
+        json={
+            "prompt": "Add an interview prompt about defending a decision made with incomplete data.",
+            "target_skill_slugs": ["decision-justification"],
+            "counts": {
+                "quick_practice_prompt_count": 0,
+                "interview_prompt_count": 1,
+            },
+        },
+    )
+    assert chat_generation_response.status_code == 200
+    chat_generation_payload = chat_generation_response.json()["data"]
+    assert chat_generation_payload["generation_mode"] == "prompt_items_chat"
+    assert len(chat_generation_payload["prompt_items"]) == 1
+    assert chat_generation_payload["prompt_items"][0]["title"] == "Tradeoff interview"
+
+    duplicate_generation_response = await client.post(
+        f"/api/collections/{collection_id}/generate/prompt-items/chat",
+        headers={"X-User-ID": creator["id"]},
+        json={
+            "prompt": "Add that same interview prompt again.",
+            "target_skill_slugs": ["decision-justification"],
+            "counts": {
+                "quick_practice_prompt_count": 0,
+                "interview_prompt_count": 1,
+            },
+        },
+    )
+    assert duplicate_generation_response.status_code == 422
+    assert duplicate_generation_response.json()["error"]["code"] == "SS-VALIDATION-065"
+
+    with app.state.container.session_factory() as session:
+        prompt_records = (
+            session.query(ContentGenerationArtifactRecord)
+            .filter(ContentGenerationArtifactRecord.collection_id == collection_id)
+            .all()
+        )
+        pipeline_names = {
+            record.pipeline_name for record in session.query(PipelineRunRecord).all()
+        }
+
+    assert len(prompt_records) == 2
+    assert "catalog_prompt_items_structured_generation" in pipeline_names
+    assert "catalog_prompt_items_chat_generation" in pipeline_names
+    assert "catalog_prompt_item_worker" in pipeline_names

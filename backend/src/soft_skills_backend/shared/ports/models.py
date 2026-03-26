@@ -14,3 +14,13 @@ class ProviderCompletion(BaseModel):
     model_slug: str
     usage: dict[str, int] = Field(default_factory=dict)
     raw_response: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProviderTextChunk(BaseModel):
+    """Provider text-stream chunk normalized for live token delivery."""
+
+    delta: str
+    model_slug: str | None = None
+    usage: dict[str, int] = Field(default_factory=dict)
+    raw_event: dict[str, Any] = Field(default_factory=dict)
+    done: bool = False

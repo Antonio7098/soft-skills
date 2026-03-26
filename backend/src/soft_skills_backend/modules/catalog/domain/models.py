@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -199,6 +201,66 @@ class ChatCollectionGenerationCommand(BaseModel):
     counts: CollectionGenerationCounts
 
 
+class PromptItemGenerationCounts(BaseModel):
+    quick_practice_prompt_count: int = Field(default=0, ge=0, le=6)
+    interview_prompt_count: int = Field(default=0, ge=0, le=6)
+
+    @model_validator(mode="after")
+    def validate_non_empty(self) -> PromptItemGenerationCounts:
+        if self.quick_practice_prompt_count + self.interview_prompt_count <= 0:
+            raise ValueError("At least one generated prompt item is required")
+        return self
+
+
+class StructuredPromptItemGenerationCommand(BaseModel):
+    title_hint: str | None = None
+    workplace_context: str
+    generation_focus: str
+    realism_notes: list[str] = Field(default_factory=list)
+    target_skill_slugs: list[str] = Field(default_factory=list)
+    counts: PromptItemGenerationCounts
+
+
+class ChatPromptItemGenerationCommand(BaseModel):
+    prompt: str
+    target_skill_slugs: list[str] = Field(default_factory=list)
+    counts: PromptItemGenerationCounts
+
+
+class GeneratedPromptItemPlan(BaseModel):
+    prompt_type: str
+    title_hint: str
+    generation_brief: str
+    difficulty: str
+    target_skill_slugs: list[str]
+    rubric_id: str
+
+
+class GeneratedScenarioPlan(BaseModel):
+    title_hint: str
+    generation_brief: str
+    target_skill_slugs: list[str]
+    rubric_id: str
+    supporting_artifact_count: int = Field(default=0, ge=0, le=3)
+
+
+class GeneratedCollectionBlueprint(BaseModel):
+    prompt_version: str
+    provider: str
+    model_slug: str
+    title: str
+    summary: str
+    prompt_items: list[GeneratedPromptItemPlan] = Field(default_factory=list)
+    scenarios: list[GeneratedScenarioPlan] = Field(default_factory=list)
+
+
+class GeneratedPromptItemPlanBatch(BaseModel):
+    prompt_version: str
+    provider: str
+    model_slug: str
+    prompt_items: list[GeneratedPromptItemPlan] = Field(default_factory=list)
+
+
 class GeneratedPromptItemDraft(BaseModel):
     prompt_type: str
     title: str
@@ -239,6 +301,34 @@ class GeneratedCollectionDraft(BaseModel):
 
 class CollectionGenerationView(BaseModel):
     collection: CollectionView
+    generation_artifact_id: str
+    generation_mode: str
+    prompt_version: str
+    provider: str
+    model_slug: str
+
+
+class GenerationWorkerArtifact(BaseModel):
+    pipeline_name: str
+    child_run_id: str
+    correlation_id: str
+    prompt_version: str
+    provider: str
+    model_slug: str
+    usage: dict[str, int] = Field(default_factory=dict)
+    output_payload: dict[str, Any] = Field(default_factory=dict)
+    raw_payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class GenerationManifest(BaseModel):
+    planner: GenerationWorkerArtifact | None = None
+    prompt_items: list[GenerationWorkerArtifact] = Field(default_factory=list)
+    scenarios: list[GenerationWorkerArtifact] = Field(default_factory=list)
+
+
+class PromptItemGenerationView(BaseModel):
+    collection: CollectionView
+    prompt_items: list[PromptItemView] = Field(default_factory=list)
     generation_artifact_id: str
     generation_mode: str
     prompt_version: str

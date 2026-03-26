@@ -6,15 +6,16 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, TypeVar, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from stageflow.api import Pipeline, PipelineContext
 from stageflow.core import StageContext, StageOutput
 from stageflow.observability.wide_events import WideEventEmitter
-from stageflow.pipeline.dag import UnifiedStageExecutionError
+from stageflow.pipeline.dag import UnifiedPipelineCancelled, UnifiedStageExecutionError
 from stageflow.pipeline.guard_retry import GuardRetryStrategy
 from stageflow.pipeline.idempotency import IdempotencyInterceptor, InMemoryIdempotencyStore
 from stageflow.pipeline.results import PipelineResults
+from stageflow.pipeline.subpipeline import SubpipelineResult, SubpipelineSpawner
 
 from soft_skills_backend.platform.workflows.stageflow_runtime import StageflowRuntime
 from soft_skills_backend.shared.errors import orchestration_error
@@ -88,7 +89,7 @@ def payload_from_results(results: PipelineResults, stage_name: str, *, expected_
                 "actual_type": type(payload).__name__,
             },
         )
-    return cast(T, payload)
+    return payload
 
 
 def summary_from_output(output: StageOutput) -> dict[str, Any]:
@@ -149,6 +150,7 @@ async def run_logged_pipeline(
     idempotency_params: dict[str, Any] | None = None,
     guard_retry_strategy: GuardRetryStrategy | None = None,
     timeout_ms: int | None = None,
+    on_context_ready: Callable[[PipelineContext], None] | None = None,
 ) -> PipelineResults:
     """Run a Stageflow pipeline with shared correlation, logging, and wide-event wiring."""
 
@@ -177,6 +179,8 @@ async def run_logged_pipeline(
         service=service,
         data=ctx_data,
     )
+    if on_context_ready is not None:
+        on_context_ready(ctx)
     await support.pipeline_run_logger.log_run_started(
         pipeline_run_id=pipeline_run_id,
         pipeline_name=pipeline.name,
@@ -195,6 +199,18 @@ async def run_logged_pipeline(
             emit_pipeline_wide_event=True,
             wide_event_emitter=support.wide_event_emitter,
         )
+    except UnifiedPipelineCancelled as exc:
+        finished_at = datetime.now(UTC)
+        await support.pipeline_run_logger.log_run_completed(
+            pipeline_run_id=pipeline_run_id,
+            pipeline_name=pipeline.name,
+            duration_ms=int((finished_at - started_at).total_seconds() * 1000),
+            status="cancelled",
+            stage_results=_stage_summaries(pipeline, exc.results),
+            request_id=request_id,
+            trace_id=trace_id,
+        )
+        return exc.results
     except UnifiedStageExecutionError as exc:
         await support.pipeline_run_logger.log_run_failed(
             pipeline_run_id=pipeline_run_id,
@@ -241,6 +257,123 @@ def _stage_summaries(pipeline: Pipeline, results: PipelineResults) -> dict[str, 
         }
         for stage_name, output in results.items()
     }
+
+
+async def run_logged_subpipeline(
+    support: StageflowPipelineSupport,
+    *,
+    parent_ctx: StageContext,
+    parent_stage_name: str,
+    correlation_id: UUID,
+    pipeline: Pipeline,
+    result_stage_name: str,
+    execution_mode: str,
+    service: str,
+    idempotency_key: str | None = None,
+    idempotency_params: dict[str, Any] | None = None,
+    guard_retry_strategy: GuardRetryStrategy | None = None,
+    timeout_ms: int | None = None,
+) -> SubpipelineResult:
+    """Run a logged Stageflow child pipeline and preserve parent-child lineage."""
+
+    pipeline_ctx = PipelineContext.from_snapshot(
+        parent_ctx.snapshot,
+        event_sink=parent_ctx.event_sink,
+        ports=parent_ctx.inputs.ports,
+        service=service,
+        data={},
+    )
+    if idempotency_key is not None:
+        pipeline_ctx.data["idempotency_key"] = idempotency_key
+    if idempotency_params is not None:
+        pipeline_ctx.data["idempotency_params"] = idempotency_params
+    if timeout_ms is not None:
+        pipeline_ctx.data["_timeout_ms"] = timeout_ms
+
+    spawner = SubpipelineSpawner()
+
+    async def runner(child_ctx: PipelineContext) -> dict[str, Any]:
+        # Subpipeline forking preserves parent context data in `_parent_data` and gives
+        # the child a fresh mutable `data` dict. Rehydrate application-scoped controls
+        # like timeout and idempotency so child stages run under the intended budget.
+        parent_data = getattr(child_ctx, "_parent_data", None)
+        if parent_data:
+            child_ctx.data.update(dict(parent_data))
+        child_run_id = child_ctx.pipeline_run_id
+        request_id = None if child_ctx.request_id is None else str(child_ctx.request_id)
+        trace_id = (
+            None
+            if child_ctx.metadata.get("trace_id") is None
+            else str(child_ctx.metadata["trace_id"])
+        )
+        await support.pipeline_run_logger.log_run_started(
+            pipeline_run_id=child_run_id,
+            pipeline_name=pipeline.name,
+            topology=child_ctx.topology or pipeline.name,
+            execution_mode=child_ctx.execution_mode,
+            user_id=child_ctx.user_id,
+            request_id=request_id,
+            trace_id=trace_id,
+        )
+        started_at = datetime.now(UTC)
+        try:
+            results = await pipeline.run(
+                child_ctx,
+                interceptors=support.interceptors(scoped_idempotency=idempotency_key is not None),
+                guard_retry_strategy=guard_retry_strategy,
+                emit_stage_wide_events=True,
+                emit_pipeline_wide_event=True,
+                wide_event_emitter=support.wide_event_emitter,
+            )
+        except UnifiedStageExecutionError as exc:
+            await support.pipeline_run_logger.log_run_failed(
+                pipeline_run_id=child_run_id,
+                pipeline_name=pipeline.name,
+                error=str(exc.original),
+                stage=exc.stage,
+                request_id=request_id,
+                trace_id=trace_id,
+            )
+            raise exc.original from exc
+        except Exception as exc:
+            await support.pipeline_run_logger.log_run_failed(
+                pipeline_run_id=child_run_id,
+                pipeline_name=pipeline.name,
+                error=str(exc),
+                stage=None,
+                request_id=request_id,
+                trace_id=trace_id,
+            )
+            raise orchestration_error(
+                "Stageflow child pipeline execution failed unexpectedly",
+                code="SS-ORCHESTRATION-006",
+                details={"pipeline_name": pipeline.name, "reason": str(exc)},
+            ) from exc
+
+        finished_at = datetime.now(UTC)
+        await support.pipeline_run_logger.log_run_completed(
+            pipeline_run_id=child_run_id,
+            pipeline_name=pipeline.name,
+            duration_ms=int((finished_at - started_at).total_seconds() * 1000),
+            status="completed",
+            stage_results=_stage_summaries(pipeline, results),
+            request_id=request_id,
+            trace_id=trace_id,
+        )
+        return {
+            "payload": results.require_ok(result_stage_name).data["payload"],
+            "stage_results": _stage_summaries(pipeline, results),
+        }
+
+    return await spawner.spawn(
+        pipeline_name=pipeline.name,
+        ctx=pipeline_ctx,
+        correlation_id=correlation_id,
+        parent_stage_id=parent_stage_name,
+        runner=runner,
+        topology=pipeline.name,
+        execution_mode=execution_mode,
+    )
 
 
 class StageScopedIdempotencyInterceptor(IdempotencyInterceptor):

@@ -100,7 +100,7 @@ class SqlAlchemyWorkflowEventRepository:
         event_id: str,
         *,
         error_code: str | None = None,
-        payload: dict | None = None,
+        payload: dict[str, object] | None = None,
     ) -> WorkflowEventRecord | None:
         with self._session_factory() as session:
             record = session.get(WorkflowEventRecord, event_id)

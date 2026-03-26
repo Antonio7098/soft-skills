@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import cast
 
 import httpx
@@ -104,10 +105,9 @@ class SmokeBackendClient:
         return self.data(response)
 
     async def generate_structured_collection(self, *, user_id: str) -> JsonObject:
-        response = await self._client.post(
-            "/api/collections/generate/structured",
-            headers={"X-User-ID": user_id},
-            json={
+        payload = await self.generate_structured_collection_payload(
+            user_id=user_id,
+            payload={
                 "title_hint": "Smoke Structured Draft",
                 "target_audience": "Early-career consultants",
                 "difficulty": "intermediate",
@@ -127,15 +127,26 @@ class SmokeBackendClient:
                 },
             },
         )
-        self.require_ok(response, "generate structured collection")
-        payload = self.data(response)
         return cast(JsonObject, payload["collection"])
 
-    async def generate_chat_collection(self, *, user_id: str) -> JsonObject:
+    async def generate_structured_collection_payload(
+        self,
+        *,
+        user_id: str,
+        payload: JsonObject,
+    ) -> JsonObject:
         response = await self._client.post(
-            "/api/collections/generate/chat",
+            "/api/collections/generate/structured",
             headers={"X-User-ID": user_id},
-            json={
+            json=payload,
+        )
+        self.require_ok(response, "generate structured collection")
+        return self.data(response)
+
+    async def generate_chat_collection(self, *, user_id: str) -> JsonObject:
+        payload = await self.generate_chat_collection_payload(
+            user_id=user_id,
+            payload={
                 "prompt": (
                     "Create a realistic interview draft about making a decision with incomplete "
                     "information while keeping a senior stakeholder aligned."
@@ -154,11 +165,99 @@ class SmokeBackendClient:
                 },
             },
         )
-        self.require_ok(response, "generate chat collection")
-        payload = self.data(response)
         return cast(JsonObject, payload["collection"])
 
-    async def start_quick_practice_session(self, *, user_id: str, prompt_item_id: str) -> JsonObject:
+    async def generate_chat_collection_payload(
+        self,
+        *,
+        user_id: str,
+        payload: JsonObject,
+    ) -> JsonObject:
+        response = await self._client.post(
+            "/api/collections/generate/chat",
+            headers={"X-User-ID": user_id},
+            json=payload,
+        )
+        self.require_ok(response, "generate chat collection")
+        return self.data(response)
+
+    async def generate_structured_prompt_items(
+        self,
+        *,
+        user_id: str,
+        collection_id: str,
+    ) -> JsonObject:
+        return await self.generate_structured_prompt_items_payload(
+            user_id=user_id,
+            collection_id=collection_id,
+            payload={
+                "title_hint": "Smoke Prompt Expansion",
+                "workplace_context": "A senior stakeholder is escalating delivery risk after new legal feedback.",
+                "generation_focus": "Generate one realistic quick practice prompt about resetting expectations.",
+                "realism_notes": ["Keep the conflict concrete and business-relevant."],
+                "target_skill_slugs": ["active-listening"],
+                "counts": {
+                    "quick_practice_prompt_count": 1,
+                    "interview_prompt_count": 0,
+                },
+            },
+        )
+
+    async def generate_structured_prompt_items_payload(
+        self,
+        *,
+        user_id: str,
+        collection_id: str,
+        payload: JsonObject,
+    ) -> JsonObject:
+        response = await self._client.post(
+            f"/api/collections/{collection_id}/generate/prompt-items/structured",
+            headers={"X-User-ID": user_id},
+            json=payload,
+        )
+        self.require_ok(response, "generate structured prompt items")
+        return self.data(response)
+
+    async def generate_chat_prompt_items(
+        self,
+        *,
+        user_id: str,
+        collection_id: str,
+    ) -> JsonObject:
+        return await self.generate_chat_prompt_items_payload(
+            user_id=user_id,
+            collection_id=collection_id,
+            payload={
+                "prompt": (
+                    "Add an interview prompt about defending a decision made with incomplete "
+                    "information while keeping a senior stakeholder aligned."
+                ),
+                "target_skill_slugs": ["decision-justification"],
+                "counts": {
+                    "quick_practice_prompt_count": 0,
+                    "interview_prompt_count": 1,
+                },
+            },
+        )
+
+    async def generate_chat_prompt_items_payload(
+        self,
+        *,
+        user_id: str,
+        collection_id: str,
+        payload: JsonObject,
+    ) -> JsonObject:
+        response = await self._client.post(
+            f"/api/collections/{collection_id}/generate/prompt-items/chat",
+            headers={"X-User-ID": user_id},
+            json=payload,
+        )
+        self.require_ok(response, "generate chat prompt items")
+        return self.data(response)
+
+    async def start_quick_practice_session(
+        self, *, user_id: str, prompt_item_id: str
+    ) -> JsonObject:
         response = await self._client.post(
             "/api/attempts/quick-practice/sessions",
             headers={"X-User-ID": user_id},
@@ -255,6 +354,85 @@ class SmokeBackendClient:
         )
         self.require_ok(response, "list aggregate practice runs")
         return cast(list[JsonObject], response.json()["data"])
+
+    async def create_assistant_session(
+        self,
+        *,
+        user_id: str,
+        title: str | None = None,
+    ) -> JsonObject:
+        response = await self._client.post(
+            "/api/assistant/sessions",
+            headers={"X-User-ID": user_id},
+            json={} if title is None else {"title": title},
+        )
+        self.require_ok(response, "create assistant session")
+        return self.data(response)
+
+    async def create_assistant_turn(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        message: str,
+    ) -> JsonObject:
+        response = await self._client.post(
+            f"/api/assistant/sessions/{session_id}/turns",
+            headers={"X-User-ID": user_id},
+            json={"message": message},
+        )
+        self.require_ok(response, "create assistant turn")
+        return self.data(response)
+
+    async def get_assistant_session(self, *, user_id: str, session_id: str) -> JsonObject:
+        response = await self._client.get(
+            f"/api/assistant/sessions/{session_id}",
+            headers={"X-User-ID": user_id},
+        )
+        self.require_ok(response, "get assistant session")
+        return self.data(response)
+
+    async def list_assistant_sessions(self, *, user_id: str) -> list[JsonObject]:
+        response = await self._client.get(
+            "/api/assistant/sessions",
+            headers={"X-User-ID": user_id},
+        )
+        self.require_ok(response, "list assistant sessions")
+        return cast(list[JsonObject], response.json()["data"])
+
+    async def list_assistant_messages(self, *, user_id: str, session_id: str) -> list[JsonObject]:
+        response = await self._client.get(
+            f"/api/assistant/sessions/{session_id}/messages",
+            headers={"X-User-ID": user_id},
+        )
+        self.require_ok(response, "list assistant messages")
+        return cast(list[JsonObject], response.json()["data"])
+
+    async def wait_for_assistant_turn(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        turn_id: str,
+        timeout_seconds: float = 120.0,
+        poll_interval_seconds: float = 0.5,
+    ) -> JsonObject:
+        deadline = asyncio.get_running_loop().time() + timeout_seconds
+        while True:
+            session_payload = await self.get_assistant_session(user_id=user_id, session_id=session_id)
+            for turn in cast(list[JsonObject], session_payload.get("turns", [])):
+                if str(turn.get("id")) != turn_id:
+                    continue
+                status = str(turn.get("status"))
+                if status in {"completed", "failed", "cancelled"}:
+                    return turn
+            if asyncio.get_running_loop().time() >= deadline:
+                raise provider_error(
+                    "Smoke backend step failed",
+                    code="SS-PROVIDER-011",
+                    details={"operation": "wait for assistant turn", "turn_id": turn_id},
+                )
+            await asyncio.sleep(poll_interval_seconds)
 
     @staticmethod
     def data(response: httpx.Response) -> JsonObject:

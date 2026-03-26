@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session, sessionmaker
 from stageflow.api import Pipeline, StageKind, stage
+from stageflow.core import StageContext
 
 from soft_skills_backend.modules.catalog.contracts.prompt_item_commands import (
     PromptItemCreateCommand,
@@ -59,7 +60,7 @@ class PromptItemService:
         collection_id: str,
         command: PromptItemCreateCommand,
     ) -> PromptItemView:
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 collection = self._collection_or_error(session, collection_id)
                 require_collection_owner_or_admin(actor, collection)
@@ -74,7 +75,7 @@ class PromptItemService:
                 )
             )
 
-        async def persistence_work(_ctx) -> Any:
+        async def persistence_work(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 collection = self._collection_or_error(session, collection_id)
                 record = PromptItemRecord(
@@ -145,7 +146,7 @@ class PromptItemService:
         prompt_item_id: str,
         command: PromptItemUpdateCommand,
     ) -> PromptItemView:
-        async def input_guard(_ctx) -> Any:
+        async def input_guard(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 collection = self._collection_or_error(session, collection_id)
                 prompt_item = self._prompt_item_or_error(session, prompt_item_id)
@@ -164,7 +165,7 @@ class PromptItemService:
                 )
             )
 
-        async def persistence_work(_ctx) -> Any:
+        async def persistence_work(_ctx: StageContext) -> Any:
             with self._session_factory() as session:
                 collection = self._collection_or_error(session, collection_id)
                 prompt_item = self._prompt_item_or_error(session, prompt_item_id)

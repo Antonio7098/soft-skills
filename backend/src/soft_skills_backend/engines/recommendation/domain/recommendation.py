@@ -44,12 +44,17 @@ def compute_recommendation(
     for candidate in candidates:
         if not candidate.target_dimension_refs:
             continue
-        if config.allowed_lifecycle_states and candidate.lifecycle_state not in set(config.allowed_lifecycle_states):
+        if config.allowed_lifecycle_states and candidate.lifecycle_state not in set(
+            config.allowed_lifecycle_states
+        ):
             continue
-        if candidate.difficulty in set(config.advanced_difficulty_labels) and candidate.target_aggregate_refs:
+        if (
+            candidate.difficulty in set(config.advanced_difficulty_labels)
+            and candidate.target_aggregate_refs
+        ):
             readiness = max(
                 (
-                    aggregate_map.get(aggregate_ref).score
+                    aggregate_map[aggregate_ref].score
                     for aggregate_ref in candidate.target_aggregate_refs
                     if aggregate_ref in aggregate_map
                 ),
@@ -94,9 +99,13 @@ def compute_recommendation(
         )
 
     ranked.sort(key=lambda item: (-item[0], item[1].title, item[1].content_ref))
-    selected = [item for _, item in ranked if item.score > config.minimum_score][: config.max_recommendations]
+    selected = [item for _, item in ranked if item.score > config.minimum_score][
+        : config.max_recommendations
+    ]
     alternatives = [
-        item for _, item in ranked[config.max_recommendations :] if item.score > config.minimum_score
+        item
+        for _, item in ranked[config.max_recommendations :]
+        if item.score > config.minimum_score
     ][: config.max_alternatives]
     if not selected:
         raise validation_error(
@@ -145,10 +154,7 @@ def _recommendation_components(
         for state in overlapping_states
         if abs(state.delta) < 0.05 and state.evidence_count >= 2
     ]
-    coverage_values = [
-        1 - min(1.0, state.evidence_count / 2)
-        for state in overlapping_states
-    ]
+    coverage_values = [1 - min(1.0, state.evidence_count / 2) for state in overlapping_states]
     verification_boost = 0.5 if candidate.verification_state in set(config.verified_states) else 0.0
     repeat_penalty = 0.0
     if candidate.last_attempted_at is not None:
@@ -156,7 +162,10 @@ def _recommendation_components(
         if last_attempted_at >= now - timedelta(hours=config.cooldown_hours):
             repeat_penalty = config.immediate_repeat_penalty
         else:
-            repeat_penalty = min(config.repeat_penalty_cap, candidate.attempt_count * config.repeat_penalty_per_attempt)
+            repeat_penalty = min(
+                config.repeat_penalty_cap,
+                candidate.attempt_count * config.repeat_penalty_per_attempt,
+            )
     return {
         "dimension_deficit_alignment": _average(deficit_values),
         "stagnation_relief": _average(stagnation_values),
@@ -176,7 +185,11 @@ def _reason_codes(
     reasons: list[str] = []
     weak_overlap = sorted(
         (
-            state for state in (dimension_map.get(dimension_ref) for dimension_ref in candidate.target_dimension_refs)
+            state
+            for state in (
+                dimension_map.get(dimension_ref)
+                for dimension_ref in candidate.target_dimension_refs
+            )
             if state is not None and state.evidence_count > 0 and state.score < 0.65
         ),
         key=lambda state: (state.score, state.dimension_ref),
@@ -185,7 +198,11 @@ def _reason_codes(
         reasons.append(f"weak_dimension:{weak_overlap[0].dimension_ref}")
     stagnating_overlap = sorted(
         (
-            state for state in (dimension_map.get(dimension_ref) for dimension_ref in candidate.target_dimension_refs)
+            state
+            for state in (
+                dimension_map.get(dimension_ref)
+                for dimension_ref in candidate.target_dimension_refs
+            )
             if state is not None and state.evidence_count >= 2 and abs(state.delta) < 0.05
         ),
         key=lambda state: (state.score, state.dimension_ref),
@@ -194,7 +211,11 @@ def _reason_codes(
         reasons.append(f"stagnation:{stagnating_overlap[0].dimension_ref}")
     coverage_overlap = sorted(
         (
-            state for state in (dimension_map.get(dimension_ref) for dimension_ref in candidate.target_dimension_refs)
+            state
+            for state in (
+                dimension_map.get(dimension_ref)
+                for dimension_ref in candidate.target_dimension_refs
+            )
             if state is not None and state.evidence_count < 2
         ),
         key=lambda state: (state.evidence_count, state.dimension_ref),

@@ -4,10 +4,10 @@ import asyncio
 
 import pytest
 
-from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 from soft_skills_backend.config import Settings
-from soft_skills_backend.shared.errors import AppError
 from soft_skills_backend.platform.providers.llm.openai_compatible import OpenAICompatibleLLMProvider
+from soft_skills_backend.shared.errors import AppError
+from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
 
 class _NoOpProviderCallLogger:

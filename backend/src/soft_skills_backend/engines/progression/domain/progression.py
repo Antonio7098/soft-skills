@@ -75,10 +75,16 @@ def compute_progression_snapshot(
             streak=aggregate.streak,
             delta=_round(
                 aggregate.score
-                - (previous_state.dimension_scores.get(dimension_ref, 0.0) if previous_state else 0.0)
+                - (
+                    previous_state.dimension_scores.get(dimension_ref, 0.0)
+                    if previous_state
+                    else 0.0
+                )
             ),
             last_assessment_at=(
-                None if aggregate.last_assessment_at is None else aggregate.last_assessment_at.isoformat()
+                None
+                if aggregate.last_assessment_at is None
+                else aggregate.last_assessment_at.isoformat()
             ),
             contributions=list(aggregate.contributions),
         )
@@ -101,14 +107,20 @@ def compute_progression_snapshot(
             raw_score += aggregate.score * weight
             raw_confidence += aggregate.confidence * weight
         score = raw_score
-        for dimension_ref, floor, ceiling in gate_rules_by_aggregate.get(definition.aggregate_ref, []):
-            aggregate = dimension_state_map.get(dimension_ref)
-            if aggregate is None:
+        for dimension_ref, floor, ceiling in gate_rules_by_aggregate.get(
+            definition.aggregate_ref, []
+        ):
+            gate_aggregate = dimension_state_map.get(dimension_ref)
+            if gate_aggregate is None:
                 continue
-            if aggregate.score < floor and score > ceiling:
+            if gate_aggregate.score < floor and score > ceiling:
                 score = ceiling
                 gating_reasons.append(f"{dimension_ref}_floor")
-        prior_score = previous_state.aggregate_scores.get(definition.aggregate_ref, 0.0) if previous_state else 0.0
+        prior_score = (
+            previous_state.aggregate_scores.get(definition.aggregate_ref, 0.0)
+            if previous_state
+            else 0.0
+        )
         aggregate_states.append(
             AggregateState(
                 aggregate_ref=definition.aggregate_ref,
@@ -164,7 +176,11 @@ def diff_summary(
     changed_dimension_count = sum(
         1
         for state in snapshot.dimension_states
-        if not math.isclose(state.score, previous_state.dimension_scores.get(state.dimension_ref, 0.0), abs_tol=0.001)
+        if not math.isclose(
+            state.score,
+            previous_state.dimension_scores.get(state.dimension_ref, 0.0),
+            abs_tol=0.001,
+        )
     )
     changed_aggregate_count = sum(
         1
@@ -245,7 +261,7 @@ def _compute_dimension_aggregate(
                 ],
             )
         )
-    score = weighted_score / total_weight if total_weight else 0.0
+    computed_score = weighted_score / total_weight if total_weight else 0.0
     last_assessment_at = _as_utc(matching_scores[-1][0].created_at)
     confidence = _confidence(
         evidence_count=len(matching_scores),
@@ -256,7 +272,7 @@ def _compute_dimension_aggregate(
     )
     return _DimensionAggregate(
         dimension_ref=dimension_ref,
-        score=score,
+        score=computed_score,
         confidence=confidence,
         evidence_count=len(matching_scores),
         recent_evidence_count=recent_evidence_count,
