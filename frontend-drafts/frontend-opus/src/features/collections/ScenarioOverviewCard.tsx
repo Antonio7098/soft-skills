@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { Card } from '@/design-system/primitives/Card';
 import { Badge } from '@/design-system/primitives/Badge';
 import { Avatar } from '@/design-system/primitives/Avatar';
-import { cn } from '@/lib/cn';
 import type { ScenarioView } from '@/data';
 
 interface ScenarioOverviewCardProps {

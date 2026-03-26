@@ -16,6 +16,7 @@ interface SessionShellProps {
   readonly sidebar?: ReactNode;
   readonly onEnd?: () => void;
   readonly className?: string;
+  readonly wide?: boolean;
 }
 
 const shellVariants = {
@@ -40,6 +41,7 @@ export function SessionShell({
   sidebar,
   onEnd,
   className,
+  wide = false,
 }: SessionShellProps) {
   const navigate = useNavigate();
 
@@ -86,7 +88,7 @@ export function SessionShell({
           </motion.aside>
         )}
         <motion.main variants={childVariants} className="flex-1 overflow-y-auto p-6 md:p-10">
-          <div className="max-w-2xl mx-auto flex flex-col gap-8">
+          <div className={cn('flex flex-col gap-8', wide ? 'w-full' : 'max-w-2xl mx-auto')}>
             {children}
           </div>
         </motion.main>

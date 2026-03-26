@@ -8,6 +8,8 @@ import type {
   AttemptView,
   InterviewSessionView,
   ScenarioSessionView,
+  PracticeRunView,
+  PracticeSessionView,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -79,6 +81,16 @@ export const apiDataProvider: DataProvider = {
     request<ScenarioSessionView>('/attempts/scenario/sessions', { method: 'POST', body: JSON.stringify({ scenario_id: scenarioId }) }),
   submitScenarioStep: (sessionId, cmd) =>
     request<ScenarioSessionView>(`/attempts/scenario/sessions/${sessionId}/steps`, { method: 'POST', body: JSON.stringify(cmd) }),
+
+  // --- Practice Runs (Aggregate) ---------------------------------------------
+  createPracticeRun: (cmd) =>
+    request<PracticeRunView>('/practice-runs', { method: 'POST', body: JSON.stringify(cmd) }),
+  listPracticeRuns: () =>
+    request<PracticeRunView[]>('/practice-runs'),
+  getPracticeRun: (runId) =>
+    request<PracticeRunView>(`/practice-runs/${runId}`),
+  getPracticeSessions: (runId) =>
+    request<PracticeSessionView[]>(`/practice-runs/${runId}/sessions`),
 
   // --- Progress (no backend endpoint yet — stub) ---------------------------
   getCompetencyProgress: async () => {

@@ -354,3 +354,63 @@ export interface AttemptHistoryItem {
   readonly created_at: string;
   readonly status: AttemptStatus;
 }
+
+// --- Practice Run (Aggregate) -----------------------------------------------
+
+export type PracticeRunStatus = 'active' | 'completed' | 'abandoned';
+export type PracticeRunItemType = 'prompt_item' | 'scenario';
+
+export interface PracticeRunItemSummary {
+  readonly id: string;
+  readonly item_type: PracticeRunItemType;
+  readonly title: string;
+  readonly difficulty: Difficulty;
+  readonly target_skill_slugs: string[];
+  readonly status: 'pending' | 'active' | 'completed' | 'skipped';
+}
+
+export interface PracticeRunSummary {
+  readonly total_items: number;
+  readonly completed_items: number;
+  readonly overall_score: number | null;
+  readonly score_distribution: Record<string, number>;
+  readonly skill_breakdown: Record<string, { avg_score: number; count: number }>;
+  readonly practice_type_breakdown: Record<string, number>;
+}
+
+export interface PracticeRunView {
+  readonly id: string;
+  readonly user_id: string;
+  readonly title: string;
+  readonly status: PracticeRunStatus;
+  readonly items: PracticeRunItemSummary[];
+  readonly summary: PracticeRunSummary;
+  readonly created_at: string;
+  readonly updated_at: string;
+  readonly completed_at: string | null;
+}
+
+export interface PracticeSessionView {
+  readonly id: string;
+  readonly practice_run_id: string;
+  readonly sequence_index: number;
+  readonly content_item_id: string;
+  readonly content_item_type: PracticeRunItemType;
+  readonly attempt_id: string;
+  readonly status: SessionStatus;
+  readonly score: number | null;
+  readonly started_at: string;
+  readonly completed_at: string | null;
+}
+
+export interface StartPracticeRunCommand {
+  readonly title: string;
+  readonly selected_items: readonly {
+    readonly item_id: string;
+    readonly item_type: PracticeRunItemType;
+  }[];
+}
+
+export interface SubmitAttemptCommand {
+  readonly response_text: string;
+}

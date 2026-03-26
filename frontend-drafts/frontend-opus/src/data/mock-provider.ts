@@ -17,6 +17,10 @@ import type {
   AttemptHistoryItem,
   InterviewSessionView,
   ScenarioSessionView,
+  PracticeRunView,
+  PracticeSessionView,
+  StartPracticeRunCommand,
+  PracticeRunItemSummary,
 } from './types';
 import {
   SEED_SKILLS,
@@ -126,6 +130,8 @@ let _user = { ...SEED_CURRENT_USER };
 let _attempts = [...SEED_ATTEMPT_HISTORY];
 const _interviewSessions = new Map<string, InterviewSessionView>();
 const _scenarioSessions = new Map<string, ScenarioSessionView>();
+const _practiceRuns = new Map<string, PracticeRunView>();
+const _practiceSessions = new Map<string, PracticeSessionView>();
 
 function delay(ms = 300): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -649,5 +655,104 @@ export const mockDataProvider: DataProvider = {
   async getAttemptHistory(_userId: string): Promise<AttemptHistoryItem[]> {
     await delay(150);
     return _attempts;
+  },
+
+  // --- Practice Runs (Aggregate) ---------------------------------------------
+
+  async createPracticeRun(cmd: StartPracticeRunCommand): Promise<PracticeRunView> {
+    await delay(300);
+    const runId = `run-${uid()}`;
+    const now = new Date().toISOString();
+
+    const items: PracticeRunItemSummary[] = cmd.selected_items.map((sel, idx) => {
+      let title = '';
+      let difficulty: 'introductory' | 'intermediate' | 'advanced' = 'intermediate';
+      let skillSlugs: string[] = [];
+
+      if (sel.item_type === 'prompt_item') {
+        const item = _collections.flatMap((c) => c.prompt_items).find((p) => p.id === sel.item_id);
+        if (item) {
+          title = item.title;
+          difficulty = item.difficulty;
+          skillSlugs = item.target_skill_slugs;
+        }
+      } else {
+        const scenario = _collections.flatMap((c) => c.scenarios).find((s) => s.id === sel.item_id);
+        if (scenario) {
+          title = scenario.title;
+          difficulty = 'intermediate';
+          skillSlugs = scenario.target_skill_slugs;
+        }
+      }
+
+      return {
+        id: sel.item_id,
+        item_type: sel.item_type,
+        title: title || `Item ${idx + 1}`,
+        difficulty,
+        target_skill_slugs: skillSlugs,
+        status: 'pending' as const,
+      };
+    });
+
+    items.forEach((item, idx) => {
+      const sessionId = `ps-${uid()}`;
+      const attemptId = `att-${uid()}`;
+      _practiceSessions.set(sessionId, {
+        id: sessionId,
+        practice_run_id: runId,
+        sequence_index: idx,
+        content_item_id: item.id,
+        content_item_type: item.item_type,
+        attempt_id: attemptId,
+        status: 'active',
+        score: null,
+        started_at: now,
+        completed_at: null,
+      });
+    });
+
+    const run: PracticeRunView = {
+      id: runId,
+      user_id: _user.id,
+      title: cmd.title,
+      status: 'active',
+      items,
+      summary: {
+        total_items: items.length,
+        completed_items: 0,
+        overall_score: null,
+        score_distribution: {},
+        skill_breakdown: {},
+        practice_type_breakdown: {},
+      },
+      created_at: now,
+      updated_at: now,
+      completed_at: null,
+    };
+
+    _practiceRuns.set(runId, run);
+    return run;
+  },
+
+  async listPracticeRuns(): Promise<PracticeRunView[]> {
+    await delay(150);
+    return Array.from(_practiceRuns.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+  },
+
+  async getPracticeRun(runId: string): Promise<PracticeRunView> {
+    await delay(150);
+    const run = _practiceRuns.get(runId);
+    if (!run) throw new Error(`Practice run ${runId} not found`);
+    return run;
+  },
+
+  async getPracticeSessions(runId: string): Promise<PracticeSessionView[]> {
+    await delay(150);
+    return Array.from(_practiceSessions.values())
+      .filter((s) => s.practice_run_id === runId)
+      .sort((a, b) => a.sequence_index - b.sequence_index);
   },
 };

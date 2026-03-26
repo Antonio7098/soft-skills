@@ -17,6 +17,7 @@ import { ScenarioDetail } from './pages/ScenarioDetail';
 import { QuickPracticeSession } from './pages/session/QuickPracticeSession';
 import { InterviewSession } from './pages/session/InterviewSession';
 import { ScenarioSession } from './pages/session/ScenarioSession';
+import { PracticeRunSession } from './pages/session/PracticeRunSession';
 import './index.css';
 
 const router = createBrowserRouter([
@@ -42,6 +43,7 @@ const router = createBrowserRouter([
       { path: 'quick/:promptId', element: <QuickPracticeSession /> },
       { path: 'interview/:promptId', element: <InterviewSession /> },
       { path: 'scenario/:scenarioId', element: <ScenarioSession /> },
+      { path: 'practice-run/:runId', element: <PracticeRunSession /> },
     ],
   },
 ]);
