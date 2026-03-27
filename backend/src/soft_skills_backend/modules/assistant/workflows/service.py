@@ -288,13 +288,14 @@ class AssistantWorkflowService:
                 ),
             )
             if result.cancelled:
+                reason = result.reason or "cancelled"
                 cancelled = self._repository.mark_turn_cancelled(
                     turn_id=execution.turn_id,
-                    reason=result.reason,
+                    reason=reason,
                 )
                 await self._emit_turn_cancelled(cancelled)
                 return StageOutput.cancel(
-                    reason=result.reason,
+                    reason=reason,
                     data={"payload": {"status": "cancelled"}, "summary": {"status": "cancelled"}},
                 )
             (
@@ -416,7 +417,7 @@ class AssistantWorkflowService:
                     raise validation_error(
                         "Assistant blocked unsafe user content",
                         code="SS-VALIDATION-204",
-                        details={"reason": exc.report.reason},
+                        details={"guardrail": exc.report.guardrail},
                     ) from exc
                 messages.append(hardened)
 
@@ -448,6 +449,21 @@ class AssistantWorkflowService:
                     model_slug=typed.model_slug,
                     planning_messages=list(messages),
                 )
+            for tool_request in decision.tool_calls:
+                ctx.try_emit_event(
+                    "tool.invoked",
+                    {
+                        "tool_name": tool_request.tool_name,
+                        "call_id": tool_request.call_id,
+                        "arguments": tool_request.arguments,
+                        "pipeline_run_id": str(ctx.pipeline_run_id)
+                        if ctx.pipeline_run_id
+                        else None,
+                        "request_id": execution.request_id,
+                        "trace_id": execution.trace_id,
+                        "workflow_id": execution.workflow_id,
+                    },
+                )
             tool_results = await self._tools.execute_many(
                 stage_ctx=ctx,
                 execution=ToolExecutionContext(
@@ -473,7 +489,10 @@ class AssistantWorkflowService:
                     raise validation_error(
                         "Assistant blocked unsafe tool output",
                         code="SS-VALIDATION-205",
-                        details={"reason": exc.report.reason, "tool_name": tool_result.tool_name},
+                        details={
+                            "guardrail": exc.report.guardrail,
+                            "tool_name": tool_result.tool_name,
+                        },
                     ) from exc
                 messages.append(hardened_tool)
         raise orchestration_error(

@@ -6,15 +6,81 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from soft_skills_backend.platform.observability.events import PipelineRunLog, ProviderCallLog
-from soft_skills_backend.shared.ports import PipelineRunRepository, ProviderCallRepository
+from pydantic import BaseModel, Field
+
+from soft_skills_backend.platform.observability.events import (
+    PipelineRunLog,
+    ProviderCallLog,
+    WorkflowEvent,
+)
+from soft_skills_backend.shared.errors import AppError, ErrorCategory
+from soft_skills_backend.shared.ports import (
+    PipelineRunRepository,
+    ProviderCallRepository,
+    WorkflowEventRepository,
+)
+
+
+class PipelineErrorSummary(BaseModel):
+    error_type: str
+    error_code: str | None = None
+    category: str | None = None
+    stage_name: str | None = None
+    pipeline_name: str | None = None
+    root_cause: str | None = None
+    is_retryable: bool = False
+    context: dict[str, Any] = Field(default_factory=dict)
+
+
+def summarize_pipeline_error(
+    error: str | Exception,
+    *,
+    stage_name: str | None = None,
+    pipeline_name: str | None = None,
+) -> PipelineErrorSummary:
+    error_type = type(error).__name__ if isinstance(error, Exception) else "UnknownError"
+    error_code: str | None = None
+    category: str | None = None
+    root_cause: str | None = None
+    is_retryable = False
+    context: dict[str, Any] = {}
+
+    if isinstance(error, AppError):
+        error_code = error.code
+        category = error.category.value
+        root_cause = error.message
+        is_retryable = error.category in (ErrorCategory.PROVIDER, ErrorCategory.PERSISTENCE)
+        context = dict(error.details) if error.details else {}
+    elif isinstance(error, Exception):
+        root_cause = str(error)
+        error_type = type(error).__name__
+        if "timeout" in root_cause.lower():
+            is_retryable = True
+    else:
+        root_cause = str(error)
+
+    return PipelineErrorSummary(
+        error_type=error_type,
+        error_code=error_code,
+        category=category,
+        stage_name=stage_name,
+        pipeline_name=pipeline_name,
+        root_cause=root_cause,
+        is_retryable=is_retryable,
+        context=context,
+    )
 
 
 class DatabasePipelineRunLogger:
     """Persist Stageflow pipeline run lifecycle metadata."""
 
-    def __init__(self, repository: PipelineRunRepository) -> None:
+    def __init__(
+        self,
+        repository: PipelineRunRepository,
+        workflow_events: WorkflowEventRepository | None = None,
+    ) -> None:
         self._repository = repository
+        self._workflow_events = workflow_events
 
     async def log_run_started(
         self,
@@ -92,6 +158,27 @@ class DatabasePipelineRunLogger:
                 finished_at=datetime.now(UTC),
             )
         )
+        if self._workflow_events is not None:
+            summary = summarize_pipeline_error(
+                error,
+                stage_name=stage,
+                pipeline_name=pipeline_name,
+            )
+            event_type = (
+                f"pipeline.error.{summary.category or 'unknown'}"
+                if summary.category
+                else "pipeline.error.unknown"
+            )
+            self._workflow_events.record(
+                WorkflowEvent(
+                    event_type=event_type,
+                    request_id=request_id,
+                    trace_id=trace_id,
+                    workflow_id=str(pipeline_run_id),
+                    error_code=summary.error_code,
+                    payload=summary.model_dump(),
+                )
+            )
 
 
 class DatabaseProviderCallLogger:

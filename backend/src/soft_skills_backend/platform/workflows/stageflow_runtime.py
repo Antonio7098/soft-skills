@@ -21,7 +21,11 @@ from soft_skills_backend.platform.observability.telemetry import (
     setup_telemetry,
 )
 from soft_skills_backend.shared.errors import orchestration_error
-from soft_skills_backend.shared.ports import PipelineRunRepository, ProviderCallRepository
+from soft_skills_backend.shared.ports import (
+    PipelineRunRepository,
+    ProviderCallRepository,
+    WorkflowEventRepository,
+)
 
 
 @dataclass(slots=True)
@@ -53,6 +57,7 @@ def build_stageflow_runtime(
     event_sink: DurableEventSink,
     pipeline_runs: PipelineRunRepository,
     provider_calls: ProviderCallRepository,
+    workflow_events: WorkflowEventRepository,
 ) -> StageflowRuntime:
     """Build the mandatory Stageflow runtime wrapper for the application."""
 
@@ -73,7 +78,7 @@ def build_stageflow_runtime(
     pipeline_context_cls = stageflow_api_module.PipelineContext
     stage_kind_enum = stageflow_api_module.StageKind
 
-    pipeline_run_logger = DatabasePipelineRunLogger(pipeline_runs)
+    pipeline_run_logger = DatabasePipelineRunLogger(pipeline_runs, workflow_events)
     provider_call_logger = DatabaseProviderCallLogger(provider_calls)
     buffered_sink = backpressure_aware_event_sink_cls(
         downstream=event_sink,

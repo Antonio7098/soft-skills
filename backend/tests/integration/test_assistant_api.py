@@ -16,6 +16,7 @@ from soft_skills_backend.platform.db.models import (
     AssistantToolCallRecord,
     AssistantTurnRecord,
     PipelineRunRecord,
+    WorkflowEventRecord,
 )
 from soft_skills_backend.shared.ports.models import ProviderCompletion, ProviderTextChunk
 
@@ -200,7 +201,15 @@ async def test_assistant_turn_streams_tool_events_and_persists_messages(
         assert session.query(AssistantMessageRecord).filter_by(turn_id=turn["id"]).count() == 2
         assert session.query(AssistantToolCallRecord).filter_by(turn_id=turn["id"]).count() == 1
         pipeline_names = {record.pipeline_name for record in session.query(PipelineRunRecord).all()}
+        workflow_events = session.query(WorkflowEventRecord).all()
+        workflow_event_types = {event.event_type for event in workflow_events}
     assert "assistant_turn_runtime" in pipeline_names
+    stage_wide_events = [et for et in workflow_event_types if et.startswith("stage.wide.")]
+    pipeline_wide_events = [et for et in workflow_event_types if et.startswith("pipeline.wide.")]
+    assert len(stage_wide_events) > 0, f"Expected stage.wide.* events, got: {workflow_event_types}"
+    assert "tool.invoked" in workflow_event_types, (
+        f"Expected tool.invoked in workflow events, got: {workflow_event_types}"
+    )
     messages_response = await client.get(
         f"/api/assistant/sessions/{session_id}/messages",
         headers={"X-User-ID": learner["id"]},

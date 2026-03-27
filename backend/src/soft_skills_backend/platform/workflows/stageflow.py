@@ -23,6 +23,54 @@ from soft_skills_backend.shared.errors import orchestration_error
 T = TypeVar("T")
 
 
+class AgentWideEventEmitter(WideEventEmitter):
+    """Stageflow wide event emitter with agent-specific stage-name-prefixed event types.
+
+    Emits events with fully namespaced event_types like:
+    - stage.wide.input_guard
+    - stage.wide.history_enrich
+    - pipeline.wide.assistant_turn_runtime
+
+    This enables efficient querying of wide events by stage name in workflow_events.
+    """
+
+    def emit_stage_event(
+        self,
+        *,
+        ctx: PipelineContext,
+        result: Any,
+        extra: Any = None,
+    ) -> None:
+        namespaced_type = f"{self.stage_event_type}.{result.name}"
+        payload = self.build_stage_payload(ctx=ctx, result=result, extra=extra)
+        ctx.event_sink.try_emit(type=namespaced_type, data=payload)
+
+    def emit_pipeline_event(
+        self,
+        *,
+        ctx: PipelineContext,
+        stage_results: Any,
+        pipeline_name: str | None = None,
+        status: str | None = None,
+        duration_ms: int | None = None,
+        started_at: datetime | None = None,
+        extra: Any = None,
+    ) -> None:
+        namespaced_type = (
+            f"{self.pipeline_event_type}.{pipeline_name or ctx.topology or 'pipeline'}"
+        )
+        payload = self.build_pipeline_payload(
+            ctx=ctx,
+            stage_results=stage_results,
+            pipeline_name=pipeline_name,
+            status=status,
+            duration_ms=duration_ms,
+            started_at=started_at,
+            extra=extra,
+        )
+        ctx.event_sink.try_emit(type=namespaced_type, data=payload)
+
+
 @dataclass(frozen=True, slots=True)
 class StageflowStageResult:
     """Typed stage payload paired with summary metadata for observability."""
@@ -38,7 +86,7 @@ class StageflowPipelineSupport:
     event_sink: Any
     get_default_interceptors: Callable[..., list[Any]]
     pipeline_run_logger: Any
-    wide_event_emitter: WideEventEmitter = field(default_factory=WideEventEmitter)
+    wide_event_emitter: WideEventEmitter = field(default_factory=AgentWideEventEmitter)
     idempotency_store: InMemoryIdempotencyStore = field(default_factory=InMemoryIdempotencyStore)
     otel_interceptor: Any = None
 

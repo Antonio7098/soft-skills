@@ -105,6 +105,7 @@ def build_container(settings: Settings) -> AppContainer:
         event_sink=durable_event_sink,
         pipeline_runs=pipeline_runs,
         provider_calls=provider_calls,
+        workflow_events=workflow_events,
     )
     auth_provider = HeaderAuthProvider(session_factory, workflow_events=workflow_events)
     identity_service = IdentityService(
