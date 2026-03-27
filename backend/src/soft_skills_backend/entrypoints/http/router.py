@@ -12,6 +12,7 @@ from soft_skills_backend.entrypoints.http.routes import (
     collections,
     evaluations,
     events,
+    generation,
     health,
     organisations,
     practice_runs,
@@ -29,6 +30,7 @@ api_router.include_router(events.router, prefix="/events", tags=["events"])
 api_router.include_router(assistant.router, prefix="/assistant", tags=["assistant"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(skills.router, prefix="/skills", tags=["skills"])
+api_router.include_router(generation.router, prefix="", tags=["generation"])
 api_router.include_router(collections.router, prefix="/collections", tags=["collections"])
 api_router.include_router(attempts.router, prefix="/attempts", tags=["attempts"])
 api_router.include_router(practice_runs.router, prefix="/practice-runs", tags=["practice-runs"])

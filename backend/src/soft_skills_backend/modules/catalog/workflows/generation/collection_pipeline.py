@@ -87,11 +87,14 @@ async def generate_collection(
     workplace_context_for_commands: Callable[
         [StructuredCollectionGenerationCommand | None, ChatCollectionGenerationCommand | None], str
     ],
+    progress_callback: Callable[[str, float, dict[str, object]], None] | None = None,
 ) -> CollectionGenerationView:
     assert structured_command is not None or chat_command is not None
     command = structured_command or cast(ChatCollectionGenerationCommand, chat_command)
 
     async def input_guard(_ctx: StageContext) -> Any:
+        if progress_callback:
+            progress_callback("input_guard", 5.0, {"difficulty": command.difficulty, "mode": mode})
         with session_factory() as session:
             validate_generation_request(session, command)
         return ok_output(
@@ -102,6 +105,8 @@ async def generate_collection(
         )
 
     async def blueprint_transform(ctx: StageContext) -> Any:
+        if progress_callback:
+            progress_callback("blueprint_transform", 15.0, {"mode": mode})
         typed_result = await generate_collection_blueprint(
             ctx=ctx,
             prompt_library=prompt_library,
@@ -121,6 +126,8 @@ async def generate_collection(
         )
 
     async def blueprint_guard(ctx: StageContext) -> Any:
+        if progress_callback:
+            progress_callback("blueprint_guard", 20.0, {})
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_transform"))
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
         validate_collection_blueprint(
@@ -142,6 +149,8 @@ async def generate_collection(
         )
 
     async def prompt_items_work(ctx: StageContext) -> Any:
+        if progress_callback:
+            progress_callback("prompt_items_work", 35.0, {})
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_guard"))
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
         prompt_item_results = await run_prompt_item_workers(
@@ -158,6 +167,10 @@ async def generate_collection(
             prompt_item_plans=blueprint.prompt_items,
             timeout_ms=timeout_ms,
         )
+        if progress_callback:
+            progress_callback(
+                "prompt_items_work", 50.0, {"generated_prompt_items": len(prompt_item_results)}
+            )
         return ok_output(
             StageflowStageResult(
                 payload=prompt_item_results,
@@ -166,6 +179,8 @@ async def generate_collection(
         )
 
     async def scenarios_work(ctx: StageContext) -> Any:
+        if progress_callback:
+            progress_callback("scenarios_work", 55.0, {})
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_guard"))
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
         scenario_results = await run_scenario_workers(
@@ -182,6 +197,10 @@ async def generate_collection(
             scenario_plans=blueprint.scenarios,
             timeout_ms=timeout_ms,
         )
+        if progress_callback:
+            progress_callback(
+                "scenarios_work", 65.0, {"generated_scenarios": len(scenario_results)}
+            )
         return ok_output(
             StageflowStageResult(
                 payload=scenario_results,
@@ -190,6 +209,8 @@ async def generate_collection(
         )
 
     async def assemble_transform(ctx: StageContext) -> Any:
+        if progress_callback:
+            progress_callback("assemble_transform", 75.0, {})
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_guard"))
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
         prompt_item_results = cast(
@@ -230,6 +251,8 @@ async def generate_collection(
         )
 
     async def output_guard(ctx: StageContext) -> Any:
+        if progress_callback:
+            progress_callback("output_guard", 85.0, {})
         draft = cast(GeneratedCollectionDraft, payload_from_inputs(ctx, "assemble_transform"))
         with session_factory() as session:
             validate_generated_collection_draft(
@@ -247,6 +270,8 @@ async def generate_collection(
         )
 
     async def persistence_work(ctx: StageContext) -> Any:
+        if progress_callback:
+            progress_callback("persistence_work", 90.0, {})
         draft = cast(GeneratedCollectionDraft, payload_from_inputs(ctx, "output_guard"))
         blueprint_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_guard"))
         prompt_item_results = cast(
@@ -297,6 +322,15 @@ async def generate_collection(
             manifest=manifest,
             organisation_id=getattr(command, "organisation_id", None) or actor.organisation_id,
         )
+        if progress_callback:
+            progress_callback(
+                "persistence_work",
+                100.0,
+                {
+                    "collection_id": str(view.collection.id),
+                    "generation_artifact_id": view.generation_artifact_id,
+                },
+            )
         return ok_output(
             StageflowStageResult(
                 payload=view,

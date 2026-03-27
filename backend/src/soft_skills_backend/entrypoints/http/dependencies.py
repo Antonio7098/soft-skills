@@ -11,6 +11,7 @@ from soft_skills_backend.modules.admin import AdminService
 from soft_skills_backend.modules.assistant import AssistantService
 from soft_skills_backend.modules.assistant.infra.realtime import AssistantRealtimeBroker
 from soft_skills_backend.modules.catalog import CatalogService
+from soft_skills_backend.modules.catalog.infra.realtime import GenerationRealtimeBroker
 from soft_skills_backend.modules.evaluation import EvaluationService
 from soft_skills_backend.modules.identity import IdentityService
 from soft_skills_backend.modules.organisations import OrganisationService
@@ -91,6 +92,10 @@ def get_assistant_broker(request: Request) -> AssistantRealtimeBroker:
 
 def get_catalog_service(request: Request) -> CatalogService:
     return get_container(request).catalog_service
+
+
+def get_generation_broker(request: Request) -> GenerationRealtimeBroker:
+    return get_container(request).generation_broker
 
 
 def get_evaluation_service(request: Request) -> EvaluationService:

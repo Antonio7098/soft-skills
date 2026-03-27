@@ -35,6 +35,7 @@ from soft_skills_backend.modules.catalog.contracts.scenario_commands import (
 )
 from soft_skills_backend.modules.catalog.contracts.scenario_views import ScenarioView
 from soft_skills_backend.modules.catalog.infra.events import CatalogEventRecorder
+from soft_skills_backend.modules.catalog.infra.realtime import GenerationRealtimeBroker
 from soft_skills_backend.modules.catalog.workflows.collections.service import CollectionService
 from soft_skills_backend.modules.catalog.workflows.generation.service import (
     CatalogGenerationService,
@@ -58,6 +59,7 @@ class CatalogService:
         workflow_events: SqlAlchemyWorkflowEventRepository,
         llm_provider: LLMProvider,
         stageflow_runtime: StageflowRuntime,
+        generation_broker: GenerationRealtimeBroker | None = None,
     ) -> None:
         events = CatalogEventRecorder(workflow_events)
         self._collections = CollectionService(
@@ -84,6 +86,7 @@ class CatalogService:
             llm_provider=llm_provider,
             prompt_security_policy=PromptSecurityPolicy(),
             stageflow_runtime=stageflow_runtime,
+            broker=generation_broker,
         )
 
     async def create_collection(

@@ -24,6 +24,7 @@ from .suites.content_generation import (
     StructuredGenerationSmoke,
     StructuredPromptItemGenerationSmoke,
 )
+from .suites.generation_streaming import GenerationStreamingSmoke
 from .suites.organisation_smoke import OrganisationSmoke
 from .suites.practice_run_lifecycle import PracticeRunLifecycleSmoke
 from .suites.practice_session_flow import PracticeSessionFlowSmoke
@@ -44,6 +45,7 @@ def build_default_registry() -> SmokeRegistry:
             StructuredPromptItemGenerationSmoke(),
             ChatPromptItemGenerationSmoke(),
             GenerationLatencyEnvelopeSmoke(),
+            GenerationStreamingSmoke(),
             QuickPracticeMarkingSmoke(),
             InterviewMarkingSmoke(),
             ScenarioMarkingSmoke(),

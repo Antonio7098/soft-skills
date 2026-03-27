@@ -15,6 +15,7 @@ from soft_skills_backend.modules.assistant.infra.realtime import AssistantRealti
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
 from soft_skills_backend.modules.assistant.workflows.service import AssistantWorkflowService
 from soft_skills_backend.modules.catalog import CatalogService
+from soft_skills_backend.modules.catalog.infra.realtime import GenerationRealtimeBroker
 from soft_skills_backend.modules.evaluation import EvaluationService
 from soft_skills_backend.modules.events import EventsService
 from soft_skills_backend.modules.identity import IdentityService
@@ -66,6 +67,7 @@ class AppContainer:
     taxonomy_service: TaxonomyService
     assistant_service: AssistantService
     assistant_broker: AssistantRealtimeBroker
+    generation_broker: GenerationRealtimeBroker
     catalog_service: CatalogService
     evaluation_service: EvaluationService
     practice_service: PracticeService
@@ -114,6 +116,7 @@ def build_container(settings: Settings) -> AppContainer:
         workflow_events=workflow_events,
     )
     assistant_broker = AssistantRealtimeBroker()
+    generation_broker = GenerationRealtimeBroker()
     provider_call_logger = DatabaseProviderCallLogger(provider_calls)
     llm_provider = OpenAICompatibleLLMProvider(
         settings=settings,
@@ -125,6 +128,7 @@ def build_container(settings: Settings) -> AppContainer:
         workflow_events=workflow_events,
         llm_provider=llm_provider,
         stageflow_runtime=stageflow_runtime,
+        generation_broker=generation_broker,
     )
     evaluation_service = EvaluationService(
         settings=settings,
@@ -193,6 +197,7 @@ def build_container(settings: Settings) -> AppContainer:
         taxonomy_service=taxonomy_service,
         assistant_service=assistant_service,
         assistant_broker=assistant_broker,
+        generation_broker=generation_broker,
         catalog_service=catalog_service,
         evaluation_service=evaluation_service,
         practice_service=practice_service,
