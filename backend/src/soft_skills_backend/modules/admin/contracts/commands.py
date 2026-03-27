@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class AdminCollectionVerificationCommand(BaseModel):
@@ -46,3 +46,68 @@ class AdminFeatureCollectionCommand(BaseModel):
     """Admin feature/highlight collection request."""
 
     featured: bool
+
+
+class RubricCriterionLevelCommand(BaseModel):
+    """One scored rubric level."""
+
+    level: int = Field(ge=1, le=5)
+    description: str
+    examples: list[str] = Field(min_length=1)
+
+
+class RubricCriterionCommand(BaseModel):
+    """One rubric criterion definition."""
+
+    criterion_ref: str
+    skill_slug: str
+    title: str
+    description: str
+    weight: float = Field(default=1.0, gt=0)
+    required: bool = True
+    position: int = 0
+    levels: list[RubricCriterionLevelCommand] = Field(min_length=1)
+
+
+class CreateRubricCommand(BaseModel):
+    """Create a new rubric."""
+
+    rubric_id: str
+    family: str
+    version: str
+    content_type: str
+    schema_version: str
+    name: str
+    criteria: list[RubricCriterionCommand] = Field(min_length=1)
+
+
+class UpdateRubricCommand(BaseModel):
+    """Update an existing rubric."""
+
+    family: str | None = None
+    version: str | None = None
+    name: str | None = None
+
+
+class RubricCriterionUpdateCommand(BaseModel):
+    """Update a rubric criterion."""
+
+    title: str | None = None
+    description: str | None = None
+    weight: float | None = Field(default=None, gt=0)
+    required: bool | None = None
+    position: int | None = None
+    levels: list[RubricCriterionLevelCommand] | None = None
+
+
+class CreateRubricCriterionCommand(BaseModel):
+    """Add a new criterion to an existing rubric."""
+
+    criterion_ref: str
+    skill_slug: str
+    title: str
+    description: str
+    weight: float = Field(default=1.0, gt=0)
+    required: bool = True
+    position: int = 0
+    levels: list[RubricCriterionLevelCommand] = Field(min_length=1)

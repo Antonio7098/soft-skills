@@ -8,6 +8,10 @@ from soft_skills_backend.modules.admin.contracts.commands import (
     AdminCollectionVerificationCommand,
     AdminFeatureCollectionCommand,
     AdminLearnerRelationshipCommand,
+    CreateRubricCommand,
+    CreateRubricCriterionCommand,
+    RubricCriterionUpdateCommand,
+    UpdateRubricCommand,
 )
 from soft_skills_backend.modules.admin.contracts.views import (
     AdminLearnerRelationshipView,
@@ -16,12 +20,14 @@ from soft_skills_backend.modules.admin.contracts.views import (
     CollectionVerificationAuditView,
     CollectionVerificationQueueItemView,
     LearnerAnalyticsView,
+    RubricView,
 )
 from soft_skills_backend.modules.admin.infra.analytics_repository import AdminAnalyticsRepository
 from soft_skills_backend.modules.admin.infra.audit_repository import AdminAuditRepository
 from soft_skills_backend.modules.admin.infra.relationship_repository import (
     AdminRelationshipRepository,
 )
+from soft_skills_backend.modules.admin.infra.rubric_admin_repository import RubricAdminRepository
 from soft_skills_backend.modules.admin.infra.verification_repository import (
     AdminVerificationRepository,
 )
@@ -52,6 +58,7 @@ class AdminService:
             session_factory=session_factory,
             relationships=relationships,
         )
+        self._rubrics = RubricAdminRepository(session_factory=session_factory)
 
     def list_collection_verification_queue(
         self, actor: Actor
@@ -154,3 +161,39 @@ class AdminService:
             record.featured = command.featured
             session.commit()
             return build_collection_view(session, record, actor=actor)
+
+    def list_rubrics(self, actor: Actor) -> list[RubricView]:
+        return self._rubrics.list_rubrics()
+
+    def get_rubric(self, actor: Actor, rubric_id: str) -> RubricView:
+        return self._rubrics.get_rubric(rubric_id)
+
+    def create_rubric(self, actor: Actor, command: CreateRubricCommand) -> RubricView:
+        return self._rubrics.create_rubric(command)
+
+    def update_rubric(
+        self, actor: Actor, rubric_id: str, command: UpdateRubricCommand
+    ) -> RubricView:
+        return self._rubrics.update_rubric(rubric_id, command)
+
+    def delete_rubric(self, actor: Actor, rubric_id: str) -> None:
+        self._rubrics.delete_rubric(rubric_id)
+
+    def create_rubric_criterion(
+        self, actor: Actor, rubric_id: str, command: CreateRubricCriterionCommand
+    ) -> RubricView:
+        return self._rubrics.create_criterion(rubric_id, command)
+
+    def update_rubric_criterion(
+        self,
+        actor: Actor,
+        rubric_id: str,
+        criterion_ref: str,
+        command: RubricCriterionUpdateCommand,
+    ) -> RubricView:
+        return self._rubrics.update_criterion(rubric_id, criterion_ref, command)
+
+    def delete_rubric_criterion(
+        self, actor: Actor, rubric_id: str, criterion_ref: str
+    ) -> RubricView:
+        return self._rubrics.delete_criterion(rubric_id, criterion_ref)

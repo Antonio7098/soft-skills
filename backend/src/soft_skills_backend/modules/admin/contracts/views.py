@@ -272,3 +272,36 @@ class AttemptAuditView(BaseModel):
     workflow_events: list[WorkflowEventAuditView] = Field(default_factory=list)
     pipeline_runs: list[PipelineRunAuditView] = Field(default_factory=list)
     provider_calls: list[ProviderCallAuditView] = Field(default_factory=list)
+
+
+class RubricCriterionLevelView(BaseModel):
+    """One scored rubric level."""
+
+    level: int
+    description: str
+    examples: list[str]
+
+
+class RubricCriterionView(BaseModel):
+    """One rubric criterion."""
+
+    criterion_ref: str
+    skill_slug: str
+    title: str
+    description: str
+    weight: float
+    required: bool
+    position: int
+    levels: list[RubricCriterionLevelView]
+
+
+class RubricView(BaseModel):
+    """Rubric definition view."""
+
+    rubric_id: str
+    family: str
+    version: str
+    content_type: str
+    schema_version: str
+    name: str
+    criteria: list[RubricCriterionView] = Field(default_factory=list)
