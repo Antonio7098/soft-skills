@@ -1,18 +1,20 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, BookOpen, Clock, Users, Shield, Play } from 'lucide-react';
+import { ArrowLeft, BookOpen, Clock, Users, Shield, Play, Bookmark } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Badge } from '@/design-system/primitives/Badge';
 import { Button } from '@/design-system/primitives/Button';
 import { Avatar } from '@/design-system/primitives/Avatar';
 import { getDomainDifficultyVariant } from '@/lib/variant-helpers';
+import { cn } from '@/lib/cn';
 import type { CollectionView } from '@/data';
 
 interface CollectionHeaderProps {
   readonly collection: CollectionView;
   readonly onStartFirst?: () => void;
+  readonly onSaveToggle?: (id: string, saved: boolean) => void;
 }
 
-export function CollectionHeader({ collection, onStartFirst }: CollectionHeaderProps) {
+export function CollectionHeader({ collection, onStartFirst, onSaveToggle }: CollectionHeaderProps) {
   const navigate = useNavigate();
   const totalItems = collection.prompt_items.length + collection.scenarios.length;
   const estimatedMinutes = collection.prompt_items.length * 10 + collection.scenarios.length * 25;
@@ -76,7 +78,15 @@ export function CollectionHeader({ collection, onStartFirst }: CollectionHeaderP
           </div>
         </div>
 
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center gap-2">
+          <Button
+            variant={collection.saved_by_actor ? 'primary' : 'secondary'}
+            size="md"
+            icon={<Bookmark className={cn('w-4 h-4', collection.saved_by_actor && 'fill-current')} />}
+            onClick={() => onSaveToggle?.(collection.id, !collection.saved_by_actor)}
+          >
+            {collection.saved_by_actor ? 'Saved' : 'Save'}
+          </Button>
           <Button
             variant="primary"
             size="md"

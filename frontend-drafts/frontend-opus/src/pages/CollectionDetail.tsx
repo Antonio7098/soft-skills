@@ -27,6 +27,12 @@ export function CollectionDetail() {
       .catch((e) => { setError(e.message); setLoading(false); });
   }, [collectionId, data]);
 
+  const handleSaveToggle = (_id: string, saved: boolean) => {
+    setCollection((prev) =>
+      prev ? { ...prev, saved_by_actor: saved, save_count: saved ? prev.save_count + 1 : prev.save_count - 1 } : prev,
+    );
+  };
+
   if (loading) return <LoadingState message="Loading collection..." />;
   if (error || !collection) return <ErrorState message={error || 'Collection not found'} onRetry={() => navigate('/collections')} />;
 
@@ -43,7 +49,7 @@ export function CollectionDetail() {
 
   return (
     <div className="flex flex-col gap-8 max-w-5xl mx-auto">
-      <CollectionHeader collection={collection} onStartFirst={handleStartFirst} />
+      <CollectionHeader collection={collection} onStartFirst={handleStartFirst} onSaveToggle={handleSaveToggle} />
       <CollectionContentTabs collection={collection} />
     </div>
   );

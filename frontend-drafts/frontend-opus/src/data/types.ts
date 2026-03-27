@@ -23,6 +23,8 @@ export type LifecycleState =
   | 'archived';
 export type VerificationState = 'unverified' | 'verified' | 'rejected';
 export type PromptType = 'quick_practice_prompt' | 'interview_prompt' | 'scenario_step';
+export type DiscoveryTier = 'private' | 'global_public' | 'org_public' | 'standard_public';
+export type SourceType = 'manual' | 'generated_structured' | 'generated_chat';
 
 // --- Identity -------------------------------------------------------------
 
@@ -118,16 +120,28 @@ export interface ScenarioView {
 export interface CollectionView {
   readonly id: string;
   readonly author_user_id: string;
+  readonly organisation_id: string | null;
   readonly title: string;
   readonly summary: string;
   readonly target_audience: string;
   readonly difficulty: Difficulty;
   readonly lifecycle_state: LifecycleState;
   readonly verification_state: VerificationState;
+  readonly discovery_tier: DiscoveryTier;
+  readonly source_type: SourceType;
   readonly content_format_mix: string[];
   readonly target_skill_slugs: string[];
   readonly target_competency_slugs: string[];
   readonly rubric_ids: string[];
+  readonly save_count: number;
+  readonly saved_by_actor: boolean;
+  readonly avg_rating: number | null;
+  readonly rating_count: number;
+  readonly rated_by_actor: number | null;
+  readonly featured: boolean;
+  readonly last_generation_artifact_id: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
   readonly prompt_items: PromptItemView[];
   readonly scenarios: ScenarioView[];
 }
@@ -137,6 +151,10 @@ export interface CollectionListFilters {
   readonly skill_slug?: string;
   readonly competency_slug?: string;
   readonly include_private?: boolean;
+  readonly saved_only?: boolean;
+  readonly discovery_tier?: DiscoveryTier;
+  readonly author_user_id?: string;
+  readonly organisation_id?: string;
 }
 
 // --- Practice --------------------------------------------------------------
@@ -240,6 +258,7 @@ export interface CollectionCreateCommand {
   readonly target_skill_slugs: string[];
   readonly target_competency_slugs: string[];
   readonly rubric_ids: string[];
+  readonly organisation_id?: string | null;
 }
 
 export interface PromptItemCreateCommand {

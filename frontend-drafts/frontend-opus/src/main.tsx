@@ -9,6 +9,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Practice } from './pages/Practice';
 import { Generate } from './pages/Generate';
 import { Collections } from './pages/Collections';
+import { HubBrowse } from './pages/HubBrowse';
 import { Progress } from './pages/Progress';
 import { Settings } from './pages/Settings';
 import { Assessment } from './pages/Assessment';
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
       { path: 'practice', element: <Practice /> },
       { path: 'generate', element: <Generate /> },
       { path: 'collections', element: <Collections /> },
+      { path: 'collections/hub/:hubType', element: <HubBrowse /> },
       { path: 'collections/:collectionId', element: <CollectionDetail /> },
       { path: 'collections/:collectionId/scenario/:scenarioId', element: <ScenarioDetail /> },
       { path: 'progress', element: <Progress /> },

@@ -137,6 +137,8 @@ const _interviewSessions = new Map<string, InterviewSessionView>();
 const _scenarioSessions = new Map<string, ScenarioSessionView>();
 const _practiceRuns = new Map<string, PracticeRunView>();
 const _practiceSessions = new Map<string, PracticeSessionView>();
+const _saves = new Map<string, Set<string>>();
+const _ratings = new Map<string, Map<string, number>>();
 
 function delay(ms = 300): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -213,34 +215,72 @@ export const mockDataProvider: DataProvider = {
     if (filters?.competency_slug) {
       result = result.filter((c) => c.target_competency_slugs.includes(filters.competency_slug!));
     }
-    if (!filters?.include_private) {
-      result = result.filter((c) => c.lifecycle_state === 'published_public');
+    if (filters?.discovery_tier) {
+      result = result.filter((c) => c.discovery_tier === filters.discovery_tier);
     }
-    return result;
+    if (filters?.author_user_id) {
+      result = result.filter((c) => c.author_user_id === filters.author_user_id);
+    }
+    if (filters?.organisation_id) {
+      result = result.filter((c) => c.organisation_id === filters.organisation_id);
+    }
+    if (!filters?.include_private) {
+      result = result.filter((c) => c.discovery_tier === 'global_public');
+    }
+    if (filters?.saved_only) {
+      const userSaves = _saves.get(_user.id);
+      if (userSaves) {
+        result = result.filter((c) => userSaves.has(c.id));
+      } else {
+        result = [];
+      }
+    }
+    return result.map((c) => ({
+      ...c,
+      saved_by_actor: _saves.get(_user.id)?.has(c.id) ?? false,
+      rated_by_actor: _ratings.get(c.id)?.get(_user.id) ?? null,
+    }));
   },
 
   async getCollection(id: string): Promise<CollectionView> {
     await delay(200);
     const col = _collections.find((c) => c.id === id);
     if (!col) throw new Error(`Collection ${id} not found`);
-    return col;
+    return {
+      ...col,
+      saved_by_actor: _saves.get(_user.id)?.has(id) ?? false,
+      rated_by_actor: _ratings.get(id)?.get(_user.id) ?? null,
+    };
   },
 
   async createCollection(cmd: CollectionCreateCommand): Promise<CollectionView> {
     await delay();
+    const now = new Date().toISOString();
     const col: CollectionView = {
       id: `col-${uid()}`,
       author_user_id: _user.id,
+      organisation_id: cmd.organisation_id ?? null,
       title: cmd.title,
       summary: cmd.summary,
       target_audience: cmd.target_audience,
       difficulty: cmd.difficulty,
       lifecycle_state: 'draft',
       verification_state: 'unverified',
+      discovery_tier: 'private',
+      source_type: 'manual',
       content_format_mix: cmd.content_format_mix ?? [],
       target_skill_slugs: cmd.target_skill_slugs,
       target_competency_slugs: cmd.target_competency_slugs,
       rubric_ids: cmd.rubric_ids,
+      save_count: 0,
+      saved_by_actor: false,
+      avg_rating: null,
+      rating_count: 0,
+      rated_by_actor: null,
+      featured: false,
+      last_generation_artifact_id: null,
+      created_at: now,
+      updated_at: now,
       prompt_items: [],
       scenarios: [],
     };
@@ -378,16 +418,28 @@ export const mockDataProvider: DataProvider = {
     const col: CollectionView = {
       id: collectionId,
       author_user_id: _user.id,
+      organisation_id: null,
       title: cmd.title_hint ?? `Generated Collection - ${new Date().toLocaleDateString()}`,
       summary: `AI-generated ${cmd.target_audience} content for ${cmd.target_skill_slugs.map((s) => s.replace(/-/g, ' ')).join(', ')} practice.`,
       target_audience: cmd.target_audience,
       difficulty: cmd.difficulty,
       lifecycle_state: 'draft',
       verification_state: 'unverified',
+      discovery_tier: 'private',
+      source_type: 'generated_structured',
       content_format_mix: cmd.content_format_mix,
       target_skill_slugs: cmd.target_skill_slugs,
       target_competency_slugs: cmd.target_competency_slugs,
       rubric_ids: cmd.rubric_ids,
+      save_count: 0,
+      saved_by_actor: false,
+      avg_rating: null,
+      rating_count: 0,
+      rated_by_actor: null,
+      featured: false,
+      last_generation_artifact_id: artifactId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       prompt_items: promptItems,
       scenarios,
     };
@@ -461,16 +513,28 @@ export const mockDataProvider: DataProvider = {
     const col: CollectionView = {
       id: collectionId,
       author_user_id: _user.id,
+      organisation_id: null,
       title: `Generated from prompt - ${new Date().toLocaleDateString()}`,
       summary: `AI-generated content based on your input: "${cmd.prompt.slice(0, 80)}..."`,
       target_audience: cmd.target_audience,
       difficulty: cmd.difficulty,
       lifecycle_state: 'draft',
       verification_state: 'unverified',
+      discovery_tier: 'private',
+      source_type: 'generated_chat',
       content_format_mix: cmd.content_format_mix,
       target_skill_slugs: cmd.target_skill_slugs,
       target_competency_slugs: cmd.target_competency_slugs,
       rubric_ids: cmd.rubric_ids,
+      save_count: 0,
+      saved_by_actor: false,
+      avg_rating: null,
+      rating_count: 0,
+      rated_by_actor: null,
+      featured: false,
+      last_generation_artifact_id: artifactId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       prompt_items: promptItems,
       scenarios,
     };
