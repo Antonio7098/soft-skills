@@ -565,7 +565,7 @@ async def test_practice_run_start_is_idempotent_per_request_id(app, client, test
     _, learner = await _bootstrap_admin_and_learner(
         client, learner_email="learner-practice-run-idempotent@example.com"
     )
-    learner_id = learner["id"]
+    learner_id = str(learner["id"])
     quick_prompt = await _seed_quick_practice_prompt(client, learner_id)
     interview_prompt = await _seed_interview_prompt(client, learner_id)
 

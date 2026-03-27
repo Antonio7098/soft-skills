@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import httpx
@@ -45,14 +46,14 @@ def app_without_otel(test_settings_without_otel: Settings):
 
 
 @pytest_asyncio.fixture()
-async def client_with_otel(app_with_otel) -> httpx.AsyncClient:
+async def client_with_otel(app_with_otel) -> AsyncGenerator[httpx.AsyncClient, None]:
     transport = httpx.ASGITransport(app=app_with_otel)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as async_client:
         yield async_client
 
 
 @pytest_asyncio.fixture()
-async def client_without_otel(app_without_otel) -> httpx.AsyncClient:
+async def client_without_otel(app_without_otel) -> AsyncGenerator[httpx.AsyncClient, None]:
     transport = httpx.ASGITransport(app=app_without_otel)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as async_client:
         yield async_client

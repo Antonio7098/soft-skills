@@ -19,7 +19,7 @@ def test_assistant_decision_requires_exactly_one_action() -> None:
                     "tool_name": "list_recent_attempts",
                     "arguments": {},
                 }
-            ],
+            ],  # type: ignore[list-item]
             final_response="Both set",
         )
 

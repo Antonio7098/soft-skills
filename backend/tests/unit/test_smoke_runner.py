@@ -27,7 +27,7 @@ class _DummySmoke(SmokeCase):
 def test_smoke_runner_runs_default_smoke() -> None:
     runner = SmokeRunner(
         SmokeRegistry([_DummySmoke()]),
-        SmokeContext.create(Settings(_env_file=None, environment="test")),
+        SmokeContext.create(Settings(_env_file=None, environment="test")),  # type: ignore[call-arg]
     )
 
     result = runner.run()
