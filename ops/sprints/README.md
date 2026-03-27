@@ -18,15 +18,18 @@ contracts, or sequencing change.
 6. [Sprint 5: Progression And Recommendation V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-05-progression-and-recommendation-v1.md)
 7. [Sprint 6: Creator Workflows And Discovery V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-06-creator-workflows-and-discovery-v1.md)
 8. [Sprint 7: Admin Verification And Cohort Visibility](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-07-admin-verification-and-cohort-visibility.md)
-9. [Sprint 8: Hardening And Release Readiness](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-08-hardening-and-release-readiness.md)
+9. [Sprint 8: Evaluation Framework](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-08-evaluation-framework.md)
 10. [Sprint 9: Generation Orchestration V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-09-generation-orchestration-v1.md)
 11. [Sprint 10: Chat Assistant And Streaming V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-10-chat-assistant-and-streaming-v1.md)
+12. [Sprint 11: Org Enforcement](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-11-org-enforcement.md)
+13. [Sprint 12: Collections Enhancement](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-12-collections-enhancement.md)
+14. [Sprint 13: Admin Dashboard Backend Readiness](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13-admin-dashboard-backend-readiness.md)
 
 ## Active Sprint
 
 The current active sprint for backend execution is:
 
-- [Sprint 10: Chat Assistant And Streaming V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-10-chat-assistant-and-streaming-v1.md)
+- [Sprint 13: Admin Dashboard Backend Readiness](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13-admin-dashboard-backend-readiness.md)
 
 ## Common Rules
 

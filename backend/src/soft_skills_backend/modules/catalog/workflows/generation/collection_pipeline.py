@@ -105,8 +105,6 @@ async def generate_collection(
         )
 
     async def blueprint_transform(ctx: StageContext) -> Any:
-        if progress_callback:
-            progress_callback("blueprint_transform", 15.0, {"mode": mode})
         typed_result = await generate_collection_blueprint(
             ctx=ctx,
             prompt_library=prompt_library,
@@ -118,6 +116,20 @@ async def generate_collection(
             chat_command=chat_command,
             sanitize_text=sanitize_text,
         )
+        if progress_callback:
+            blueprint = typed_result.parsed
+            progress_callback(
+                "blueprint_transform",
+                15.0,
+                {
+                    "mode": mode,
+                    "title": blueprint.title,
+                    "summary": blueprint.summary,
+                    "prompt_items_count": len(blueprint.prompt_items),
+                    "scenarios_count": len(blueprint.scenarios),
+                    "model_slug": typed_result.model_slug,
+                },
+            )
         return ok_output(
             StageflowStageResult(
                 payload=typed_result,
@@ -168,8 +180,21 @@ async def generate_collection(
             timeout_ms=timeout_ms,
         )
         if progress_callback:
+            prompt_items = [
+                {
+                    "title": result.typed_result.parsed.title,
+                    "prompt_type": result.typed_result.parsed.prompt_type,
+                    "difficulty": result.typed_result.parsed.difficulty,
+                }
+                for result in prompt_item_results
+            ]
             progress_callback(
-                "prompt_items_work", 50.0, {"generated_prompt_items": len(prompt_item_results)}
+                "prompt_items_work",
+                50.0,
+                {
+                    "generated_prompt_items": len(prompt_item_results),
+                    "prompt_items": prompt_items,
+                },
             )
         return ok_output(
             StageflowStageResult(

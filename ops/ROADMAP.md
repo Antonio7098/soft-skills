@@ -193,6 +193,57 @@ in the linked sprint documents under `ops/sprints/`.
 
 ---
 
+## Sprint 11: Org Enforcement
+
+**Purpose:** Add organization-level enforcement, multi-tenancy boundaries, and role-based access control for enterprise readiness.
+
+**Key Outcomes:**
+- Organization-level isolation
+- Role-based access control (admin, creator, learner)
+- Org-scoped content and learner management
+- Enforcement middleware
+
+**Exit Criteria:** The backend can enforce organization boundaries and role-based permissions across all major workflows.
+
+**Detail:** [ops/sprints/sprint-11-org-enforcement.md](ops/sprints/sprint-11-org-enforcement.md)
+
+---
+
+## Sprint 12: Collections Enhancement
+
+**Purpose:** Extend collections with enhanced features including catalog generation improvements, content verification, and publishing workflows.
+
+**Key Outcomes:**
+- Enhanced catalog generation with structured output
+- Collection verification workflow improvements
+- Content quality gates
+- Publishing automation
+
+**Exit Criteria:** The backend supports enhanced collection management with improved generation and verification.
+
+**Detail:** [ops/sprints/sprint-12-collections-enhancement.md](ops/sprints/sprint-12-collections-enhancement.md)
+
+---
+
+## Sprint 13: Admin Dashboard Backend Readiness
+
+**Purpose:** Implement foundational admin dashboard backend capabilities including comprehensive event logging, typed error taxonomy, user management API, and observability improvements.
+
+**Key Outcomes:**
+- Response delta aggregation (single record instead of per-token)
+- HTTP request audit logging with field-level PII scrubbing
+- Auth event logging (login success/failure, token refresh, access denied)
+- Typed error events (validation, authentication, authorization, not_found, rate_limited)
+- Provider call enrichment with token counts
+- Admin user management API (listing, suspension, role management)
+- Wide events persistence via Stageflow
+
+**Exit Criteria:** The backend provides comprehensive event logging and observability infrastructure sufficient for admin dashboard visibility.
+
+**Detail:** [ops/sprints/sprint-13-admin-dashboard-backend-readiness.md](ops/sprints/sprint-13-admin-dashboard-backend-readiness.md)
+
+---
+
 ## Rules For Using This Roadmap
 
 - Frontend is intentionally omitted here and can move on its own cadence.
