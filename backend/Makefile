@@ -2,6 +2,7 @@
 	smoke \
 	smoke-list \
 	smoke-provider \
+	smoke-auth \
 	smoke-marking-quick \
 	smoke-marking-interview \
 	smoke-marking-scenario \
@@ -29,6 +30,9 @@ smoke-list:
 
 smoke-provider:
 	$(PYTHONPATH_SRC) python -m soft_skills_backend.smoke provider-baseline
+
+smoke-auth:
+	$(PYTHONPATH_SRC) python -m soft_skills_backend.smoke auth-flows
 
 smoke-marking-quick:
 	$(PYTHONPATH_SRC) python -m soft_skills_backend.smoke marking-quick-practice

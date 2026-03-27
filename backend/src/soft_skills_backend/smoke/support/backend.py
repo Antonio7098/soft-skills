@@ -37,6 +37,37 @@ class SmokeBackendClient:
         self.require_ok(response, "register user")
         return self.data(response)
 
+    async def get_user_me(self, *, user_id: str) -> JsonObject:
+        response = await self._client.get(
+            "/api/users/me",
+            headers={"X-User-ID": user_id},
+        )
+        self.require_ok(response, "get current user")
+        return self.data(response)
+
+    async def update_profile(
+        self,
+        *,
+        user_id: str,
+        target_role: str | None = None,
+        goals: list[str] | None = None,
+        practice_preferences: dict[str, object] | None = None,
+    ) -> JsonObject:
+        payload: dict[str, object] = {}
+        if target_role is not None:
+            payload["target_role"] = target_role
+        if goals is not None:
+            payload["goals"] = goals
+        if practice_preferences is not None:
+            payload["practice_preferences"] = practice_preferences
+        response = await self._client.patch(
+            "/api/users/me/profile",
+            headers={"X-User-ID": user_id},
+            json=payload,
+        )
+        self.require_ok(response, "update user profile")
+        return self.data(response)
+
     async def bootstrap_canon(self, user_id: str) -> None:
         response = await self._client.post(
             "/api/skills/bootstrap-canon",
