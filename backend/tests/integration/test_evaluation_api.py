@@ -267,3 +267,134 @@ async def test_admin_quick_practice_evaluation_suite_runs_with_binary_expectatio
     assert payload["summary"]["selected_case_count"] == 2
     assert payload["aggregate_metrics"]["case_count"] == 2
     assert payload["aggregate_metrics"]["total_tokens"] == 640
+
+
+@pytest.mark.asyncio
+async def test_admin_evaluation_dashboard_empty(app, client, test_settings) -> None:
+    _migrate(test_settings)
+    admin = await _register_user(
+        client,
+        email="admin-dashboard@example.com",
+        display_name="Admin Dashboard",
+    )
+
+    response = await client.get(
+        "/api/admin/evaluations/dashboard",
+        headers={"X-User-ID": admin["id"]},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["total_runs"] == 0
+    assert data["total_cases"] == 0
+    assert data["pass_fail"]["total_runs"] == 0
+
+
+@pytest.mark.asyncio
+async def test_admin_evaluation_dashboard_after_runs(app, client, test_settings) -> None:
+    _migrate(test_settings)
+    admin = await _register_user(
+        client,
+        email="admin-dashboard-runs@example.com",
+        display_name="Admin Dashboard Runs",
+    )
+    app.state.container.evaluation_service.set_provider_factory(_fake_provider_factory)
+
+    run_response = await client.post(
+        "/api/admin/evaluations/runs",
+        headers={"X-User-ID": admin["id"]},
+        json={
+            "suite_id": "marking_benchmark_v1",
+            "model_slugs": ["model-a"],
+            "case_ids": ["interview-pushback-01"],
+        },
+    )
+    assert run_response.status_code == 200
+
+    dashboard_response = await client.get(
+        "/api/admin/evaluations/dashboard",
+        headers={"X-User-ID": admin["id"]},
+    )
+    assert dashboard_response.status_code == 200
+    data = dashboard_response.json()["data"]
+    assert data["total_runs"] >= 1
+    assert data["pass_fail"]["total_runs"] >= 1
+    assert "marking_benchmark_v1" in data["suite_breakdown"]
+
+
+@pytest.mark.asyncio
+async def test_admin_evaluation_compare_runs(app, client, test_settings) -> None:
+    _migrate(test_settings)
+    admin = await _register_user(
+        client,
+        email="admin-compare@example.com",
+        display_name="Admin Compare",
+    )
+    app.state.container.evaluation_service.set_provider_factory(_fake_provider_factory)
+
+    run_response = await client.post(
+        "/api/admin/evaluations/runs",
+        headers={"X-User-ID": admin["id"]},
+        json={
+            "suite_id": "marking_benchmark_v1",
+            "model_slugs": ["model-a"],
+            "case_ids": ["interview-pushback-01"],
+        },
+    )
+    assert run_response.status_code == 200
+    run_id = run_response.json()["data"]["evaluation_run_id"]
+
+    compare_response = await client.get(
+        "/api/admin/evaluations/runs/compare",
+        headers={"X-User-ID": admin["id"]},
+    )
+    assert compare_response.status_code == 200
+    data = compare_response.json()["data"]
+    assert data["run_count"] >= 1
+    assert any(r["evaluation_run_id"] == run_id for r in data["runs"])
+
+
+@pytest.mark.asyncio
+async def test_admin_evaluation_benchmark(app, client, test_settings) -> None:
+    _migrate(test_settings)
+    admin = await _register_user(
+        client,
+        email="admin-benchmark@example.com",
+        display_name="Admin Benchmark",
+    )
+    app.state.container.evaluation_service.set_provider_factory(_fake_provider_factory)
+
+    await client.post(
+        "/api/admin/evaluations/runs",
+        headers={"X-User-ID": admin["id"]},
+        json={
+            "suite_id": "marking_benchmark_v1",
+            "model_slugs": ["model-a", "model-b"],
+            "case_ids": ["interview-pushback-01"],
+        },
+    )
+
+    benchmark_response = await client.get(
+        "/api/admin/evaluations/benchmark",
+        headers={"X-User-ID": admin["id"]},
+    )
+    assert benchmark_response.status_code == 200
+    data = benchmark_response.json()["data"]
+    assert data["total_runs"] >= 1
+    assert len(data["models"]) >= 1
+
+
+@pytest.mark.asyncio
+async def test_admin_evaluation_case_detail_not_found(app, client, test_settings) -> None:
+    _migrate(test_settings)
+    admin = await _register_user(
+        client,
+        email="admin-case-detail@example.com",
+        display_name="Admin Case Detail",
+    )
+
+    response = await client.get(
+        "/api/admin/evaluations/cases/nonexistent-case",
+        headers={"X-User-ID": admin["id"]},
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "SS-DOMAIN-033"

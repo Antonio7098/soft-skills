@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Query, Request
 
 from soft_skills_backend.entrypoints.http.dependencies import (
@@ -10,6 +12,10 @@ from soft_skills_backend.entrypoints.http.dependencies import (
 )
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
 from soft_skills_backend.modules.evaluation import (
+    BenchmarkDashboardView,
+    EvaluationCaseDetailView,
+    EvaluationComparisonView,
+    EvaluationDashboardView,
     EvaluationRunCommand,
     EvaluationRunView,
     EvaluationSuiteView,
@@ -37,6 +43,22 @@ async def list_evaluation_runs(
     return ok_response(request, service.list_runs(actor, limit=limit))
 
 
+@router.get("/runs/compare", response_model=ApiEnvelope[EvaluationComparisonView])
+async def compare_evaluation_runs(
+    request: Request,
+    run_ids: str | None = Query(default=None),
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
+) -> ApiEnvelope[EvaluationComparisonView]:
+    actor = require_actor(request)
+    service = get_evaluation_service(request)
+    run_id_list = [rid.strip() for rid in run_ids.split(",")] if run_ids else None
+    return ok_response(
+        request,
+        service.compare_runs(actor, run_ids=run_id_list, from_date=from_date, to_date=to_date),
+    )
+
+
 @router.get("/runs/{run_id}", response_model=ApiEnvelope[EvaluationRunView])
 async def get_evaluation_run(
     request: Request,
@@ -62,3 +84,38 @@ async def execute_evaluation_run(
         command=command,
     )
     return ok_response(request, payload)
+
+
+@router.get("/dashboard", response_model=ApiEnvelope[EvaluationDashboardView])
+async def get_evaluation_dashboard(
+    request: Request,
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
+) -> ApiEnvelope[EvaluationDashboardView]:
+    actor = require_actor(request)
+    service = get_evaluation_service(request)
+    return ok_response(request, service.get_dashboard(actor, from_date=from_date, to_date=to_date))
+
+
+@router.get("/benchmark", response_model=ApiEnvelope[BenchmarkDashboardView])
+async def get_benchmark_dashboard(
+    request: Request,
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
+) -> ApiEnvelope[BenchmarkDashboardView]:
+    actor = require_actor(request)
+    service = get_evaluation_service(request)
+    return ok_response(
+        request,
+        service.get_benchmark_dashboard(actor, from_date=from_date, to_date=to_date),
+    )
+
+
+@router.get("/cases/{case_id}", response_model=ApiEnvelope[EvaluationCaseDetailView])
+async def get_evaluation_case_detail(
+    request: Request,
+    case_id: str,
+) -> ApiEnvelope[EvaluationCaseDetailView]:
+    actor = require_actor(request)
+    service = get_evaluation_service(request)
+    return ok_response(request, service.get_case_detail(actor, case_id))

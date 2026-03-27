@@ -26,6 +26,7 @@ from .suites.content_generation import (
     StructuredGenerationSmoke,
     StructuredPromptItemGenerationSmoke,
 )
+from .suites.eval_dashboard_smoke import EvalDashboardSmoke
 from .suites.evaluation_smoke import EvaluationSmoke
 from .suites.generation_streaming import GenerationStreamingSmoke
 from .suites.organisation_smoke import OrganisationSmoke
@@ -53,6 +54,7 @@ def build_default_registry() -> SmokeRegistry:
             GenerationStreamingSmoke(),
             AuthFlowsSmoke(),
             EvaluationSmoke(),
+            EvalDashboardSmoke(),
             QuickPracticeMarkingSmoke(),
             InterviewMarkingSmoke(),
             ScenarioMarkingSmoke(),

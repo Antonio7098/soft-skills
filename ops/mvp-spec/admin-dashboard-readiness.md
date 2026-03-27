@@ -239,15 +239,20 @@ def discover_pipelines(stageflow_runtime: StageflowRuntime) -> list[PipelineDefi
 - `EvaluationSuiteRecord`, `EvaluationRunRecord`, `EvaluationCaseResultRecord`
 - Endpoints at `/admin/evaluations/suites` and `/admin/evaluations/runs`
 - `EvaluationService`, `MarkingBenchmarkRunner`
+- **Sprint 13e**: Added dashboard APIs for aggregated views, historical comparison, benchmarking, and case drill-down
+
+**Implemented in Sprint 13e:**
+| Task | Endpoint | Description |
+|------|----------|-------------|
+| Evaluation result dashboard view | `GET /admin/evaluations/dashboard` | Aggregate pass/fail rates, latency percentiles, error breakdown |
+| Historical comparison | `GET /admin/evaluations/runs/compare` | Compare evaluation runs over time |
+| Benchmarking dashboard | `GET /admin/evaluations/benchmark` | Track provider model performance |
+| Evaluation case drill-down | `GET /admin/evaluations/cases/{case_id}` | Individual case result inspection |
 
 **What to Add:**
 | Task | Effort | Description |
 |------|--------|-------------|
 | Ad-hoc evaluation trigger UI API | Medium | `POST /admin/evaluations/runs` already exists, need workflow to trigger |
-| Evaluation result dashboard view | Medium | Aggregate pass/fail rates, latency percentiles, error breakdown |
-| Historical comparison | Medium | Compare evaluation runs over time |
-| Benchmarking dashboard | Medium | Track provider model performance |
-| Evaluation case drill-down | Low | Individual case result inspection |
 
 ---
 

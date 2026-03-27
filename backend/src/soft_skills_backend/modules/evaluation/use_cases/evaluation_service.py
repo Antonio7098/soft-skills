@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.config import Settings
 from soft_skills_backend.modules.evaluation.contracts.commands import EvaluationRunCommand
 from soft_skills_backend.modules.evaluation.contracts.views import (
+    BenchmarkDashboardView,
+    EvaluationCaseDetailView,
+    EvaluationComparisonView,
+    EvaluationDashboardView,
     EvaluationRunView,
     EvaluationSuiteView,
 )
@@ -81,3 +87,38 @@ class EvaluationService:
             workflow_id=workflow_id,
             command=command,
         )
+
+    def get_dashboard(
+        self,
+        actor: Actor,
+        *,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> EvaluationDashboardView:
+        del actor
+        return self._repository.get_dashboard(from_date=from_date, to_date=to_date)
+
+    def compare_runs(
+        self,
+        actor: Actor,
+        *,
+        run_ids: list[str] | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> EvaluationComparisonView:
+        del actor
+        return self._repository.compare_runs(run_ids=run_ids, from_date=from_date, to_date=to_date)
+
+    def get_benchmark_dashboard(
+        self,
+        actor: Actor,
+        *,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> BenchmarkDashboardView:
+        del actor
+        return self._repository.get_benchmark_dashboard(from_date=from_date, to_date=to_date)
+
+    def get_case_detail(self, actor: Actor, case_id: str) -> EvaluationCaseDetailView:
+        del actor
+        return self._repository.get_case_detail(case_id)

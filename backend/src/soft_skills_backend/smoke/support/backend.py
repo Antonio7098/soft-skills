@@ -609,6 +609,44 @@ class SmokeBackendClient:
         self.require_ok(response, f"get evaluation run {evaluation_run_id}")
         return self.data(response)
 
+    async def get_evaluation_dashboard(self, *, user_id: str) -> JsonObject:
+        response = await self._client.get(
+            "/api/admin/evaluations/dashboard",
+            headers={"X-User-ID": user_id},
+        )
+        self.require_ok(response, "get evaluation dashboard")
+        return self.data(response)
+
+    async def get_evaluation_benchmark(self, *, user_id: str) -> JsonObject:
+        response = await self._client.get(
+            "/api/admin/evaluations/benchmark",
+            headers={"X-User-ID": user_id},
+        )
+        self.require_ok(response, "get evaluation benchmark")
+        return self.data(response)
+
+    async def compare_evaluation_runs(
+        self, *, user_id: str, run_ids: list[str] | None = None
+    ) -> JsonObject:
+        params = {}
+        if run_ids:
+            params["run_ids"] = ",".join(run_ids)
+        response = await self._client.get(
+            "/api/admin/evaluations/runs/compare",
+            headers={"X-User-ID": user_id},
+            params=params,
+        )
+        self.require_ok(response, "compare evaluation runs")
+        return self.data(response)
+
+    async def get_evaluation_case_detail(self, *, user_id: str, case_id: str) -> JsonObject:
+        response = await self._client.get(
+            f"/api/admin/evaluations/cases/{case_id}",
+            headers={"X-User-ID": user_id},
+        )
+        self.require_ok(response, f"get evaluation case detail {case_id}")
+        return self.data(response)
+
     @staticmethod
     def data(response: httpx.Response) -> JsonObject:
         return cast(JsonObject, response.json()["data"])
