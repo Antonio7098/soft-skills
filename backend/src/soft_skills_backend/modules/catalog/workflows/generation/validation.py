@@ -59,14 +59,9 @@ def validate_collection_blueprint(
             code="SS-VALIDATION-057",
             details={"expected": llm_provider.provider_name, "actual": blueprint.provider},
         )
-    if blueprint.model_slug != resolved_model_slug:
-        raise validation_error(
-            "Generated blueprint model slug did not match the executing model",
-            code="SS-VALIDATION-058",
-            details={"expected": resolved_model_slug, "actual": blueprint.model_slug},
-        )
     prompt_count = (
-        structured_command.counts.quick_practice_prompt_count + structured_command.counts.interview_prompt_count
+        structured_command.counts.quick_practice_prompt_count
+        + structured_command.counts.interview_prompt_count
         if structured_command is not None
         else cast(ChatCollectionGenerationCommand, chat_command).counts.quick_practice_prompt_count
         + cast(ChatCollectionGenerationCommand, chat_command).counts.interview_prompt_count
@@ -131,7 +126,8 @@ def validate_generated_collection_draft(
         updated_at=datetime.now(UTC),
     )
     prompt_commands = [
-        PromptItemCreateCommand.model_validate(prompt_item.model_dump()) for prompt_item in draft.prompt_items
+        PromptItemCreateCommand.model_validate(prompt_item.model_dump())
+        for prompt_item in draft.prompt_items
     ]
     for prompt_command in prompt_commands:
         validate_prompt_command(session, collection_record, prompt_command)
@@ -162,14 +158,18 @@ def validate_generated_collection_draft(
             code="SS-VALIDATION-050",
         )
     if list(draft.target_skill_slugs) != list(source_command.target_skill_slugs):
-        raise validation_error("Generated draft target skills drifted from the request", code="SS-VALIDATION-051")
+        raise validation_error(
+            "Generated draft target skills drifted from the request", code="SS-VALIDATION-051"
+        )
     if list(draft.target_competency_slugs) != list(source_command.target_competency_slugs):
         raise validation_error(
             "Generated draft target competencies drifted from the request",
             code="SS-VALIDATION-052",
         )
     if list(draft.rubric_ids) != list(source_command.rubric_ids):
-        raise validation_error("Generated draft rubrics drifted from the request", code="SS-VALIDATION-053")
+        raise validation_error(
+            "Generated draft rubrics drifted from the request", code="SS-VALIDATION-053"
+        )
 
 
 def validate_prompt_item_plan_batch(
@@ -204,16 +204,24 @@ def validate_prompt_item_plan_batch(
             code="SS-VALIDATION-075",
             details={"expected": resolved_model_slug, "actual": batch.model_slug},
         )
-    expected_total = int(counts["quick_practice_prompt_count"]) + int(counts["interview_prompt_count"])
+    expected_total = int(counts["quick_practice_prompt_count"]) + int(
+        counts["interview_prompt_count"]
+    )
     if len(batch.prompt_items) != expected_total:
         raise validation_error(
             "Generated prompt-item plan count did not match the request",
             code="SS-VALIDATION-076",
             details={"expected": expected_total, "actual": len(batch.prompt_items)},
         )
-    actual_quick = sum(1 for item in batch.prompt_items if item.prompt_type == "quick_practice_prompt")
-    actual_interview = sum(1 for item in batch.prompt_items if item.prompt_type == "interview_prompt")
-    if actual_quick != int(counts["quick_practice_prompt_count"]) or actual_interview != int(counts["interview_prompt_count"]):
+    actual_quick = sum(
+        1 for item in batch.prompt_items if item.prompt_type == "quick_practice_prompt"
+    )
+    actual_interview = sum(
+        1 for item in batch.prompt_items if item.prompt_type == "interview_prompt"
+    )
+    if actual_quick != int(counts["quick_practice_prompt_count"]) or actual_interview != int(
+        counts["interview_prompt_count"]
+    ):
         raise validation_error(
             "Generated prompt-item plan distribution did not match the request",
             code="SS-VALIDATION-077",

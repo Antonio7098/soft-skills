@@ -17,6 +17,7 @@ from .suites.assistant_runtime import (
     AssistantReadRuntimeSmoke,
     AssistantStreamRuntimeSmoke,
 )
+from .suites.auth_flows import AuthFlowsSmoke
 from .suites.content_generation import (
     ChatGenerationSmoke,
     ChatPromptItemGenerationSmoke,
@@ -46,6 +47,7 @@ def build_default_registry() -> SmokeRegistry:
             ChatPromptItemGenerationSmoke(),
             GenerationLatencyEnvelopeSmoke(),
             GenerationStreamingSmoke(),
+            AuthFlowsSmoke(),
             QuickPracticeMarkingSmoke(),
             InterviewMarkingSmoke(),
             ScenarioMarkingSmoke(),

@@ -25,7 +25,7 @@ from soft_skills_backend.smoke.support.environment import (
     SmokeApplicationSessionFactory,
 )
 
-from .contracts import GenerationStreamingSmokeResult
+from .contracts import BlueprintPayload, GenerationStreamingSmokeResult, PromptItemPayload
 
 GENERATION_SMOKE_TIMEOUT_SECONDS = 420.0
 
@@ -172,6 +172,9 @@ class GenerationStreamingSmoke(SmokeCase):
                 final_status: str | None = None
                 collection_id: str | None = None
                 generation_artifact_id: str | None = None
+                blueprint: BlueprintPayload | None = None
+                prompt_items: list[PromptItemPayload] = []
+                error_message: str | None = None
 
                 async with websockets.connect(ws_url) as ws:
                     deadline = time.time() + self._flow_timeout_seconds
@@ -192,12 +195,50 @@ class GenerationStreamingSmoke(SmokeCase):
                                 break
                             elif event_type == "failed":
                                 final_status = "failed"
+                                payload = event_data.get("payload", {})
+                                error_message = (
+                                    str(payload.get("error", "no error message"))
+                                    if isinstance(payload, dict)
+                                    else str(payload)
+                                )
                                 break
+                            elif stage == "blueprint_transform" and not blueprint:
+                                payload = event_data.get("payload", {})
+                                blueprint = BlueprintPayload(
+                                    title=payload.get("title"),
+                                    summary=payload.get("summary"),
+                                    prompt_items_count=payload.get("prompt_items_count"),
+                                    scenarios_count=payload.get("scenarios_count"),
+                                    model_slug=payload.get("model_slug"),
+                                )
+                            elif stage == "prompt_items_work":
+                                payload = event_data.get("payload", {})
+                                items = payload.get("prompt_items", [])
+                                for item_data in items:
+                                    item = PromptItemPayload(
+                                        title=item_data.get("title"),
+                                        prompt_type=item_data.get("prompt_type"),
+                                        difficulty=item_data.get("difficulty"),
+                                    )
+                                    prompt_items.append(item)
                         except TimeoutError:
                             continue
 
                     if final_status is None:
                         final_status = "timeout"
+
+                if final_status == "failed":
+                    return GenerationStreamingSmokeResult(
+                        status="error",
+                        generation_mode="structured",
+                        generation_id=generation_id,
+                        stream_token=stream_token,
+                        stages_received=stages_received,
+                        blueprint=blueprint,
+                        prompt_items=prompt_items,
+                        final_status=final_status,
+                        error=error_message,
+                    )
 
                 if not stages_received:
                     return GenerationStreamingSmokeResult(
@@ -208,6 +249,26 @@ class GenerationStreamingSmoke(SmokeCase):
                         error="No streaming events received",
                     )
 
+                if not blueprint:
+                    return GenerationStreamingSmokeResult(
+                        status="error",
+                        generation_mode="structured",
+                        generation_id=generation_id,
+                        stream_token=stream_token,
+                        stages_received=stages_received,
+                        error="Blueprint not received in streaming events",
+                    )
+
+                if not blueprint.title:
+                    return GenerationStreamingSmokeResult(
+                        status="error",
+                        generation_mode="structured",
+                        generation_id=generation_id,
+                        stream_token=stream_token,
+                        stages_received=stages_received,
+                        error="Blueprint title is empty",
+                    )
+
                 return GenerationStreamingSmokeResult(
                     status="ok",
                     generation_mode="structured",
@@ -216,6 +277,8 @@ class GenerationStreamingSmoke(SmokeCase):
                     collection_id=collection_id,
                     generation_artifact_id=generation_artifact_id,
                     stages_received=stages_received,
+                    blueprint=blueprint,
+                    prompt_items=prompt_items,
                     final_status=final_status,
                 )
             finally:

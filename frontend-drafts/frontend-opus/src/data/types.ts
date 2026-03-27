@@ -469,3 +469,63 @@ export interface CollectionGenerationView {
   readonly provider: string;
   readonly model_slug: string;
 }
+
+// --- Generation Streaming ----------------------------------------------------
+
+export type GenerationStage =
+  | 'pending'
+  | 'input_guard'
+  | 'blueprint_transform'
+  | 'blueprint_guard'
+  | 'prompt_items_work'
+  | 'scenarios_work'
+  | 'assemble_transform'
+  | 'output_guard'
+  | 'persistence_work'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export interface GenerationStreamEvent {
+  readonly event_id: string;
+  readonly generation_id: string;
+  readonly type: 'started' | 'progress' | 'completed' | 'failed';
+  readonly stage: GenerationStage;
+  readonly sequence_number: number;
+  readonly emitted_at: string;
+  readonly progress_percent: number;
+  readonly payload: Record<string, unknown>;
+}
+
+export interface GenerationStartedView {
+  readonly generation_id: string;
+  readonly stream_token: string;
+  readonly mode: 'structured' | 'chat';
+}
+
+export interface BlueprintInfo {
+  readonly title: string;
+  readonly summary: string;
+  readonly prompt_items_count: number;
+  readonly scenarios_count: number;
+  readonly model_slug: string;
+}
+
+export interface PromptItemDraft {
+  readonly title: string;
+  readonly prompt_type: string;
+  readonly difficulty: string;
+}
+
+export interface GenerationProgressState {
+  readonly status: 'idle' | 'started' | 'streaming' | 'completed' | 'failed' | 'cancelled';
+  readonly generation_id: string | null;
+  readonly stream_token: string | null;
+  readonly stages_completed: GenerationStage[];
+  readonly current_stage: GenerationStage | null;
+  readonly progress_percent: number;
+  readonly blueprint: BlueprintInfo | null;
+  readonly prompt_items: PromptItemDraft[];
+  readonly collection: CollectionView | null;
+  readonly error: string | null;
+}
