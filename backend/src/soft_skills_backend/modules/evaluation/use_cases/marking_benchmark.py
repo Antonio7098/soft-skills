@@ -6,11 +6,12 @@ from collections.abc import Callable
 from time import perf_counter
 from typing import Any, cast
 
-from stageflow.core import StageContext
 from sqlalchemy.orm import Session, sessionmaker
+from stageflow.core import StageContext
 
 from soft_skills_backend.config import Settings
 from soft_skills_backend.engines.config import load_marking_runtime_config
+from soft_skills_backend.engines.marking.domain.rubric_repository import SqlAlchemyRubricRepository
 from soft_skills_backend.modules.evaluation.contracts.commands import EvaluationRunCommand
 from soft_skills_backend.modules.evaluation.domain.evaluation import (
     BuiltinEvaluationSuite,
@@ -41,11 +42,10 @@ from soft_skills_backend.modules.practice.workflows.assessment.models import (
 from soft_skills_backend.modules.practice.workflows.assessment_service import (
     model_slug_matches_execution_source,
 )
+from soft_skills_backend.platform.db.models import RubricCriterionRecord, RubricRecord
 from soft_skills_backend.platform.providers.llm.openai_compatible import (
     OpenAICompatibleLLMProvider,
 )
-from soft_skills_backend.platform.db.models import RubricCriterionRecord, RubricRecord
-from soft_skills_backend.engines.marking.domain.rubric_repository import SqlAlchemyRubricRepository
 from soft_skills_backend.platform.workflows.stageflow import (
     metadata_value,
     pipeline_run_id_from_context,

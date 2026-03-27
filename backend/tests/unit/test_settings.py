@@ -21,7 +21,7 @@ def test_settings_support_openrouter_aliases(monkeypatch) -> None:
     monkeypatch.setenv("LLM_MARKING_MODEL", "openrouter/test-model")
     monkeypatch.setenv("LLM_MARKING_MODEL_BACKUP", "qwen/qwen3.5-9b")
 
-    settings = Settings(_env_file=None)
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
     assert settings.openrouter_api_key == "test-openrouter-key"
     assert settings.llm_marking_model == "openrouter/test-model"

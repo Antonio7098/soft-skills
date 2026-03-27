@@ -9,6 +9,7 @@ from alembic.config import Config
 from alembic import command
 from soft_skills_backend.engines.config import load_catalog_generation_runtime_config
 from soft_skills_backend.platform.db.models import (
+    CollectionRecord,
     CollectionSaveRecord,
     ContentGenerationArtifactRecord,
     PipelineRunRecord,
@@ -791,7 +792,9 @@ async def test_catalog_generates_prompt_items_for_existing_collections(
                                 {
                                     "level": 1,
                                     "description": "Does not acknowledge the escalation pressure.",
-                                    "examples": ["Responds mechanically without recognizing the pressure."],
+                                    "examples": [
+                                        "Responds mechanically without recognizing the pressure."
+                                    ],
                                 },
                                 {
                                     "level": 2,
@@ -869,7 +872,10 @@ async def test_catalog_generates_prompt_items_for_existing_collections(
     )
     assert structured_generation_response.status_code == 200
     structured_generation_payload = structured_generation_response.json()["data"]
-    assert structured_generation_payload.get("generation_mode", "prompt_items_structured") == "prompt_items_structured"
+    assert (
+        structured_generation_payload.get("generation_mode", "prompt_items_structured")
+        == "prompt_items_structured"
+    )
     assert len(structured_generation_payload["prompt_items"]) == 1
     assert structured_generation_payload["prompt_items"][0]["title"] == "Escalation reset"
     assert structured_generation_payload["prompt_items"][0]["rubric_id"] != "quick_practice_text@v1"
@@ -888,7 +894,9 @@ async def test_catalog_generates_prompt_items_for_existing_collections(
     )
     assert chat_generation_response.status_code == 200
     chat_generation_payload = chat_generation_response.json()["data"]
-    assert chat_generation_payload.get("generation_mode", "prompt_items_chat") == "prompt_items_chat"
+    assert (
+        chat_generation_payload.get("generation_mode", "prompt_items_chat") == "prompt_items_chat"
+    )
     assert len(chat_generation_payload["prompt_items"]) == 1
     assert chat_generation_payload["prompt_items"][0]["title"] == "Tradeoff interview"
 
@@ -915,7 +923,10 @@ async def test_catalog_generates_prompt_items_for_existing_collections(
         )
         generated_prompt_record = (
             session.query(PromptItemRecord)
-            .filter(PromptItemRecord.collection_id == collection_id, PromptItemRecord.title == "Escalation reset")
+            .filter(
+                PromptItemRecord.collection_id == collection_id,
+                PromptItemRecord.title == "Escalation reset",
+            )
             .one()
         )
         generated_criteria_count = (

@@ -356,31 +356,31 @@ class AssistantWorkflowService:
             stage("input_guard", input_guard, StageKind.GUARD),  # type: ignore[arg-type]
             stage(
                 "history_enrich",
-                history_enrich,
+                history_enrich,  # type: ignore[arg-type]
                 StageKind.ENRICH,
-                dependencies=("input_guard",),  # type: ignore[arg-type]
+                dependencies=("input_guard",),
             ),
             stage(
                 "profile_enrich",
-                profile_enrich,
+                profile_enrich,  # type: ignore[arg-type]
                 StageKind.ENRICH,
-                dependencies=("input_guard",),  # type: ignore[arg-type]
+                dependencies=("input_guard",),
             ),
             stage(
                 "progress_enrich",
-                progress_enrich,
+                progress_enrich,  # type: ignore[arg-type]
                 StageKind.ENRICH,
-                dependencies=("input_guard",),  # type: ignore[arg-type]
+                dependencies=("input_guard",),
             ),
             stage(
                 "attempts_enrich",
-                attempts_enrich,
+                attempts_enrich,  # type: ignore[arg-type]
                 StageKind.ENRICH,
-                dependencies=("input_guard",),  # type: ignore[arg-type]
+                dependencies=("input_guard",),
             ),
             stage(
                 ASSISTANT_RUNTIME_STAGE,
-                assistant_runtime,
+                assistant_runtime,  # type: ignore[arg-type]
                 StageKind.AGENT,
                 dependencies=(
                     "history_enrich",
@@ -388,7 +388,7 @@ class AssistantWorkflowService:
                     "progress_enrich",
                     "attempts_enrich",
                 ),
-            ),  # type: ignore[arg-type]
+            ),
             name="assistant_turn_runtime",
         )
 

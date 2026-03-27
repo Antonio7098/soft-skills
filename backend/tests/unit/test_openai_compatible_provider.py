@@ -43,7 +43,7 @@ async def test_openai_compatible_provider_enforces_total_timeout(
 
     provider = OpenAICompatibleLLMProvider(
         settings=Settings(
-            _env_file=None,
+            _env_file=None,  # type: ignore[call-arg]
             provider_api_key="test-key",
             provider_base_url="https://example.com/v1",
             provider_model_slug="test-model",
@@ -96,14 +96,16 @@ async def test_openai_compatible_provider_switches_to_backup_model_on_third_atte
             return None
 
         async def post(self, *_args: object, **kwargs: object) -> _Response:
-            requested_models.append(str(kwargs["json"]["model"]))
+            json_payload = kwargs["json"]
+            assert isinstance(json_payload, dict)
+            requested_models.append(str(json_payload["model"]))
             _RetryingAsyncClient.call_count += 1
             if _RetryingAsyncClient.call_count < 3:
                 return _Response(503, {"error": {"message": "temporary outage"}})
             return _Response(
                 200,
                 {
-                    "model": kwargs["json"]["model"],
+                    "model": json_payload["model"],
                     "choices": [{"message": {"content": '{"ok": true}'}}],
                     "usage": {"total_tokens": 1},
                 },

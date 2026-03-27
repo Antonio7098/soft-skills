@@ -7,7 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 
-def _default_rubric_levels() -> list["RubricLevel"]:
+def _default_rubric_levels() -> list[RubricLevel]:
     return [
         RubricLevel(level=1, description="Poor demonstration.", examples=["Weak evidence."]),
         RubricLevel(level=2, description="Limited demonstration.", examples=["Partial evidence."]),

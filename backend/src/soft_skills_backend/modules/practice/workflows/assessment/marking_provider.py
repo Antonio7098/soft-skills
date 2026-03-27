@@ -25,7 +25,6 @@ from soft_skills_backend.modules.practice.domain.practice import (
     AssessmentDraft,
     PerSkillAssessment,
     PracticeType,
-    SkillEvidenceItem,
     flatten_per_skill_assessments,
 )
 from soft_skills_backend.modules.practice.workflows.assessment.models import (
@@ -37,8 +36,6 @@ from soft_skills_backend.modules.practice.workflows.assessment.models import (
 )
 from soft_skills_backend.platform.providers.llm.prompts import (
     ASSESSMENT_AGGREGATION_PROMPT,
-    ASSESSMENT_AGGREGATION_PROMPT_NAME,
-    ASSESSMENT_PROMPT_NAME,
     PER_SKILL_ASSESSMENT_PROMPT,
 )
 from soft_skills_backend.shared.errors import AppError, scoring_error
@@ -146,7 +143,7 @@ class DefaultAssessmentMarkingProvider:
                     user_id=call_context.user_id,
                 ),
             )
-            parsed = cast(AggregationAssessmentOutput, aggregation_result.parsed)
+            parsed = cast(AssessmentAggregationOutput, aggregation_result.parsed)
             aggregation_summary = parsed.summary
             next_actions = parsed.next_actions
             model_slug = aggregation_result.model_slug

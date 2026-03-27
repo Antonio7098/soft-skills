@@ -7,7 +7,12 @@ from typing import Protocol
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from soft_skills_backend.engines.marking import RubricCriterion, RubricDefinition, RubricLevel, RubricScale
+from soft_skills_backend.engines.marking import (
+    RubricCriterion,
+    RubricDefinition,
+    RubricLevel,
+    RubricScale,
+)
 from soft_skills_backend.platform.db.models import RubricCriterionRecord, RubricRecord
 from soft_skills_backend.shared.errors import validation_error
 

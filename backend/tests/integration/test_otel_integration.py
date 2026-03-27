@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import httpx
 import pytest
 import pytest_asyncio
-import httpx
 from alembic.config import Config
-from alembic import command
 
+from alembic import command
 from soft_skills_backend.app import create_app
 from soft_skills_backend.config import Settings
 

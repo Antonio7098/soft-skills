@@ -60,6 +60,7 @@ def test_default_registry_includes_practice_run_lifecycle_smoke() -> None:
         "generation-latency-envelope",
         "generation-streaming",
         "auth-flows",
+        "evaluation-benchmark",
         "marking-quick-practice",
         "marking-interview",
         "marking-scenario",
@@ -67,4 +68,6 @@ def test_default_registry_includes_practice_run_lifecycle_smoke() -> None:
         "practice-session-flow",
         "practice-run-lifecycle",
         "organisation-management",
+        "pipeline-visualization",
+        "telemetry",
     ]

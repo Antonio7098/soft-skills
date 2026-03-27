@@ -46,7 +46,7 @@ class RubricSeed:
     content_type: str
     schema_version: str
     name: str
-    criteria: tuple["RubricCriterionSeed", ...]
+    criteria: tuple[RubricCriterionSeed, ...]
 
 
 @dataclass(frozen=True, slots=True)

@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-
 from soft_skills_backend.platform.observability.telemetry import (
-    TelemetryConfig,
-    build_telemetry_config,
-    extract_trace_context,
-    format_traceparent,
     OTEL_TRACE_CONTEXT_HEADER,
     W3C_TRACE_VERSION,
+    build_telemetry_config,
+    extract_trace_context,
 )
 
 
@@ -48,7 +44,7 @@ class TestExtractTraceContext:
         assert "traceparent" in result
 
     def test_returns_none_for_missing_header(self) -> None:
-        headers = {}
+        headers: dict[str, str] = {}
         result = extract_trace_context(headers)
 
         assert result is None

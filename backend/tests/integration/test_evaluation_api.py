@@ -52,14 +52,18 @@ class FakeEvaluationProvider:
         operation = call_context.operation
         if operation.endswith(":aggregation"):
             if "manual approval bottleneck" in content:
-                payload = {
+                payload: dict[str, object] = {
                     "summary": "The response aligned with the interviewer concern and justified the recommendation with clear tradeoffs.",
-                    "next_actions": ["Keep naming the key tradeoff before defending the recommendation."],
+                    "next_actions": [
+                        "Keep naming the key tradeoff before defending the recommendation."
+                    ],
                 }
             else:
                 payload = {
                     "summary": "The response protected the launch date and set a realistic follow-through plan.",
-                    "next_actions": ["Keep stating what ships now and when deferred work will be revisited."],
+                    "next_actions": [
+                        "Keep stating what ships now and when deferred work will be revisited."
+                    ],
                 }
         else:
             skill_slug = operation.rsplit(":", 1)[-1]

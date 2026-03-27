@@ -201,7 +201,7 @@ class AssistantStreamRuntimeSmoke(_AssistantRuntimeSmoke):
             flow_timeout_seconds=flow_timeout_seconds,
         )
 
-    def run(self, context: SmokeContext) -> AssistantStreamSmokeResult:
+    def run(self, context: SmokeContext) -> AssistantStreamSmokeResult:  # type: ignore[override]
         self._preflight.assert_ready(context.settings)
         try:
             return asyncio.run(
@@ -214,7 +214,7 @@ class AssistantStreamRuntimeSmoke(_AssistantRuntimeSmoke):
                 details={"timeout_seconds": self._flow_timeout_seconds},
             ) from exc
 
-    async def _run(self, settings: Settings) -> AssistantStreamSmokeResult:
+    async def _run(self, settings: Settings) -> AssistantStreamSmokeResult:  # type: ignore[override]
         import json
         import socket
         import tempfile
