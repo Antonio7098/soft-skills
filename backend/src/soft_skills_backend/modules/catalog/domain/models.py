@@ -277,6 +277,25 @@ class GeneratedPromptItemPlanBatch(BaseModel):
     prompt_items: list[GeneratedPromptItemPlan] = Field(default_factory=list)
 
 
+class GeneratedQuickPracticeRubricLevel(BaseModel):
+    level: int = Field(ge=1, le=2)
+    description: str
+    examples: list[str] = Field(default_factory=list, min_length=1)
+
+
+class GeneratedQuickPracticeRubricCriterion(BaseModel):
+    criterion_ref: str
+    skill_slug: str
+    title: str
+    description: str
+    levels: list[GeneratedQuickPracticeRubricLevel] = Field(min_length=2, max_length=2)
+
+
+class GeneratedQuickPracticeRubric(BaseModel):
+    title: str
+    criteria: list[GeneratedQuickPracticeRubricCriterion] = Field(min_length=1)
+
+
 class GeneratedPromptItemDraft(BaseModel):
     prompt_type: str
     title: str
@@ -284,6 +303,7 @@ class GeneratedPromptItemDraft(BaseModel):
     difficulty: str
     target_skill_slugs: list[str]
     rubric_id: str
+    generated_rubric: GeneratedQuickPracticeRubric | None = None
 
 
 class GeneratedScenarioDraft(BaseModel):

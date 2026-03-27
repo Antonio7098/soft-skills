@@ -126,6 +126,38 @@ class EvidenceItem(BaseModel):
         return cleaned
 
 
+class SkillEvidenceItem(BaseModel):
+    """Evidence nested inside one per-skill assessment."""
+
+    quote: str
+    explanation: str
+
+    @field_validator("quote", "explanation")
+    @classmethod
+    def _require_non_blank_nested_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Value must not be blank")
+        return cleaned
+
+
+class PerSkillAssessment(BaseModel):
+    """Canonical result for one assessed skill."""
+
+    skill_slug: str
+    score: int = Field(ge=1, le=5)
+    rationale: str
+    evidence: list[SkillEvidenceItem] = Field(min_length=1, max_length=2)
+
+    @field_validator("skill_slug", "rationale")
+    @classmethod
+    def _require_non_blank_skill_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Value must not be blank")
+        return cleaned
+
+
 class AssessmentDraft(BaseModel):
     """Structured assessment payload expected from the marking model."""
 
@@ -196,6 +228,7 @@ def validate_assessment_draft(
     response_text: str,
     required_skill_slugs: Iterable[str],
     draft: AssessmentDraft,
+    rubric_definition: RubricDefinition | None = None,
 ) -> None:
     """Enforce explainability and scoring guards before persistence."""
 
@@ -210,7 +243,7 @@ def validate_assessment_draft(
         response_mode="text",
         rubric_id="quick-practice-rubric",
     )
-    rubric = RubricDefinition(
+    rubric = rubric_definition or RubricDefinition(
         rubric_id="quick-practice-rubric",
         rubric_version=draft.rubric_version,
         scale=RubricScale(minimum_score=1, maximum_score=5),
@@ -218,6 +251,18 @@ def validate_assessment_draft(
             RubricCriterion(
                 criterion_ref=skill_slug,
                 description=f"Validate criterion coverage for {skill_slug}.",
+                levels=[
+                    {
+                        "level": 1,
+                        "description": f"{skill_slug} is missing.",
+                        "examples": [f"No {skill_slug} evidence was shown."],
+                    },
+                    {
+                        "level": 5,
+                        "description": f"{skill_slug} is strongly demonstrated.",
+                        "examples": [f"Clear {skill_slug} evidence was shown."],
+                    },
+                ],
             )
             for skill_slug in expected_skills
         ],
@@ -322,6 +367,23 @@ def _map_marking_validation_error(exc: AppError) -> AppError:
 
 def _normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip().lower())
+
+
+def flatten_per_skill_assessments(
+    assessments: list[PerSkillAssessment],
+) -> tuple[list[SkillScore], list[EvidenceItem]]:
+    """Flatten nested skill assessments into compatibility projections."""
+
+    skill_scores = [
+        SkillScore(skill_slug=item.skill_slug, score=item.score, rationale=item.rationale)
+        for item in assessments
+    ]
+    evidence = [
+        EvidenceItem(skill_slug=item.skill_slug, quote=e.quote, explanation=e.explanation)
+        for item in assessments
+        for e in item.evidence
+    ]
+    return skill_scores, evidence
 
 
 def is_attempt_terminal(status: str | AttemptStatus) -> bool:

@@ -74,7 +74,10 @@ class SmokeApplicationSessionFactory:
                 transport=transport,
                 base_url="http://testserver",
             ) as client:
-                yield SmokeBackendClient(client)
+                yield SmokeBackendClient(
+                    client,
+                    session_factory=app.state.container.session_factory,
+                )
 
     def _build_smoke_settings(self, settings: Settings, temp_dir: str) -> Settings:
         database_path = Path(temp_dir) / "smoke.db"

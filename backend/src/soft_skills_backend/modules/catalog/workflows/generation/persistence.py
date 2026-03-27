@@ -18,6 +18,7 @@ from soft_skills_backend.modules.catalog.contracts.scenario_commands import Scen
 from soft_skills_backend.modules.catalog.contracts.views import build_collection_view
 from soft_skills_backend.modules.catalog.domain.models import (
     GeneratedCollectionDraft,
+    GeneratedPromptItemDraft,
     GenerationManifest,
     GenerationWorkerArtifact,
 )
@@ -30,6 +31,8 @@ from soft_skills_backend.platform.db.models import (
     MockCompanyRecord,
     MockPersonRecord,
     PromptItemRecord,
+    RubricCriterionRecord,
+    RubricRecord,
     ScenarioRecord,
     ScenarioSupportingArtifactRecord,
 )
@@ -76,7 +79,18 @@ def persist_generated_collection(
         )
         session.add(collection)
         session.flush()
+        generated_rubric_ids: list[str] = []
         for prompt_item in draft.prompt_items:
+            rubric_id = prompt_item.rubric_id
+            if (
+                prompt_item.prompt_type == "quick_practice_prompt"
+                and prompt_item.generated_rubric is not None
+            ):
+                rubric_id = _persist_generated_quick_practice_rubric(
+                    session=session,
+                    prompt_item=prompt_item,
+                )
+                generated_rubric_ids.append(rubric_id)
             session.add(
                 PromptItemRecord(
                     id=uuid4().hex,
@@ -88,7 +102,7 @@ def persist_generated_collection(
                     difficulty=prompt_item.difficulty,
                     lifecycle_state="draft",
                     target_skill_slugs=list(prompt_item.target_skill_slugs),
-                    rubric_id=prompt_item.rubric_id,
+                    rubric_id=rubric_id,
                     created_at=now,
                     updated_at=now,
                 )
@@ -139,6 +153,8 @@ def persist_generated_collection(
         )
         session.add(artifact)
         session.flush()
+        if generated_rubric_ids:
+            collection.rubric_ids = list(dict.fromkeys([*collection.rubric_ids, *generated_rubric_ids]))
         collection.last_generation_artifact_id = artifact.id
         session.commit()
         collection_view = build_collection_view(session, collection, actor=actor)
@@ -190,7 +206,7 @@ def persist_generated_prompt_items(
     workflow_id: str,
     collection_id: str,
     generation_mode: str,
-    commands: list[PromptItemCreateCommand],
+    commands: list[PromptItemCreateCommand | GeneratedPromptItemDraft],
     planner_prompt_version: str,
     planner_provider: str,
     planner_model_slug: str,
@@ -201,7 +217,20 @@ def persist_generated_prompt_items(
     created_prompt_ids: list[str] = []
     with session_factory() as session:
         collection = collection_or_error(session, collection_id)
+        generated_rubric_ids: list[str] = []
+        resolved_output_payload: list[dict[str, Any]] = []
         for command in commands:
+            command_payload = command.model_dump(mode="json")
+            generated_rubric_payload = command_payload.pop("generated_rubric", None)
+            rubric_id = command.rubric_id
+            if command.prompt_type == "quick_practice_prompt" and generated_rubric_payload is not None:
+                rubric_id = _persist_generated_quick_practice_rubric(
+                    session=session,
+                    prompt_item=GeneratedPromptItemDraft.model_validate(
+                        {**command_payload, "rubric_id": command.rubric_id, "generated_rubric": generated_rubric_payload}
+                    ),
+                )
+                generated_rubric_ids.append(rubric_id)
             record = PromptItemRecord(
                 id=uuid4().hex,
                 collection_id=collection_id,
@@ -212,12 +241,22 @@ def persist_generated_prompt_items(
                 difficulty=command.difficulty,
                 lifecycle_state="draft",
                 target_skill_slugs=list(command.target_skill_slugs),
-                rubric_id=command.rubric_id,
+                rubric_id=rubric_id,
                 created_at=now,
                 updated_at=now,
             )
             session.add(record)
             created_prompt_ids.append(record.id)
+            resolved_output_payload.append(
+                {
+                    "prompt_type": command.prompt_type,
+                    "title": command.title,
+                    "prompt_text": command.prompt_text,
+                    "difficulty": command.difficulty,
+                    "target_skill_slugs": list(command.target_skill_slugs),
+                    "rubric_id": rubric_id,
+                }
+            )
         artifact = ContentGenerationArtifactRecord(
             id=uuid4().hex,
             collection_id=collection_id,
@@ -233,7 +272,7 @@ def persist_generated_prompt_items(
             workflow_id=workflow_id,
             input_payload=input_payload,
             output_payload={
-                "prompt_items": [command.model_dump(mode="json") for command in commands],
+                "prompt_items": resolved_output_payload,
                 "manifest": manifest.model_dump(mode="json"),
             },
             raw_payload=manifest.model_dump(mode="json"),
@@ -241,6 +280,8 @@ def persist_generated_prompt_items(
         )
         session.add(artifact)
         session.flush()
+        if generated_rubric_ids:
+            collection.rubric_ids = list(dict.fromkeys([*collection.rubric_ids, *generated_rubric_ids]))
         collection.last_generation_artifact_id = artifact.id
         collection.updated_at = now
         session.commit()
@@ -282,6 +323,56 @@ def persist_generated_prompt_items(
         provider=planner_provider,
         model_slug=planner_model_slug,
     )
+
+
+def _persist_generated_quick_practice_rubric(
+    *,
+    session: Session,
+    prompt_item: GeneratedPromptItemDraft,
+) -> str:
+    generated_rubric = prompt_item.generated_rubric
+    if generated_rubric is None:
+        raise domain_error(
+            "Generated quick-practice prompt item was missing a generated rubric payload",
+            code="SS-DOMAIN-029",
+            details={"title": prompt_item.title},
+        )
+    rubric_id = f"quick_practice_generated_{uuid4().hex}@v1"
+    session.add(
+        RubricRecord(
+            rubric_id=rubric_id,
+            family="quick_practice_generated",
+            version="v1",
+            content_type="quick_practice_prompt",
+            schema_version="v1",
+            name=generated_rubric.title,
+            criteria=[criterion.skill_slug for criterion in generated_rubric.criteria],
+        )
+    )
+    for position, criterion in enumerate(generated_rubric.criteria, start=1):
+        session.add(
+            RubricCriterionRecord(
+                rubric_id=rubric_id,
+                rubric_version="v1",
+                criterion_ref=criterion.criterion_ref,
+                skill_slug=criterion.skill_slug,
+                title=criterion.title,
+                description=criterion.description,
+                weight=1.0,
+                required=True,
+                position=position,
+                levels_json=[
+                    {
+                        f"level_{level.level}": {
+                            "description": level.description,
+                            "examples": list(level.examples),
+                        }
+                    }
+                    for level in criterion.levels
+                ],
+            )
+        )
+    return rubric_id
 
 
 def collection_or_error(session: Session, collection_id: str) -> CollectionRecord:

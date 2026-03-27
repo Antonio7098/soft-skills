@@ -8,6 +8,7 @@ from uuid import uuid4
 from stageflow.api import Pipeline, StageKind, stage
 from stageflow.core import StageContext
 
+from soft_skills_backend.engines.marking.domain.rubric_repository import RubricRepository
 from soft_skills_backend.modules.practice.domain.practice import PracticeType
 from soft_skills_backend.modules.practice.models import (
     AttemptGuardPayload,
@@ -68,6 +69,7 @@ class PracticeService:
         stageflow_runtime: StageflowRuntime,
         store: PracticeRepository,
         assessment_marker: AssessmentMarkingProvider,
+        rubric_repository: RubricRepository,
         progression_service: ProgressionService,
     ) -> None:
         self._store = store
@@ -77,6 +79,7 @@ class PracticeService:
         self._assessment = AssessmentService(
             store=store,
             assessment_marker=assessment_marker,
+            rubric_repository=rubric_repository,
         )
 
     async def start_session(
@@ -539,6 +542,7 @@ class PracticeService:
             if (
                 assessment_view is not None
                 and assessment_view.validation_status.value == "validated"
+                and ownership.practice_type != "quick_practice"
             ):
                 await self._progression.refresh_from_assessment(
                     request_id=correlation.request_id,

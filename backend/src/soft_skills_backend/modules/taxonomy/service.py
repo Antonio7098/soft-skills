@@ -15,6 +15,7 @@ from soft_skills_backend.modules.taxonomy.models import (
 from soft_skills_backend.platform.db.models import (
     CompetencyRecord,
     CompetencySkillMapRecord,
+    RubricCriterionRecord,
     RubricRecord,
     SkillRecord,
 )
@@ -45,6 +46,26 @@ class RubricSeed:
     content_type: str
     schema_version: str
     name: str
+    criteria: tuple["RubricCriterionSeed", ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RubricLevelSeed:
+    level: int
+    description: str
+    examples: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RubricCriterionSeed:
+    criterion_ref: str
+    skill_slug: str
+    title: str
+    description: str
+    weight: float
+    required: bool
+    position: int
+    levels: tuple[RubricLevelSeed, ...]
 
 
 SKILL_SEEDS: tuple[SkillSeed, ...] = (
@@ -127,6 +148,222 @@ COMPETENCY_SEEDS: tuple[CompetencySeed, ...] = (
     ),
 )
 
+
+def _levels(
+    *,
+    skill_name: str,
+    poor: str,
+    adequate: str,
+    excellent: str,
+) -> tuple[RubricLevelSeed, ...]:
+    return (
+        RubricLevelSeed(1, poor, (f"No credible {skill_name.lower()} signal.",)),
+        RubricLevelSeed(
+            2,
+            f"Shows limited {skill_name.lower()} with notable gaps.",
+            (f"Weak {skill_name.lower()} signal with missed opportunities.",),
+        ),
+        RubricLevelSeed(
+            3,
+            adequate,
+            (f"Adequate {skill_name.lower()} signal with partial coverage.",),
+        ),
+        RubricLevelSeed(
+            4,
+            f"Shows strong {skill_name.lower()} with minor gaps.",
+            (f"Strong {skill_name.lower()} signal with small omissions.",),
+        ),
+        RubricLevelSeed(5, excellent, (f"Clear and consistent {skill_name.lower()} signal.",)),
+    )
+
+
+def _binary_levels(
+    *,
+    fail_description: str,
+    pass_description: str,
+    fail_example: str,
+    pass_example: str,
+) -> tuple[RubricLevelSeed, ...]:
+    return (
+        RubricLevelSeed(1, fail_description, (fail_example,)),
+        RubricLevelSeed(2, pass_description, (pass_example,)),
+    )
+
+
+def _criterion(
+    *,
+    position: int,
+    skill_slug: str,
+    title: str,
+    description: str,
+    poor: str,
+    adequate: str,
+    excellent: str,
+    weight: float = 1.0,
+) -> RubricCriterionSeed:
+    return RubricCriterionSeed(
+        criterion_ref=skill_slug,
+        skill_slug=skill_slug,
+        title=title,
+        description=description,
+        weight=weight,
+        required=True,
+        position=position,
+        levels=_levels(skill_name=title, poor=poor, adequate=adequate, excellent=excellent),
+    )
+
+
+def _binary_criterion(
+    *,
+    position: int,
+    skill_slug: str,
+    title: str,
+    description: str,
+    fail_description: str,
+    pass_description: str,
+    fail_example: str,
+    pass_example: str,
+    weight: float = 1.0,
+) -> RubricCriterionSeed:
+    return RubricCriterionSeed(
+        criterion_ref=skill_slug,
+        skill_slug=skill_slug,
+        title=title,
+        description=description,
+        weight=weight,
+        required=True,
+        position=position,
+        levels=_binary_levels(
+            fail_description=fail_description,
+            pass_description=pass_description,
+            fail_example=fail_example,
+            pass_example=pass_example,
+        ),
+    )
+
+
+COMMON_RUBRIC_CRITERIA: tuple[RubricCriterionSeed, ...] = (
+    _criterion(
+        position=1,
+        skill_slug="active-listening",
+        title="Active Listening",
+        description="Assess whether the learner reflects stakeholder signals and responds to them.",
+        poor="Does not reflect stakeholder concerns or acknowledge what matters.",
+        adequate="Partially reflects stakeholder concerns but misses important signals.",
+        excellent="Clearly reflects stakeholder concerns, priorities, and emotional signals.",
+    ),
+    _criterion(
+        position=2,
+        skill_slug="structured-communication",
+        title="Structured Communication",
+        description="Assess whether the learner organizes the response clearly and logically.",
+        poor="Response is disorganized and difficult to follow.",
+        adequate="Response has some structure but sequencing or clarity is inconsistent.",
+        excellent="Response is clear, well sequenced, and easy to follow.",
+    ),
+    _criterion(
+        position=3,
+        skill_slug="concise-explanation",
+        title="Concise Explanation",
+        description="Assess whether the learner explains the point efficiently without unnecessary sprawl.",
+        poor="Response is verbose, vague, or indirect.",
+        adequate="Response is understandable but could be tighter and more direct.",
+        excellent="Response is direct, efficient, and appropriately concise.",
+    ),
+    _criterion(
+        position=4,
+        skill_slug="empathy",
+        title="Empathy",
+        description="Assess whether the learner acknowledges stakeholder concerns with care and credibility.",
+        poor="Ignores or dismisses stakeholder concerns.",
+        adequate="Acknowledges concerns at a surface level without much depth.",
+        excellent="Acknowledges concerns credibly and responds with appropriate care.",
+    ),
+    _criterion(
+        position=5,
+        skill_slug="expectation-setting",
+        title="Expectation Setting",
+        description="Assess whether the learner sets realistic next steps, boundaries, or timing.",
+        poor="Sets no clear expectations or makes unrealistic commitments.",
+        adequate="Sets partial expectations but leaves ambiguity about next steps or timing.",
+        excellent="Sets clear, realistic expectations, ownership, and next-step timing.",
+    ),
+    _criterion(
+        position=6,
+        skill_slug="prioritization-under-pressure",
+        title="Prioritization Under Pressure",
+        description="Assess whether the learner prioritizes well under constraints or urgency.",
+        poor="Does not prioritize or chooses weak tradeoffs under pressure.",
+        adequate="Makes a workable prioritization choice but misses some tradeoffs.",
+        excellent="Makes strong prioritization decisions with clear tradeoff handling.",
+    ),
+    _criterion(
+        position=7,
+        skill_slug="conflict-handling",
+        title="Conflict Handling",
+        description="Assess whether the learner handles disagreement constructively.",
+        poor="Escalates conflict or avoids it without resolving the issue.",
+        adequate="Handles disagreement partly but leaves tension unresolved.",
+        excellent="Handles disagreement constructively while moving toward resolution.",
+    ),
+    _criterion(
+        position=8,
+        skill_slug="negotiation",
+        title="Negotiation",
+        description="Assess whether the learner trades off positions to move stakeholders toward alignment.",
+        poor="Does not negotiate or treats positions as fixed.",
+        adequate="Attempts tradeoffs but misses leverage or alignment opportunities.",
+        excellent="Uses tradeoffs well to move stakeholders toward workable alignment.",
+    ),
+    _criterion(
+        position=9,
+        skill_slug="executive-summary",
+        title="Executive Summary",
+        description="Assess whether the learner can summarize the key message for a senior audience.",
+        poor="Does not surface the key takeaway clearly.",
+        adequate="Surfaces a usable takeaway but with some clutter or missing emphasis.",
+        excellent="Surfaces the key takeaway clearly, crisply, and at the right altitude.",
+    ),
+    _criterion(
+        position=10,
+        skill_slug="decision-justification",
+        title="Decision Justification",
+        description="Assess whether the learner justifies recommendations with reasoning and evidence.",
+        poor="Makes assertions without clear reasoning.",
+        adequate="Provides some reasoning but leaves important logic unstated.",
+        excellent="Justifies recommendations with clear, defensible reasoning.",
+    ),
+)
+
+QUICK_PRACTICE_RESET_TIMELINE_CRITERIA: tuple[RubricCriterionSeed, ...] = (
+    _binary_criterion(
+        position=1,
+        skill_slug="active-listening",
+        title="Acknowledge The Client Concern",
+        description=(
+            "Check whether the response directly acknowledges why the requested date matters "
+            "to the stakeholder."
+        ),
+        fail_description="The response does not acknowledge the client concern or why the date matters.",
+        pass_description="The response directly acknowledges the client concern and why the date matters.",
+        fail_example="Jumps straight to logistics without recognizing the stakeholder concern.",
+        pass_example="Explicitly recognizes the importance or pressure behind the requested date.",
+    ),
+    _binary_criterion(
+        position=2,
+        skill_slug="expectation-setting",
+        title="Set A Realistic Next Step",
+        description=(
+            "Check whether the response sets a realistic next step, boundary, or timeline "
+            "instead of making a vague or impossible commitment."
+        ),
+        fail_description="The response does not set a realistic next step or makes an unrealistic commitment.",
+        pass_description="The response sets a clear and realistic next step, boundary, or timeline.",
+        fail_example="Promises the impossible date without clarifying tradeoffs or next steps.",
+        pass_example="Sets a realistic date, boundary, or follow-up action with concrete timing.",
+    ),
+)
+
 RUBRIC_SEEDS: tuple[RubricSeed, ...] = (
     RubricSeed(
         "quick_practice_text@v1",
@@ -135,9 +372,25 @@ RUBRIC_SEEDS: tuple[RubricSeed, ...] = (
         "quick_practice_prompt",
         "v1",
         "Quick Practice Text Rubric",
+        COMMON_RUBRIC_CRITERIA,
     ),
     RubricSeed(
-        "scenario_text@v1", "scenario_text", "v1", "scenario_step", "v1", "Scenario Text Rubric"
+        "quick_practice_reset_timeline@v1",
+        "quick_practice_reset_timeline",
+        "v1",
+        "quick_practice_prompt",
+        "v1",
+        "Quick Practice Reset Timeline Rubric",
+        QUICK_PRACTICE_RESET_TIMELINE_CRITERIA,
+    ),
+    RubricSeed(
+        "scenario_text@v1",
+        "scenario_text",
+        "v1",
+        "scenario_step",
+        "v1",
+        "Scenario Text Rubric",
+        COMMON_RUBRIC_CRITERIA,
     ),
     RubricSeed(
         "interview_text@v1",
@@ -146,6 +399,7 @@ RUBRIC_SEEDS: tuple[RubricSeed, ...] = (
         "interview_prompt",
         "v1",
         "Interview Text Rubric",
+        COMMON_RUBRIC_CRITERIA,
     ),
 )
 
@@ -200,9 +454,34 @@ class TaxonomyService:
                             content_type=rubric_seed.content_type,
                             schema_version=rubric_seed.schema_version,
                             name=rubric_seed.name,
-                            criteria=["overall_score", "skill_scores", "evidence", "rationale"],
+                            criteria=[criterion.skill_slug for criterion in rubric_seed.criteria],
                         )
                     )
+            if session.query(RubricCriterionRecord).count() == 0:
+                for rubric_seed in RUBRIC_SEEDS:
+                    for criterion in rubric_seed.criteria:
+                        session.add(
+                            RubricCriterionRecord(
+                                rubric_id=rubric_seed.rubric_id,
+                                rubric_version=rubric_seed.version,
+                                criterion_ref=criterion.criterion_ref,
+                                skill_slug=criterion.skill_slug,
+                                title=criterion.title,
+                                description=criterion.description,
+                                weight=criterion.weight,
+                                required=criterion.required,
+                                position=criterion.position,
+                                levels_json=[
+                                    {
+                                        f"level_{level.level}": {
+                                            "description": level.description,
+                                            "examples": list(level.examples),
+                                        }
+                                    }
+                                    for level in criterion.levels
+                                ],
+                            )
+                        )
             session.commit()
 
         self._workflow_events.record(

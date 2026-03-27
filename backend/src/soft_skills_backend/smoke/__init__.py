@@ -9,6 +9,7 @@ from .registry import SmokeRegistry
 from .runner import SmokeRunner
 from .suites.assessment_marking import (
     InterviewMarkingSmoke,
+    MarkingRelationalPersistenceSmoke,
     QuickPracticeMarkingSmoke,
     ScenarioMarkingSmoke,
 )
@@ -51,6 +52,7 @@ def build_default_registry() -> SmokeRegistry:
             QuickPracticeMarkingSmoke(),
             InterviewMarkingSmoke(),
             ScenarioMarkingSmoke(),
+            MarkingRelationalPersistenceSmoke(),
             PracticeSessionFlowSmoke(),
             PracticeRunLifecycleSmoke(),
             OrganisationSmoke(),

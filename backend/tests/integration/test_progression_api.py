@@ -61,10 +61,10 @@ async def _seed_prompt(client) -> tuple[dict[str, object], dict[str, object], di
             "summary": "Practice setting expectations when stakeholders push back.",
             "target_audience": "Consultant",
             "difficulty": "intermediate",
-            "content_format_mix": ["quick_practice_prompt"],
-            "target_skill_slugs": ["active-listening", "expectation-setting"],
-            "target_competency_slugs": ["stakeholder-management"],
-            "rubric_ids": ["quick_practice_text@v1"],
+            "content_format_mix": ["interview_prompt"],
+            "target_skill_slugs": ["active-listening", "decision-justification"],
+            "target_competency_slugs": ["adaptability"],
+            "rubric_ids": ["interview_text@v1"],
         },
     )
     assert collection_response.status_code == 200
@@ -74,14 +74,12 @@ async def _seed_prompt(client) -> tuple[dict[str, object], dict[str, object], di
         f"/api/collections/{collection['id']}/prompt-items",
         headers={"X-User-ID": learner["id"]},
         json={
-            "prompt_type": "quick_practice_prompt",
-            "title": "Reset the timeline",
-            "prompt_text": (
-                "A client asks for an impossible delivery date. Respond with empathy and a realistic next step."
-            ),
+            "prompt_type": "interview_prompt",
+            "title": "Lead through ambiguity",
+            "prompt_text": "Tell me about a time you had to make a decision with incomplete information.",
             "difficulty": "intermediate",
-            "target_skill_slugs": ["active-listening", "expectation-setting"],
-            "rubric_id": "quick_practice_text@v1",
+            "target_skill_slugs": ["active-listening", "decision-justification"],
+            "rubric_id": "interview_text@v1",
         },
     )
     assert prompt_response.status_code == 200
@@ -107,7 +105,7 @@ class FakeSuccessMarker:
                     "provider": "openai",
                     "model_slug": "gpt-4.1-mini",
                     "overall_score": 4,
-                    "rationale": "The response balanced empathy with a realistic commitment.",
+                    "rationale": "The response balanced listening with a defensible decision.",
                     "skill_scores": [
                         {
                             "skill_slug": "active-listening",
@@ -115,26 +113,26 @@ class FakeSuccessMarker:
                             "rationale": "It acknowledged the client concern directly.",
                         },
                         {
-                            "skill_slug": "expectation-setting",
-                            "score": 3,
-                            "rationale": "It set a next step but could tighten the boundary.",
+                            "skill_slug": "decision-justification",
+                            "score": 4,
+                            "rationale": "It supported the decision with clear reasoning.",
                         },
                     ],
                     "evidence": [
                         {
                             "skill_slug": "active-listening",
-                            "quote": "I hear why the date matters to you",
-                            "explanation": "The learner acknowledged the stakeholder concern.",
+                            "quote": "I first aligned the team on the uncertainty",
+                            "explanation": "The learner showed attention to stakeholder alignment.",
                         },
                         {
-                            "skill_slug": "expectation-setting",
-                            "quote": "The earliest realistic date is next Friday",
-                            "explanation": "The learner set a realistic boundary.",
+                            "skill_slug": "decision-justification",
+                            "quote": "we chose the lower-risk option because the data was incomplete",
+                            "explanation": "The learner justified the decision directly.",
                         },
                     ],
-                    "strengths": ["Acknowledged the client concern before resetting expectations."],
-                    "weaknesses": ["Could have named a firmer checkpoint and owner."],
-                    "next_actions": ["Practice tighter expectation-setting under pressure."],
+                    "strengths": ["Balanced alignment with a clear rationale."],
+                    "weaknesses": ["Could have made the tradeoff framing even crisper."],
+                    "next_actions": ["Practice making tradeoffs explicit under uncertainty."],
                 }
             ),
             raw_payload={"ok": True},
@@ -146,9 +144,13 @@ class FakeSuccessMarker:
 async def _submit_assessed_attempt(app, client, learner_id: str, prompt_id: str) -> None:
     app.state.container.practice_service._assessment_marker = FakeSuccessMarker()
     start_response = await client.post(
-        "/api/attempts/quick-practice/sessions",
+        "/api/attempts/interview/sessions",
         headers={"X-User-ID": learner_id},
-        json={"prompt_item_id": prompt_id},
+        json={
+            "prompt_item_id": prompt_id,
+            "competency_context": "Assess structured communication and reasoning.",
+            "interviewer_perspective": "Hiring manager at a consulting firm.",
+        },
     )
     assert start_response.status_code == 200
     attempt_id = start_response.json()["data"]["attempt_id"]
@@ -157,8 +159,8 @@ async def _submit_assessed_attempt(app, client, learner_id: str, prompt_id: str)
         headers={"X-User-ID": learner_id},
         json={
             "response_text": (
-                "I hear why the date matters to you. The earliest realistic date is next Friday, "
-                "and I can confirm scope with the team by tomorrow."
+                "I first aligned the team on the uncertainty, then we chose the lower-risk option "
+                "because the data was incomplete and the downside of a rushed decision was higher."
             )
         },
     )

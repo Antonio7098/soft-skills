@@ -196,12 +196,11 @@ async def generate_prompt_items_for_collection(
         prompt_item_results = cast(
             list[WorkerExecutionResult], payload_from_inputs(ctx, "prompt_items_work")
         )
-        commands = [
-            PromptItemCreateCommand.model_validate(
-                cast(GeneratedPromptItemDraft, result.typed_result.parsed).model_dump()
-            )
+        drafts = [
+            cast(GeneratedPromptItemDraft, result.typed_result.parsed)
             for result in prompt_item_results
         ]
+        commands = [PromptItemCreateCommand.model_validate(draft.model_dump()) for draft in drafts]
         with session_factory() as session:
             collection = collection_or_error(session, collection_id)
             existing_prompt_items = (
@@ -218,13 +217,13 @@ async def generate_prompt_items_for_collection(
             )
         return ok_output(
             StageflowStageResult(
-                payload=commands,
+                payload=drafts,
                 summary={"validated_prompt_items": len(commands)},
             )
         )
 
     async def persistence_work(ctx: StageContext) -> Any:
-        commands = cast(list[PromptItemCreateCommand], payload_from_inputs(ctx, "output_guard"))
+        drafts = cast(list[GeneratedPromptItemDraft], payload_from_inputs(ctx, "output_guard"))
         plan_result = cast(TypedLLMResult, payload_from_inputs(ctx, "plan_guard"))
         plan_batch = cast(GeneratedPromptItemPlanBatch, plan_result.parsed)
         prompt_item_results = cast(
@@ -259,7 +258,7 @@ async def generate_prompt_items_for_collection(
             workflow_id=metadata_value(ctx, "workflow_id"),
             collection_id=collection_id,
             generation_mode=mode,
-            commands=commands,
+            commands=drafts,
             planner_prompt_version=plan_batch.prompt_version,
             planner_provider=plan_batch.provider,
             planner_model_slug=plan_result.model_slug,

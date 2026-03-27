@@ -13,8 +13,6 @@ class PracticeFixtureSeeder:
         self._backend = backend
 
     async def seed(self, user_id: str) -> PracticeFixtures:
-        await self._backend.generate_structured_collection(user_id=user_id)
-        await self._backend.generate_chat_collection(user_id=user_id)
         scenario = await self._seed_scenario(user_id)
         quick_prompt = await self._seed_quick_practice_prompt(user_id)
         interview_prompt = await self._seed_interview_prompt(user_id)
@@ -31,7 +29,7 @@ class PracticeFixtureSeeder:
             content_format_mix=["quick_practice_prompt"],
             target_skill_slugs=["active-listening", "expectation-setting"],
             target_competency_slugs=["stakeholder-management"],
-            rubric_ids=["quick_practice_text@v1"],
+            rubric_ids=["quick_practice_reset_timeline@v1"],
         )
         return await self._backend.create_prompt_item(
             collection_id=collection_id,
@@ -46,7 +44,7 @@ class PracticeFixtureSeeder:
                 ),
                 "difficulty": "intermediate",
                 "target_skill_slugs": ["active-listening", "expectation-setting"],
-                "rubric_id": "quick_practice_text@v1",
+                "rubric_id": "quick_practice_reset_timeline@v1",
             },
         )
 
@@ -67,8 +65,7 @@ class PracticeFixtureSeeder:
                 "prompt_type": "interview_prompt",
                 "title": "Lead through ambiguity",
                 "prompt_text": (
-                    "Tell me about a time you had to make a decision with incomplete "
-                    "information."
+                    "Tell me about a time you had to make a decision with incomplete information."
                 ),
                 "difficulty": "intermediate",
                 "target_skill_slugs": ["active-listening", "decision-justification"],
@@ -95,9 +92,7 @@ class PracticeFixtureSeeder:
                 ),
                 "learner_objective": "Re-align the sponsor without hiding delivery risk.",
                 "constraints": ["The launch date is on the board agenda tomorrow."],
-                "stakeholder_tensions": [
-                    "Legal wants a delay and sales wants the current date."
-                ],
+                "stakeholder_tensions": ["Legal wants a delay and sales wants the current date."],
                 "target_skill_slugs": [
                     "expectation-setting",
                     "prioritization-under-pressure",

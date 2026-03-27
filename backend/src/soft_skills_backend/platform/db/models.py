@@ -166,6 +166,24 @@ class RubricRecord(Base):
     criteria: Mapped[list[str]] = mapped_column(JSON, default=list)
 
 
+class RubricCriterionRecord(Base):
+    """One stored rubric criterion with scored levels."""
+
+    __tablename__ = "rubric_criteria"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    rubric_id: Mapped[str] = mapped_column(String(128), index=True)
+    rubric_version: Mapped[str] = mapped_column(String(32))
+    criterion_ref: Mapped[str] = mapped_column(String(64), index=True)
+    skill_slug: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text)
+    weight: Mapped[float]
+    required: Mapped[bool] = mapped_column(default=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    levels_json: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+
+
 class CollectionRecord(Base):
     """Collection browsing and authoring unit."""
 
@@ -446,6 +464,32 @@ class AssessmentRecord(Base):
     rejection_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     trace_id: Mapped[str] = mapped_column(String(32), index=True)
     pipeline_run_id: Mapped[str] = mapped_column(String(32), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class AssessmentSkillResultRecord(Base):
+    """Stored per-skill assessment result."""
+
+    __tablename__ = "assessment_skill_results"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    assessment_id: Mapped[str] = mapped_column(String(32), index=True)
+    skill_slug: Mapped[str] = mapped_column(String(64), index=True)
+    score: Mapped[int] = mapped_column(Integer)
+    rationale: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class AssessmentSkillEvidenceRecord(Base):
+    """Stored evidence item for one skill result."""
+
+    __tablename__ = "assessment_skill_evidence"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    assessment_id: Mapped[str] = mapped_column(String(32), index=True)
+    skill_slug: Mapped[str] = mapped_column(String(64), index=True)
+    quote: Mapped[str] = mapped_column(Text)
+    explanation: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 

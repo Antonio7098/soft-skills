@@ -7,6 +7,16 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 
+def _default_rubric_levels() -> list["RubricLevel"]:
+    return [
+        RubricLevel(level=1, description="Poor demonstration.", examples=["Weak evidence."]),
+        RubricLevel(level=2, description="Limited demonstration.", examples=["Partial evidence."]),
+        RubricLevel(level=3, description="Adequate demonstration.", examples=["Acceptable evidence."]),
+        RubricLevel(level=4, description="Strong demonstration.", examples=["Strong evidence."]),
+        RubricLevel(level=5, description="Excellent demonstration.", examples=["Compelling evidence."]),
+    ]
+
+
 class PromptTemplate(BaseModel):
     """Versioned prompt template used to render an evaluator prompt."""
 
@@ -86,13 +96,39 @@ class RubricScale(BaseModel):
     maximum_score: int
 
 
+class RubricLevel(BaseModel):
+    """One scored rubric level with examples."""
+
+    level: int = Field(ge=1)
+    description: str
+    examples: list[str] = Field(min_length=1)
+
+    @field_validator("description")
+    @classmethod
+    def _require_description(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Value must not be blank")
+        return cleaned
+
+    @field_validator("examples", mode="after")
+    @classmethod
+    def _clean_examples(cls, values: list[str]) -> list[str]:
+        cleaned = [value.strip() for value in values if value.strip()]
+        if not cleaned:
+            raise ValueError("List must contain at least one non-blank item")
+        return cleaned
+
+
 class RubricCriterion(BaseModel):
     """One rubric criterion."""
 
     criterion_ref: str
+    title: str | None = None
     description: str
     weight: float = Field(default=1.0, gt=0)
     required: bool = True
+    levels: list[RubricLevel] = Field(default_factory=_default_rubric_levels, min_length=1)
 
     @field_validator("criterion_ref", "description")
     @classmethod
@@ -101,6 +137,14 @@ class RubricCriterion(BaseModel):
         if not cleaned:
             raise ValueError("Value must not be blank")
         return cleaned
+
+    @field_validator("title")
+    @classmethod
+    def _clean_optional_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
 
 
 class RubricDefinition(BaseModel):

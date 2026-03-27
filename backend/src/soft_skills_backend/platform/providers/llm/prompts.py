@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-ASSESSMENT_PROMPT_NAME = "quick-practice-assessment"
+ASSESSMENT_PROMPT_NAME = "assessment-per-skill"
+ASSESSMENT_AGGREGATION_PROMPT_NAME = "assessment-aggregation"
 CREATOR_STRUCTURED_GENERATION_PROMPT_NAME = "creator-structured-draft"
 CREATOR_CHAT_GENERATION_PROMPT_NAME = "creator-chat-draft"
 CREATOR_PROMPT_ITEM_STRUCTURED_GENERATION_PROMPT_NAME = "creator-prompt-items-structured-plan"
@@ -10,7 +11,7 @@ CREATOR_PROMPT_ITEM_CHAT_GENERATION_PROMPT_NAME = "creator-prompt-items-chat-pla
 CREATOR_PROMPT_ITEM_WORKER_PROMPT_NAME = "creator-prompt-item-worker"
 CREATOR_SCENARIO_WORKER_PROMPT_NAME = "creator-scenario-worker"
 
-QUICK_PRACTICE_ASSESSMENT_PROMPT = """Assess this SoftSkills text practice response.
+PER_SKILL_ASSESSMENT_PROMPT = """Assess this SoftSkills text practice response for exactly one skill.
 Practice mode: {practice_type}
 Prompt type: {prompt_type}
 Prompt: {prompt_text}
@@ -20,21 +21,37 @@ Learner response: {response_text}
 Target role: {target_role}
 Learner goals: {goals}
 Prior assessed attempts: {prior_assessed_attempts}
-Target skills: {skill_slugs}
+Requested skill: {skill_slug}
+Rubric id: {rubric_id}
 Rubric version: {rubric_version}
+Criterion title: {criterion_title}
+Criterion description: {criterion_description}
+Criterion levels:
+{criterion_levels}
+CRITICAL CONSTRAINTS:
+- You MUST assess only the requested skill: {skill_slug}
+- Every evidence quote must be copied directly from the learner response
+- Return one or two evidence items only
+- Keep the rationale aligned to the selected rubric level
 Return JSON with these required fields exactly:
-- prompt_version: '{prompt_version}'
-- rubric_version: '{rubric_version}'
-- provider: '{provider}'
-- model_slug: '{model_slug}'
-- overall_score: integer 1-5
+- skill_slug: '{skill_slug}'
+- score: integer using one of the rubric levels listed above
 - rationale: string
-- skill_scores: array of objects with skill_slug, score, rationale
-- evidence: array of objects with skill_slug, quote, explanation
-- strengths: array of strings
-- weaknesses: array of strings
+- evidence: array of objects with quote and explanation
+Do not include markdown fences or extra fields."""
+
+ASSESSMENT_AGGREGATION_PROMPT = """Synthesize the validated per-skill assessments for a SoftSkills practice response.
+Learner response: {response_text}
+Per-skill assessments:
+{per_skill_json}
+Return JSON with these required fields exactly:
+- summary: string
 - next_actions: array of strings
-Each evidence quote must be copied directly from the learner response."""
+Rules:
+- Do not invent new scores
+- Do not restate per-skill evidence verbatim unless necessary
+- Keep the summary grounded in the supplied per-skill assessments
+- Do not include markdown fences or extra fields."""
 
 CREATOR_DRAFT_OUTPUT_FORMAT = """Return JSON with these required fields exactly:
 - prompt_version: '{prompt_version}'
@@ -119,8 +136,21 @@ CREATOR_PROMPT_ITEM_OUTPUT_FORMAT = """Return JSON with these required fields ex
 - difficulty: one of introductory, intermediate, advanced
 - target_skill_slugs: array of strings
 - rubric_id: string
+- generated_rubric: null or object with:
+  - title
+  - criteria: array of objects with:
+    - criterion_ref
+    - skill_slug
+    - title
+    - description
+    - levels: array with exactly two objects:
+      - level: 1 or 2
+      - description
+      - examples: array of strings
 Rules:
 - Preserve prompt_type, difficulty, target_skill_slugs, and rubric_id exactly as requested.
+- If prompt_type is quick_practice_prompt, generated_rubric is required and must define a question-specific pass/fail rubric for this exact prompt.
+- If prompt_type is not quick_practice_prompt, generated_rubric must be null.
 - Produce editable, realistic workplace practice content.
 - Avoid repeating the title hint verbatim if a better specific title exists.
 - Do not include markdown fences or prose outside the JSON object."""

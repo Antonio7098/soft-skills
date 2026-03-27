@@ -32,7 +32,7 @@ The canon is now grouped into subfolders to keep related artifacts together:
 - `platform/`
   - `assessment-and-progression.md`, `soft-skill-progression.md`, `soft-skill-recommendation.md`
 - `engines/`
-  - `marking-engine.md`, `recommendation-engine.md`, `progression-engine.md`
+  - `marking-engine.md`, `marking-overhaul-plan.md`, `recommendation-engine.md`, `progression-engine.md`
 - `operations/`
   - `chat-assistant.md`, `content-system.md`, `generation.md`, `observability-and-operations.md`
 

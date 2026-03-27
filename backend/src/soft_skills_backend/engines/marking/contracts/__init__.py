@@ -11,6 +11,7 @@ from soft_skills_backend.engines.marking.contracts.models import (
     RenderedPrompt,
     RubricCriterion,
     RubricDefinition,
+    RubricLevel,
     RubricScale,
 )
 
@@ -25,5 +26,6 @@ __all__ = [
     "RenderedPrompt",
     "RubricCriterion",
     "RubricDefinition",
+    "RubricLevel",
     "RubricScale",
 ]

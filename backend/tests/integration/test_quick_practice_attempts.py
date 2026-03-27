@@ -73,7 +73,7 @@ async def _seed_quick_practice_prompt(client) -> tuple[dict[str, object], dict[s
             "content_format_mix": ["quick_practice_prompt"],
             "target_skill_slugs": ["active-listening", "expectation-setting"],
             "target_competency_slugs": ["stakeholder-management"],
-            "rubric_ids": ["quick_practice_text@v1"],
+            "rubric_ids": ["quick_practice_reset_timeline@v1"],
         },
     )
     assert collection_response.status_code == 200
@@ -90,7 +90,7 @@ async def _seed_quick_practice_prompt(client) -> tuple[dict[str, object], dict[s
             ),
             "difficulty": "intermediate",
             "target_skill_slugs": ["active-listening", "expectation-setting"],
-            "rubric_id": "quick_practice_text@v1",
+            "rubric_id": "quick_practice_reset_timeline@v1",
         },
     )
     assert prompt_response.status_code == 200
@@ -117,17 +117,17 @@ class FakeSuccessMarker:
                     "rubric_version": prompt_payload.prompt.rubric_version,
                     "provider": "openai",
                     "model_slug": "gpt-4.1-mini",
-                    "overall_score": 4,
+                    "overall_score": 2,
                     "rationale": "The response balanced empathy with a realistic commitment.",
                     "skill_scores": [
                         {
                             "skill_slug": "active-listening",
-                            "score": 4,
+                            "score": 2,
                             "rationale": "It acknowledged the client concern directly.",
                         },
                         {
                             "skill_slug": "expectation-setting",
-                            "score": 4,
+                            "score": 2,
                             "rationale": "It proposed a credible date and checkpoint.",
                         },
                     ],
@@ -213,7 +213,7 @@ async def test_quick_practice_start_submit_and_persist(app, client, test_setting
     assert submit_response.status_code == 200
     attempt_payload = submit_response.json()["data"]
     assert attempt_payload["status"] == "assessed"
-    assert attempt_payload["assessment"]["overall_score"] == 4
+    assert attempt_payload["assessment"]["overall_score"] == 2
     assert attempt_payload["assessment"]["prompt_version"] == "assessment.quick-practice.v1"
 
     with app.state.container.session_factory() as session:
@@ -240,18 +240,17 @@ async def test_quick_practice_start_submit_and_persist(app, client, test_setting
     assert session_record is not None and session_record.status == "completed"
     assert attempt_record is not None and attempt_record.status == "assessed"
     assert assessment_record is not None and assessment_record.validation_status == "validated"
-    assert snapshot_record is not None
-    assert recommendation_record is not None
+    assert snapshot_record is None
+    assert recommendation_record is None
     assert "quick_practice_session_start" in pipeline_run_names
     assert "quick_practice_assessment" in pipeline_run_names
-    assert "progression_refresh" in pipeline_run_names
     assert "practice.session_started.v1" in event_types
     assert "practice.prompt_delivered.v1" in event_types
     assert "practice.attempt_submitted.v1" in event_types
     assert "assessment.started.v1" in event_types
     assert "assessment.validated.v1" in event_types
-    assert "progression.snapshot.created.v1" in event_types
-    assert "recommendation.generated.v1" in event_types
+    assert "progression.snapshot.created.v1" not in event_types
+    assert "recommendation.generated.v1" not in event_types
 
 
 @pytest.mark.asyncio

@@ -7,6 +7,7 @@ from time import perf_counter
 from typing import Any, cast
 
 from stageflow.core import StageContext
+from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.config import Settings
 from soft_skills_backend.engines.config import load_marking_runtime_config
@@ -27,8 +28,9 @@ from soft_skills_backend.modules.practice.domain.practice import validate_assess
 from soft_skills_backend.modules.practice.workflows.assessment.marking_provider import (
     DefaultAssessmentMarkingProvider,
     StructuredOutputRejectionError,
+    build_aggregation_typed_output,
+    build_per_skill_typed_output,
     build_prompt_library,
-    build_typed_output,
 )
 from soft_skills_backend.modules.practice.workflows.assessment.models import (
     AssessmentTransformPayload,
@@ -42,6 +44,7 @@ from soft_skills_backend.modules.practice.workflows.assessment_service import (
 from soft_skills_backend.platform.providers.llm.openai_compatible import (
     OpenAICompatibleLLMProvider,
 )
+from soft_skills_backend.engines.marking.domain.rubric_repository import SqlAlchemyRubricRepository
 from soft_skills_backend.platform.workflows.stageflow import (
     metadata_value,
     pipeline_run_id_from_context,
@@ -61,12 +64,15 @@ class MarkingBenchmarkRunner:
         self,
         *,
         settings: Settings,
+        session_factory: sessionmaker[Session],
         provider_call_logger: Any,
         provider_factory: ProviderFactory | None = None,
     ) -> None:
         self._settings = settings
+        self._session_factory = session_factory
         self._provider_call_logger = provider_call_logger
         self._provider_factory = provider_factory or self._default_provider_factory
+        self._rubric_repository = SqlAlchemyRubricRepository(session_factory)
 
     def set_provider_factory(self, provider_factory: ProviderFactory) -> None:
         self._provider_factory = provider_factory
@@ -113,7 +119,9 @@ class MarkingBenchmarkRunner:
             settings=settings,
             llm_provider=provider,
             prompt_library=build_prompt_library(settings),
-            typed_output=build_typed_output(settings),
+            per_skill_typed_output=build_per_skill_typed_output(settings),
+            aggregation_typed_output=build_aggregation_typed_output(settings),
+            rubric_repository=SqlAlchemyRubricRepository(self._session_factory),
         )
 
     async def _evaluate_case(
@@ -386,6 +394,10 @@ class MarkingBenchmarkRunner:
             response_text=case.response_text,
             required_skill_slugs=case.prompt.target_skill_slugs,
             draft=draft,
+            rubric_definition=self._rubric_repository.get_rubric_definition(
+                prompt_payload.prompt.rubric_id,
+                required_skill_slugs=prompt_payload.prompt.target_skill_slugs,
+            ),
         )
 
     def _default_model_slug(self) -> str:

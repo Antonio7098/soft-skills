@@ -26,11 +26,15 @@ from soft_skills_backend.modules.practice import (
 )
 from soft_skills_backend.modules.practice.workflows.assessment import (
     DefaultAssessmentMarkingProvider,
+    build_aggregation_typed_output,
+    build_per_skill_typed_output,
     build_prompt_library,
-    build_typed_output,
 )
 from soft_skills_backend.modules.progression import ProgressionService
 from soft_skills_backend.modules.taxonomy import TaxonomyService
+from soft_skills_backend.engines.marking.domain.rubric_repository import (
+    SqlAlchemyRubricRepository,
+)
 from soft_skills_backend.platform.background_tasks import BackgroundTaskRunner
 from soft_skills_backend.platform.db.repositories import (
     SqlAlchemyPipelineRunRepository,
@@ -142,6 +146,7 @@ def build_container(settings: Settings) -> AppContainer:
         workflow_events=workflow_events,
         stageflow_runtime=stageflow_runtime,
     )
+    rubric_repository = SqlAlchemyRubricRepository(session_factory)
     practice_store = PracticeRepository(
         settings=settings,
         session_factory=session_factory,
@@ -154,8 +159,11 @@ def build_container(settings: Settings) -> AppContainer:
             settings=settings,
             llm_provider=llm_provider,
             prompt_library=build_prompt_library(settings),
-            typed_output=build_typed_output(settings),
+            per_skill_typed_output=build_per_skill_typed_output(settings),
+            aggregation_typed_output=build_aggregation_typed_output(settings),
+            rubric_repository=rubric_repository,
         ),
+        rubric_repository=rubric_repository,
         progression_service=progression_service,
     )
     assistant_repository = AssistantRepository(

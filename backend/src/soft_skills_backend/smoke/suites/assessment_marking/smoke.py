@@ -8,6 +8,12 @@ from typing import SupportsInt, cast
 
 from soft_skills_backend.config import Settings
 from soft_skills_backend.modules.practice.domain.practice import AttemptStatus
+from soft_skills_backend.platform.db.models import (
+    AssessmentSkillEvidenceRecord,
+    AssessmentSkillResultRecord,
+    AttemptRecord,
+    RubricCriterionRecord,
+)
 from soft_skills_backend.shared.errors import provider_error
 from soft_skills_backend.smoke.contracts import SmokeCase, SmokeContext
 from soft_skills_backend.smoke.support.actors import SmokeActorBootstrap
@@ -69,7 +75,9 @@ class _AssessmentMarkingSmoke(SmokeCase, ABC):
             if response.status_code not in {200, 422, 503}:
                 SmokeBackendClient.require_ok(response, f"submit attempt {attempt_id}")
 
-            attempt_payload = await backend.get_attempt(user_id=actors.learner_id, attempt_id=attempt_id)
+            attempt_payload = await backend.get_attempt(
+                user_id=actors.learner_id, attempt_id=attempt_id
+            )
             attempt_status = str(attempt_payload["status"])
             if attempt_status not in {
                 AttemptStatus.ASSESSED.value,
@@ -97,6 +105,30 @@ class _AssessmentMarkingSmoke(SmokeCase, ABC):
                     error_code=error_code,
                 )
 
+            overall_score_value = assessment.get("overall_score")
+            per_skill_result_count = None
+            per_skill_evidence_count = None
+            rubric_criteria_count = None
+            session_factory = backend.session_factory
+            if assessment.get("assessment_id") is not None and session_factory is not None:
+                with session_factory() as session:
+                    assessment_id = str(assessment["assessment_id"])
+                    attempt_record = session.get(AttemptRecord, attempt_id)
+                    per_skill_result_count = (
+                        session.query(AssessmentSkillResultRecord)
+                        .filter(AssessmentSkillResultRecord.assessment_id == assessment_id)
+                        .count()
+                    )
+                    per_skill_evidence_count = (
+                        session.query(AssessmentSkillEvidenceRecord)
+                        .filter(AssessmentSkillEvidenceRecord.assessment_id == assessment_id)
+                        .count()
+                    )
+                    rubric_criteria_count = 0 if attempt_record is None else (
+                        session.query(RubricCriterionRecord)
+                        .filter(RubricCriterionRecord.rubric_id == attempt_record.rubric_id)
+                        .count()
+                    )
             return AssessmentMarkingSmokeResult(
                 status="ok",
                 practice_type=self.practice_type,
@@ -105,7 +137,12 @@ class _AssessmentMarkingSmoke(SmokeCase, ABC):
                 provider=str(assessment["provider"]),
                 model_slug=str(assessment["model_slug"]),
                 assessment_id=str(assessment["assessment_id"]),
-                overall_score=int(cast(str | SupportsInt, assessment["overall_score"])),
+                overall_score=int(cast(str | SupportsInt, overall_score_value))
+                if overall_score_value is not None
+                else None,
+                per_skill_result_count=per_skill_result_count,
+                per_skill_evidence_count=per_skill_evidence_count,
+                rubric_criteria_count=rubric_criteria_count,
                 error_code=error_code,
             )
 
@@ -234,3 +271,55 @@ class ScenarioMarkingSmoke(_AssessmentMarkingSmoke):
             "I would recommend a one-day delay, explain the legal risk directly, and "
             "propose a 7am checkpoint with sales and legal before the board meeting."
         )
+
+
+class MarkingRelationalPersistenceSmoke(QuickPracticeMarkingSmoke):
+    """Verify the overhauled marking runtime persists relational skill artifacts."""
+
+    def __init__(
+        self,
+        *,
+        preflight: ProviderSmokePreflight | None = None,
+        session_factory: SmokeApplicationSessionFactory | None = None,
+        flow_timeout_seconds: float = SMOKE_FLOW_TIMEOUT_SECONDS,
+    ) -> None:
+        super().__init__(
+            preflight=preflight,
+            session_factory=session_factory,
+            flow_timeout_seconds=flow_timeout_seconds,
+        )
+        self.name = "marking-relational-persistence"
+        self.description = (
+            "Run quick-practice marking and verify rubric criteria plus per-skill relational rows."
+        )
+
+    async def _run(self, settings: Settings) -> AssessmentMarkingSmokeResult:
+        result = await super()._run(settings)
+        if result.assessment_id is None:
+            raise provider_error(
+                "Relational marking smoke did not produce a validated assessment artifact",
+                code="SS-PROVIDER-020",
+                details={"attempt_status": result.attempt_status},
+            )
+        if (result.rubric_criteria_count or 0) < 2:
+            raise provider_error(
+                "Rubric criteria were not seeded into the relational rubric table",
+                code="SS-PROVIDER-021",
+                details={"rubric_criteria_count": result.rubric_criteria_count},
+            )
+        if (result.per_skill_result_count or 0) < 2:
+            raise provider_error(
+                "Per-skill assessment rows were not persisted",
+                code="SS-PROVIDER-022",
+                details={"per_skill_result_count": result.per_skill_result_count},
+            )
+        if (result.per_skill_evidence_count or 0) < (result.per_skill_result_count or 0):
+            raise provider_error(
+                "Per-skill evidence rows were not persisted for the assessment",
+                code="SS-PROVIDER-023",
+                details={
+                    "per_skill_result_count": result.per_skill_result_count,
+                    "per_skill_evidence_count": result.per_skill_evidence_count,
+                },
+            )
+        return result

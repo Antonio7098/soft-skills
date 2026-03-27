@@ -212,6 +212,19 @@ async def _run_prompt_item_worker(
                     "expected_rubric_id": plan.rubric_id,
                 },
             )
+        if draft.prompt_type == "quick_practice_prompt":
+            if draft.generated_rubric is None:
+                raise validation_error(
+                    "Generated quick-practice prompt item must include a question-specific rubric",
+                    code="SS-VALIDATION-078",
+                    details={"title": draft.title, "rubric_id": draft.rubric_id},
+                )
+        elif draft.generated_rubric is not None:
+            raise validation_error(
+                "Only quick-practice prompt items may include a generated rubric payload",
+                code="SS-VALIDATION-079",
+                details={"prompt_type": draft.prompt_type, "title": draft.title},
+            )
         return ok_output(
             StageflowStageResult(
                 payload=typed_result,

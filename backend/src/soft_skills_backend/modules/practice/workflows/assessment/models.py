@@ -12,6 +12,7 @@ from soft_skills_backend.engines.marking.contracts.models import (
 )
 from soft_skills_backend.modules.practice.domain.practice import (
     AssessmentDraft,
+    PerSkillAssessment,
     PracticeType,
 )
 
@@ -109,7 +110,15 @@ class AssessmentTransformPayload(BaseModel):
     """Typed provider output before domain validation."""
 
     draft: AssessmentDraft
+    per_skill_assessments: list[PerSkillAssessment] = Field(default_factory=list)
     raw_payload: dict[str, object]
     model_slug: str
     schema_version: str
     usage: dict[str, int] = Field(default_factory=dict)
+
+
+class AssessmentAggregationOutput(BaseModel):
+    """Aggregation LLM output after per-skill validation."""
+
+    summary: str
+    next_actions: list[str] = Field(min_length=1)

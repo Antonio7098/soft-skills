@@ -8,11 +8,24 @@ from pydantic import BaseModel
 class MarkingRuntimeConfig(BaseModel):
     """Reviewed config for the text-practice marking runtime."""
 
-    prompt_name: str
-    prompt_version: str
+    per_skill_prompt_name: str
+    per_skill_prompt_version: str
+    aggregation_prompt_name: str
+    aggregation_prompt_version: str
+    per_skill_output_schema_version: str
+    aggregation_output_schema_version: str
     output_schema_version: str
     config_version: str
     engine_version: str
+    max_parallel_skill_children: int
+
+    @property
+    def prompt_name(self) -> str:
+        return self.per_skill_prompt_name
+
+    @property
+    def prompt_version(self) -> str:
+        return self.per_skill_prompt_version
 
 
 class CatalogGenerationRuntimeConfig(BaseModel):

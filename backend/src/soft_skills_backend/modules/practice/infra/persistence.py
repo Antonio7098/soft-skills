@@ -27,6 +27,8 @@ from soft_skills_backend.modules.practice.models import (
 )
 from soft_skills_backend.platform.db.models import (
     AssessmentRecord,
+    AssessmentSkillEvidenceRecord,
+    AssessmentSkillResultRecord,
     AttemptRecord,
     PracticeRunRecord,
     PracticeSessionRecord,
@@ -394,6 +396,24 @@ def persist_assessment(
                     pipeline_run_id=pipeline_run_id_from_context(ctx),
                 )
             )
+            for per_skill in assessment.per_skill_assessments:
+                session.add(
+                    AssessmentSkillResultRecord(
+                        assessment_id=assessment_id,
+                        skill_slug=per_skill.skill_slug,
+                        score=per_skill.score,
+                        rationale=per_skill.rationale,
+                    )
+                )
+                for evidence_item in per_skill.evidence:
+                    session.add(
+                        AssessmentSkillEvidenceRecord(
+                            assessment_id=assessment_id,
+                            skill_slug=per_skill.skill_slug,
+                            quote=evidence_item.quote,
+                            explanation=evidence_item.explanation,
+                        )
+                    )
             attempt.status = AttemptStatus.ASSESSED.value
             attempt.assessment_id = assessment_id
             attempt.assessed_at = utcnow()

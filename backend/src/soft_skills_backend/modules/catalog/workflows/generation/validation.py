@@ -129,8 +129,43 @@ def validate_generated_collection_draft(
         PromptItemCreateCommand.model_validate(prompt_item.model_dump())
         for prompt_item in draft.prompt_items
     ]
-    for prompt_command in prompt_commands:
+    for prompt_command, prompt_item in zip(prompt_commands, draft.prompt_items, strict=False):
         validate_prompt_command(session, collection_record, prompt_command)
+        if prompt_item.prompt_type == "quick_practice_prompt":
+            if prompt_item.generated_rubric is None:
+                raise validation_error(
+                    "Generated quick-practice prompt items must include a question-specific rubric",
+                    code="SS-VALIDATION-080",
+                    details={"title": prompt_item.title},
+                )
+            expected_skill_slugs = set(prompt_item.target_skill_slugs)
+            actual_skill_slugs = {
+                criterion.skill_slug for criterion in prompt_item.generated_rubric.criteria
+            }
+            if actual_skill_slugs != expected_skill_slugs:
+                raise validation_error(
+                    "Generated quick-practice rubric skills must match the prompt item target skills",
+                    code="SS-VALIDATION-081",
+                    details={
+                        "expected_skill_slugs": sorted(expected_skill_slugs),
+                        "actual_skill_slugs": sorted(actual_skill_slugs),
+                        "title": prompt_item.title,
+                    },
+                )
+            for criterion in prompt_item.generated_rubric.criteria:
+                levels = sorted(level.level for level in criterion.levels)
+                if levels != [1, 2]:
+                    raise validation_error(
+                        "Generated quick-practice rubrics must use binary pass/fail levels",
+                        code="SS-VALIDATION-082",
+                        details={"criterion_ref": criterion.criterion_ref, "levels": levels},
+                    )
+        elif prompt_item.generated_rubric is not None:
+            raise validation_error(
+                "Only quick-practice generated prompt items may include a generated rubric",
+                code="SS-VALIDATION-083",
+                details={"title": prompt_item.title, "prompt_type": prompt_item.prompt_type},
+            )
     validate_generated_prompt_item_uniqueness(
         existing_prompt_items=[],
         generated_commands=prompt_commands,

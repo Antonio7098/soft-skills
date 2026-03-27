@@ -119,6 +119,15 @@ class ProgressionRepository:
                     code="SS-VALIDATION-033",
                     details={"assessment_id": assessment_id},
                 )
+            if assessment_record.practice_type == "quick_practice":
+                raise validation_error(
+                    "Quick-practice assessments do not update progression",
+                    code="SS-VALIDATION-074",
+                    details={
+                        "assessment_id": assessment_id,
+                        "practice_type": assessment_record.practice_type,
+                    },
+                )
             learner_profile = session.get(LearnerProfileRecord, assessment_record.user_id)
             if learner_profile is None:
                 raise domain_error(
@@ -132,6 +141,7 @@ class ProgressionRepository:
                 .filter(
                     AssessmentRecord.user_id == assessment_record.user_id,
                     AssessmentRecord.validation_status == "validated",
+                    AssessmentRecord.practice_type != "quick_practice",
                 )
                 .order_by(AssessmentRecord.created_at.asc())
                 .all()
@@ -259,6 +269,7 @@ class ProgressionRepository:
                 .filter(
                     AssessmentRecord.user_id == learner_id,
                     AssessmentRecord.validation_status == "validated",
+                    AssessmentRecord.practice_type != "quick_practice",
                 )
                 .order_by(AssessmentRecord.created_at.desc())
                 .first()

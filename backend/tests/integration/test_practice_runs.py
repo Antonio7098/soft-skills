@@ -97,7 +97,7 @@ async def _seed_quick_practice_prompt(client, learner_id: str) -> dict[str, obje
         learner_id=learner_id,
         title="Quick Practice Run Pack",
         content_format_mix=["quick_practice_prompt"],
-        rubric_ids=["quick_practice_text@v1"],
+        rubric_ids=["quick_practice_reset_timeline@v1"],
         target_skill_slugs=["active-listening", "expectation-setting"],
         target_competency_slugs=["stakeholder-management"],
     )
@@ -112,7 +112,7 @@ async def _seed_quick_practice_prompt(client, learner_id: str) -> dict[str, obje
             ),
             "difficulty": "intermediate",
             "target_skill_slugs": ["active-listening", "expectation-setting"],
-            "rubric_id": "quick_practice_text@v1",
+            "rubric_id": "quick_practice_reset_timeline@v1",
         },
     )
     assert response.status_code == 200
@@ -215,12 +215,18 @@ class FakeSuccessMarker:
                     "rubric_version": prompt_payload.prompt.rubric_version,
                     "provider": "openai",
                     "model_slug": "gpt-4.1-mini",
-                    "overall_score": 4,
+                    "overall_score": (
+                        2 if prompt_payload.prompt.practice_type.value == "quick_practice" else 4
+                    ),
                     "rationale": "The response addressed the prompt with a credible next step.",
                     "skill_scores": [
                         {
                             "skill_slug": slug,
-                            "score": 4,
+                            "score": (
+                                2
+                                if prompt_payload.prompt.practice_type.value == "quick_practice"
+                                else 4
+                            ),
                             "rationale": f"The response demonstrated {slug}.",
                         }
                         for slug in prompt_payload.prompt.target_skill_slugs
@@ -339,7 +345,7 @@ async def test_practice_run_start_submit_review_and_history(app, client, test_se
     assert mid_run_payload["validated_items"] == 1
     assert mid_run_payload["failed_items"] == 0
     assert mid_run_payload["summary"]["validated_attempt_count"] == 1
-    assert mid_run_payload["summary"]["overall_score_average"] == 4.0
+    assert mid_run_payload["summary"]["overall_score_average"] == 2.0
     assert mid_run_payload["current_attempt_id"] == second_attempt_id
 
     second_submit = await client.post(
@@ -379,23 +385,23 @@ async def test_practice_run_start_submit_review_and_history(app, client, test_se
     assert complete_run_payload["current_attempt_id"] is None
     assert complete_run_payload["summary"]["validated_attempt_count"] == 3
     assert complete_run_payload["summary"]["failed_attempt_count"] == 0
-    assert complete_run_payload["summary"]["overall_score_average"] == 4.0
+    assert complete_run_payload["summary"]["overall_score_average"] == 3.33
     assert complete_run_payload["summary"]["score_distribution"] == {
         "1": 0,
-        "2": 0,
+        "2": 1,
         "3": 0,
-        "4": 3,
+        "4": 2,
         "5": 0,
     }
     assert complete_run_payload["summary"]["practice_type_breakdown"] == [
         {"practice_type": "interview", "average_score": 4.0, "count": 1},
-        {"practice_type": "quick_practice", "average_score": 4.0, "count": 1},
+        {"practice_type": "quick_practice", "average_score": 2.0, "count": 1},
         {"practice_type": "scenario", "average_score": 4.0, "count": 1},
     ]
     assert complete_run_payload["summary"]["skill_breakdown"] == [
-        {"skill_slug": "active-listening", "average_score": 4.0, "count": 2},
+        {"skill_slug": "active-listening", "average_score": 3.0, "count": 2},
         {"skill_slug": "decision-justification", "average_score": 4.0, "count": 1},
-        {"skill_slug": "expectation-setting", "average_score": 4.0, "count": 2},
+        {"skill_slug": "expectation-setting", "average_score": 3.0, "count": 2},
         {"skill_slug": "prioritization-under-pressure", "average_score": 4.0, "count": 1},
     ]
 
@@ -408,7 +414,7 @@ async def test_practice_run_start_submit_review_and_history(app, client, test_se
     assert len(history_payload) == 1
     assert history_payload[0]["run_id"] == run_id
     assert history_payload[0]["status"] == "completed"
-    assert history_payload[0]["overall_score_average"] == 4.0
+    assert history_payload[0]["overall_score_average"] == 3.33
     assert history_payload[0]["practice_types"] == [
         "quick_practice",
         "interview",
@@ -534,12 +540,12 @@ async def test_practice_run_completes_with_failed_items_and_excludes_them_from_a
     assert payload["failed_items"] == 1
     assert payload["summary"]["validated_attempt_count"] == 1
     assert payload["summary"]["failed_attempt_count"] == 1
-    assert payload["summary"]["overall_score_average"] == 4.0
+    assert payload["summary"]["overall_score_average"] == 2.0
     assert payload["summary"]["score_distribution"] == {
         "1": 0,
-        "2": 0,
+        "2": 1,
         "3": 0,
-        "4": 1,
+        "4": 0,
         "5": 0,
     }
     assert payload["items"][1]["attempt"]["status"] == "assessment_failed"

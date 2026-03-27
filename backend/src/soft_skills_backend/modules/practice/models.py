@@ -10,6 +10,7 @@ from soft_skills_backend.modules.practice.domain.practice import (
     AssessmentValidationStatus,
     AttemptStatus,
     EvidenceItem,
+    PerSkillAssessment,
     PracticeRunStatus,
     PracticeType,
     SessionStatus,
@@ -92,6 +93,7 @@ class ValidatedAssessmentPayload(BaseModel):
     config_version: str
     overall_score: int
     rationale: str
+    per_skill_assessments: list[PerSkillAssessment]
     skill_scores: list[SkillScore]
     evidence: list[EvidenceItem]
     strengths: list[str]

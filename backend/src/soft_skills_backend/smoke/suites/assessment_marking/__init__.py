@@ -3,6 +3,7 @@
 from .contracts import AssessmentMarkingSmokeResult
 from .smoke import (
     InterviewMarkingSmoke,
+    MarkingRelationalPersistenceSmoke,
     QuickPracticeMarkingSmoke,
     ScenarioMarkingSmoke,
 )
@@ -10,6 +11,7 @@ from .smoke import (
 __all__ = [
     "AssessmentMarkingSmokeResult",
     "InterviewMarkingSmoke",
+    "MarkingRelationalPersistenceSmoke",
     "QuickPracticeMarkingSmoke",
     "ScenarioMarkingSmoke",
 ]

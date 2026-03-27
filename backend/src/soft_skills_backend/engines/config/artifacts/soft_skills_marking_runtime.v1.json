@@ -1,7 +1,12 @@
 {
-  "prompt_name": "quick-practice-assessment",
-  "prompt_version": "assessment.quick-practice.v1",
+  "per_skill_prompt_name": "assessment-per-skill",
+  "per_skill_prompt_version": "assessment.quick-practice.v1",
+  "aggregation_prompt_name": "assessment-aggregation",
+  "aggregation_prompt_version": "assessment.aggregation.v1",
+  "per_skill_output_schema_version": "assessment-per-skill-output.v1",
+  "aggregation_output_schema_version": "assessment-aggregation-output.v1",
   "output_schema_version": "quick-practice-assessment-output.v1",
   "config_version": "quick-practice-marking-config.v1",
-  "engine_version": "marking-engine.v1"
+  "engine_version": "marking-engine.v2",
+  "max_parallel_skill_children": 4
 }

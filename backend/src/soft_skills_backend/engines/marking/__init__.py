@@ -11,6 +11,7 @@ from soft_skills_backend.engines.marking.contracts.models import (
     RenderedPrompt,
     RubricCriterion,
     RubricDefinition,
+    RubricLevel,
     RubricScale,
 )
 from soft_skills_backend.engines.marking.domain.validation import (
@@ -40,6 +41,7 @@ __all__ = [
     "RenderedPrompt",
     "RubricCriterion",
     "RubricDefinition",
+    "RubricLevel",
     "RubricScale",
     "StructuredOutputRejectionError",
     "TypedLLMOutput",

@@ -7,6 +7,7 @@ import re
 from stageflow.core import StageContext
 
 from soft_skills_backend.engines.config import load_marking_runtime_config
+from soft_skills_backend.engines.marking.domain.rubric_repository import RubricRepository
 from soft_skills_backend.modules.practice.domain.practice import validate_assessment_draft
 from soft_skills_backend.modules.practice.models import ValidatedAssessmentPayload
 from soft_skills_backend.modules.practice.workflows.assessment.marking_provider import (
@@ -39,9 +40,11 @@ class AssessmentService:
         *,
         store: PracticeRepository,
         assessment_marker: AssessmentMarkingProvider,
+        rubric_repository: RubricRepository,
     ) -> None:
         self._store = store
         self._assessment_marker = assessment_marker
+        self._rubric_repository = rubric_repository
 
     def set_marker(self, assessment_marker: AssessmentMarkingProvider) -> None:
         self._assessment_marker = assessment_marker
@@ -145,10 +148,15 @@ class AssessmentService:
                 raw_payload=transform_payload.raw_payload,
             )
         try:
+            rubric_definition = self._rubric_repository.get_rubric_definition(
+                prompt_payload.prompt.rubric_id,
+                required_skill_slugs=prompt_payload.prompt.target_skill_slugs,
+            )
             validate_assessment_draft(
                 response_text=prompt_payload.response_text,
                 required_skill_slugs=prompt_payload.prompt.target_skill_slugs,
                 draft=draft,
+                rubric_definition=rubric_definition,
             )
         except AppError as exc:
             raise StructuredOutputRejectionError(
@@ -167,6 +175,7 @@ class AssessmentService:
                 config_version=config.config_version,
                 overall_score=draft.overall_score,
                 rationale=draft.rationale,
+                per_skill_assessments=transform_payload.per_skill_assessments,
                 skill_scores=draft.skill_scores,
                 evidence=draft.evidence,
                 strengths=draft.strengths,

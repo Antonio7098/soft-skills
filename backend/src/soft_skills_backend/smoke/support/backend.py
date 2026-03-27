@@ -6,6 +6,7 @@ import asyncio
 from typing import cast
 
 import httpx
+from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.shared.errors import provider_error
 
@@ -15,8 +16,14 @@ JsonObject = dict[str, object]
 class SmokeBackendClient:
     """Typed wrapper around smoke backend HTTP calls."""
 
-    def __init__(self, client: httpx.AsyncClient) -> None:
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        *,
+        session_factory: sessionmaker[Session] | None = None,
+    ) -> None:
         self._client = client
+        self.session_factory = session_factory
 
     async def register_user(
         self,

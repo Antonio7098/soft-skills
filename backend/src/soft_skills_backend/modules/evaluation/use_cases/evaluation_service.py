@@ -41,6 +41,7 @@ class EvaluationService:
         self._repository = repository
         self._marking_benchmark = MarkingBenchmarkRunner(
             settings=settings,
+            session_factory=session_factory,
             provider_call_logger=provider_call_logger,
         )
         self._workflows = EvaluationWorkflowService(

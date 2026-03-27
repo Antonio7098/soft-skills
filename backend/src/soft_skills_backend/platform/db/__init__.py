@@ -2,6 +2,8 @@
 
 from soft_skills_backend.platform.db.base import Base
 from soft_skills_backend.platform.db.models import (
+    AssessmentSkillEvidenceRecord,
+    AssessmentSkillResultRecord,
     CollectionRecord,
     CompetencyRecord,
     CompetencySkillMapRecord,
@@ -11,6 +13,7 @@ from soft_skills_backend.platform.db.models import (
     PipelineRunRecord,
     PromptItemRecord,
     ProviderCallRecord,
+    RubricCriterionRecord,
     RubricRecord,
     ScenarioRecord,
     SkillRecord,
@@ -30,6 +33,8 @@ from soft_skills_backend.platform.db.session import (
 
 __all__ = [
     "Base",
+    "AssessmentSkillEvidenceRecord",
+    "AssessmentSkillResultRecord",
     "CollectionRecord",
     "CompetencyRecord",
     "CompetencySkillMapRecord",
@@ -39,6 +44,7 @@ __all__ = [
     "PipelineRunRecord",
     "PromptItemRecord",
     "ProviderCallRecord",
+    "RubricCriterionRecord",
     "RubricRecord",
     "ScenarioRecord",
     "SkillRecord",

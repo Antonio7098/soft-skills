@@ -16,4 +16,7 @@ class AssessmentMarkingSmokeResult(BaseModel):
     model_slug: str | None = None
     assessment_id: str | None = None
     overall_score: int | None = None
+    per_skill_result_count: int | None = None
+    per_skill_evidence_count: int | None = None
+    rubric_criteria_count: int | None = None
     error_code: str | None = None
