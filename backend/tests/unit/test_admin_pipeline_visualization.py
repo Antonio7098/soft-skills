@@ -350,6 +350,7 @@ class TestAdminServicePipelineMethods:
 
         result = service.get_pipeline_metrics(actor, "test-pipeline")
 
+        assert result is not None
         assert result.pipeline_name == "test-pipeline"
         assert result.total_runs == 2
         assert result.success_count == 1

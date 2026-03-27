@@ -26,10 +26,10 @@ def test_start_scenario_command_rejects_blank_artifact_fields() -> None:
         StartScenarioSessionCommand(
             scenario_id="scenario-123",
             artifacts=[
-                {
+                {  # type: ignore[list-item]
                     "artifact_type": "email",
                     "title": "Stakeholder note",
                     "body": "   ",
                 }
-            ],  # type: ignore[list-item]
+            ],
         )

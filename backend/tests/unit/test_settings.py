@@ -7,7 +7,7 @@ from soft_skills_backend.config import Settings
 
 
 def test_settings_parse_cors_csv() -> None:
-    settings = Settings(cors_allowed_origins="https://a.example, https://b.example")
+    settings = Settings(cors_allowed_origins="https://a.example, https://b.example")  # type: ignore[arg-type]
     assert settings.cors_allowed_origins == ("https://a.example", "https://b.example")
 
 

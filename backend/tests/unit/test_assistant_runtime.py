@@ -14,12 +14,12 @@ def test_assistant_decision_requires_exactly_one_action() -> None:
     with pytest.raises(ValidationError):
         AssistantDecision(
             tool_calls=[
-                {
+                {  # type: ignore[list-item]
                     "call_id": "call-1",
                     "tool_name": "list_recent_attempts",
                     "arguments": {},
                 }
-            ],  # type: ignore[list-item]
+            ],
             final_response="Both set",
         )
 
