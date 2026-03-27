@@ -173,11 +173,11 @@ async def test_progress_dashboard_returns_latest_snapshot_and_recommendation(
 ) -> None:
     _migrate(test_settings)
     _admin, learner, prompt = await _seed_prompt(client)
-    await _submit_assessed_attempt(app, client, learner["id"], prompt["id"])
+    await _submit_assessed_attempt(app, client, str(learner["id"]), str(prompt["id"]))
 
     progress_response = await client.get(
         "/api/progress/me",
-        headers={"X-User-ID": learner["id"]},
+        headers={"X-User-ID": str(learner["id"])},
     )
     assert progress_response.status_code == 200
     payload = progress_response.json()["data"]
@@ -220,11 +220,11 @@ async def test_progress_dashboard_returns_latest_snapshot_and_recommendation(
 async def test_progress_recalculate_creates_audit_record(app, client, test_settings) -> None:
     _migrate(test_settings)
     admin, learner, prompt = await _seed_prompt(client)
-    await _submit_assessed_attempt(app, client, learner["id"], prompt["id"])
+    await _submit_assessed_attempt(app, client, str(learner["id"]), str(prompt["id"]))
 
     recalc_response = await client.post(
         "/api/progress/recalculate",
-        headers={"X-User-ID": admin["id"]},
+        headers={"X-User-ID": str(admin["id"])},
         json={"learner_id": learner["id"], "reason": "verify replay determinism"},
     )
     assert recalc_response.status_code == 200

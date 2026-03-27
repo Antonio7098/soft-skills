@@ -193,7 +193,7 @@ async def test_typed_llm_output_retries_invalid_json_once() -> None:
     )
 
     result = await typed_output.generate(
-        provider,
+        provider,  # type: ignore[arg-type]
         messages=[{"role": "user", "content": "Assess this"}],
         call_context=ProviderCallContext(
             operation="quick_practice_assessment",

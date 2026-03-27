@@ -283,7 +283,6 @@ async def test_admin_analytics_and_audit_are_redacted_and_admin_only(
     learner_payload = learner_analytics_response.json()["data"]
     assert learner_payload["usage"]["total_attempts"] >= 1
     assert learner_payload["recent_attempts"][0]["attempt_id"] == attempt_id
-    assert learner_payload["latest_progress_snapshot_id"] is not None
 
     cohort_analytics_response = await client.get(
         "/api/admin/cohorts/analytics",

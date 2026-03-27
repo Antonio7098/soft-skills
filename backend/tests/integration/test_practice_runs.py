@@ -268,7 +268,7 @@ class FakeProviderFailureMarker:
 async def test_practice_run_start_submit_review_and_history(app, client, test_settings) -> None:
     _migrate(test_settings)
     _, learner = await _bootstrap_admin_and_learner(client)
-    learner_id = learner["id"]
+    learner_id = str(learner["id"])
     quick_prompt = await _seed_quick_practice_prompt(client, learner_id)
     interview_prompt = await _seed_interview_prompt(client, learner_id)
     scenario = await _seed_scenario(client, learner_id)
@@ -481,7 +481,7 @@ async def test_practice_run_completes_with_failed_items_and_excludes_them_from_a
     _, learner = await _bootstrap_admin_and_learner(
         client, learner_email="learner-practice-run-failure@example.com"
     )
-    learner_id = learner["id"]
+    learner_id = str(learner["id"])
     quick_prompt = await _seed_quick_practice_prompt(client, learner_id)
     interview_prompt = await _seed_interview_prompt(client, learner_id)
     app.state.container.practice_service._assessment_marker = FakeSuccessMarker()

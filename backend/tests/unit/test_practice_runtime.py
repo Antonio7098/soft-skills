@@ -31,5 +31,5 @@ def test_start_scenario_command_rejects_blank_artifact_fields() -> None:
                     "title": "Stakeholder note",
                     "body": "   ",
                 }
-            ],
+            ],  # type: ignore[list-item]
         )

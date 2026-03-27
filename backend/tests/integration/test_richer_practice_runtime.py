@@ -92,7 +92,7 @@ async def _seed_interview_prompt(client) -> tuple[dict[str, object], dict[str, o
     _, learner = await _bootstrap_admin_and_learner(client)
     collection = await _create_collection(
         client,
-        learner_id=learner["id"],
+        learner_id=str(learner["id"]),
         title="Behavioral Interview Pack",
         content_format_mix=["interview_prompt"],
         rubric_ids=["interview_text@v1"],
@@ -119,7 +119,7 @@ async def _seed_scenario(client) -> tuple[dict[str, object], dict[str, object]]:
     _, learner = await _bootstrap_admin_and_learner(client)
     collection = await _create_collection(
         client,
-        learner_id=learner["id"],
+        learner_id=str(learner["id"]),
         title="Stakeholder Pressure Scenarios",
         content_format_mix=["scenario_step"],
         rubric_ids=["scenario_text@v1"],
