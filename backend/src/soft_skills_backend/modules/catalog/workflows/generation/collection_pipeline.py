@@ -412,17 +412,48 @@ async def generate_collection(
         ),
         name=f"catalog_{mode}_generation",
     )
-    results = await run_logged_pipeline(
-        stageflow,
-        pipeline,
+    resolved_workflow_id = workflow_id or f"catalog-{mode}-generation:{actor.user_id}:{request_id}"
+    events.record(
+        "catalog.generation.started.v1",
         request_id=request_id,
         trace_id=trace_id,
-        workflow_id=workflow_id or f"catalog-{mode}-generation:{actor.user_id}:{request_id}",
-        user_id=actor.user_id,
-        execution_mode="catalog_generation",
-        service="soft_skills_backend.catalog",
-        idempotency_key=f"catalog_{mode}_generation:{actor.user_id}:{request_id}",
-        idempotency_params=command.model_dump(mode="json"),
-        timeout_ms=timeout_ms,
+        workflow_id=resolved_workflow_id,
+        payload={
+            "mode": mode,
+            "actor_user_id": actor.user_id,
+            "command": command.model_dump(mode="json"),
+        },
     )
-    return payload_from_results(results, "persistence_work", expected_type=CollectionGenerationView)
+    try:
+        results = await run_logged_pipeline(
+            stageflow,
+            pipeline,
+            request_id=request_id,
+            trace_id=trace_id,
+            workflow_id=resolved_workflow_id,
+            user_id=actor.user_id,
+            execution_mode="catalog_generation",
+            service="soft_skills_backend.catalog",
+            idempotency_key=f"catalog_{mode}_generation:{actor.user_id}:{request_id}",
+            idempotency_params=command.model_dump(mode="json"),
+            timeout_ms=timeout_ms,
+        )
+        events.record(
+            "catalog.generation.completed.v1",
+            request_id=request_id,
+            trace_id=trace_id,
+            workflow_id=resolved_workflow_id,
+            payload={"mode": mode},
+        )
+        return payload_from_results(
+            results, "persistence_work", expected_type=CollectionGenerationView
+        )
+    except Exception as exc:
+        events.record(
+            "catalog.generation.failed.v1",
+            request_id=request_id,
+            trace_id=trace_id,
+            workflow_id=resolved_workflow_id,
+            payload={"mode": mode, "error": str(exc)},
+        )
+        raise

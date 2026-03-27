@@ -6,7 +6,9 @@ import asyncio
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from time import perf_counter
 from typing import Any, cast
+from uuid import uuid4
 
 from stageflow.agent.security import PromptSecurityError, PromptSecurityPolicy
 from stageflow.api import Pipeline, StageKind, stage
@@ -215,7 +217,10 @@ class AssistantWorkflowService:
                 await self._emit_turn_cancelled(cancelled)
                 return StageOutput.cancel(
                     reason=cancelled.cancel_reason or "user_requested",
-                    data={"payload": {"status": cancelled.status.value}, "summary": {"status": "cancelled"}},
+                    data={
+                        "payload": {"status": cancelled.status.value},
+                        "summary": {"status": "cancelled"},
+                    },
                 )
             return ok_output(
                 StageflowStageResult(
@@ -239,11 +244,15 @@ class AssistantWorkflowService:
 
         async def profile_enrich(_ctx: StageContext) -> Any:
             payload = self._repository.load_profile(execution.actor.user_id)
-            return ok_output(StageflowStageResult(payload=payload, summary={"user_id": execution.actor.user_id}))
+            return ok_output(
+                StageflowStageResult(payload=payload, summary={"user_id": execution.actor.user_id})
+            )
 
         async def progress_enrich(_ctx: StageContext) -> Any:
             try:
-                dashboard = self._progression.get_dashboard(execution.actor, execution.actor.user_id)
+                dashboard = self._progression.get_dashboard(
+                    execution.actor, execution.actor.user_id
+                )
                 payload: dict[str, Any] = {
                     "available": True,
                     "dashboard": dashboard.model_dump(mode="json"),
@@ -253,7 +262,9 @@ class AssistantWorkflowService:
                     payload = {"available": False}
                 else:
                     raise
-            return ok_output(StageflowStageResult(payload=payload, summary={"available": payload["available"]}))
+            return ok_output(
+                StageflowStageResult(payload=payload, summary={"available": payload["available"]})
+            )
 
         async def attempts_enrich(_ctx: StageContext) -> Any:
             attempts = self._repository.load_recent_attempts(actor=execution.actor, limit=5)
@@ -272,7 +283,9 @@ class AssistantWorkflowService:
                 history=cast(list[Any], payload_from_inputs(ctx, "history_enrich")),
                 profile=cast(dict[str, Any], payload_from_inputs(ctx, "profile_enrich")),
                 progress=cast(dict[str, Any], payload_from_inputs(ctx, "progress_enrich")),
-                recent_attempts=cast(list[dict[str, Any]], payload_from_inputs(ctx, "attempts_enrich")),
+                recent_attempts=cast(
+                    list[dict[str, Any]], payload_from_inputs(ctx, "attempts_enrich")
+                ),
             )
             if result.cancelled:
                 cancelled = self._repository.mark_turn_cancelled(
@@ -284,7 +297,11 @@ class AssistantWorkflowService:
                     reason=result.reason,
                     data={"payload": {"status": "cancelled"}, "summary": {"status": "cancelled"}},
                 )
-            final_response, streamed_model_slug = await self._generate_final_response(
+            (
+                final_response,
+                streamed_model_slug,
+                response_metrics,
+            ) = await self._generate_final_response(
                 execution=execution,
                 ctx=ctx,
                 active=active,
@@ -313,6 +330,7 @@ class AssistantWorkflowService:
             await self._publish_final_response_completed(
                 turn=completed,
                 response_text=final_response,
+                metrics=response_metrics,
             )
             await self._broker.publish(
                 execution.stream_token,
@@ -335,15 +353,28 @@ class AssistantWorkflowService:
 
         return Pipeline.from_stages(
             stage("input_guard", input_guard, StageKind.GUARD),
-            stage("history_enrich", history_enrich, StageKind.ENRICH, dependencies=("input_guard",)),
-            stage("profile_enrich", profile_enrich, StageKind.ENRICH, dependencies=("input_guard",)),
-            stage("progress_enrich", progress_enrich, StageKind.ENRICH, dependencies=("input_guard",)),
-            stage("attempts_enrich", attempts_enrich, StageKind.ENRICH, dependencies=("input_guard",)),
+            stage(
+                "history_enrich", history_enrich, StageKind.ENRICH, dependencies=("input_guard",)
+            ),
+            stage(
+                "profile_enrich", profile_enrich, StageKind.ENRICH, dependencies=("input_guard",)
+            ),
+            stage(
+                "progress_enrich", progress_enrich, StageKind.ENRICH, dependencies=("input_guard",)
+            ),
+            stage(
+                "attempts_enrich", attempts_enrich, StageKind.ENRICH, dependencies=("input_guard",)
+            ),
             stage(
                 ASSISTANT_RUNTIME_STAGE,
                 assistant_runtime,
                 StageKind.AGENT,
-                dependencies=("history_enrich", "profile_enrich", "progress_enrich", "attempts_enrich"),
+                dependencies=(
+                    "history_enrich",
+                    "profile_enrich",
+                    "progress_enrich",
+                    "attempts_enrich",
+                ),
             ),
             name="assistant_turn_runtime",
         )
@@ -459,7 +490,7 @@ class AssistantWorkflowService:
         active: ActiveTurnExecution,
         draft_response: str,
         planning_messages: list[dict[str, str]],
-    ) -> tuple[str, str | None]:
+    ) -> tuple[str, str | None, dict[str, Any]]:
         stream_messages = [
             *planning_messages,
             {
@@ -474,6 +505,11 @@ class AssistantWorkflowService:
         chunks: list[str] = []
         model_slug: str | None = None
         index = 0
+        chunk_count = 0
+        prompt_tokens: int | None = None
+        completion_tokens: int | None = None
+        total_tokens: int | None = None
+        start_time = perf_counter()
         try:
             async for chunk in self._llm_provider.stream_text(
                 messages=stream_messages,
@@ -487,67 +523,143 @@ class AssistantWorkflowService:
                 ),
             ):
                 if active.cancel_reason is not None:
-                    return draft_response, model_slug
+                    final_response = "".join(chunks).strip() or draft_response
+                    return (
+                        final_response,
+                        model_slug,
+                        self._build_response_metrics(
+                            chunks=chunks,
+                            model_slug=model_slug,
+                            prompt_tokens=prompt_tokens,
+                            completion_tokens=completion_tokens,
+                            total_tokens=total_tokens,
+                            start_time=start_time,
+                            chunk_count=chunk_count,
+                        ),
+                    )
                 if chunk.done:
                     model_slug = chunk.model_slug or model_slug
+                    if chunk.usage:
+                        prompt_tokens = chunk.usage.get("prompt_tokens", prompt_tokens)
+                        completion_tokens = chunk.usage.get("completion_tokens", completion_tokens)
+                        total_tokens = chunk.usage.get("total_tokens", total_tokens)
                     continue
                 if not chunk.delta:
                     continue
                 index += 1
+                chunk_count += 1
                 model_slug = chunk.model_slug or model_slug
                 chunks.append(chunk.delta)
+                if chunk.usage:
+                    prompt_tokens = chunk.usage.get("prompt_tokens", prompt_tokens)
+                    completion_tokens = chunk.usage.get("completion_tokens", completion_tokens)
+                    total_tokens = chunk.usage.get("total_tokens", total_tokens)
                 await self._broker.publish(
                     execution.stream_token,
-                    self._repository.create_stream_event(
+                    AssistantStreamEvent(
+                        event_id=uuid4().hex,
+                        session_id=execution.session_id,
+                        type="response.delta",
                         turn_id=execution.turn_id,
-                        event_type="response.delta",
-                        payload={"index": index, "delta": chunk.delta},
+                        trace_id=execution.trace_id,
+                        workflow_id=execution.workflow_id,
+                        sequence_number=index,
                         emitted_at=_utcnow(),
+                        payload={"index": index, "delta": chunk.delta},
                     ),
                 )
         except (AttributeError, NotImplementedError):
             for index, chunk_text in enumerate(_chunk_text(draft_response), start=1):
                 chunks.append(chunk_text)
+                chunk_count += 1
                 await self._broker.publish(
                     execution.stream_token,
-                    self._repository.create_stream_event(
+                    AssistantStreamEvent(
+                        event_id=uuid4().hex,
+                        session_id=execution.session_id,
+                        type="response.delta",
                         turn_id=execution.turn_id,
-                        event_type="response.delta",
-                        payload={"index": index, "delta": chunk_text},
+                        trace_id=execution.trace_id,
+                        workflow_id=execution.workflow_id,
+                        sequence_number=index,
                         emitted_at=_utcnow(),
+                        payload={"index": index, "delta": chunk_text},
                     ),
                 )
         final_response = "".join(chunks).strip()
         if not final_response:
             final_response = draft_response
-        return final_response, model_slug
+        return (
+            final_response,
+            model_slug,
+            self._build_response_metrics(
+                chunks=chunks,
+                model_slug=model_slug,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                start_time=start_time,
+                chunk_count=chunk_count,
+            ),
+        )
+
+    def _build_response_metrics(
+        self,
+        *,
+        chunks: list[str],
+        model_slug: str | None,
+        prompt_tokens: int | None,
+        completion_tokens: int | None,
+        total_tokens: int | None,
+        start_time: float,
+        chunk_count: int,
+    ) -> dict[str, Any]:
+        content = "".join(chunks)
+        max_content_length = 65536
+        truncated_content = (
+            content[:max_content_length] if len(content) > max_content_length else content
+        )
+        latency_ms = int((perf_counter() - start_time) * 1000)
+        return {
+            "content": truncated_content,
+            "model_slug": model_slug,
+            "token_count_prompt": prompt_tokens,
+            "token_count_completion": completion_tokens,
+            "token_count_total": total_tokens,
+            "latency_ms": latency_ms,
+            "chunk_count": chunk_count,
+        }
 
     async def _publish_final_response_completed(
         self,
         *,
         turn: AssistantTurnView,
         response_text: str,
+        metrics: dict[str, Any],
     ) -> None:
-        await self._broker.publish(
-            turn.stream_token,
-            self._repository.create_stream_event(
-                turn_id=turn.id,
-                event_type="response.completed",
-                payload={
-                    "assistant_message_id": turn.assistant_message_id,
-                    "content": response_text,
-                },
-                emitted_at=_utcnow(),
-            ),
+        event = self._repository.create_stream_event(
+            turn_id=turn.id,
+            event_type="response.completed",
+            payload={
+                "assistant_message_id": turn.assistant_message_id,
+                **metrics,
+            },
+            emitted_at=_utcnow(),
         )
+        await self._broker.publish(turn.stream_token, event)
 
     async def _stream_final_response(self, *, turn: AssistantTurnView, response_text: str) -> None:
         for index, chunk in enumerate(_chunk_text(response_text), start=1):
             await self._broker.publish(
                 turn.stream_token,
                 AssistantStreamEvent(
+                    event_id=uuid4().hex,
+                    session_id=turn.session_id,
                     type="response.delta",
                     turn_id=turn.id,
+                    trace_id=turn.trace_id,
+                    workflow_id=turn.workflow_id,
+                    sequence_number=index,
                     emitted_at=_utcnow(),
                     payload={"index": index, "delta": chunk},
                 ),
@@ -556,8 +668,13 @@ class AssistantWorkflowService:
         await self._broker.publish(
             turn.stream_token,
             AssistantStreamEvent(
+                event_id=uuid4().hex,
+                session_id=turn.session_id,
                 type="response.completed",
                 turn_id=turn.id,
+                trace_id=turn.trace_id,
+                workflow_id=turn.workflow_id,
+                sequence_number=len(_chunk_text(response_text)) + 1,
                 emitted_at=_utcnow(),
                 payload={
                     "assistant_message_id": turn.assistant_message_id,
@@ -603,6 +720,7 @@ class _AssistantLoopResult:
     prompt_version: str | None = None
     model_slug: str | None = None
     planning_messages: list[dict[str, str]] | None = None
+
 
 def _chunk_text(text: str, *, chunk_size: int = 80) -> list[str]:
     if not text:

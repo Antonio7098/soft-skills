@@ -143,6 +143,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     )
                 content = _extract_message_content(response_payload)
                 usage = _extract_usage(response_payload)
+                finish_reason = _extract_finish_reason(response_payload)
                 await self._provider_call_logger.log_call_end(
                     call_id,
                     success=True,
@@ -156,6 +157,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     workflow_id=call_context.workflow_id,
                     user_id=call_context.user_id,
                     usage=usage,
+                    finish_reason=finish_reason,
                 )
                 return ProviderCompletion(
                     content=content,
@@ -320,7 +322,8 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                                     and attempt < self._settings.provider_max_retries
                                 ):
                                     await asyncio.sleep(
-                                        self._settings.provider_retry_backoff_seconds * (attempt + 1)
+                                        self._settings.provider_retry_backoff_seconds
+                                        * (attempt + 1)
                                     )
                                     continue
                                 raise provider_error(
@@ -333,6 +336,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                                 )
 
                             usage: dict[str, int] = {}
+                            finish_reason: str | None = None
                             streamed_any = False
                             async for line in response.aiter_lines():
                                 if not line.startswith("data:"):
@@ -348,6 +352,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                                 if not delta:
                                     continue
                                 streamed_any = True
+                                finish_reason = _extract_finish_reason(event_payload)
                                 yield ProviderTextChunk(
                                     delta=delta,
                                     model_slug=str(event_payload.get("model", active_model_slug)),
@@ -369,6 +374,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                                 workflow_id=call_context.workflow_id,
                                 user_id=call_context.user_id,
                                 usage=usage,
+                                finish_reason=finish_reason,
                             )
                             yield ProviderTextChunk(
                                 delta="",
@@ -538,6 +544,16 @@ def _extract_usage(payload: dict[str, Any]) -> dict[str, int]:
         for key, value in usage.items()
         if key in {"prompt_tokens", "completion_tokens", "total_tokens"} and value is not None
     }
+
+
+def _extract_finish_reason(payload: dict[str, Any]) -> str | None:
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return None
+    finish_reason = choices[0].get("finish_reason")
+    if isinstance(finish_reason, str):
+        return finish_reason
+    return None
 
 
 def _provider_error_message(payload: dict[str, Any]) -> str:

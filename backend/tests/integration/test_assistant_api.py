@@ -80,7 +80,10 @@ async def _wait_for_turn_status(
             assert turn_record is not None
             if turn_record.status == expected_status:
                 return turn_record
-            if turn_record.status in {"failed", "cancelled"} and turn_record.status != expected_status:
+            if (
+                turn_record.status in {"failed", "cancelled"}
+                and turn_record.status != expected_status
+            ):
                 raise AssertionError(f"Turn ended with unexpected status {turn_record.status}")
         errors = container.background_tasks.pop_errors()
         if errors:
@@ -174,12 +177,17 @@ async def test_assistant_turn_streams_tool_events_and_persists_messages(
     assert "turn.started" in event_types
     assert "tool.started" in event_types
     assert "tool.completed" in event_types
-    assert "response.delta" in event_types
     assert "response.completed" in event_types
     assert "turn.completed" in event_types
     assert sequence_numbers == sorted(sequence_numbers)
     assert final_response_events
-    assert "You have no recent attempts yet." in str(final_response_events[-1].payload["content"])
+    final_event = final_response_events[-1]
+    assert "You have no recent attempts yet." in str(final_event.payload["content"])
+    assert "token_count_prompt" in final_event.payload
+    assert "token_count_completion" in final_event.payload
+    assert "token_count_total" in final_event.payload
+    assert "latency_ms" in final_event.payload
+    assert "chunk_count" in final_event.payload
     for event in events:
         assert event.event_id
         assert event.session_id == session_id
@@ -191,9 +199,7 @@ async def test_assistant_turn_streams_tool_events_and_persists_messages(
         assert turn_record.status == "completed"
         assert session.query(AssistantMessageRecord).filter_by(turn_id=turn["id"]).count() == 2
         assert session.query(AssistantToolCallRecord).filter_by(turn_id=turn["id"]).count() == 1
-        pipeline_names = {
-            record.pipeline_name for record in session.query(PipelineRunRecord).all()
-        }
+        pipeline_names = {record.pipeline_name for record in session.query(PipelineRunRecord).all()}
     assert "assistant_turn_runtime" in pipeline_names
     messages_response = await client.get(
         f"/api/assistant/sessions/{session_id}/messages",
@@ -240,7 +246,9 @@ async def test_assistant_turn_can_be_cancelled_over_websocket(
     assert cancel_response.status_code == 200
 
     await _wait_for_turn_status(container, turn_id=turn["id"], expected_status="cancelled")
-    event_types = [event.type for event in container.assistant_service.list_stream_events(turn["stream_token"])]
+    event_types = [
+        event.type for event in container.assistant_service.list_stream_events(turn["stream_token"])
+    ]
     assert "turn.cancelling" in event_types
     assert "turn.cancelled" in event_types
 

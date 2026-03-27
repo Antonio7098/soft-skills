@@ -145,3 +145,26 @@ def orchestration_error(
         status_code=status_code,
         details=details,
     )
+
+
+def get_typed_error_event_type(error: AppError) -> str:
+    """Map an AppError to its corresponding typed error event type."""
+    code = error.code
+    if code.startswith("SS-VALIDATION-"):
+        return "error.validation.v1"
+    if code.startswith("SS-AUTH-"):
+        auth_num = int(code.split("-")[-1])
+        if auth_num <= 3:
+            return "error.authentication.v1"
+        return "error.authorization.v1"
+    if code.startswith("SS-DOMAIN-"):
+        return "error.not_found.v1"
+    if code.startswith("SS-SCORING-"):
+        return "error.scoring.v1"
+    if code.startswith("SS-PROVIDER-"):
+        return "error.provider.v1"
+    if code.startswith("SS-ORCHESTRATION-"):
+        return "error.rate_limited.v1"
+    if code.startswith("SS-PERSISTENCE-"):
+        return "error.persistence.v1"
+    return "error.unknown.v1"

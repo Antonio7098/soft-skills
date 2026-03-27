@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from fastapi import Request
 from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.platform.db.models import OrganisationMembershipRecord, UserAccountRecord
 from soft_skills_backend.shared.errors import auth_error
+
+if TYPE_CHECKING:
+    from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
 
 
 @dataclass(slots=True)
@@ -28,8 +32,35 @@ class Actor:
 class HeaderAuthProvider:
     """Request-bound auth provider with optional organisation context."""
 
-    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+    def __init__(
+        self,
+        session_factory: sessionmaker[Session],
+        workflow_events: SqlAlchemyWorkflowEventRepository | None = None,
+    ) -> None:
         self._session_factory = session_factory
+        self._workflow_events = workflow_events
+
+    def _record_auth_event(
+        self,
+        event_type: str,
+        user_id: str | None = None,
+        error_code: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        """Record an authentication event to workflow events."""
+        if self._workflow_events is None:
+            return
+        from soft_skills_backend.platform.observability.events import WorkflowEvent
+
+        event = WorkflowEvent(
+            event_type=event_type,
+            request_id=None,
+            trace_id=None,
+            workflow_id=None,
+            error_code=error_code,
+            payload={"user_id": user_id, **(details or {})},
+        )
+        self._workflow_events.record(event)
 
     def _resolve_organisation_context(
         self, session: Session, user_id: str, org_id: str | None
@@ -57,12 +88,22 @@ class HeaderAuthProvider:
         with self._session_factory() as session:
             record = session.get(UserAccountRecord, user_id)
             if record is None:
+                self._record_auth_event(
+                    "auth.login.failed.v1",
+                    user_id=user_id,
+                    error_code="SS-AUTH-002",
+                    details={"reason": "user_not_found"},
+                )
                 raise auth_error(
                     "Authenticated user was not found",
                     code="SS-AUTH-002",
                     status_code=401,
                     details={"user_id": user_id},
                 )
+            self._record_auth_event(
+                "auth.login.success.v1",
+                user_id=user_id,
+            )
             org_context = self._resolve_organisation_context(session, user_id, org_id)
             return Actor(
                 user_id=record.id,
@@ -72,6 +113,14 @@ class HeaderAuthProvider:
             )
 
     def require_actor(self, request: Request) -> Actor:
+        user_id = request.headers.get("X-User-ID")
+        if not user_id:
+            self._record_auth_event(
+                "auth.login.failed.v1",
+                error_code="SS-AUTH-001",
+                details={"reason": "missing_header"},
+            )
+            raise auth_error("Authentication is required", details={"header": "X-User-ID"})
         actor = self.optional_actor(request)
         if actor is None:
             raise auth_error("Authentication is required", details={"header": "X-User-ID"})
@@ -80,6 +129,12 @@ class HeaderAuthProvider:
     def require_org_admin(self, request: Request) -> Actor:
         actor = self.require_actor(request)
         if not actor.is_org_admin:
+            self._record_auth_event(
+                "auth.access_denied.v1",
+                user_id=actor.user_id,
+                error_code="SS-AUTH-004",
+                details={"organisation_id": actor.organisation_id},
+            )
             raise auth_error(
                 "Organisation admin access is required",
                 code="SS-AUTH-004",

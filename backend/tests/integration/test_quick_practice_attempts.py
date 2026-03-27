@@ -363,4 +363,4 @@ async def test_quick_practice_marks_attempt_failed_on_provider_error(
 
     assert attempt_record is not None and attempt_record.status == "assessment_failed"
     assert attempt_record.last_error_code == "SS-PROVIDER-099"
-    assert "workflow.failed.v1" in event_types
+    assert "error.provider.v1" in event_types

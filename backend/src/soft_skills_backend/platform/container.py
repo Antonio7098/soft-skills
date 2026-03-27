@@ -102,7 +102,7 @@ def build_container(settings: Settings) -> AppContainer:
         pipeline_runs=pipeline_runs,
         provider_calls=provider_calls,
     )
-    auth_provider = HeaderAuthProvider(session_factory)
+    auth_provider = HeaderAuthProvider(session_factory, workflow_events=workflow_events)
     identity_service = IdentityService(
         session_factory=session_factory,
         workflow_events=workflow_events,

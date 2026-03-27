@@ -38,7 +38,12 @@ from soft_skills_backend.platform.workflows.stageflow import (
     request_id_from_context,
 )
 from soft_skills_backend.shared.auth import Actor
-from soft_skills_backend.shared.errors import AppError, domain_error, persistence_error
+from soft_skills_backend.shared.errors import (
+    AppError,
+    domain_error,
+    get_typed_error_event_type,
+    persistence_error,
+)
 
 from ..contracts.views import build_attempt_view, build_practice_run_view, utcnow, utcnow_iso
 from .events import PracticeEventRecorder
@@ -533,7 +538,7 @@ def mark_attempt_failed(
         session.commit()
 
     events.record(
-        event_type="workflow.failed.v1",
+        event_type=get_typed_error_event_type(error),
         request_id=request_id,
         trace_id=trace_id,
         workflow_id=attempt.workflow_id,

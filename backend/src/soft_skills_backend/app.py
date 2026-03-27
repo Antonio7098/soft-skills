@@ -56,7 +56,7 @@ def create_app(settings: Settings | None = None, container: AppContainer | None 
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(RequestContextMiddleware, workflow_events=resolved_container.workflow_events)
 
     register_error_handlers(app, resolved_settings)
     app.include_router(api_router, prefix=resolved_settings.api_prefix)
