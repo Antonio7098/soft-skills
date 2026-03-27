@@ -1,0 +1,189 @@
+{
+  "dataset_id": "marking-golden-dataset",
+  "dataset_version": "marking-golden-dataset.v2",
+  "schema_version": "marking-golden-dataset.schema.v2",
+  "rubrics": [
+    {
+      "rubric_id": "evaluation_interview_pushback_alignment@v1",
+      "family": "evaluation_interview_pushback_alignment",
+      "version": "v1",
+      "content_type": "interview_prompt",
+      "schema_version": "v1",
+      "name": "Evaluation Interview Pushback Alignment Rubric",
+      "criteria": [
+        {
+          "criterion_ref": "active-listening",
+          "skill_slug": "active-listening",
+          "title": "Reflect Interviewer Signals",
+          "description": "Assess whether the learner picks up what the interviewer actually cares about and responds to that concern.",
+          "weight": 1.0,
+          "required": true,
+          "position": 1,
+          "levels": [
+            {"level": 1, "description": "Misses or ignores the interviewer concern.", "examples": ["Answers a different question than the one being asked."]},
+            {"level": 2, "description": "Recognizes part of the concern but responds loosely.", "examples": ["Acknowledges pressure but does not connect to the interviewer signal."]},
+            {"level": 3, "description": "Shows partial understanding of the interviewer concern.", "examples": ["Responds to the signal but leaves some of the concern unstated."]},
+            {"level": 4, "description": "Clearly reflects the interviewer concern and responds to it.", "examples": ["Names what the interviewer is optimizing for before answering."]},
+            {"level": 5, "description": "Precisely reflects the interviewer concern and adapts the answer around it.", "examples": ["Frames the answer around the interviewer metric and tradeoff."]}
+          ]
+        },
+        {
+          "criterion_ref": "decision-justification",
+          "skill_slug": "decision-justification",
+          "title": "Justify The Recommendation",
+          "description": "Assess whether the learner explains the recommendation with clear reasoning and defensible tradeoffs.",
+          "weight": 1.0,
+          "required": true,
+          "position": 2,
+          "levels": [
+            {"level": 1, "description": "Makes a recommendation without reasoning.", "examples": ["States a choice but does not explain why."]},
+            {"level": 2, "description": "Provides thin or weak reasoning.", "examples": ["Uses generic justification without linking to the scenario."]},
+            {"level": 3, "description": "Provides workable but incomplete reasoning.", "examples": ["Names one reason but misses an important tradeoff."]},
+            {"level": 4, "description": "Explains the recommendation with clear reasoning and tradeoffs.", "examples": ["Links the choice to the interviewer priority and implementation reality."]},
+            {"level": 5, "description": "Builds a strong, defensible case with explicit tradeoffs and contingencies.", "examples": ["Explains the recommendation, why alternatives lose, and the boundary conditions."]}
+          ]
+        }
+      ]
+    },
+    {
+      "rubric_id": "evaluation_scenario_launch_tradeoff@v1",
+      "family": "evaluation_scenario_launch_tradeoff",
+      "version": "v1",
+      "content_type": "scenario_step",
+      "schema_version": "v1",
+      "name": "Evaluation Scenario Launch Tradeoff Rubric",
+      "criteria": [
+        {
+          "criterion_ref": "prioritization-under-pressure",
+          "skill_slug": "prioritization-under-pressure",
+          "title": "Prioritize Under Deadline Pressure",
+          "description": "Assess whether the learner makes a clear prioritization choice under time pressure.",
+          "weight": 1.0,
+          "required": true,
+          "position": 1,
+          "levels": [
+            {"level": 1, "description": "Avoids making a prioritization choice.", "examples": ["Promises everything despite the constraint."]},
+            {"level": 2, "description": "Makes a weak prioritization choice with unclear tradeoffs.", "examples": ["Cuts work arbitrarily without connecting it to the deadline."]},
+            {"level": 3, "description": "Makes a workable prioritization choice.", "examples": ["Chooses what to cut but does not fully explain why."]},
+            {"level": 4, "description": "Makes a strong prioritization choice with relevant tradeoffs.", "examples": ["Protects the deadline by cutting lower-value work."]},
+            {"level": 5, "description": "Makes an excellent prioritization choice with explicit tradeoffs and risk handling.", "examples": ["Protects the deadline, explains the tradeoff, and names how remaining risk will be managed."]}
+          ]
+        },
+        {
+          "criterion_ref": "expectation-setting",
+          "skill_slug": "expectation-setting",
+          "title": "Set Delivery Expectations",
+          "description": "Assess whether the learner sets clear next-step expectations and boundaries after the prioritization decision.",
+          "weight": 1.0,
+          "required": true,
+          "position": 2,
+          "levels": [
+            {"level": 1, "description": "Leaves next steps vague or unrealistic.", "examples": ["Says the team will try harder without clarifying a plan."]},
+            {"level": 2, "description": "Sets limited expectations with major ambiguity.", "examples": ["Mentions a follow-up but not what happens next."]},
+            {"level": 3, "description": "Sets workable expectations with some missing detail.", "examples": ["Names a next step but leaves timing or ownership vague."]},
+            {"level": 4, "description": "Sets clear expectations with timing or ownership.", "examples": ["Explains what ships now and when the deferred work will be reviewed."]},
+            {"level": 5, "description": "Sets precise, realistic expectations with boundaries and follow-through.", "examples": ["Defines what ships now, what moves later, and when the team will reconfirm."]}
+          ]
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "interview-pushback-01",
+      "label": "Respond to interviewer pushback with alignment and reasoning",
+      "prompt": {
+        "practice_type": "interview",
+        "prompt_type": "interview_prompt",
+        "title": "Answer interviewer pushback",
+        "prompt_text": "An interviewer says your proposal sounds expensive and asks why they should believe it is the right tradeoff. Respond directly.",
+        "difficulty": "advanced",
+        "target_skill_slugs": ["active-listening", "decision-justification"],
+        "rubric_id": "evaluation_interview_pushback_alignment@v1",
+        "rubric_version": "v1",
+        "interview_context": {
+          "competency_context": "Stakeholder management under pressure",
+          "interviewer_perspective": "The interviewer values practical tradeoffs and clear reasoning."
+        }
+      },
+      "response_text": "I would start by acknowledging that the real concern is whether the extra spend buys us a meaningful reduction in delivery risk. I would recommend the proposal because it removes the manual approval bottleneck that is causing the current delays, and I would make clear that the tradeoff is justified only if we keep scope limited to the highest-risk workflow first.",
+      "learner_context": {
+        "target_role": "Product Manager",
+        "goals": ["Explain tradeoffs clearly"],
+        "prior_assessed_attempts": 3
+      },
+      "expected_overall_score": {
+        "minimum": 4,
+        "maximum": 5
+      },
+      "expected_skill_scores": {
+        "active-listening": {
+          "minimum": 4,
+          "maximum": 5
+        },
+        "decision-justification": {
+          "minimum": 4,
+          "maximum": 5
+        }
+      },
+      "minimum_evidence_coverage": 1.0,
+      "tags": ["interview", "reasoning", "alignment"]
+    },
+    {
+      "case_id": "scenario-launch-tradeoff-02",
+      "label": "Protect a launch date by cutting lower-value scope and setting follow-through",
+      "prompt": {
+        "practice_type": "scenario",
+        "prompt_type": "scenario_step",
+        "title": "Protect the launch date",
+        "prompt_text": "Your team is two days from launch and a requested customization is putting the date at risk. Explain what you would do next.",
+        "difficulty": "advanced",
+        "target_skill_slugs": ["prioritization-under-pressure", "expectation-setting"],
+        "rubric_id": "evaluation_scenario_launch_tradeoff@v1",
+        "rubric_version": "v1",
+        "scenario_context": {
+          "business_context": "A B2B workflow launch is committed to a customer advisory board next week.",
+          "learner_objective": "Protect the launch date while preserving credibility with Sales.",
+          "constraints": ["Engineering capacity is fixed for the week."],
+          "stakeholder_tensions": ["Sales wants the customization included immediately."],
+          "mock_company": {
+            "name": "Northstar Ops",
+            "industry": "SaaS",
+            "operating_context": "Mid-market operations tooling"
+          },
+          "mock_people": [
+            {
+              "name": "Rina",
+              "role": "Sales Director",
+              "goals": ["Keep the promised customer commitment"],
+              "communication_style": "direct",
+              "relationship_to_scenario": "cross-functional stakeholder"
+            }
+          ]
+        }
+      },
+      "response_text": "To protect the launch date, I would cut the custom export from this release and keep the core workflow shipment intact. I would tell Sales exactly what ships next week, explain that the export moves to the following sprint because engineering capacity is fixed, and set a checkpoint tomorrow afternoon to confirm the revised customer communication.",
+      "learner_context": {
+        "target_role": "Product Manager",
+        "goals": ["Make firmer prioritization calls"],
+        "prior_assessed_attempts": 5
+      },
+      "expected_overall_score": {
+        "minimum": 4,
+        "maximum": 5
+      },
+      "expected_skill_scores": {
+        "prioritization-under-pressure": {
+          "minimum": 4,
+          "maximum": 5
+        },
+        "expectation-setting": {
+          "minimum": 4,
+          "maximum": 5
+        }
+      },
+      "minimum_evidence_coverage": 1.0,
+      "tags": ["scenario", "prioritization", "delivery"]
+    }
+  ]
+}

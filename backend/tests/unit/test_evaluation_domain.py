@@ -6,6 +6,7 @@ from soft_skills_backend.modules.evaluation.domain.evaluation import (
     EvaluationCaseOutcome,
     build_marking_computation,
     load_marking_golden_dataset,
+    load_quick_practice_golden_dataset,
     select_cases,
     suite_definition,
 )
@@ -17,10 +18,23 @@ def test_select_cases_filters_the_versioned_golden_dataset() -> None:
 
     selected = select_cases(
         dataset=dataset,
-        case_ids=["scope-tradeoff-02", "weak-response-03"],
+        case_ids=["scenario-launch-tradeoff-02", "interview-pushback-01"],
     )
 
-    assert [case.case_id for case in selected] == ["scope-tradeoff-02", "weak-response-03"]
+    assert [case.case_id for case in selected] == [
+        "scenario-launch-tradeoff-02",
+        "interview-pushback-01",
+    ]
+
+
+def test_quick_practice_suite_loads_its_own_dataset() -> None:
+    dataset = load_quick_practice_golden_dataset()
+
+    assert dataset.dataset_version == "quick-practice-golden-dataset.v1"
+    assert [case.case_id for case in dataset.cases] == [
+        "quick-reset-deadline-01",
+        "quick-vague-reassurance-02",
+    ]
 
 
 def test_select_cases_rejects_unknown_case_ids() -> None:
@@ -34,7 +48,7 @@ def test_select_cases_rejects_unknown_case_ids() -> None:
 
 def test_build_marking_computation_aggregates_metrics_by_model() -> None:
     dataset = load_marking_golden_dataset()
-    selected = select_cases(dataset=dataset, case_ids=["stakeholder-reset-01"])
+    selected = select_cases(dataset=dataset, case_ids=["interview-pushback-01"])
 
     computation = build_marking_computation(
         suite=suite_definition("marking_benchmark_v1"),
@@ -80,7 +94,7 @@ def test_build_marking_computation_aggregates_metrics_by_model() -> None:
     )
 
     assert computation.passed is False
-    assert computation.summary["dataset_version"] == "marking-golden-dataset.v1"
+    assert computation.summary["dataset_version"] == "marking-golden-dataset.v2"
     assert computation.aggregate_metrics["case_count"] == 2
     assert computation.aggregate_metrics["passed_case_count"] == 1
     assert computation.aggregate_metrics["pass_rate"] == 0.5

@@ -285,6 +285,36 @@ The practice module owns:
 - durable assessment persistence
 - API projections
 
+### 5. Evaluation Datasets
+
+Evaluation must follow the same rubric model as runtime marking.
+
+That means:
+
+- golden benchmark cases cannot rely on implicit shared taxonomy rubrics
+- each evaluation dataset must carry explicit rubric definitions for the cases
+  it evaluates
+- the benchmark runner must materialize those rubric definitions into the
+  relational rubric tables before executing marking
+
+The evaluation split is:
+
+- `marking_benchmark_v1`
+  - rich-score interview and scenario cases only
+  - multi-level rubric criteria
+  - overall-score and per-skill score band checks
+- `quick_practice_benchmark_v1`
+  - quick-practice cases only
+  - item-specific binary rubrics
+  - score bands constrained to `1..2`
+
+Quick-practice golden cases must not point at a generic quick-practice rubric
+family. They must reference an item-specific rubric definition embedded in the
+golden dataset artifact and materialized at evaluation time.
+
+Rich-score golden cases should also carry explicit rubric definitions in the
+artifact so the benchmark is stable even if the taxonomy seed catalog changes.
+
 ## Stageflow Execution Model
 
 ### Parent Pipeline
@@ -603,6 +633,8 @@ path is stable.
 ### Phase 5. Evals, Smokes, And Cutover
 
 - replace benchmark fixtures and smoke suites
+- split evaluation into rich-score and quick-practice suites
+- move golden-case rubrics into explicit dataset artifacts
 - run provider-backed latency and quality checks
 - remove the legacy marking runtime
 
@@ -616,7 +648,8 @@ The overhaul is complete only when all of the following are true:
 - every per-skill result contains grounded evidence
 - overall score is computed programmatically from per-skill scores
 - Stageflow traces show one child run per skill assessment
-- provider-backed evals and smoke tests pass on the new runtime
+- provider-backed rich-score evals, quick-practice evals, and smoke tests pass
+  on the new runtime
 - the legacy single-pass marking path is removed
 
 ## Non-Goals

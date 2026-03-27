@@ -21,7 +21,7 @@ from soft_skills_backend.modules.evaluation.domain.evaluation import (
     ScoreBand,
     build_marking_computation,
     estimate_cost_usd,
-    load_marking_golden_dataset,
+    load_suite_dataset,
     select_cases,
 )
 from soft_skills_backend.modules.practice.domain.practice import validate_assessment_draft
@@ -44,6 +44,7 @@ from soft_skills_backend.modules.practice.workflows.assessment_service import (
 from soft_skills_backend.platform.providers.llm.openai_compatible import (
     OpenAICompatibleLLMProvider,
 )
+from soft_skills_backend.platform.db.models import RubricCriterionRecord, RubricRecord
 from soft_skills_backend.engines.marking.domain.rubric_repository import SqlAlchemyRubricRepository
 from soft_skills_backend.platform.workflows.stageflow import (
     metadata_value,
@@ -85,8 +86,9 @@ class MarkingBenchmarkRunner:
         suite: BuiltinEvaluationSuite,
         command: EvaluationRunCommand,
     ) -> EvaluationComputation:
-        dataset = load_marking_golden_dataset()
+        dataset = load_suite_dataset(suite)
         selected_cases = select_cases(dataset=dataset, case_ids=command.case_ids)
+        self._materialize_rubrics(dataset=dataset, selected_cases=selected_cases)
         model_slugs = command.model_slugs or [self._default_model_slug()]
         case_results: list[EvaluationCaseOutcome] = []
         for model_slug in model_slugs:
@@ -109,6 +111,64 @@ class MarkingBenchmarkRunner:
             model_slugs=model_slugs,
             case_results=case_results,
         )
+
+    def _materialize_rubrics(
+        self,
+        *,
+        dataset: GoldenDataset,
+        selected_cases: list[GoldenMarkingCase],
+    ) -> None:
+        required_rubric_ids = {case.prompt.rubric_id for case in selected_cases}
+        rubric_map = {
+            rubric.rubric_id: rubric for rubric in dataset.rubrics if rubric.rubric_id in required_rubric_ids
+        }
+        missing = sorted(required_rubric_ids.difference(rubric_map))
+        if missing:
+            raise scoring_error(
+                "Golden dataset was missing required rubric definitions",
+                code="SS-SCORING-026",
+                details={"missing_rubric_ids": missing, "dataset_version": dataset.dataset_version},
+            )
+        with self._session_factory() as session:
+            for rubric_id in sorted(required_rubric_ids):
+                rubric = rubric_map[rubric_id]
+                existing = session.get(RubricRecord, rubric_id)
+                if existing is None:
+                    existing = RubricRecord(rubric_id=rubric_id)
+                    session.add(existing)
+                existing.family = rubric.family
+                existing.version = rubric.version
+                existing.content_type = rubric.content_type
+                existing.schema_version = rubric.schema_version
+                existing.name = rubric.name
+                existing.criteria = [criterion.skill_slug for criterion in rubric.criteria]
+                session.query(RubricCriterionRecord).filter(
+                    RubricCriterionRecord.rubric_id == rubric_id
+                ).delete()
+                for criterion in rubric.criteria:
+                    session.add(
+                        RubricCriterionRecord(
+                            rubric_id=rubric.rubric_id,
+                            rubric_version=rubric.version,
+                            criterion_ref=criterion.criterion_ref,
+                            skill_slug=criterion.skill_slug,
+                            title=criterion.title,
+                            description=criterion.description,
+                            weight=criterion.weight,
+                            required=criterion.required,
+                            position=criterion.position,
+                            levels_json=[
+                                {
+                                    f"level_{level.level}": {
+                                        "description": level.description,
+                                        "examples": list(level.examples),
+                                    }
+                                }
+                                for level in criterion.levels
+                            ],
+                        )
+                    )
+            session.commit()
 
     def _build_marker(self, model_slug: str) -> DefaultAssessmentMarkingProvider:
         settings = self._settings.model_copy(

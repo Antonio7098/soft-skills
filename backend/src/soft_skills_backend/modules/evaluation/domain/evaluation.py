@@ -59,6 +59,7 @@ class BuiltinEvaluationSuite(BaseModel):
     suite_version: str
     benchmark_set_version: str
     description: str
+    dataset_artifact: str
 
 
 class ScoreBand(BaseModel):
@@ -97,6 +98,39 @@ class GoldenLearnerContext(BaseModel):
     prior_assessed_attempts: int = 0
 
 
+class GoldenRubricLevel(BaseModel):
+    """Versioned rubric level definition embedded in a golden dataset."""
+
+    level: int
+    description: str
+    examples: list[str] = Field(default_factory=list)
+
+
+class GoldenRubricCriterion(BaseModel):
+    """Stored criterion definition for one golden rubric."""
+
+    criterion_ref: str
+    skill_slug: str
+    title: str
+    description: str
+    weight: float = 1.0
+    required: bool = True
+    position: int
+    levels: list[GoldenRubricLevel] = Field(default_factory=list)
+
+
+class GoldenRubricDefinition(BaseModel):
+    """Explicit rubric definition required by one or more golden cases."""
+
+    rubric_id: str
+    family: str
+    version: str
+    content_type: str
+    schema_version: str
+    name: str
+    criteria: list[GoldenRubricCriterion] = Field(default_factory=list)
+
+
 class GoldenMarkingCase(BaseModel):
     """One reviewed golden dataset entry."""
 
@@ -117,6 +151,7 @@ class GoldenDataset(BaseModel):
     dataset_id: str
     dataset_version: str
     schema_version: str
+    rubrics: list[GoldenRubricDefinition] = Field(default_factory=list)
     cases: list[GoldenMarkingCase] = Field(default_factory=list)
 
 
@@ -139,12 +174,24 @@ _BUILTIN_SUITES: tuple[BuiltinEvaluationSuite, ...] = (
     BuiltinEvaluationSuite(
         suite_id="marking_benchmark_v1",
         suite_type=EvaluationSuiteType.MARKING_GOLDEN_DATASET,
-        suite_version="evaluation-suite.marking-golden.v2",
-        benchmark_set_version="marking-golden-dataset.v1",
+        suite_version="evaluation-suite.marking-golden.v3",
+        benchmark_set_version="marking-golden-dataset.v2",
         description=(
-            "Provider-backed marking evaluation over the reviewed golden dataset, "
-            "persisting model quality, latency, token, and cost metrics."
+            "Provider-backed interview and scenario marking evaluation over the "
+            "reviewed rich-score golden dataset."
         ),
+        dataset_artifact="marking_golden_dataset.v2.json",
+    ),
+    BuiltinEvaluationSuite(
+        suite_id="quick_practice_benchmark_v1",
+        suite_type=EvaluationSuiteType.MARKING_GOLDEN_DATASET,
+        suite_version="evaluation-suite.quick-practice-golden.v1",
+        benchmark_set_version="quick-practice-golden-dataset.v1",
+        description=(
+            "Provider-backed quick-practice evaluation over item-specific binary "
+            "rubrics and golden responses."
+        ),
+        dataset_artifact="quick_practice_golden_dataset.v1.json",
     ),
 )
 
@@ -168,9 +215,23 @@ def suite_definition(suite_id: str) -> BuiltinEvaluationSuite:
 
 @lru_cache(maxsize=1)
 def load_marking_golden_dataset() -> GoldenDataset:
+    return load_golden_dataset("marking_golden_dataset.v2.json")
+
+
+@lru_cache(maxsize=1)
+def load_quick_practice_golden_dataset() -> GoldenDataset:
+    return load_golden_dataset("quick_practice_golden_dataset.v1.json")
+
+
+@lru_cache(maxsize=8)
+def load_golden_dataset(artifact_name: str) -> GoldenDataset:
     return GoldenDataset.model_validate(
-        json.loads((_ARTIFACTS_DIR / "marking_golden_dataset.v1.json").read_text(encoding="utf-8"))
+        json.loads((_ARTIFACTS_DIR / artifact_name).read_text(encoding="utf-8"))
     )
+
+
+def load_suite_dataset(suite: BuiltinEvaluationSuite) -> GoldenDataset:
+    return load_golden_dataset(suite.dataset_artifact)
 
 
 @lru_cache(maxsize=1)
@@ -315,4 +376,3 @@ def _rounded_mean(values: list[float]) -> float | None:
     if not values:
         return None
     return round(fmean(values), 4)
-

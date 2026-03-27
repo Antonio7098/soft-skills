@@ -1,0 +1,153 @@
+{
+  "dataset_id": "quick-practice-golden-dataset",
+  "dataset_version": "quick-practice-golden-dataset.v1",
+  "schema_version": "quick-practice-golden-dataset.schema.v1",
+  "rubrics": [
+    {
+      "rubric_id": "evaluation_quick_reset_deadline@v1",
+      "family": "evaluation_quick_reset_deadline",
+      "version": "v1",
+      "content_type": "quick_practice_prompt",
+      "schema_version": "v1",
+      "name": "Evaluation Quick Practice Reset Deadline Rubric",
+      "criteria": [
+        {
+          "criterion_ref": "active-listening",
+          "skill_slug": "active-listening",
+          "title": "Acknowledge The Deadline Pressure",
+          "description": "Check whether the response explicitly recognizes why the date matters.",
+          "weight": 1.0,
+          "required": true,
+          "position": 1,
+          "levels": [
+            {"level": 1, "description": "Fail: the response does not acknowledge why the date matters.", "examples": ["Moves straight into logistics without recognizing the pressure."]},
+            {"level": 2, "description": "Pass: the response directly acknowledges why the date matters.", "examples": ["Names the pressure or importance behind the request."]}
+          ]
+        },
+        {
+          "criterion_ref": "expectation-setting",
+          "skill_slug": "expectation-setting",
+          "title": "Set A Realistic Boundary",
+          "description": "Check whether the response sets a realistic next step, timing, or boundary.",
+          "weight": 1.0,
+          "required": true,
+          "position": 2,
+          "levels": [
+            {"level": 1, "description": "Fail: the response stays vague or makes an unrealistic promise.", "examples": ["Says the team will try without giving a realistic boundary."]},
+            {"level": 2, "description": "Pass: the response sets a realistic next step, timing, or boundary.", "examples": ["Gives a realistic date or checkpoint instead of an empty reassurance."]}
+          ]
+        }
+      ]
+    },
+    {
+      "rubric_id": "evaluation_quick_scope_tradeoff@v1",
+      "family": "evaluation_quick_scope_tradeoff",
+      "version": "v1",
+      "content_type": "quick_practice_prompt",
+      "schema_version": "v1",
+      "name": "Evaluation Quick Practice Scope Tradeoff Rubric",
+      "criteria": [
+        {
+          "criterion_ref": "active-listening",
+          "skill_slug": "active-listening",
+          "title": "Reflect The Sponsor Goal",
+          "description": "Check whether the response reflects what the sponsor is trying to achieve.",
+          "weight": 1.0,
+          "required": true,
+          "position": 1,
+          "levels": [
+            {"level": 1, "description": "Fail: the response does not reflect the sponsor goal.", "examples": ["Proposes a tradeoff without acknowledging the sponsor priority."]},
+            {"level": 2, "description": "Pass: the response reflects the sponsor goal before giving the tradeoff.", "examples": ["Names the goal or urgency that matters to the sponsor."]}
+          ]
+        },
+        {
+          "criterion_ref": "expectation-setting",
+          "skill_slug": "expectation-setting",
+          "title": "Offer A Concrete Tradeoff",
+          "description": "Check whether the response offers a concrete tradeoff instead of vague reassurance.",
+          "weight": 1.0,
+          "required": true,
+          "position": 2,
+          "levels": [
+            {"level": 1, "description": "Fail: the response avoids a concrete tradeoff.", "examples": ["Promises progress soon without specifying scope or timing."]},
+            {"level": 2, "description": "Pass: the response offers a concrete tradeoff with a realistic follow-up.", "examples": ["Suggests a narrowed scope and a concrete checkpoint."]}
+          ]
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "quick-reset-deadline-01",
+      "label": "Reset an impossible deadline with empathy and a realistic next step",
+      "prompt": {
+        "practice_type": "quick_practice",
+        "prompt_type": "quick_practice_prompt",
+        "title": "Reset the timeline",
+        "prompt_text": "A client asks for an impossible delivery date. Respond with empathy and a realistic next step.",
+        "difficulty": "intermediate",
+        "target_skill_slugs": ["active-listening", "expectation-setting"],
+        "rubric_id": "evaluation_quick_reset_deadline@v1",
+        "rubric_version": "v1"
+      },
+      "response_text": "I hear why the date matters to you. The earliest realistic delivery date is next Friday, and I can confirm any scope tradeoffs with the team by tomorrow afternoon.",
+      "learner_context": {
+        "target_role": "Consultant",
+        "goals": ["Improve stakeholder handling"],
+        "prior_assessed_attempts": 2
+      },
+      "expected_overall_score": {
+        "minimum": 2,
+        "maximum": 2
+      },
+      "expected_skill_scores": {
+        "active-listening": {
+          "minimum": 2,
+          "maximum": 2
+        },
+        "expectation-setting": {
+          "minimum": 2,
+          "maximum": 2
+        }
+      },
+      "minimum_evidence_coverage": 1.0,
+      "tags": ["quick-practice", "deadline", "pass"]
+    },
+    {
+      "case_id": "quick-vague-reassurance-02",
+      "label": "Weak response that reassures without a usable boundary",
+      "prompt": {
+        "practice_type": "quick_practice",
+        "prompt_type": "quick_practice_prompt",
+        "title": "Vague reassurance",
+        "prompt_text": "A client pushes for a date you cannot commit to. Respond in a way that manages expectations.",
+        "difficulty": "intermediate",
+        "target_skill_slugs": ["active-listening", "expectation-setting"],
+        "rubric_id": "evaluation_quick_scope_tradeoff@v1",
+        "rubric_version": "v1"
+      },
+      "response_text": "I know this is important and I will do my best to make it happen. We should have something soon and I will keep you posted.",
+      "learner_context": {
+        "target_role": "Consultant",
+        "goals": ["Set firmer expectations"],
+        "prior_assessed_attempts": 1
+      },
+      "expected_overall_score": {
+        "minimum": 1,
+        "maximum": 1
+      },
+      "expected_skill_scores": {
+        "active-listening": {
+          "minimum": 1,
+          "maximum": 1
+        },
+        "expectation-setting": {
+          "minimum": 1,
+          "maximum": 1
+        }
+      },
+      "minimum_evidence_coverage": 1.0,
+      "tags": ["quick-practice", "negative", "fail"]
+    }
+  ]
+}

@@ -573,6 +573,42 @@ class SmokeBackendClient:
         )
         self.require_ok(response, f"remove member from organisation {organisation_id}")
 
+    async def list_evaluation_suites(self, *, user_id: str) -> list[JsonObject]:
+        response = await self._client.get(
+            "/api/admin/evaluations/suites",
+            headers={"X-User-ID": user_id},
+        )
+        self.require_ok(response, "list evaluation suites")
+        return cast(list[JsonObject], response.json()["data"])
+
+    async def run_evaluation(
+        self,
+        *,
+        user_id: str,
+        suite_id: str,
+        model_slugs: list[str] | None = None,
+        case_ids: list[str] | None = None,
+    ) -> JsonObject:
+        response = await self._client.post(
+            "/api/admin/evaluations/runs",
+            headers={"X-User-ID": user_id},
+            json={
+                "suite_id": suite_id,
+                "model_slugs": list(model_slugs or []),
+                "case_ids": list(case_ids or []),
+            },
+        )
+        self.require_ok(response, f"run evaluation suite {suite_id}")
+        return self.data(response)
+
+    async def get_evaluation_run(self, *, user_id: str, evaluation_run_id: str) -> JsonObject:
+        response = await self._client.get(
+            f"/api/admin/evaluations/runs/{evaluation_run_id}",
+            headers={"X-User-ID": user_id},
+        )
+        self.require_ok(response, f"get evaluation run {evaluation_run_id}")
+        return self.data(response)
+
     @staticmethod
     def data(response: httpx.Response) -> JsonObject:
         return cast(JsonObject, response.json()["data"])
