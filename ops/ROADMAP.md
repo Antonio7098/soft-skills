@@ -225,22 +225,55 @@ in the linked sprint documents under `ops/sprints/`.
 
 ---
 
-## Sprint 13: Admin Dashboard Backend Readiness
+## Sprint 13: Admin Dashboard Backend Readiness (Split Into 9 Sprints)
 
-**Purpose:** Implement foundational admin dashboard backend capabilities including comprehensive event logging, typed error taxonomy, user management API, and observability improvements.
+Sprint 13 was too large and has been split into 9 focused sprints for better manageability:
+
+### Sprint 13a: Event Logging Infrastructure
+**Status:** Completed
+**Detail:** [ops/sprints/sprint-13a-event-logging-infrastructure.md](ops/sprints/sprint-13a-event-logging-infrastructure.md)
 
 **Key Outcomes:**
 - Response delta aggregation (single record instead of per-token)
 - HTTP request audit logging with field-level PII scrubbing
-- Auth event logging (login success/failure, token refresh, access denied)
+- Auth event logging (login success/failure, access denied)
 - Typed error events (validation, authentication, authorization, not_found, rate_limited)
-- Provider call enrichment with token counts
-- Admin user management API (listing, suspension, role management)
-- Wide events persistence via Stageflow
+- Catalog generation lifecycle events
+- Provider call enrichment with token counts and finish_reason
 
-**Exit Criteria:** The backend provides comprehensive event logging and observability infrastructure sufficient for admin dashboard visibility.
+### Sprint 13b: Monitoring/Telemetry
+**Status:** Not Started
+**Detail:** [ops/sprints/sprint-13b-monitoring-telemetry.md](ops/sprints/sprint-13b-monitoring-telemetry.md)
 
-**Detail:** [ops/sprints/sprint-13-admin-dashboard-backend-readiness.md](ops/sprints/sprint-13-admin-dashboard-backend-readiness.md)
+### Sprint 13c: Agent Observability
+**Status:** Not Started
+**Detail:** [ops/sprints/sprint-13c-agent-observability.md](ops/sprints/sprint-13c-agent-observability.md)
+
+### Sprint 13d: Pipeline Visualization
+**Status:** Not Started
+**Detail:** [ops/sprints/sprint-13d-pipeline-visualization.md](ops/sprints/sprint-13d-pipeline-visualization.md)
+
+### Sprint 13e: Eval Dashboard
+**Status:** Not Started
+**Detail:** [ops/sprints/sprint-13e-eval-dashboard.md](ops/sprints/sprint-13e-eval-dashboard.md)
+
+### Sprint 13f: Prompt Library API
+**Status:** Not Started
+**Detail:** [ops/sprints/sprint-13f-prompt-library-api.md](ops/sprints/sprint-13f-prompt-library-api.md)
+
+### Sprint 13g: User Management API
+**Status:** Not Started
+**Detail:** [ops/sprints/sprint-13g-user-management-api.md](ops/sprints/sprint-13g-user-management-api.md)
+
+### Sprint 13h: User Cohort Analytics
+**Status:** Not Started
+**Detail:** [ops/sprints/sprint-13h-user-cohort-analytics.md](ops/sprints/sprint-13h-user-cohort-analytics.md)
+
+### Sprint 13i: Policy Layer
+**Status:** Not Started
+**Detail:** [ops/sprints/sprint-13i-policy-layer.md](ops/sprints/sprint-13i-policy-layer.md)
+
+**Combined Exit Criteria:** The backend provides comprehensive event logging, observability infrastructure, and APIs sufficient for admin dashboard visibility.
 
 ---
 

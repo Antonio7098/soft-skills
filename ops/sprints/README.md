@@ -23,13 +23,21 @@ contracts, or sequencing change.
 11. [Sprint 10: Chat Assistant And Streaming V1](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-10-chat-assistant-and-streaming-v1.md)
 12. [Sprint 11: Org Enforcement](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-11-org-enforcement.md)
 13. [Sprint 12: Collections Enhancement](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-12-collections-enhancement.md)
-14. [Sprint 13: Admin Dashboard Backend Readiness](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13-admin-dashboard-backend-readiness.md)
+14. [Sprint 13a: Event Logging Infrastructure](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13a-event-logging-infrastructure.md)
+15. [Sprint 13b: Monitoring/Telemetry](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13b-monitoring-telemetry.md)
+16. [Sprint 13c: Agent Observability](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13c-agent-observability.md)
+17. [Sprint 13d: Pipeline Visualization](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13d-pipeline-visualization.md)
+18. [Sprint 13e: Eval Dashboard](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13e-eval-dashboard.md)
+19. [Sprint 13f: Prompt Library API](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13f-prompt-library-api.md)
+20. [Sprint 13g: User Management API](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13g-user-management-api.md)
+21. [Sprint 13h: User Cohort Analytics](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13h-user-cohort-analytics.md)
+22. [Sprint 13i: Policy Layer](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13i-policy-layer.md)
 
 ## Active Sprint
 
 The current active sprint for backend execution is:
 
-- [Sprint 13: Admin Dashboard Backend Readiness](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13-admin-dashboard-backend-readiness.md)
+- [Sprint 13b: Monitoring/Telemetry](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13b-monitoring-telemetry.md)
 
 ## Common Rules
 
