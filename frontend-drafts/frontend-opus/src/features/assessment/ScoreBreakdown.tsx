@@ -4,16 +4,16 @@ import { Card } from '@/design-system/primitives/Card';
 import { ProgressBar } from '@/design-system/primitives/ProgressBar';
 import { Badge } from '@/design-system/primitives/Badge';
 import { getScoreVariant } from '@/lib/variant-helpers';
-import type { SkillScore } from '@/data';
+import type { PerSkillAssessment } from '@/data';
 
 interface ScoreBreakdownProps {
   readonly overallScore: number;
   readonly maxScore?: number;
-  readonly skillScores: readonly SkillScore[];
+  readonly perSkillAssessments: readonly PerSkillAssessment[];
   readonly rationale?: string | null;
 }
 
-export function ScoreBreakdown({ overallScore, maxScore = 5, skillScores, rationale }: ScoreBreakdownProps) {
+export function ScoreBreakdown({ overallScore, maxScore = 5, perSkillAssessments, rationale }: ScoreBreakdownProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -35,7 +35,7 @@ export function ScoreBreakdown({ overallScore, maxScore = 5, skillScores, ration
           Skill Scores
         </span>
         <div className="flex flex-col gap-3">
-          {skillScores.map((ss, i) => (
+          {perSkillAssessments.map((ss, i) => (
             <motion.div
               key={ss.skill_slug}
               initial={{ opacity: 0, x: -8 }}
@@ -45,7 +45,7 @@ export function ScoreBreakdown({ overallScore, maxScore = 5, skillScores, ration
             >
               <div className="flex items-center justify-between">
                 <span className="text-body-sm font-medium text-content-primary">
-                  {ss.skill_slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                  {ss.skill_slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
                 </span>
                 <Badge variant={getScoreVariant(ss.score)} size="sm">
                   {ss.score}/{maxScore}

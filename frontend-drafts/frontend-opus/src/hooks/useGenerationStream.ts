@@ -218,6 +218,7 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
       for (let i = 0; i < mockPrompts.length; i++) {
         const progress = 35 + (i / mockPrompts.length) * 20;
         await new Promise((resolve) => setTimeout(resolve, 400));
+        const mockPrompt = mockPrompts[i] as PromptItemDraft;
         const event: GenerationStreamEvent = {
           event_id: `evt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
           generation_id: mockGenerationId,
@@ -226,10 +227,10 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
           sequence_number: stagesToSimulate.length + i,
           emitted_at: new Date().toISOString(),
           progress_percent: progress,
-          payload: { title: mockPrompts[i].title, prompt_type: mockPrompts[i].prompt_type, difficulty: mockPrompts[i].difficulty },
+          payload: { title: mockPrompt.title, prompt_type: mockPrompt.prompt_type, difficulty: mockPrompt.difficulty },
         };
         dispatch({ type: 'EVENT', event });
-        dispatch({ type: 'ADD_PROMPT_ITEM', prompt_item: mockPrompts[i] });
+        dispatch({ type: 'ADD_PROMPT_ITEM', prompt_item: mockPrompt });
       }
 
       const remainingStages: {

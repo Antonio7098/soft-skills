@@ -25,6 +25,7 @@ export type VerificationState = 'unverified' | 'verified' | 'rejected';
 export type PromptType = 'quick_practice_prompt' | 'interview_prompt' | 'scenario_step';
 export type DiscoveryTier = 'private' | 'global_public' | 'org_public' | 'standard_public';
 export type SourceType = 'manual' | 'generated_structured' | 'generated_chat';
+export type RubricType = 'quick_practice' | 'interview' | 'scenario';
 
 // --- Identity -------------------------------------------------------------
 
@@ -68,10 +69,30 @@ export interface RubricView {
   readonly name: string;
 }
 
+export interface RubricLevel {
+  readonly description: string;
+  readonly examples: string[];
+}
+
+export interface RubricCriterionView {
+  readonly id: string;
+  readonly rubric_id: string;
+  readonly rubric_version: string;
+  readonly criterion_ref: string;
+  readonly skill_slug: string;
+  readonly title: string;
+  readonly description: string;
+  readonly weight: number;
+  readonly required: boolean;
+  readonly position: number;
+  readonly levels: Record<string, RubricLevel>;
+}
+
 export interface TaxonomySnapshot {
   readonly skills: SkillView[];
   readonly competencies: CompetencyView[];
   readonly rubrics: RubricView[];
+  readonly rubric_criteria: RubricCriterionView[];
 }
 
 // --- Catalog ---------------------------------------------------------------
@@ -159,16 +180,38 @@ export interface CollectionListFilters {
 
 // --- Practice --------------------------------------------------------------
 
-export interface SkillScore {
+export interface EvidenceItem {
+  readonly quote: string;
+  readonly explanation: string;
+}
+
+export interface PerSkillAssessment {
   readonly skill_slug: string;
   readonly score: number;
   readonly rationale: string;
+  readonly evidence: EvidenceItem[];
 }
 
-export interface EvidenceItem {
-  readonly skill_slug: string;
-  readonly quote: string;
-  readonly explanation: string;
+export interface AssessmentAggregationOutput {
+  readonly summary: string;
+  readonly next_actions: string[];
+}
+
+export interface AssessmentArtifact {
+  readonly prompt_version: string;
+  readonly rubric_id: string;
+  readonly rubric_version: string;
+  readonly provider: string;
+  readonly model_slug: string;
+  readonly schema_version: string;
+  readonly config_version: string;
+  readonly overall_score: number;
+  readonly summary: string;
+  readonly per_skill_assessments: PerSkillAssessment[];
+  readonly strengths: string[];
+  readonly weaknesses: string[];
+  readonly next_actions: string[];
+  readonly raw_payload: Record<string, unknown>;
 }
 
 export interface QuickPracticePromptView {
@@ -196,9 +239,8 @@ export interface QuickPracticeAssessmentView {
   readonly provider: string;
   readonly model_slug: string;
   readonly overall_score: number | null;
-  readonly skill_scores: SkillScore[];
-  readonly evidence: EvidenceItem[];
-  readonly rationale: string | null;
+  readonly per_skill_assessments: PerSkillAssessment[];
+  readonly summary: string;
   readonly strengths: string[];
   readonly weaknesses: string[];
   readonly next_actions: string[];
@@ -206,6 +248,7 @@ export interface QuickPracticeAssessmentView {
   readonly pipeline_run_id: string;
   readonly rejection_code: string | null;
   readonly created_at: string;
+  readonly raw_payload: Record<string, unknown>;
 }
 
 export interface AttemptView {

@@ -26,11 +26,14 @@ import type {
   CollectionGenerationView,
   PromptItemView,
   ScenarioView,
+  PerSkillAssessment,
+  EvidenceItem,
 } from './types';
 import {
   SEED_SKILLS,
   SEED_COMPETENCIES,
   SEED_RUBRICS,
+  SEED_RUBRIC_CRITERIA,
   SEED_COLLECTIONS,
   SEED_CURRENT_USER,
   SEED_ATTEMPT_HISTORY,
@@ -58,17 +61,19 @@ export function buildMockAttemptView(opts: {
 }): AttemptView {
   const score = Math.floor(Math.random() * 3) + 3; // 3-5
 
-  const skill_scores = opts.skillSlugs.map((slug) => ({
-    skill_slug: slug,
-    score: Math.max(1, Math.min(5, score + (Math.random() > 0.5 ? 0 : -1))),
-    rationale: `Demonstrated ${score >= 4 ? 'strong' : score >= 3 ? 'solid' : 'developing'} ${slug.replace(/-/g, ' ')} throughout the session.`,
-  }));
-
-  const evidence = opts.skillSlugs.slice(0, 3).map((slug) => ({
-    skill_slug: slug,
-    quote: opts.responseText.slice(0, 100) || 'Response demonstrated relevant competency.',
-    explanation: `This shows ${slug.replace(/-/g, ' ')} through the learner's structured approach and situational awareness.`,
-  }));
+  const per_skill_assessments: PerSkillAssessment[] = opts.skillSlugs.map((slug) => {
+    const skillScore = Math.max(1, Math.min(5, score + (Math.random() > 0.5 ? 0 : -1)));
+    const evidence: EvidenceItem[] = [{
+      quote: opts.responseText.slice(0, 80) || 'Response demonstrated relevant competency.',
+      explanation: `This shows ${slug.replace(/-/g, ' ')} through the learner's structured approach and situational awareness.`,
+    }];
+    return {
+      skill_slug: slug,
+      score: skillScore,
+      rationale: `Demonstrated ${score >= 4 ? 'strong' : score >= 3 ? 'solid' : 'developing'} ${slug.replace(/-/g, ' ')} throughout the session.`,
+      evidence,
+    };
+  });
 
   return {
     id: opts.attemptId,
@@ -88,7 +93,7 @@ export function buildMockAttemptView(opts: {
       difficulty: opts.difficulty,
       delivery_version: 'quick-practice.delivery.v1',
       target_skill_slugs: opts.skillSlugs,
-      rubric_id: 'quick_practice_text',
+      rubric_id: 'quick_practice_text@v1',
       rubric_version: 'v1',
     },
     assessment: {
@@ -97,16 +102,15 @@ export function buildMockAttemptView(opts: {
       session_id: opts.sessionId,
       validation_status: 'validated',
       prompt_version: 'assessment.quick-practice.v1',
-      rubric_id: 'quick_practice_text',
+      rubric_id: 'quick_practice_text@v1',
       rubric_version: 'v1',
       schema_version: 'quick-practice-assessment-output.v1',
       config_version: 'quick-practice-marking-config.v1',
       provider: 'mock',
       model_slug: 'mock-v1',
       overall_score: score,
-      skill_scores,
-      evidence,
-      rationale: score >= 4
+      per_skill_assessments,
+      summary: score >= 4
         ? 'Excellent performance across all assessed competencies. Responses were well-structured, demonstrated strong situational awareness, and addressed key stakeholder concerns effectively.'
         : score >= 3
           ? 'Solid performance with good foundational skills. The responses addressed the core requirements with a practical approach that could benefit from more specific examples and deeper analysis.'
@@ -126,6 +130,7 @@ export function buildMockAttemptView(opts: {
       pipeline_run_id: `run-${uid()}`,
       rejection_code: null,
       created_at: new Date().toISOString(),
+      raw_payload: {},
     },
   };
 }
@@ -198,6 +203,7 @@ export const mockDataProvider: DataProvider = {
       skills: SEED_SKILLS,
       competencies: SEED_COMPETENCIES,
       rubrics: SEED_RUBRICS,
+      rubric_criteria: SEED_RUBRIC_CRITERIA,
     };
   },
 
@@ -600,21 +606,23 @@ export const mockDataProvider: DataProvider = {
       difficulty: promptItem.difficulty,
       delivery_version: 'quick-practice.delivery.v1',
       target_skill_slugs: promptItem.target_skill_slugs,
-      rubric_id: promptItem.rubric_id,
+      rubric_id: `${promptItem.rubric_id}@v1`,
       rubric_version: 'v1',
     };
 
-    const skill_scores = promptItem.target_skill_slugs.map((slug) => ({
-      skill_slug: slug,
-      score: Math.max(1, Math.min(5, score + (Math.random() > 0.5 ? 0 : -1))),
-      rationale: `Demonstrated ${score >= 3 ? 'solid' : 'developing'} ${slug.replace(/-/g, ' ')}.`,
-    }));
-
-    const evidence = promptItem.target_skill_slugs.slice(0, 2).map((slug) => ({
-      skill_slug: slug,
-      quote: cmd.response_text.slice(0, 80),
-      explanation: `This excerpt demonstrates ${slug.replace(/-/g, ' ')} through the learner's approach.`,
-    }));
+    const per_skill_assessments: PerSkillAssessment[] = promptItem.target_skill_slugs.map((slug) => {
+      const skillScore = Math.max(1, Math.min(5, score + (Math.random() > 0.5 ? 0 : -1)));
+      const evidence: EvidenceItem[] = [{
+        quote: cmd.response_text.slice(0, 80),
+        explanation: `This excerpt demonstrates ${slug.replace(/-/g, ' ')} through the learner's approach.`,
+      }];
+      return {
+        skill_slug: slug,
+        score: skillScore,
+        rationale: `Demonstrated ${score >= 3 ? 'solid' : 'developing'} ${slug.replace(/-/g, ' ')}.`,
+        evidence,
+      };
+    });
 
     const attempt: AttemptView = {
       id: attemptId,
@@ -633,16 +641,15 @@ export const mockDataProvider: DataProvider = {
         session_id: `sess-${uid()}`,
         validation_status: 'validated',
         prompt_version: 'assessment.quick-practice.v1',
-        rubric_id: promptItem.rubric_id,
+        rubric_id: `${promptItem.rubric_id}@v1`,
         rubric_version: 'v1',
         schema_version: 'quick-practice-assessment-output.v1',
         config_version: 'quick-practice-marking-config.v1',
         provider: 'mock',
         model_slug: 'mock-v1',
         overall_score: score,
-        skill_scores,
-        evidence,
-        rationale: score >= 4
+        per_skill_assessments,
+        summary: score >= 4
           ? 'The response effectively addresses the prompt with clear reasoning and structure.'
           : 'The response partially addresses the prompt with a reasonable approach that could be more detailed.',
         strengths: score >= 3 ? ['Clear communication', 'Relevant context'] : ['Attempted to address the prompt'],
@@ -652,6 +659,7 @@ export const mockDataProvider: DataProvider = {
         pipeline_run_id: `run-${uid()}`,
         rejection_code: null,
         created_at: new Date().toISOString(),
+        raw_payload: {},
       },
     };
 
@@ -699,7 +707,7 @@ export const mockDataProvider: DataProvider = {
         difficulty: promptItem.difficulty,
         delivery_version: 'quick-practice.delivery.v1',
         target_skill_slugs: promptItem.target_skill_slugs,
-        rubric_id: promptItem.rubric_id,
+        rubric_id: `${promptItem.rubric_id}@v1`,
         rubric_version: 'v1',
       },
       assessment: {
@@ -708,24 +716,23 @@ export const mockDataProvider: DataProvider = {
         session_id: historyItem.session_id,
         validation_status: 'validated',
         prompt_version: 'assessment.quick-practice.v1',
-        rubric_id: promptItem.rubric_id,
+        rubric_id: `${promptItem.rubric_id}@v1`,
         rubric_version: 'v1',
         schema_version: 'quick-practice-assessment-output.v1',
         config_version: 'quick-practice-marking-config.v1',
         provider: 'mock',
         model_slug: 'mock-v1',
         overall_score: historyItem.score,
-        skill_scores: historyItem.skill_slugs.map((slug) => ({
+        per_skill_assessments: historyItem.skill_slugs.map((slug) => ({
           skill_slug: slug,
           score: historyItem.score,
           rationale: `Consistent ${slug.replace(/-/g, ' ')} performance.`,
+          evidence: [{
+            quote: 'Relevant excerpt from the stored response.',
+            explanation: `Demonstrates ${slug.replace(/-/g, ' ')}.`,
+          }],
         })),
-        evidence: historyItem.skill_slugs.slice(0, 2).map((slug) => ({
-          skill_slug: slug,
-          quote: 'Relevant excerpt from the stored response.',
-          explanation: `Demonstrates ${slug.replace(/-/g, ' ')}.`,
-        })),
-        rationale: `Score of ${historyItem.score}/5 based on rubric criteria.`,
+        summary: `Score of ${historyItem.score}/5 based on rubric criteria.`,
         strengths: ['Structured approach', 'Clear reasoning'],
         weaknesses: historyItem.score < 4 ? ['Could be more specific'] : [],
         next_actions: ['Continue practicing similar prompts'],
@@ -733,6 +740,7 @@ export const mockDataProvider: DataProvider = {
         pipeline_run_id: `run-${historyItem.id}`,
         rejection_code: null,
         created_at: historyItem.created_at,
+        raw_payload: {},
       },
     };
   },

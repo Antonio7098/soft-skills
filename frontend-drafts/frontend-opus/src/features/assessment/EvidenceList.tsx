@@ -2,14 +2,18 @@ import { motion } from 'framer-motion';
 import { Quote } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
 import { Badge } from '@/design-system/primitives/Badge';
-import type { EvidenceItem } from '@/data';
+import type { PerSkillAssessment } from '@/data';
 
 interface EvidenceListProps {
-  readonly evidence: readonly EvidenceItem[];
+  readonly perSkillAssessments: readonly PerSkillAssessment[];
 }
 
-export function EvidenceList({ evidence }: EvidenceListProps) {
-  if (evidence.length === 0) return null;
+export function EvidenceList({ perSkillAssessments }: EvidenceListProps) {
+  const allEvidence = perSkillAssessments.flatMap((psa) =>
+    psa.evidence.map((e) => ({ ...e, skill_slug: psa.skill_slug })),
+  );
+
+  if (allEvidence.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -17,7 +21,7 @@ export function EvidenceList({ evidence }: EvidenceListProps) {
         Evidence from Your Response
       </span>
       <div className="flex flex-col gap-3">
-        {evidence.map((item, i) => (
+        {allEvidence.map((item, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 6 }}
@@ -28,7 +32,7 @@ export function EvidenceList({ evidence }: EvidenceListProps) {
               <div className="flex items-start gap-3">
                 <Quote className="w-4 h-4 text-accent shrink-0 mt-0.5" />
                 <p className="text-body-sm text-content-primary italic leading-relaxed">
-                  "{item.quote}"
+                  &quot;{item.quote}&quot;
                 </p>
               </div>
               <div className="flex items-start gap-3 pl-7">
@@ -36,7 +40,7 @@ export function EvidenceList({ evidence }: EvidenceListProps) {
               </div>
               <div className="pl-7">
                 <Badge variant="accent" size="sm">
-                  {item.skill_slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                  {item.skill_slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
                 </Badge>
               </div>
             </Card>

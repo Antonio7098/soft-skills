@@ -55,7 +55,6 @@ export function GenerationStreamPanel({
 
   const isGeneratingPrompts = currentStage === 'prompt_items_work' && isActive;
   const hasPrompts = promptItems.length > 0;
-  const isPromptsComplete = !isGeneratingPrompts && hasPrompts && (isComplete || stagesCompleted.includes('prompt_items_work'));
   const totalPrompts = blueprint?.prompt_items_count ?? promptItems.length;
 
   return (

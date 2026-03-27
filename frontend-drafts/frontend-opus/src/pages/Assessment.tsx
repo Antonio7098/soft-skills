@@ -53,11 +53,11 @@ export function Assessment() {
     >
       <ScoreBreakdown
         overallScore={assessment.overall_score ?? 0}
-        skillScores={assessment.skill_scores}
-        rationale={assessment.rationale}
+        perSkillAssessments={assessment.per_skill_assessments}
+        rationale={assessment.summary}
       />
 
-      <EvidenceList evidence={assessment.evidence} />
+      <EvidenceList perSkillAssessments={assessment.per_skill_assessments} />
 
       <FeedbackSection
         strengths={assessment.strengths}
