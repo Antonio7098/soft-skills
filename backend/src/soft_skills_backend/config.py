@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     provider_retry_backoff_seconds: float = Field(default=0.25, gt=0, le=10.0)
     assessment_validation_retries: int = Field(default=1, ge=0, le=3)
     creator_generation_validation_retries: int = Field(default=2, ge=0, le=3)
+    otel_enabled: bool = Field(default=False)
+    otel_service_name: str = Field(default="soft-skills-backend")
+    otel_exporter_otlp_endpoint: str | None = Field(
+        default=None,
+        validation_alias="OTEL_EXPORTER_OTLP_ENDPOINT",
+    )
 
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod

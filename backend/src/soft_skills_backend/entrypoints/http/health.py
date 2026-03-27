@@ -25,7 +25,8 @@ class ReadinessPayload(BaseModel):
     version: str
     environment: str
     checks: dict[str, HealthCheck]
-    stageflow: dict[str, str | bool]
+    stageflow: dict[str, str | bool | list[str]]
+    otel: dict[str, str | bool]
 
 
 class HealthService:
@@ -55,6 +56,10 @@ class HealthService:
                 "installed": self._stageflow_runtime.installed,
                 "pipeline_type": self._stageflow_runtime.pipeline_type_name,
             },
+            otel={
+                "enabled": self._settings.otel_enabled,
+                "service_name": self._settings.otel_service_name,
+            },
         )
 
     def readiness(self) -> ReadinessPayload:
@@ -66,18 +71,38 @@ class HealthService:
         except Exception as exc:
             database_check = HealthCheck(status="failed", detail=str(exc))
 
-        overall_status = "ready" if database_check.status == "ready" else "degraded"
+        otel_endpoint_check = HealthCheck(status="ready", detail="OTLP endpoint not configured")
+        if self._settings.otel_enabled and self._settings.otel_exporter_otlp_endpoint:
+            otel_endpoint_check = HealthCheck(
+                status="configured",
+                detail=f"OTLP endpoint: {self._settings.otel_exporter_otlp_endpoint}",
+            )
+        elif not self._settings.otel_enabled:
+            otel_endpoint_check = HealthCheck(status="disabled", detail="OpenTelemetry is disabled")
+
+        overall_status = "ready"
+        if database_check.status != "ready":
+            overall_status = "degraded"
 
         return ReadinessPayload(
             status=overall_status,
             service=self._settings.app_name,
             version=self._settings.app_version,
             environment=self._settings.environment,
-            checks={"database": database_check},
+            checks={
+                "database": database_check,
+                "otel_exporter": otel_endpoint_check,
+            },
             stageflow={
                 "installed": self._stageflow_runtime.installed,
                 "status": "ready",
                 "pipeline_type": self._stageflow_runtime.pipeline_type_name,
                 "pipeline_context_type": self._stageflow_runtime.pipeline_context_type_name,
+                "interceptor_names": list(self._stageflow_runtime.default_interceptor_names),
+            },
+            otel={
+                "enabled": self._settings.otel_enabled,
+                "service_name": self._settings.otel_service_name,
+                "endpoint": self._settings.otel_exporter_otlp_endpoint or "not configured",
             },
         )

@@ -14,6 +14,10 @@ from soft_skills_backend.platform.observability.context import (
 )
 from soft_skills_backend.platform.observability.events import WorkflowEvent
 from soft_skills_backend.platform.observability.logging import get_logger
+from soft_skills_backend.platform.observability.telemetry import (
+    W3C_TRACE_VERSION,
+    extract_trace_context,
+)
 
 
 class RequestContextMiddleware:
@@ -34,9 +38,19 @@ class RequestContextMiddleware:
             key.decode("latin1").lower(): value.decode("latin1")
             for key, value in scope.get("headers", [])
         }
+
+        otel_context = extract_trace_context(headers)
+        trace_id_from_otel = None
+        if otel_context:
+            traceparent = otel_context.get("traceparent", "")
+            if traceparent:
+                parts = traceparent.split("-")
+                if len(parts) >= 3:
+                    trace_id_from_otel = parts[1]
+
         correlation = initialize_request_context(
             request_id=headers.get("x-request-id"),
-            trace_id=headers.get("x-trace-id"),
+            trace_id=headers.get("x-trace-id") or trace_id_from_otel,
             workflow_id=headers.get("x-workflow-id"),
         )
         scope.setdefault("state", {})
@@ -77,6 +91,12 @@ class RequestContextMiddleware:
                 headers_list = list(message["headers"])
                 headers_list.append((b"x-request-id", correlation["request_id"].encode("latin1")))
                 headers_list.append((b"x-trace-id", correlation["trace_id"].encode("latin1")))
+                headers_list.append(
+                    (
+                        b"traceparent",
+                        f"{W3C_TRACE_VERSION}-{correlation['trace_id']}-0-01".encode("latin1"),
+                    )
+                )
                 message["headers"] = headers_list
             await send(message)
 

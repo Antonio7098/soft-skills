@@ -17,6 +17,18 @@ from soft_skills_backend.platform.observability.logging import configure_logging
 from soft_skills_backend.platform.observability.middleware import RequestContextMiddleware
 
 
+def instrument_with_otel(app: FastAPI, service_name: str) -> None:
+    """Instrument FastAPI app with OpenTelemetry if available."""
+    try:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+
+        FastAPIInstrumentor.instrument_app(app)
+        HTTPXClientInstrumentor().instrument()
+    except ImportError:
+        pass
+
+
 def create_app(settings: Settings | None = None, container: AppContainer | None = None) -> FastAPI:
     """Create a configured FastAPI application."""
 
@@ -33,6 +45,7 @@ def create_app(settings: Settings | None = None, container: AppContainer | None 
             environment=resolved_settings.environment,
             database_url=resolved_settings.database_url,
             stageflow_installed=resolved_container.stageflow_runtime.installed,
+            otel_enabled=resolved_settings.otel_enabled,
         )
         try:
             yield
@@ -48,6 +61,9 @@ def create_app(settings: Settings | None = None, container: AppContainer | None 
         lifespan=lifespan,
     )
     app.state.container = resolved_container
+
+    if resolved_settings.otel_enabled:
+        instrument_with_otel(app, resolved_settings.otel_service_name)
 
     app.add_middleware(
         CORSMiddleware,

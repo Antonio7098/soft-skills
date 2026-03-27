@@ -32,6 +32,7 @@ from .suites.organisation_smoke import OrganisationSmoke
 from .suites.practice_run_lifecycle import PracticeRunLifecycleSmoke
 from .suites.practice_session_flow import PracticeSessionFlowSmoke
 from .suites.provider_baseline import ProviderBaselineSmoke
+from .suites.telemetry_smoke import TelemetrySmoke
 
 
 def build_default_registry() -> SmokeRegistry:
@@ -58,6 +59,7 @@ def build_default_registry() -> SmokeRegistry:
             PracticeSessionFlowSmoke(),
             PracticeRunLifecycleSmoke(),
             OrganisationSmoke(),
+            TelemetrySmoke(),
         ]
     )
 

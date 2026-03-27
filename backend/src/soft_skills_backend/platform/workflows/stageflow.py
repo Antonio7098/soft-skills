@@ -40,6 +40,7 @@ class StageflowPipelineSupport:
     pipeline_run_logger: Any
     wide_event_emitter: WideEventEmitter = field(default_factory=WideEventEmitter)
     idempotency_store: InMemoryIdempotencyStore = field(default_factory=InMemoryIdempotencyStore)
+    otel_interceptor: Any = None
 
     @classmethod
     def from_runtime(cls, stageflow_runtime: StageflowRuntime) -> StageflowPipelineSupport:
@@ -49,19 +50,25 @@ class StageflowPipelineSupport:
             event_sink=runtime_objects["event_sink"],
             get_default_interceptors=runtime_objects["get_default_interceptors"],
             pipeline_run_logger=runtime_objects["pipeline_run_logger"],
+            otel_interceptor=runtime_objects.get("otel_interceptor"),
         )
 
     def interceptors(self, *, scoped_idempotency: bool) -> list[Any]:
         """Build the interceptor stack for a production pipeline."""
 
         if not scoped_idempotency:
-            return self.get_default_interceptors(include_auth=False)
-        interceptors = self.get_default_interceptors(
-            include_auth=False,
-            include_idempotency=False,
-        )
-        interceptors.insert(1, StageScopedIdempotencyInterceptor(store=self.idempotency_store))
-        return interceptors
+            result = self.get_default_interceptors(include_auth=False)
+        else:
+            result = self.get_default_interceptors(
+                include_auth=False,
+                include_idempotency=False,
+            )
+            result.insert(1, StageScopedIdempotencyInterceptor(store=self.idempotency_store))
+
+        if self.otel_interceptor is not None:
+            result.append(self.otel_interceptor)
+
+        return result
 
 
 def ok_output(result: StageflowStageResult) -> StageOutput:

@@ -28,6 +28,34 @@ RETRYABLE_PROVIDER_PAYLOAD_CODES = {
 }
 
 
+def _add_llm_span_attributes(
+    operation: str,
+    provider: str,
+    model_slug: str | None = None,
+    usage: dict[str, int] | None = None,
+) -> None:
+    """Add LLM-specific attributes to the current OpenTelemetry span if available."""
+    try:
+        from opentelemetry import trace
+
+        span = trace.get_current_span()
+        if span is None:
+            return
+        span.set_attribute("llm.operation", operation)
+        span.set_attribute("llm.provider", provider)
+        if model_slug:
+            span.set_attribute("llm.model", model_slug)
+        if usage:
+            if usage.get("prompt_tokens"):
+                span.set_attribute("llm.tokens.prompt", usage["prompt_tokens"])
+            if usage.get("completion_tokens"):
+                span.set_attribute("llm.tokens.completion", usage["completion_tokens"])
+            if usage.get("total_tokens"):
+                span.set_attribute("llm.tokens.total", usage["total_tokens"])
+    except ImportError:
+        pass
+
+
 @dataclass(frozen=True, slots=True)
 class ResolvedLLMProviderConfig:
     """Resolved provider config after applying environment fallbacks."""
@@ -158,6 +186,12 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     user_id=call_context.user_id,
                     usage=usage,
                     finish_reason=finish_reason,
+                )
+                _add_llm_span_attributes(
+                    operation=call_context.operation,
+                    provider=self._resolved.provider_name,
+                    model_slug=active_model_slug,
+                    usage=usage,
                 )
                 return ProviderCompletion(
                     content=content,
@@ -375,6 +409,12 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                                 user_id=call_context.user_id,
                                 usage=usage,
                                 finish_reason=finish_reason,
+                            )
+                            _add_llm_span_attributes(
+                                operation=call_context.operation,
+                                provider=self._resolved.provider_name,
+                                model_slug=active_model_slug,
+                                usage=usage,
                             )
                             yield ProviderTextChunk(
                                 delta="",

@@ -25,15 +25,15 @@
 
 ## Scope Checklist
 
-- [ ] Task 2.1: OpenTelemetry integration - `opentelemetry-sdk`, `opentelemetry-exporter-otlp`, wire `StageflowTracer` to interceptors
-- [ ] Task 2.2: OTLP endpoint configuration - Environment variable `OTEL_EXPORTER_OTLP_ENDPOINT`
-- [ ] Task 2.3: Span attributes enrichment - Add `pipeline.name`, `stage.name`, `pipeline.run_id`, `user_id`, `provider`, `model` to spans
-- [ ] Task 2.4: Trace context propagation - Ensure trace context flows through async boundaries and HTTP headers
-- [ ] Task 2.5: Tempo/Jaeger/Grafana stack - Docker-compose with OpenTelemetry backend
-- [ ] Task 2.6: Distributed tracing UI - Connect admin dashboard to Jaeger/Tempo for trace visualization
-- [ ] Task 2.7: Health dashboard endpoint - Extended `/health` with component status (DB, external services)
-- [ ] Task 2.8: LLM span attributes - Add `llm.operation`, `llm.provider`, `llm.model`, `llm.tokens` to spans
-- [ ] Task 2.9: Documentation updates for all changed behavior
+- [x] Task 2.1: OpenTelemetry integration - `opentelemetry-sdk`, `opentelemetry-exporter-otlp`, wire `StageflowTracer` to interceptors
+- [x] Task 2.2: OTLP endpoint configuration - Environment variable `OTEL_EXPORTER_OTLP_ENDPOINT`
+- [x] Task 2.3: Span attributes enrichment - Add `pipeline.name`, `stage.name`, `pipeline.run_id`, `user_id`, `provider`, `model` to spans
+- [x] Task 2.4: Trace context propagation - Ensure trace context flows through async boundaries and HTTP headers
+- [x] Task 2.5: Tempo/Jaeger/Grafana stack - Docker-compose with OpenTelemetry backend
+- [ ] Task 2.6: Distributed tracing UI - Connect admin dashboard to Jaeger/Tempo for trace visualization (deferred)
+- [x] Task 2.7: Health dashboard endpoint - Extended `/health` with component status (DB, external services)
+- [x] Task 2.8: LLM span attributes - Add `llm.operation`, `llm.provider`, `llm.model`, `llm.tokens` to spans
+- [x] Task 2.9: Documentation updates for all changed behavior
 
 ## Constitution And Quality Checklist
 
@@ -68,9 +68,9 @@ Tasks 2.1-2.4 are the critical path (OTLP integration and span enrichment). Task
 
 | Risk | Impact | Mitigation | Status |
 | --- | --- | --- | --- |
-| OpenTelemetry integration complexity | High | Go straight to OTLP; skip Prometheus intermediate step | Open |
-| Docker-compose for observability stack | Medium | Use existing patterns; add Tempo/Jaeger/Grafana as services | Open |
-| Trace context propagation through async boundaries | High | Ensure W3C trace context headers are propagated | Open |
+| OpenTelemetry integration complexity | High | Go straight to OTLP; skip Prometheus intermediate step | Mitigated |
+| Docker-compose for observability stack | Medium | Use existing patterns; add Tempo/Jaeger/Grafana as services | Mitigated |
+| Trace context propagation through async boundaries | High | Ensure W3C trace context headers are propagated | Mitigated |
 
 ## Sprint Notes
 
@@ -96,17 +96,17 @@ Key decisions, tradeoffs, and implementation notes:
 
 ## Review And Sign-Off
 
-- Sprint Status: Not Started
-- Completion Date: [Date]
+- Sprint Status: Completed
+- Completion Date: 2026-03-27
 
 Checklist:
 
-- [ ] Primary goal achieved
-- [ ] Constitution and quality checks passed
-- [ ] Unit tests completed
-- [ ] Integration tests completed
-- [ ] Smoke tests with real provider completed
-- [ ] Documentation updated
+- [x] Primary goal achieved
+- [x] Constitution and quality checks passed
+- [x] Unit tests completed
+- [x] Integration tests completed
+- [ ] Smoke tests with real provider completed (requires OTEL_EXPORTER_OTLP_ENDPOINT to be set)
+- [x] Documentation updated
 - [ ] Code review completed
 
 Next Sprint Priorities:
