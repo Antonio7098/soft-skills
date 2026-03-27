@@ -8,6 +8,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.config import Settings
+from soft_skills_backend.engines.marking.domain.rubric_repository import (
+    SqlAlchemyRubricRepository,
+)
 from soft_skills_backend.entrypoints.http.health import HealthService
 from soft_skills_backend.modules.admin import AdminService
 from soft_skills_backend.modules.assistant import AssistantService
@@ -32,13 +35,13 @@ from soft_skills_backend.modules.practice.workflows.assessment import (
 )
 from soft_skills_backend.modules.progression import ProgressionService
 from soft_skills_backend.modules.taxonomy import TaxonomyService
-from soft_skills_backend.engines.marking.domain.rubric_repository import (
-    SqlAlchemyRubricRepository,
-)
 from soft_skills_backend.platform.background_tasks import BackgroundTaskRunner
 from soft_skills_backend.platform.db.repositories import (
+    SqlAlchemyPipelineDefinitionRepository,
+    SqlAlchemyPipelineExecutionTraceRepository,
     SqlAlchemyPipelineRunRepository,
     SqlAlchemyProviderCallRepository,
+    SqlAlchemyStageDefinitionRepository,
     SqlAlchemyWorkflowEventRepository,
 )
 from soft_skills_backend.platform.db.session import (
@@ -81,6 +84,9 @@ class AppContainer:
     workflow_events: SqlAlchemyWorkflowEventRepository
     pipeline_runs: SqlAlchemyPipelineRunRepository
     provider_calls: SqlAlchemyProviderCallRepository
+    pipeline_definitions: SqlAlchemyPipelineDefinitionRepository
+    stage_definitions: SqlAlchemyStageDefinitionRepository
+    pipeline_execution_traces: SqlAlchemyPipelineExecutionTraceRepository
     stageflow_runtime: StageflowRuntime
     background_tasks: BackgroundTaskRunner
 
@@ -98,6 +104,9 @@ def build_container(settings: Settings) -> AppContainer:
     workflow_events = SqlAlchemyWorkflowEventRepository(session_factory)
     pipeline_runs = SqlAlchemyPipelineRunRepository(session_factory)
     provider_calls = SqlAlchemyProviderCallRepository(session_factory)
+    pipeline_definitions = SqlAlchemyPipelineDefinitionRepository(session_factory)
+    stage_definitions = SqlAlchemyStageDefinitionRepository(session_factory)
+    pipeline_execution_traces = SqlAlchemyPipelineExecutionTraceRepository(session_factory)
     background_tasks = BackgroundTaskRunner()
     durable_event_sink = DurableEventSink(workflow_events)
     stageflow_runtime = build_stageflow_runtime(
@@ -106,6 +115,7 @@ def build_container(settings: Settings) -> AppContainer:
         pipeline_runs=pipeline_runs,
         provider_calls=provider_calls,
         workflow_events=workflow_events,
+        execution_trace_repository=pipeline_execution_traces,
     )
     auth_provider = HeaderAuthProvider(session_factory, workflow_events=workflow_events)
     identity_service = IdentityService(
@@ -115,6 +125,10 @@ def build_container(settings: Settings) -> AppContainer:
     admin_service = AdminService(
         session_factory=session_factory,
         workflow_events=workflow_events,
+        pipeline_definitions=pipeline_definitions,
+        stage_definitions=stage_definitions,
+        pipeline_execution_traces=pipeline_execution_traces,
+        pipeline_runs=pipeline_runs,
     )
     taxonomy_service = TaxonomyService(
         session_factory=session_factory,
@@ -216,6 +230,9 @@ def build_container(settings: Settings) -> AppContainer:
         workflow_events=workflow_events,
         pipeline_runs=pipeline_runs,
         provider_calls=provider_calls,
+        pipeline_definitions=pipeline_definitions,
+        stage_definitions=stage_definitions,
+        pipeline_execution_traces=pipeline_execution_traces,
         stageflow_runtime=stageflow_runtime,
         background_tasks=background_tasks,
     )

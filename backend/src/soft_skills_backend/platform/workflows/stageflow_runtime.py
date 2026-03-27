@@ -58,6 +58,7 @@ def build_stageflow_runtime(
     pipeline_runs: PipelineRunRepository,
     provider_calls: ProviderCallRepository,
     workflow_events: WorkflowEventRepository,
+    execution_trace_repository: Any = None,
 ) -> StageflowRuntime:
     """Build the mandatory Stageflow runtime wrapper for the application."""
 
@@ -78,7 +79,11 @@ def build_stageflow_runtime(
     pipeline_context_cls = stageflow_api_module.PipelineContext
     stage_kind_enum = stageflow_api_module.StageKind
 
-    pipeline_run_logger = DatabasePipelineRunLogger(pipeline_runs, workflow_events)
+    pipeline_run_logger = DatabasePipelineRunLogger(
+        pipeline_runs,
+        workflow_events,
+        execution_trace_repository=execution_trace_repository,
+    )
     provider_call_logger = DatabaseProviderCallLogger(provider_calls)
     buffered_sink = backpressure_aware_event_sink_cls(
         downstream=event_sink,

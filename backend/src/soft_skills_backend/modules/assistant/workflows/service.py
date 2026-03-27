@@ -353,18 +353,30 @@ class AssistantWorkflowService:
             )
 
         return Pipeline.from_stages(
-            stage("input_guard", input_guard, StageKind.GUARD),
+            stage("input_guard", input_guard, StageKind.GUARD),  # type: ignore[arg-type]
             stage(
-                "history_enrich", history_enrich, StageKind.ENRICH, dependencies=("input_guard",)
+                "history_enrich",
+                history_enrich,
+                StageKind.ENRICH,
+                dependencies=("input_guard",),  # type: ignore[arg-type]
             ),
             stage(
-                "profile_enrich", profile_enrich, StageKind.ENRICH, dependencies=("input_guard",)
+                "profile_enrich",
+                profile_enrich,
+                StageKind.ENRICH,
+                dependencies=("input_guard",),  # type: ignore[arg-type]
             ),
             stage(
-                "progress_enrich", progress_enrich, StageKind.ENRICH, dependencies=("input_guard",)
+                "progress_enrich",
+                progress_enrich,
+                StageKind.ENRICH,
+                dependencies=("input_guard",),  # type: ignore[arg-type]
             ),
             stage(
-                "attempts_enrich", attempts_enrich, StageKind.ENRICH, dependencies=("input_guard",)
+                "attempts_enrich",
+                attempts_enrich,
+                StageKind.ENRICH,
+                dependencies=("input_guard",),  # type: ignore[arg-type]
             ),
             stage(
                 ASSISTANT_RUNTIME_STAGE,
@@ -376,7 +388,7 @@ class AssistantWorkflowService:
                     "progress_enrich",
                     "attempts_enrich",
                 ),
-            ),
+            ),  # type: ignore[arg-type]
             name="assistant_turn_runtime",
         )
 

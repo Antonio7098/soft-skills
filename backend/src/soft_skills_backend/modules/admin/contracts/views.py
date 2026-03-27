@@ -305,3 +305,99 @@ class RubricView(BaseModel):
     schema_version: str
     name: str
     criteria: list[RubricCriterionView] = Field(default_factory=list)
+
+
+class StageDefinitionView(BaseModel):
+    """One stage in a pipeline DAG."""
+
+    name: str
+    kind: str
+    dependencies: list[str] = Field(default_factory=list)
+    runner_class: str | None = None
+    description: str | None = None
+
+
+class PipelineDefinitionView(BaseModel):
+    """Pipeline definition for DAG visualization."""
+
+    pipeline_name: str
+    topology: str | None = None
+    description: str | None = None
+    stage_count: int = 0
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class PipelineDAGView(BaseModel):
+    """Full pipeline DAG with stages and dependencies."""
+
+    pipeline_name: str
+    topology: str | None = None
+    description: str | None = None
+    stages: list[StageDefinitionView] = Field(default_factory=list)
+
+
+class PipelineRunSummaryView(BaseModel):
+    """Summary of one pipeline run."""
+
+    pipeline_run_id: str
+    pipeline_name: str
+    status: str
+    execution_mode: str | None = None
+    user_id: str | None = None
+    request_id: str | None = None
+    trace_id: str | None = None
+    error: str | None = None
+    failed_stage: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    duration_ms: int | None = None
+
+
+class StageExecutionEventView(BaseModel):
+    """One stage execution event in a trace."""
+
+    stage_name: str
+    event_type: str
+    timestamp: str
+    duration_ms: int | None = None
+    status: str | None = None
+    error: str | None = None
+
+
+class PipelineTraceView(BaseModel):
+    """Full execution trace for visualization replay."""
+
+    pipeline_run_id: str
+    pipeline_name: str
+    execution_sequence: list[StageExecutionEventView] = Field(default_factory=list)
+    total_duration_ms: int
+    started_at: str | None = None
+    completed_at: str | None = None
+
+
+class StageMetricsView(BaseModel):
+    """Aggregate metrics for one stage."""
+
+    stage_name: str
+    invocation_count: int = 0
+    success_count: int = 0
+    failure_count: int = 0
+    skip_count: int = 0
+    cancel_count: int = 0
+    retry_count: int = 0
+    avg_duration_ms: float | None = None
+    p50_duration_ms: int | None = None
+    p95_duration_ms: int | None = None
+    p99_duration_ms: int | None = None
+
+
+class PipelineMetricsView(BaseModel):
+    """Aggregate metrics for a pipeline."""
+
+    pipeline_name: str
+    total_runs: int = 0
+    success_count: int = 0
+    failure_count: int = 0
+    cancel_count: int = 0
+    stage_metrics: list[StageMetricsView] = Field(default_factory=list)

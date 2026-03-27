@@ -732,3 +732,49 @@ class CircuitBreakerRecord(Base):
     opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class PipelineDefinitionRecord(Base):
+    """Static pipeline DAG definition discovered at startup."""
+
+    __tablename__ = "pipeline_definitions"
+
+    pipeline_name: Mapped[str] = mapped_column(String(128), primary_key=True)
+    topology: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    stage_definitions: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
+class StageDefinitionRecord(Base):
+    """Individual stage metadata within a pipeline DAG."""
+
+    __tablename__ = "stage_definitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pipeline_name: Mapped[str] = mapped_column(String(128), index=True)
+    stage_name: Mapped[str] = mapped_column(String(128))
+    stage_kind: Mapped[str] = mapped_column(String(32))
+    dependencies: Mapped[list[str]] = mapped_column(JSON, default=list)
+    runner_class: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        Index("ix_stage_definitions_pipeline_stage", "pipeline_name", "stage_name", unique=True),
+    )
+
+
+class PipelineExecutionTraceRecord(Base):
+    """Actual pipeline execution trace for visualization replay."""
+
+    __tablename__ = "pipeline_execution_traces"
+
+    pipeline_run_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    pipeline_name: Mapped[str] = mapped_column(String(128), index=True)
+    execution_sequence: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    total_duration_ms: Mapped[int]
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

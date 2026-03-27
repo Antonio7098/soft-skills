@@ -5,8 +5,11 @@ from __future__ import annotations
 from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.platform.db.models import (
+    PipelineDefinitionRecord,
+    PipelineExecutionTraceRecord,
     PipelineRunRecord,
     ProviderCallRecord,
+    StageDefinitionRecord,
     WorkflowEventRecord,
 )
 from soft_skills_backend.platform.observability.events import (
@@ -192,6 +195,20 @@ class SqlAlchemyPipelineRunRepository:
                 record.finished_at = log.finished_at
             session.commit()
 
+    def list_by_pipeline(
+        self, pipeline_name: str, *, offset: int = 0, limit: int = 50
+    ) -> list[PipelineRunRecord]:
+        """List pipeline runs for a specific pipeline."""
+        with self._session_factory() as session:
+            return (
+                session.query(PipelineRunRecord)
+                .filter(PipelineRunRecord.pipeline_name == pipeline_name)
+                .order_by(PipelineRunRecord.started_at.desc())
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+
 
 class SqlAlchemyProviderCallRepository:
     """Persist provider call telemetry."""
@@ -231,3 +248,105 @@ class SqlAlchemyProviderCallRepository:
                 record.metrics = log.metrics
                 record.created_at = log.created_at
             session.commit()
+
+
+class SqlAlchemyPipelineDefinitionRepository:
+    """Persist and retrieve pipeline definition records."""
+
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+        self._session_factory = session_factory
+
+    def upsert(self, record: PipelineDefinitionRecord) -> None:
+        with self._session_factory() as session:
+            existing = session.get(PipelineDefinitionRecord, record.pipeline_name)
+            if existing is None:
+                session.add(record)
+            else:
+                existing.topology = record.topology
+                existing.description = record.description
+                existing.stage_definitions = record.stage_definitions
+                existing.updated_at = record.updated_at
+            session.commit()
+
+    def get_by_name(self, pipeline_name: str) -> PipelineDefinitionRecord | None:
+        with self._session_factory() as session:
+            return session.get(PipelineDefinitionRecord, pipeline_name)
+
+    def list_all(self) -> list[PipelineDefinitionRecord]:
+        with self._session_factory() as session:
+            return (
+                session.query(PipelineDefinitionRecord)
+                .order_by(PipelineDefinitionRecord.pipeline_name)
+                .all()
+            )
+
+    def delete(self, pipeline_name: str) -> bool:
+        with self._session_factory() as session:
+            record = session.get(PipelineDefinitionRecord, pipeline_name)
+            if record is None:
+                return False
+            session.delete(record)
+            session.commit()
+            return True
+
+
+class SqlAlchemyStageDefinitionRepository:
+    """Persist and retrieve stage definition records."""
+
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+        self._session_factory = session_factory
+
+    def upsert_batch(self, pipeline_name: str, stages: list[StageDefinitionRecord]) -> None:
+        with self._session_factory() as session:
+            session.query(StageDefinitionRecord).filter(
+                StageDefinitionRecord.pipeline_name == pipeline_name
+            ).delete()
+            for stage in stages:
+                session.add(stage)
+            session.commit()
+
+    def get_by_pipeline(self, pipeline_name: str) -> list[StageDefinitionRecord]:
+        with self._session_factory() as session:
+            return (
+                session.query(StageDefinitionRecord)
+                .filter(StageDefinitionRecord.pipeline_name == pipeline_name)
+                .order_by(StageDefinitionRecord.id)
+                .all()
+            )
+
+
+class SqlAlchemyPipelineExecutionTraceRepository:
+    """Persist and retrieve pipeline execution traces."""
+
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+        self._session_factory = session_factory
+
+    def upsert(self, record: PipelineExecutionTraceRecord) -> None:
+        with self._session_factory() as session:
+            existing = session.get(PipelineExecutionTraceRecord, record.pipeline_run_id)
+            if existing is None:
+                session.add(record)
+            else:
+                existing.pipeline_name = record.pipeline_name
+                existing.execution_sequence = record.execution_sequence
+                existing.total_duration_ms = record.total_duration_ms
+                existing.started_at = record.started_at
+                existing.completed_at = record.completed_at
+            session.commit()
+
+    def get_by_run_id(self, pipeline_run_id: str) -> PipelineExecutionTraceRecord | None:
+        with self._session_factory() as session:
+            return session.get(PipelineExecutionTraceRecord, pipeline_run_id)
+
+    def get_by_pipeline(
+        self, pipeline_name: str, *, offset: int = 0, limit: int = 50
+    ) -> list[PipelineExecutionTraceRecord]:
+        with self._session_factory() as session:
+            return (
+                session.query(PipelineExecutionTraceRecord)
+                .filter(PipelineExecutionTraceRecord.pipeline_name == pipeline_name)
+                .order_by(PipelineExecutionTraceRecord.started_at.desc())
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )

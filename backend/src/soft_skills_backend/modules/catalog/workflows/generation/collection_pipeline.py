@@ -117,7 +117,7 @@ async def generate_collection(
             sanitize_text=sanitize_text,
         )
         if progress_callback:
-            blueprint = typed_result.parsed
+            blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
             progress_callback(
                 "blueprint_transform",
                 15.0,
@@ -182,9 +182,13 @@ async def generate_collection(
         if progress_callback:
             prompt_items = [
                 {
-                    "title": result.typed_result.parsed.title,
-                    "prompt_type": result.typed_result.parsed.prompt_type,
-                    "difficulty": result.typed_result.parsed.difficulty,
+                    "title": cast(GeneratedPromptItemDraft, result.typed_result.parsed).title,
+                    "prompt_type": cast(
+                        GeneratedPromptItemDraft, result.typed_result.parsed
+                    ).prompt_type,
+                    "difficulty": cast(
+                        GeneratedPromptItemDraft, result.typed_result.parsed
+                    ).difficulty,
                 }
                 for result in prompt_item_results
             ]

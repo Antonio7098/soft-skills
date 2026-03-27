@@ -22,6 +22,11 @@ from soft_skills_backend.modules.admin import (
     CreateRubricCommand,
     CreateRubricCriterionCommand,
     LearnerAnalyticsView,
+    PipelineDAGView,
+    PipelineDefinitionView,
+    PipelineMetricsView,
+    PipelineRunSummaryView,
+    PipelineTraceView,
     RubricCriterionUpdateCommand,
     RubricView,
     UpdateRubricCommand,
@@ -253,3 +258,92 @@ async def delete_rubric_criterion(
     actor = require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.delete_rubric_criterion(actor, rubric_id, criterion_ref))
+
+
+@router.get("/pipelines", response_model=ApiEnvelope[list[PipelineDefinitionView]])
+async def list_pipelines(
+    request: Request,
+) -> ApiEnvelope[list[PipelineDefinitionView]]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.list_pipelines(actor))
+
+
+@router.get("/pipelines/{pipeline_name}", response_model=ApiEnvelope[PipelineDAGView])
+async def get_pipeline_dag(
+    request: Request,
+    pipeline_name: str,
+) -> ApiEnvelope[PipelineDAGView]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    result = service.get_pipeline_dag(actor, pipeline_name)
+    if result is None:
+        from soft_skills_backend.shared.errors import domain_error
+
+        raise domain_error(
+            "Pipeline not found",
+            code="SS-ORCHESTRATION-007",
+            status_code=404,
+            details={"pipeline_name": pipeline_name},
+        )
+    return ok_response(request, result)
+
+
+@router.get(
+    "/pipelines/{pipeline_name}/runs", response_model=ApiEnvelope[list[PipelineRunSummaryView]]
+)
+async def list_pipeline_runs(
+    request: Request,
+    pipeline_name: str,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
+) -> ApiEnvelope[list[PipelineRunSummaryView]]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(
+        request, service.list_pipeline_runs(actor, pipeline_name, offset=offset, limit=limit)
+    )
+
+
+@router.get(
+    "/pipelines/{pipeline_name}/runs/{pipeline_run_id}/trace",
+    response_model=ApiEnvelope[PipelineTraceView],
+)
+async def get_pipeline_trace(
+    request: Request,
+    pipeline_name: str,
+    pipeline_run_id: str,
+) -> ApiEnvelope[PipelineTraceView]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    result = service.get_pipeline_trace(actor, pipeline_name, pipeline_run_id)
+    if result is None:
+        from soft_skills_backend.shared.errors import domain_error
+
+        raise domain_error(
+            "Pipeline trace not found",
+            code="SS-ORCHESTRATION-008",
+            status_code=404,
+            details={"pipeline_name": pipeline_name, "pipeline_run_id": pipeline_run_id},
+        )
+    return ok_response(request, result)
+
+
+@router.get("/pipelines/{pipeline_name}/metrics", response_model=ApiEnvelope[PipelineMetricsView])
+async def get_pipeline_metrics(
+    request: Request,
+    pipeline_name: str,
+) -> ApiEnvelope[PipelineMetricsView]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    result = service.get_pipeline_metrics(actor, pipeline_name)
+    if result is None:
+        from soft_skills_backend.shared.errors import domain_error
+
+        raise domain_error(
+            "Pipeline not found",
+            code="SS-ORCHESTRATION-007",
+            status_code=404,
+            details={"pipeline_name": pipeline_name},
+        )
+    return ok_response(request, result)

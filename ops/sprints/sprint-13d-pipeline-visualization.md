@@ -25,16 +25,16 @@
 
 ## Scope Checklist
 
-- [ ] Task 2c.1: Pipeline definition discovery - Discover all registered pipelines at startup and store `PipelineDefinitionRecord`
-- [ ] Task 2c.2: Stage definition records - Store `StageDefinitionRecord` for each stage (name, kind, dependencies, runner_class)
-- [ ] Task 2c.3: Pipeline execution trace storage - Store `PipelineExecutionTraceRecord` per run for visualization replay
-- [ ] Task 2c.4: Admin pipelines endpoint - `GET /admin/pipelines` to list all pipeline definitions
-- [ ] Task 2c.5: Pipeline DAG endpoint - `GET /admin/pipelines/{name}` to get pipeline DAG (stages, dependencies, kinds)
-- [ ] Task 2c.6: Pipeline runs endpoint - `GET /admin/pipelines/{name}/runs` to list recent runs
-- [ ] Task 2c.7: Pipeline trace endpoint - `GET /admin/pipelines/{name}/runs/{run_id}/trace` for execution trace
-- [ ] Task 2c.8: Pipeline metrics endpoint - `GET /admin/pipelines/{name}/metrics` for aggregate stage metrics (latency p50/p95/p99, success rate)
-- [ ] Task 2c.9: Trace visualization backend - API support for pipeline DAG view, execution trace view, stage metrics view, flame chart view
-- [ ] Task 2c.10: Documentation updates
+- [x] Task 2c.1: Pipeline definition discovery - Discover all registered pipelines at startup and store `PipelineDefinitionRecord`
+- [x] Task 2c.2: Stage definition records - Store `StageDefinitionRecord` for each stage (name, kind, dependencies, runner_class)
+- [x] Task 2c.3: Pipeline execution trace storage - Store `PipelineExecutionTraceRecord` per run for visualization replay
+- [x] Task 2c.4: Admin pipelines endpoint - `GET /admin/pipelines` to list all pipeline definitions
+- [x] Task 2c.5: Pipeline DAG endpoint - `GET /admin/pipelines/{name}` to get pipeline DAG (stages, dependencies, kinds)
+- [x] Task 2c.6: Pipeline runs endpoint - `GET /admin/pipelines/{name}/runs` to list recent runs
+- [x] Task 2c.7: Pipeline trace endpoint - `GET /admin/pipelines/{name}/runs/{run_id}/trace` for execution trace
+- [x] Task 2c.8: Pipeline metrics endpoint - `GET /admin/pipelines/{name}/metrics` for aggregate stage metrics (latency p50/p95/p99, success rate)
+- [x] Task 2c.9: Trace visualization backend - API support for pipeline DAG view, execution trace view, stage metrics view, flame chart view
+- [x] Task 2c.10: Documentation updates
 
 ## Constitution And Quality Checklist
 

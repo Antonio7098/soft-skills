@@ -20,7 +20,15 @@ from soft_skills_backend.modules.admin.contracts.views import (
     CollectionVerificationAuditView,
     CollectionVerificationQueueItemView,
     LearnerAnalyticsView,
+    PipelineDAGView,
+    PipelineDefinitionView,
+    PipelineMetricsView,
+    PipelineRunSummaryView,
+    PipelineTraceView,
     RubricView,
+    StageDefinitionView,
+    StageExecutionEventView,
+    StageMetricsView,
 )
 from soft_skills_backend.modules.admin.infra.analytics_repository import AdminAnalyticsRepository
 from soft_skills_backend.modules.admin.infra.audit_repository import AdminAuditRepository
@@ -34,7 +42,13 @@ from soft_skills_backend.modules.admin.infra.verification_repository import (
 from soft_skills_backend.modules.catalog.contracts.collection_views import CollectionView
 from soft_skills_backend.modules.catalog.contracts.views import build_collection_view
 from soft_skills_backend.platform.db.models import CollectionRecord
-from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
+from soft_skills_backend.platform.db.repositories import (
+    SqlAlchemyPipelineDefinitionRepository,
+    SqlAlchemyPipelineExecutionTraceRepository,
+    SqlAlchemyPipelineRunRepository,
+    SqlAlchemyStageDefinitionRepository,
+    SqlAlchemyWorkflowEventRepository,
+)
 from soft_skills_backend.shared.auth import Actor
 
 
@@ -46,6 +60,10 @@ class AdminService:
         *,
         session_factory: sessionmaker[Session],
         workflow_events: SqlAlchemyWorkflowEventRepository,
+        pipeline_definitions: SqlAlchemyPipelineDefinitionRepository | None = None,
+        stage_definitions: SqlAlchemyStageDefinitionRepository | None = None,
+        pipeline_execution_traces: SqlAlchemyPipelineExecutionTraceRepository | None = None,
+        pipeline_runs: SqlAlchemyPipelineRunRepository | None = None,
     ) -> None:
         relationships = AdminRelationshipRepository(session_factory=session_factory)
         self._verification = AdminVerificationRepository(
@@ -59,6 +77,10 @@ class AdminService:
             relationships=relationships,
         )
         self._rubrics = RubricAdminRepository(session_factory=session_factory)
+        self._pipeline_definitions = pipeline_definitions
+        self._stage_definitions = stage_definitions
+        self._pipeline_execution_traces = pipeline_execution_traces
+        self._pipeline_runs = pipeline_runs
 
     def list_collection_verification_queue(
         self, actor: Actor
@@ -197,3 +219,190 @@ class AdminService:
         self, actor: Actor, rubric_id: str, criterion_ref: str
     ) -> RubricView:
         return self._rubrics.delete_criterion(rubric_id, criterion_ref)
+
+    def list_pipelines(self, actor: Actor) -> list[PipelineDefinitionView]:
+        """List all registered pipeline definitions."""
+        if self._pipeline_definitions is None:
+            return []
+        records = self._pipeline_definitions.list_all()
+        return [
+            PipelineDefinitionView(
+                pipeline_name=r.pipeline_name,
+                topology=r.topology,
+                description=r.description,
+                stage_count=len(r.stage_definitions),
+                created_at=r.created_at.isoformat() if r.created_at else None,
+                updated_at=r.updated_at.isoformat() if r.updated_at else None,
+            )
+            for r in records
+        ]
+
+    def get_pipeline_dag(self, actor: Actor, pipeline_name: str) -> PipelineDAGView | None:
+        """Get full pipeline DAG with stages and dependencies."""
+        if self._pipeline_definitions is None or self._stage_definitions is None:
+            return None
+        definition = self._pipeline_definitions.get_by_name(pipeline_name)
+        if definition is None:
+            return None
+        stage_records = self._stage_definitions.get_by_pipeline(pipeline_name)
+        stages = [
+            StageDefinitionView(
+                name=s.stage_name,
+                kind=s.stage_kind,
+                dependencies=s.dependencies,
+                runner_class=s.runner_class,
+                description=s.description,
+            )
+            for s in stage_records
+        ]
+        return PipelineDAGView(
+            pipeline_name=definition.pipeline_name,
+            topology=definition.topology,
+            description=definition.description,
+            stages=stages,
+        )
+
+    def list_pipeline_runs(
+        self, actor: Actor, pipeline_name: str, *, offset: int = 0, limit: int = 50
+    ) -> list[PipelineRunSummaryView]:
+        """List recent runs for a pipeline."""
+        if self._pipeline_execution_traces is None or self._pipeline_runs is None:
+            return []
+        trace_records = self._pipeline_execution_traces.get_by_pipeline(
+            pipeline_name, offset=offset, limit=limit
+        )
+        run_records = self._pipeline_runs.list_by_pipeline(
+            pipeline_name, offset=offset, limit=limit
+        )
+        run_map = {r.pipeline_run_id: r for r in run_records}
+        result = []
+        for trace in trace_records:
+            run = run_map.get(trace.pipeline_run_id)
+            result.append(
+                PipelineRunSummaryView(
+                    pipeline_run_id=trace.pipeline_run_id,
+                    pipeline_name=trace.pipeline_name,
+                    status=run.status if run else "unknown",
+                    execution_mode=run.execution_mode if run else None,
+                    user_id=run.user_id if run else None,
+                    request_id=run.request_id if run else None,
+                    trace_id=run.trace_id if run else None,
+                    error=None,
+                    failed_stage=run.failed_stage if run else None,
+                    started_at=trace.started_at.isoformat() if trace.started_at else None,
+                    finished_at=trace.completed_at.isoformat() if trace.completed_at else None,
+                    duration_ms=trace.total_duration_ms,
+                )
+            )
+        return result
+
+    def get_pipeline_trace(
+        self, actor: Actor, pipeline_name: str, pipeline_run_id: str
+    ) -> PipelineTraceView | None:
+        """Get execution trace for a specific pipeline run."""
+        if self._pipeline_execution_traces is None:
+            return None
+        trace = self._pipeline_execution_traces.get_by_run_id(pipeline_run_id)
+        if trace is None or trace.pipeline_name != pipeline_name:
+            return None
+        events = [
+            StageExecutionEventView(
+                stage_name=e.get("stage_name", ""),
+                event_type=e.get("event_type", ""),
+                timestamp=e.get("timestamp", ""),
+                duration_ms=e.get("duration_ms"),
+                status=e.get("status"),
+                error=e.get("error"),
+            )
+            for e in trace.execution_sequence
+        ]
+        return PipelineTraceView(
+            pipeline_run_id=trace.pipeline_run_id,
+            pipeline_name=trace.pipeline_name,
+            execution_sequence=events,
+            total_duration_ms=trace.total_duration_ms,
+            started_at=trace.started_at.isoformat() if trace.started_at else None,
+            completed_at=trace.completed_at.isoformat() if trace.completed_at else None,
+        )
+
+    def get_pipeline_metrics(self, actor: Actor, pipeline_name: str) -> PipelineMetricsView | None:
+        """Get aggregate stage metrics for a pipeline."""
+        if self._pipeline_execution_traces is None or self._pipeline_runs is None:
+            return None
+        runs = self._pipeline_runs.list_by_pipeline(pipeline_name, offset=0, limit=1000)
+        if not runs:
+            return PipelineMetricsView(pipeline_name=pipeline_name, total_runs=0)
+        traces = self._pipeline_execution_traces.get_by_pipeline(
+            pipeline_name, offset=0, limit=1000
+        )
+        traces_by_run_id = {t.pipeline_run_id: t for t in traces}
+        success_count = sum(1 for r in runs if r.status == "completed")
+        failure_count = sum(1 for r in runs if r.status == "failed")
+        cancel_count = sum(1 for r in runs if r.status == "cancelled")
+
+        invocation_counts: dict[str, int] = {}
+        success_counts: dict[str, int] = {}
+        failure_counts: dict[str, int] = {}
+        skip_counts: dict[str, int] = {}
+        cancel_counts: dict[str, int] = {}
+        retry_counts: dict[str, int] = {}
+        stage_durations: dict[str, list[int]] = {}
+
+        for run in runs:
+            trace = traces_by_run_id.get(run.pipeline_run_id)
+            if trace is None:
+                continue
+            for event in trace.execution_sequence:
+                stage_name = event.get("stage_name", "unknown")
+                if stage_name not in invocation_counts:
+                    invocation_counts[stage_name] = 0
+                    success_counts[stage_name] = 0
+                    failure_counts[stage_name] = 0
+                    skip_counts[stage_name] = 0
+                    cancel_counts[stage_name] = 0
+                    retry_counts[stage_name] = 0
+                    stage_durations[stage_name] = []
+                invocation_counts[stage_name] += 1
+                status = event.get("status", "unknown")
+                if status == "completed":
+                    success_counts[stage_name] += 1
+                elif status == "failed":
+                    failure_counts[stage_name] += 1
+                elif status == "skipped":
+                    skip_counts[stage_name] += 1
+                elif status == "cancelled":
+                    cancel_counts[stage_name] += 1
+                duration = event.get("duration_ms")
+                if duration is not None:
+                    stage_durations[stage_name].append(duration)
+
+        stage_metrics_views = []
+        for stage_name in invocation_counts:
+            durations = sorted(stage_durations.get(stage_name, []))
+            p50_idx = len(durations) // 2
+            p95_idx = int(len(durations) * 0.95)
+            p99_idx = int(len(durations) * 0.99)
+            avg_duration = sum(durations) / len(durations) if durations else None
+            stage_metrics_views.append(
+                StageMetricsView(
+                    stage_name=stage_name,
+                    invocation_count=invocation_counts[stage_name],
+                    success_count=success_counts[stage_name],
+                    failure_count=failure_counts[stage_name],
+                    skip_count=skip_counts[stage_name],
+                    cancel_count=cancel_counts[stage_name],
+                    retry_count=retry_counts[stage_name],
+                    avg_duration_ms=avg_duration,
+                    p50_duration_ms=durations[p50_idx] if durations else None,
+                    p95_duration_ms=durations[p95_idx] if durations else None,
+                    p99_duration_ms=durations[p99_idx] if durations else None,
+                )
+            )
+        return PipelineMetricsView(
+            pipeline_name=pipeline_name,
+            total_runs=len(runs),
+            success_count=success_count,
+            failure_count=failure_count,
+            cancel_count=cancel_count,
+            stage_metrics=stage_metrics_views,
+        )

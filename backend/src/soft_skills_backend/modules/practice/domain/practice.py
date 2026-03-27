@@ -16,6 +16,7 @@ from soft_skills_backend.engines.marking import (
     PromptContract,
     RubricCriterion,
     RubricDefinition,
+    RubricLevel,
     RubricScale,
     build_marking_decision,
     validate_marking_decision,
@@ -252,16 +253,16 @@ def validate_assessment_draft(
                 criterion_ref=skill_slug,
                 description=f"Validate criterion coverage for {skill_slug}.",
                 levels=[
-                    {
-                        "level": 1,
-                        "description": f"{skill_slug} is missing.",
-                        "examples": [f"No {skill_slug} evidence was shown."],
-                    },
-                    {
-                        "level": 5,
-                        "description": f"{skill_slug} is strongly demonstrated.",
-                        "examples": [f"Clear {skill_slug} evidence was shown."],
-                    },
+                    RubricLevel(
+                        level=1,
+                        description=f"{skill_slug} is missing.",
+                        examples=[f"No {skill_slug} evidence was shown."],
+                    ),
+                    RubricLevel(
+                        level=5,
+                        description=f"{skill_slug} is strongly demonstrated.",
+                        examples=[f"Clear {skill_slug} evidence was shown."],
+                    ),
                 ],
             )
             for skill_slug in expected_skills
@@ -274,7 +275,10 @@ def validate_assessment_draft(
                 code="SS-SCORING-003",
                 details={"skill_slug": evidence.skill_slug},
             )
-        if len(evidence.quote.strip()) < 6 or _normalize_text(evidence.quote) not in response_normalized:
+        if (
+            len(evidence.quote.strip()) < 6
+            or _normalize_text(evidence.quote) not in response_normalized
+        ):
             raise scoring_error(
                 "Evidence must quote the learner response directly",
                 code="SS-SCORING-004",

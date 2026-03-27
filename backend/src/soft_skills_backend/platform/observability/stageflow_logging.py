@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -19,6 +19,9 @@ from soft_skills_backend.shared.ports import (
     ProviderCallRepository,
     WorkflowEventRepository,
 )
+
+if TYPE_CHECKING:
+    from soft_skills_backend.shared.ports.repositories import PipelineExecutionTraceRepository
 
 
 class PipelineErrorSummary(BaseModel):
@@ -78,9 +81,12 @@ class DatabasePipelineRunLogger:
         self,
         repository: PipelineRunRepository,
         workflow_events: WorkflowEventRepository | None = None,
+        execution_trace_repository: PipelineExecutionTraceRepository | None = None,
     ) -> None:
         self._repository = repository
         self._workflow_events = workflow_events
+        self._execution_trace_repository = execution_trace_repository
+        self._stage_timings: dict[str, list[dict[str, Any]]] = {}
 
     async def log_run_started(
         self,
@@ -94,9 +100,12 @@ class DatabasePipelineRunLogger:
         trace_id: str | None = None,
         **_: object,
     ) -> None:
+        run_id_str = str(pipeline_run_id)
+        now = datetime.now(UTC)
+        self._stage_timings[run_id_str] = []
         self._repository.upsert(
             PipelineRunLog(
-                pipeline_run_id=str(pipeline_run_id),
+                pipeline_run_id=run_id_str,
                 pipeline_name=pipeline_name,
                 topology=topology,
                 execution_mode=execution_mode,
@@ -104,9 +113,33 @@ class DatabasePipelineRunLogger:
                 status="running",
                 request_id=request_id,
                 trace_id=trace_id,
-                started_at=datetime.now(UTC),
+                started_at=now,
             )
         )
+
+    def log_stage_timing(
+        self,
+        *,
+        pipeline_run_id: str,
+        stage_name: str,
+        event_type: str,
+        timestamp: datetime,
+        duration_ms: int | None = None,
+        status: str | None = None,
+        error: str | None = None,
+    ) -> None:
+        """Record a stage execution event for trace storage."""
+        if pipeline_run_id in self._stage_timings:
+            self._stage_timings[pipeline_run_id].append(
+                {
+                    "stage_name": stage_name,
+                    "event_type": event_type,
+                    "timestamp": timestamp.isoformat(),
+                    "duration_ms": duration_ms,
+                    "status": status,
+                    "error": error,
+                }
+            )
 
     async def log_run_completed(
         self,
@@ -121,10 +154,15 @@ class DatabasePipelineRunLogger:
         **_: object,
     ) -> None:
         finished_at = datetime.now(UTC)
-        started_at = finished_at if duration_ms <= 0 else finished_at
+        started_at = (
+            finished_at
+            if duration_ms <= 0
+            else datetime.fromtimestamp(finished_at.timestamp() - duration_ms / 1000, tz=UTC)
+        )
+        run_id_str = str(pipeline_run_id)
         self._repository.upsert(
             PipelineRunLog(
-                pipeline_run_id=str(pipeline_run_id),
+                pipeline_run_id=run_id_str,
                 pipeline_name=pipeline_name,
                 status=status,
                 request_id=request_id,
@@ -134,6 +172,31 @@ class DatabasePipelineRunLogger:
                 finished_at=finished_at,
             )
         )
+        if self._execution_trace_repository is not None:
+            execution_sequence = self._stage_timings.pop(run_id_str, [])
+            if not execution_sequence and stage_results:
+                execution_sequence = [
+                    {
+                        "stage_name": stage_name,
+                        "event_type": "stage.completed",
+                        "timestamp": finished_at.isoformat(),
+                        "duration_ms": stage_results.get(stage_name, {}).get("duration_ms"),
+                        "status": status if status == "completed" else "failed",
+                        "error": None,
+                    }
+                    for stage_name in stage_results
+                ]
+            from soft_skills_backend.platform.db.models import PipelineExecutionTraceRecord
+
+            trace_record = PipelineExecutionTraceRecord(
+                pipeline_run_id=run_id_str,
+                pipeline_name=pipeline_name,
+                execution_sequence=execution_sequence,
+                total_duration_ms=duration_ms,
+                started_at=started_at,
+                completed_at=finished_at,
+            )
+            self._execution_trace_repository.upsert(trace_record)
 
     async def log_run_failed(
         self,

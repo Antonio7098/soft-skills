@@ -207,16 +207,20 @@ class AssistantToolExecutor:
             return {"collections": [item.model_dump(mode="json") for item in result]}, None
         if tool_request.tool_name == "get_collection":
             collection_id = _require_string(arguments, "collection_id")
-            result = self._catalog.get_collection(execution.actor, collection_id)
-            return {"collection": result.model_dump(mode="json")}, None
+            collection = self._catalog.get_collection(execution.actor, collection_id)
+            return {"collection": collection.model_dump(mode="json")}, None
         if tool_request.tool_name == "list_recent_attempts":
             limit = int(arguments.get("limit", 5))
             limit = max(1, min(limit, 10))
-            return {"attempts": self._repository.load_recent_attempts(actor=execution.actor, limit=limit)}, None
+            return {
+                "attempts": self._repository.load_recent_attempts(
+                    actor=execution.actor, limit=limit
+                )
+            }, None
         if tool_request.tool_name == "get_attempt":
             attempt_id = _require_string(arguments, "attempt_id")
-            result = self._practice.get_attempt(execution.actor, attempt_id)
-            return {"attempt": result.model_dump(mode="json")}, None
+            attempt = self._practice.get_attempt(execution.actor, attempt_id)
+            return {"attempt": attempt.model_dump(mode="json")}, None
         if tool_request.tool_name == "generate_collection":
             return await self._run_generate_collection(
                 parent_ctx=stage_ctx,
@@ -265,7 +269,7 @@ class AssistantToolExecutor:
             )
 
         pipeline = Pipeline.from_stages(
-            stage("generation", generation_stage, StageKind.WORK),
+            stage("generation", generation_stage, StageKind.WORK),  # type: ignore[arg-type]
             name="assistant_generate_collection",
         )
         result = await run_logged_subpipeline(
@@ -314,7 +318,7 @@ class AssistantToolExecutor:
             )
 
         pipeline = Pipeline.from_stages(
-            stage("generation", generation_stage, StageKind.WORK),
+            stage("generation", generation_stage, StageKind.WORK),  # type: ignore[arg-type]
             name="assistant_generate_prompt_items",
         )
         result = await run_logged_subpipeline(

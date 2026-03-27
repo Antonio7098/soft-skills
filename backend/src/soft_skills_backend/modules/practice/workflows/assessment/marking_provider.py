@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Protocol
+from typing import Protocol, cast
 
 from soft_skills_backend.config import Settings
 from soft_skills_backend.engines.config import load_marking_runtime_config
@@ -146,8 +146,9 @@ class DefaultAssessmentMarkingProvider:
                     user_id=call_context.user_id,
                 ),
             )
-            aggregation_summary = aggregation_result.parsed.summary
-            next_actions = aggregation_result.parsed.next_actions
+            parsed = cast(AggregationAssessmentOutput, aggregation_result.parsed)
+            aggregation_summary = parsed.summary
+            next_actions = parsed.next_actions
             model_slug = aggregation_result.model_slug
             aggregation_raw_payload = aggregation_result.raw_payload
             aggregation_usage = aggregation_result.usage
@@ -191,7 +192,9 @@ class DefaultAssessmentMarkingProvider:
     ) -> list[tuple[PerSkillAssessment, dict[str, object], dict[str, int]]]:
         semaphore = asyncio.Semaphore(max(1, max_parallel))
 
-        async def run_one(criterion: RubricCriterion) -> tuple[PerSkillAssessment, dict[str, object], dict[str, int]]:
+        async def run_one(
+            criterion: RubricCriterion,
+        ) -> tuple[PerSkillAssessment, dict[str, object], dict[str, int]]:
             async with semaphore:
                 return await self._assess_skill(
                     prompt_payload=prompt_payload,
@@ -431,7 +434,10 @@ def _verify_per_skill_assessment(
         )
     normalized_response = _normalize_text(response_text)
     for evidence in assessment.evidence:
-        if len(evidence.quote.strip()) < 6 or _normalize_text(evidence.quote) not in normalized_response:
+        if (
+            len(evidence.quote.strip()) < 6
+            or _normalize_text(evidence.quote) not in normalized_response
+        ):
             raise scoring_error(
                 "Evidence must quote the learner response directly",
                 code="SS-SCORING-004",
@@ -514,10 +520,7 @@ def _build_quick_practice_feedback(
     passed = [item for item in assessments if item.score >= 2]
     failed = [item for item in assessments if item.score < 2]
     summary = f"Passed {len(passed)} of {len(assessments)} rubric areas."
-    next_actions = [
-        f"Improve {item.skill_slug}: {item.rationale}"
-        for item in failed[:2]
-    ]
+    next_actions = [f"Improve {item.skill_slug}: {item.rationale}" for item in failed[:2]]
     if not next_actions:
         next_actions = ["Repeat the exercise and keep the same behaviors explicit."]
     return summary, next_actions

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -154,7 +155,9 @@ def persist_generated_collection(
         session.add(artifact)
         session.flush()
         if generated_rubric_ids:
-            collection.rubric_ids = list(dict.fromkeys([*collection.rubric_ids, *generated_rubric_ids]))
+            collection.rubric_ids = list(
+                dict.fromkeys([*collection.rubric_ids, *generated_rubric_ids])
+            )
         collection.last_generation_artifact_id = artifact.id
         session.commit()
         collection_view = build_collection_view(session, collection, actor=actor)
@@ -206,7 +209,7 @@ def persist_generated_prompt_items(
     workflow_id: str,
     collection_id: str,
     generation_mode: str,
-    commands: list[PromptItemCreateCommand | GeneratedPromptItemDraft],
+    commands: Sequence[PromptItemCreateCommand | GeneratedPromptItemDraft],
     planner_prompt_version: str,
     planner_provider: str,
     planner_model_slug: str,
@@ -223,11 +226,18 @@ def persist_generated_prompt_items(
             command_payload = command.model_dump(mode="json")
             generated_rubric_payload = command_payload.pop("generated_rubric", None)
             rubric_id = command.rubric_id
-            if command.prompt_type == "quick_practice_prompt" and generated_rubric_payload is not None:
+            if (
+                command.prompt_type == "quick_practice_prompt"
+                and generated_rubric_payload is not None
+            ):
                 rubric_id = _persist_generated_quick_practice_rubric(
                     session=session,
                     prompt_item=GeneratedPromptItemDraft.model_validate(
-                        {**command_payload, "rubric_id": command.rubric_id, "generated_rubric": generated_rubric_payload}
+                        {
+                            **command_payload,
+                            "rubric_id": command.rubric_id,
+                            "generated_rubric": generated_rubric_payload,
+                        }
                     ),
                 )
                 generated_rubric_ids.append(rubric_id)
@@ -281,7 +291,9 @@ def persist_generated_prompt_items(
         session.add(artifact)
         session.flush()
         if generated_rubric_ids:
-            collection.rubric_ids = list(dict.fromkeys([*collection.rubric_ids, *generated_rubric_ids]))
+            collection.rubric_ids = list(
+                dict.fromkeys([*collection.rubric_ids, *generated_rubric_ids])
+            )
         collection.last_generation_artifact_id = artifact.id
         collection.updated_at = now
         session.commit()
