@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.modules.admin.contracts.views import (
     AdminAttemptSummaryView,
+    AnalyticsOverviewView,
     CohortAnalyticsView,
+    CohortComparisonView,
     LearnerAnalyticsView,
     ProviderUsageView,
     SkillAverageView,
@@ -44,7 +46,11 @@ class AdminAnalyticsRepository:
         self._session_factory = session_factory
 
     def get_learner_analytics(
-        self, learner_id: str, organisation_id: str | None = None
+        self,
+        learner_id: str,
+        organisation_id: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
     ) -> LearnerAnalyticsView:
         with self._session_factory() as session:
             learner = session.get(LearnerProfileRecord, learner_id)
@@ -71,9 +77,11 @@ class AdminAnalyticsRepository:
                         status_code=403,
                         details={"learner_id": learner_id, "organisation_id": organisation_id},
                     )
-            sessions = self._sessions(session, [learner_id])
-            attempts = self._attempts(session, [learner_id])
-            assessments = self._assessments(session, [learner_id])
+            sessions = self._sessions(session, [learner_id], from_date=from_date, to_date=to_date)
+            attempts = self._attempts(session, [learner_id], from_date=from_date, to_date=to_date)
+            assessments = self._assessments(
+                session, [learner_id], from_date=from_date, to_date=to_date
+            )
             latest_snapshots = self._latest_snapshots(session, [learner_id])
             latest_recommendations = self._latest_recommendations(session, [learner_id])
             traces, workflows = self._lineage_keys(
@@ -150,13 +158,19 @@ class AdminAnalyticsRepository:
             )
 
     def get_cohort_analytics(
-        self, target_role: str | None, organisation_id: str | None = None
+        self,
+        target_role: str | None,
+        organisation_id: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
     ) -> CohortAnalyticsView:
         with self._session_factory() as session:
             learner_ids = self._cohort_learner_ids(session, target_role, organisation_id)
-            sessions = self._sessions(session, learner_ids)
-            attempts = self._attempts(session, learner_ids)
-            assessments = self._assessments(session, learner_ids)
+            sessions = self._sessions(session, learner_ids, from_date=from_date, to_date=to_date)
+            attempts = self._attempts(session, learner_ids, from_date=from_date, to_date=to_date)
+            assessments = self._assessments(
+                session, learner_ids, from_date=from_date, to_date=to_date
+            )
             latest_snapshots = self._latest_snapshots(session, learner_ids)
             latest_recommendations = self._latest_recommendations(session, learner_ids)
             traces, workflows = self._lineage_keys(
@@ -218,6 +232,125 @@ class AdminAnalyticsRepository:
                 ],
             )
 
+    def get_analytics_overview(
+        self,
+        organisation_id: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> AnalyticsOverviewView:
+        with self._session_factory() as session:
+            learner_ids = self._cohort_learner_ids(
+                session, target_role=None, organisation_id=organisation_id
+            )
+            sessions = self._sessions(session, learner_ids, from_date=from_date, to_date=to_date)
+            attempts = self._attempts(session, learner_ids, from_date=from_date, to_date=to_date)
+            assessments = self._assessments(
+                session, learner_ids, from_date=from_date, to_date=to_date
+            )
+            latest_snapshots = self._latest_snapshots(session, learner_ids)
+            traces, workflows = self._lineage_keys(
+                sessions=sessions,
+                attempts=attempts,
+                snapshots=list(latest_snapshots.values()),
+                recommendations=[],
+            )
+            workflow_events = self._workflow_events(session, traces, workflows)
+            pipeline_runs = self._pipeline_runs(session, learner_ids=learner_ids, trace_ids=traces)
+            provider_calls = self._provider_calls(
+                session,
+                trace_ids=traces,
+                pipeline_run_ids=[record.pipeline_run_id for record in pipeline_runs],
+            )
+            usage = self._usage_summary(
+                sessions=sessions,
+                attempts=attempts,
+                assessments=assessments,
+                workflow_events=workflow_events,
+                pipeline_runs=pipeline_runs,
+                provider_calls=provider_calls,
+            )
+            trend_points = build_usage_trend_points(
+                session_timestamps=[record.created_at for record in sessions],
+                submitted_attempt_timestamps=[
+                    record.submitted_at for record in attempts if record.submitted_at is not None
+                ],
+                validated_assessment_timestamps=[
+                    record.created_at
+                    for record in assessments
+                    if record.validation_status == "validated"
+                ],
+                rejected_assessment_timestamps=[
+                    record.created_at
+                    for record in assessments
+                    if record.validation_status == "rejected"
+                ],
+            )
+            snapshot_payloads = [record.snapshot_payload for record in latest_snapshots.values()]
+            thirty_days_ago = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+            thirty_days_ago = thirty_days_ago.replace(
+                day=thirty_days_ago.day - 30 if thirty_days_ago.day > 30 else 1
+            )
+            active_learner_ids: set[str] = set()
+            for session_record in sessions:
+                if session_record.created_at >= thirty_days_ago:
+                    active_learner_ids.add(session_record.user_id)
+            target_role_counts: dict[str, int] = {}
+            for learner_id in learner_ids:
+                profile = session.get(LearnerProfileRecord, learner_id)
+                if profile and profile.target_role:
+                    target_role_counts[profile.target_role] = (
+                        target_role_counts.get(profile.target_role, 0) + 1
+                    )
+            cohort_breakdown: list[dict[str, int | str]] = [
+                {"cohort_key": role, "learner_count": count}
+                for role, count in sorted(target_role_counts.items(), key=lambda x: -x[1])
+            ]
+            return AnalyticsOverviewView(
+                total_learners=len(learner_ids),
+                active_learners_30d=len(active_learner_ids),
+                total_sessions=usage.total_sessions,
+                total_attempts=usage.total_attempts,
+                submitted_attempts=usage.submitted_attempts,
+                validated_assessments=usage.validated_assessments,
+                rejected_assessments=usage.rejected_assessments,
+                avg_validated_score=usage.avg_validated_score,
+                overall_usage_trend=[
+                    UsageTrendPointView.model_validate(point) for point in trend_points
+                ],
+                top_weak_skills=[
+                    SkillClusterView.model_validate(item)
+                    for item in build_skill_clusters(
+                        [list(payload.get("weak_skill_slugs", [])) for payload in snapshot_payloads]
+                    )[:5]
+                ],
+                cohort_breakdown=cohort_breakdown,
+                provider_summary=[
+                    ProviderUsageView.model_validate(summary)
+                    for summary in build_provider_summary(provider_calls)
+                ],
+            )
+
+    def get_cohort_comparison(
+        self,
+        cohort_keys: list[str],
+        organisation_id: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> CohortComparisonView:
+        cohorts = []
+        for target_role in cohort_keys:
+            cohort_view = self.get_cohort_analytics(
+                target_role=target_role,
+                organisation_id=organisation_id,
+                from_date=from_date,
+                to_date=to_date,
+            )
+            cohorts.append(cohort_view)
+        return CohortComparisonView(
+            cohorts=cohorts,
+            comparison_timestamp=datetime.now(UTC).isoformat(),
+        )
+
     def _cohort_learner_ids(
         self, session: Session, target_role: str | None, organisation_id: str | None = None
     ) -> list[str]:
@@ -239,35 +372,55 @@ class AdminAnalyticsRepository:
             learner_ids = [lid for lid in learner_ids if lid in org_member_ids]
         return sorted(learner_ids)
 
-    def _sessions(self, session: Session, learner_ids: list[str]) -> list[PracticeSessionRecord]:
+    def _sessions(
+        self,
+        session: Session,
+        learner_ids: list[str],
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> list[PracticeSessionRecord]:
         if not learner_ids:
             return []
-        return (
-            session.query(PracticeSessionRecord)
-            .filter(PracticeSessionRecord.user_id.in_(learner_ids))
-            .order_by(PracticeSessionRecord.created_at.desc())
-            .all()
+        query = session.query(PracticeSessionRecord).filter(
+            PracticeSessionRecord.user_id.in_(learner_ids)
         )
+        if from_date is not None:
+            query = query.filter(PracticeSessionRecord.created_at >= from_date)
+        if to_date is not None:
+            query = query.filter(PracticeSessionRecord.created_at <= to_date)
+        return query.order_by(PracticeSessionRecord.created_at.desc()).all()
 
-    def _attempts(self, session: Session, learner_ids: list[str]) -> list[AttemptRecord]:
+    def _attempts(
+        self,
+        session: Session,
+        learner_ids: list[str],
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> list[AttemptRecord]:
         if not learner_ids:
             return []
-        return (
-            session.query(AttemptRecord)
-            .filter(AttemptRecord.user_id.in_(learner_ids))
-            .order_by(AttemptRecord.created_at.desc())
-            .all()
-        )
+        query = session.query(AttemptRecord).filter(AttemptRecord.user_id.in_(learner_ids))
+        if from_date is not None:
+            query = query.filter(AttemptRecord.created_at >= from_date)
+        if to_date is not None:
+            query = query.filter(AttemptRecord.created_at <= to_date)
+        return query.order_by(AttemptRecord.created_at.desc()).all()
 
-    def _assessments(self, session: Session, learner_ids: list[str]) -> list[AssessmentRecord]:
+    def _assessments(
+        self,
+        session: Session,
+        learner_ids: list[str],
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> list[AssessmentRecord]:
         if not learner_ids:
             return []
-        return (
-            session.query(AssessmentRecord)
-            .filter(AssessmentRecord.user_id.in_(learner_ids))
-            .order_by(AssessmentRecord.created_at.desc())
-            .all()
-        )
+        query = session.query(AssessmentRecord).filter(AssessmentRecord.user_id.in_(learner_ids))
+        if from_date is not None:
+            query = query.filter(AssessmentRecord.created_at >= from_date)
+        if to_date is not None:
+            query = query.filter(AssessmentRecord.created_at <= to_date)
+        return query.order_by(AssessmentRecord.created_at.desc()).all()
 
     def _latest_snapshots(
         self,

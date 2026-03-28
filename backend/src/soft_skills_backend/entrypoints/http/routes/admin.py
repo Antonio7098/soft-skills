@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Query, Request
+from fastapi.responses import StreamingResponse
 
 from soft_skills_backend.entrypoints.http.dependencies import (
     get_admin_service,
@@ -20,11 +23,13 @@ from soft_skills_backend.modules.admin import (
     AdminUserRoleCommand,
     AdminUserStatusCommand,
     AdminUserView,
+    AnalyticsOverviewView,
     ArchivePromptCommand,
     AttemptAuditView,
     BulkOperationResultView,
     BulkUserOperationCommand,
     CohortAnalyticsView,
+    CohortComparisonView,
     CollectionVerificationAuditView,
     CollectionVerificationQueueItemView,
     ComparePromptsCommand,
@@ -365,10 +370,14 @@ async def update_collection_verification(
 async def get_learner_analytics(
     request: Request,
     learner_id: str,
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
 ) -> ApiEnvelope[LearnerAnalyticsView]:
     actor = await require_admin_actor(request)
     service = get_admin_service(request)
-    return ok_response(request, service.get_learner_analytics(actor, learner_id))
+    return ok_response(
+        request, service.get_learner_analytics(actor, learner_id, from_date, to_date)
+    )
 
 
 @router.get(
@@ -415,10 +424,70 @@ async def delete_learner_relationship(
 async def get_cohort_analytics(
     request: Request,
     target_role: str | None = Query(default=None),
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
 ) -> ApiEnvelope[CohortAnalyticsView]:
     actor = await require_admin_actor(request)
     service = get_admin_service(request)
-    return ok_response(request, service.get_cohort_analytics(actor, target_role))
+    return ok_response(
+        request, service.get_cohort_analytics(actor, target_role, from_date, to_date)
+    )
+
+
+@router.get("/analytics/overview", response_model=ApiEnvelope[AnalyticsOverviewView])
+async def get_analytics_overview(
+    request: Request,
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
+) -> ApiEnvelope[AnalyticsOverviewView]:
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.get_analytics_overview(actor, from_date, to_date))
+
+
+@router.get("/cohorts/comparison", response_model=ApiEnvelope[CohortComparisonView])
+async def get_cohort_comparison(
+    request: Request,
+    cohort_keys: str | None = Query(default=None),
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
+) -> ApiEnvelope[CohortComparisonView]:
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    cohort_keys_list = [k.strip() for k in cohort_keys.split(",")] if cohort_keys else []
+    return ok_response(
+        request, service.get_cohort_comparison(actor, cohort_keys_list, from_date, to_date)
+    )
+
+
+@router.get("/analytics/export")
+async def export_analytics(
+    request: Request,
+    format: str = Query(default="json"),
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
+) -> StreamingResponse:
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    overview = service.get_analytics_overview(actor, from_date, to_date)
+    if format == "csv":
+        csv_lines = [
+            "total_learners,active_learners_30d,total_sessions,total_attempts,submitted_attempts,validated_assessments,rejected_assessments,avg_validated_score",
+            f"{overview.total_learners},{overview.active_learners_30d},{overview.total_sessions},{overview.total_attempts},{overview.submitted_attempts},{overview.validated_assessments},{overview.rejected_assessments},{overview.avg_validated_score}",
+        ]
+        content = "\n".join(csv_lines)
+        return StreamingResponse(
+            iter([content]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=analytics_overview.csv"},
+        )
+    import json
+
+    return StreamingResponse(
+        iter([overview.model_dump_json()]),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=analytics_overview.json"},
+    )
 
 
 @router.get("/attempts/{attempt_id}/audit", response_model=ApiEnvelope[AttemptAuditView])

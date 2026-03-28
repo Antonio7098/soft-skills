@@ -70,6 +70,7 @@ def test_default_registry_includes_practice_run_lifecycle_smoke() -> None:
         "practice-run-lifecycle",
         "organisation-management",
         "admin-user-management",
+        "admin-analytics",
         "pipeline-visualization",
         "telemetry",
     ]

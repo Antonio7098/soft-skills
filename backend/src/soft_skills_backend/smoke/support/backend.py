@@ -772,6 +772,117 @@ class SmokeBackendClient:
         self.require_ok(response, f"admin get user activity for {target_user_id}")
         return self.data(response)
 
+    async def admin_get_learner_analytics(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        learner_id: str,
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> JsonObject:
+        params: dict[str, str] = {}
+        if from_date:
+            params["from_date"] = from_date
+        if to_date:
+            params["to_date"] = to_date
+        response = await self._client.get(
+            f"/api/admin/learners/{learner_id}/analytics",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            params=params,
+        )
+        self.require_ok(response, f"admin get learner analytics for {learner_id}")
+        return self.data(response)
+
+    async def admin_get_cohort_analytics(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        target_role: str | None = None,
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> JsonObject:
+        params: dict[str, str] = {}
+        if target_role:
+            params["target_role"] = target_role
+        if from_date:
+            params["from_date"] = from_date
+        if to_date:
+            params["to_date"] = to_date
+        response = await self._client.get(
+            "/api/admin/cohorts/analytics",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            params=params,
+        )
+        self.require_ok(response, "admin get cohort analytics")
+        return self.data(response)
+
+    async def admin_get_analytics_overview(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> JsonObject:
+        params: dict[str, str] = {}
+        if from_date:
+            params["from_date"] = from_date
+        if to_date:
+            params["to_date"] = to_date
+        response = await self._client.get(
+            "/api/admin/analytics/overview",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            params=params,
+        )
+        self.require_ok(response, "admin get analytics overview")
+        return self.data(response)
+
+    async def admin_get_cohort_comparison(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        cohort_keys: str,
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> JsonObject:
+        params: dict[str, str] = {"cohort_keys": cohort_keys}
+        if from_date:
+            params["from_date"] = from_date
+        if to_date:
+            params["to_date"] = to_date
+        response = await self._client.get(
+            "/api/admin/cohorts/comparison",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            params=params,
+        )
+        self.require_ok(response, "admin get cohort comparison")
+        return self.data(response)
+
+    async def admin_export_analytics(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        format: str = "json",
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> JsonObject:
+        params: dict[str, str] = {"format": format}
+        if from_date:
+            params["from_date"] = from_date
+        if to_date:
+            params["to_date"] = to_date
+        response = await self._client.get(
+            "/api/admin/analytics/export",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            params=params,
+        )
+        self.require_ok(response, "admin export analytics")
+        return {"status": "exported", "format": format}
+
     @staticmethod
     def data(response: httpx.Response) -> JsonObject:
         return cast(JsonObject, response.json()["data"])

@@ -31,9 +31,11 @@ from soft_skills_backend.modules.admin.contracts.views import (
     AdminLearnerRelationshipView,
     AdminUserListView,
     AdminUserView,
+    AnalyticsOverviewView,
     AttemptAuditView,
     BulkOperationResultView,
     CohortAnalyticsView,
+    CohortComparisonView,
     CollectionVerificationAuditView,
     CollectionVerificationQueueItemView,
     LearnerAnalyticsView,
@@ -663,14 +665,58 @@ class AdminService:
             command=command,
         )
 
-    def get_learner_analytics(self, actor: Actor, learner_id: str) -> LearnerAnalyticsView:
+    def get_learner_analytics(
+        self,
+        actor: Actor,
+        learner_id: str,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> LearnerAnalyticsView:
         return self._analytics.get_learner_analytics(
-            learner_id, organisation_id=actor.organisation_id
+            learner_id,
+            organisation_id=actor.organisation_id,
+            from_date=from_date,
+            to_date=to_date,
         )
 
-    def get_cohort_analytics(self, actor: Actor, target_role: str | None) -> CohortAnalyticsView:
+    def get_cohort_analytics(
+        self,
+        actor: Actor,
+        target_role: str | None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> CohortAnalyticsView:
         return self._analytics.get_cohort_analytics(
-            target_role, organisation_id=actor.organisation_id
+            target_role,
+            organisation_id=actor.organisation_id,
+            from_date=from_date,
+            to_date=to_date,
+        )
+
+    def get_analytics_overview(
+        self,
+        actor: Actor,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> AnalyticsOverviewView:
+        return self._analytics.get_analytics_overview(
+            organisation_id=actor.organisation_id,
+            from_date=from_date,
+            to_date=to_date,
+        )
+
+    def get_cohort_comparison(
+        self,
+        actor: Actor,
+        cohort_keys: list[str],
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> CohortComparisonView:
+        return self._analytics.get_cohort_comparison(
+            cohort_keys=cohort_keys,
+            organisation_id=actor.organisation_id,
+            from_date=from_date,
+            to_date=to_date,
         )
 
     def get_attempt_audit(self, actor: Actor, attempt_id: str) -> AttemptAuditView:

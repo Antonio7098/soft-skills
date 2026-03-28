@@ -214,6 +214,30 @@ class CohortAnalyticsView(BaseModel):
     provider_summary: list[ProviderUsageView] = Field(default_factory=list)
 
 
+class CohortComparisonView(BaseModel):
+    """Side-by-side cohort comparison payload."""
+
+    cohorts: list[CohortAnalyticsView] = Field(default_factory=list)
+    comparison_timestamp: str
+
+
+class AnalyticsOverviewView(BaseModel):
+    """Aggregated analytics dashboard overview."""
+
+    total_learners: int = 0
+    active_learners_30d: int = 0
+    total_sessions: int = 0
+    total_attempts: int = 0
+    submitted_attempts: int = 0
+    validated_assessments: int = 0
+    rejected_assessments: int = 0
+    avg_validated_score: float | None = None
+    overall_usage_trend: list[UsageTrendPointView] = Field(default_factory=list)
+    top_weak_skills: list[SkillClusterView] = Field(default_factory=list)
+    cohort_breakdown: list[dict[str, int | str]] = Field(default_factory=list)
+    provider_summary: list[ProviderUsageView] = Field(default_factory=list)
+
+
 class AdminPromptAuditView(BaseModel):
     """Prompt context for audit without learner response content."""
 
