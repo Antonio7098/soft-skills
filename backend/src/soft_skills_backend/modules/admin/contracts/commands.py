@@ -48,6 +48,46 @@ class AdminFeatureCollectionCommand(BaseModel):
     featured: bool
 
 
+class CreatePromptCommand(BaseModel):
+    """Create a new prompt version."""
+
+    name: str
+    version: str
+    prompt_type: str
+    template: str
+    variables_schema: dict[str, object]
+    output_schema: dict[str, object] | None = None
+    parent_version_id: int | None = None
+
+
+class UpdatePromptCommand(BaseModel):
+    """Update an existing draft prompt version."""
+
+    template: str | None = None
+    variables_schema: dict[str, object] | None = None
+    output_schema: dict[str, object] | None = None
+
+
+class PublishPromptCommand(BaseModel):
+    """Publish a prompt version."""
+
+    pass
+
+
+class ArchivePromptCommand(BaseModel):
+    """Archive a prompt version."""
+
+    pass
+
+
+class ComparePromptsCommand(BaseModel):
+    """Compare two versions of the same prompt."""
+
+    name: str
+    version_a: str
+    version_b: str
+
+
 class RubricCriterionLevelCommand(BaseModel):
     """One scored rubric level."""
 

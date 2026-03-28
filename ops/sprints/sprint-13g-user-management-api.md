@@ -14,6 +14,7 @@
 - [CONSTITUTION.yml](/home/antonioborgerees/df/soft-skills/ops/CONSTITUTION.yml): lines 1-427
 - [ops/mvp-spec/admin-dashboard-readiness.md](/home/antonioborgerees/df/soft-skills/ops/mvp-spec/admin-dashboard-readiness.md): lines 320-335
 - [ops/mvp-spec/foundational/stageflow-guide.md](/home/antonioborgerees/df/soft-skills/ops/mvp-spec/foundational/stageflow-guide.md): lines 1-50
+- [ops/mvp-spec/platform/swappable-auth-adapters.md](/home/antonioborgerees/df/soft-skills/ops/mvp-spec/platform/swappable-auth-adapters.md): full doc - adapter interface design for Firebase/WorkOS/Clerk/native swap
 
 ## Sprint Goals
 
@@ -32,8 +33,8 @@
 - [ ] Task 5.5: User activity view - Recent attempts, sessions, logins per user
 - [ ] Task 5.6: Admin action audit events - Wire `admin.user.suspended.v1`, `admin.user.role_changed.v1` when above endpoints are implemented
 - [ ] Task 5.7: Documentation updates
-
-## Constitution And Quality Checklist
+- [ ] Task 5.8: Add user to org - `POST /admin/users` to create/invite user to organization
+- [ ] Task 5.9: Swappable auth provider interface - Refactor `HeaderAuthProvider` into `AuthProvider` protocol with adapter pattern per [swappable-auth-adapters.md](/home/antonioborgerees/df/soft-skills/ops/mvp-spec/platform/swappable-auth-adapters.md)
 
 - [ ] Competency growth remains the product outcome, not activity theater
 - [ ] All new external boundaries are typed and schema-validated
@@ -86,6 +87,12 @@ Key decisions, tradeoffs, and implementation notes:
    - admin.cohort.updated.v1
 
 3. Note: These events require corresponding admin endpoints to be implemented first.
+
+4. Auth Adapter Decisions (see swappable-auth-adapters.md):
+   - Token refresh: Frontend/SDK (delegated to provider SDK)
+   - Session storage: App-managed for all (SessionRecord table)
+   - Org role sync: DB lookup with 30s TTL cache; invalidate on change
+   - Migration: AuthIdentityRecord table for provider identity mapping
 ```
 
 ## Review And Sign-Off

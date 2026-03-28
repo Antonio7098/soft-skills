@@ -4,17 +4,27 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from soft_skills_backend.config import Settings
 from soft_skills_backend.modules.admin.contracts.commands import (
     AdminCollectionVerificationCommand,
     AdminFeatureCollectionCommand,
     AdminLearnerRelationshipCommand,
+    ArchivePromptCommand,
+    ComparePromptsCommand,
+    CreatePromptCommand,
     CreateRubricCommand,
     CreateRubricCriterionCommand,
+    PublishPromptCommand,
     RubricCriterionUpdateCommand,
+    UpdatePromptCommand,
     UpdateRubricCommand,
 )
 from soft_skills_backend.modules.admin.contracts.views import (
     AdminLearnerRelationshipView,
+    PromptAnalyticsView,
+    PromptCompareView,
+    PromptSummaryView,
+    PromptVersionView,
     AttemptAuditView,
     CohortAnalyticsView,
     CollectionVerificationAuditView,
@@ -32,6 +42,7 @@ from soft_skills_backend.modules.admin.contracts.views import (
 )
 from soft_skills_backend.modules.admin.infra.analytics_repository import AdminAnalyticsRepository
 from soft_skills_backend.modules.admin.infra.audit_repository import AdminAuditRepository
+from soft_skills_backend.modules.admin.infra.prompt_repository import PromptRepository
 from soft_skills_backend.modules.admin.infra.relationship_repository import (
     AdminRelationshipRepository,
 )
@@ -39,6 +50,7 @@ from soft_skills_backend.modules.admin.infra.rubric_admin_repository import Rubr
 from soft_skills_backend.modules.admin.infra.verification_repository import (
     AdminVerificationRepository,
 )
+from soft_skills_backend.modules.admin.use_cases.prompt_service import PromptService
 from soft_skills_backend.modules.catalog.contracts.collection_views import CollectionView
 from soft_skills_backend.modules.catalog.contracts.views import build_collection_view
 from soft_skills_backend.platform.db.models import CollectionRecord
@@ -58,8 +70,10 @@ class AdminService:
     def __init__(
         self,
         *,
+        settings: Settings | None = None,
         session_factory: sessionmaker[Session],
         workflow_events: SqlAlchemyWorkflowEventRepository,
+        prompt_repository: PromptRepository | None = None,
         pipeline_definitions: SqlAlchemyPipelineDefinitionRepository | None = None,
         stage_definitions: SqlAlchemyStageDefinitionRepository | None = None,
         pipeline_execution_traces: SqlAlchemyPipelineExecutionTraceRepository | None = None,
@@ -77,6 +91,14 @@ class AdminService:
             relationships=relationships,
         )
         self._rubrics = RubricAdminRepository(session_factory=session_factory)
+        self._prompts = (
+            PromptService(
+                settings=settings,
+                prompts=prompt_repository or PromptRepository(session_factory),
+            )
+            if settings is not None
+            else None
+        )
         self._pipeline_definitions = pipeline_definitions
         self._stage_definitions = stage_definitions
         self._pipeline_execution_traces = pipeline_execution_traces
@@ -219,6 +241,64 @@ class AdminService:
         self, actor: Actor, rubric_id: str, criterion_ref: str
     ) -> RubricView:
         return self._rubrics.delete_criterion(rubric_id, criterion_ref)
+
+    def list_prompts(self, actor: Actor) -> list[PromptSummaryView]:
+        return self._require_prompt_service().list_prompts(actor)
+
+    def list_prompt_versions(self, actor: Actor, name: str) -> list[PromptVersionView]:
+        return self._require_prompt_service().list_versions(actor, name)
+
+    def get_prompt_version(
+        self, actor: Actor, name: str, version: str
+    ) -> PromptVersionView | None:
+        return self._require_prompt_service().get_version(actor, name, version)
+
+    def create_prompt(self, actor: Actor, command: CreatePromptCommand) -> PromptVersionView:
+        return self._require_prompt_service().create_prompt(actor, command)
+
+    def update_prompt(
+        self,
+        actor: Actor,
+        name: str,
+        version: str,
+        command: UpdatePromptCommand,
+    ) -> PromptVersionView | None:
+        return self._require_prompt_service().update_prompt(actor, name, version, command)
+
+    def publish_prompt(
+        self,
+        actor: Actor,
+        name: str,
+        version: str,
+        command: PublishPromptCommand,
+    ) -> PromptVersionView | None:
+        return self._require_prompt_service().publish_prompt(actor, name, version, command)
+
+    def archive_prompt(
+        self,
+        actor: Actor,
+        name: str,
+        version: str,
+        command: ArchivePromptCommand,
+    ) -> PromptVersionView | None:
+        return self._require_prompt_service().archive_prompt(actor, name, version, command)
+
+    def get_prompt_analytics(
+        self, actor: Actor, name: str, version: str
+    ) -> PromptAnalyticsView | None:
+        return self._require_prompt_service().get_analytics(actor, name, version)
+
+    def compare_prompts(
+        self,
+        actor: Actor,
+        command: ComparePromptsCommand,
+    ) -> PromptCompareView | None:
+        return self._require_prompt_service().compare_prompts(actor, command)
+
+    def _require_prompt_service(self) -> PromptService:
+        if self._prompts is None:
+            raise RuntimeError("PromptService was not configured for this AdminService instance")
+        return self._prompts
 
     def list_pipelines(self, actor: Actor) -> list[PipelineDefinitionView]:
         """List all registered pipeline definitions."""

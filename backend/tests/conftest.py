@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import sys
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import httpx
 import pytest
 import pytest_asyncio
+
+SRC_PATH = Path(__file__).resolve().parents[1] / "src"
+src_str = str(SRC_PATH)
+if src_str not in sys.path:
+    sys.path.insert(0, src_str)
 
 from soft_skills_backend.app import create_app
 from soft_skills_backend.config import Settings

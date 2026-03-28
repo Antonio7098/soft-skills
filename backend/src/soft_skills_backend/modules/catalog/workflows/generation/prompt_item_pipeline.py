@@ -12,6 +12,10 @@ from stageflow.api import Pipeline, StageKind, stage
 from stageflow.core import StageContext
 
 from soft_skills_backend.engines.config.models import CatalogGenerationRuntimeConfig
+from soft_skills_backend.modules.admin.domain.prompt_registry import PromptRegistry
+from soft_skills_backend.modules.admin.workflows.prompt_render_stage import (
+    create_prompt_render_stage,
+)
 from soft_skills_backend.modules.catalog.contracts.prompt_item_commands import (
     ChatPromptItemGenerationCommand,
     PromptItemCreateCommand,
@@ -37,7 +41,8 @@ from soft_skills_backend.modules.catalog.workflows.generation.persistence import
     persist_generated_prompt_items,
 )
 from soft_skills_backend.modules.catalog.workflows.generation.prompting import (
-    generate_prompt_item_plan_batch,
+    build_prompt_item_plan_prompt_request,
+    generate_prompt_item_plan_batch_from_prompt,
 )
 from soft_skills_backend.modules.catalog.workflows.generation.validation import (
     validate_prompt_item_plan_batch,
@@ -47,7 +52,6 @@ from soft_skills_backend.modules.catalog.workflows.generation.workers import (
     run_prompt_item_workers,
 )
 from soft_skills_backend.modules.practice.workflows.assessment import (
-    PromptLibrary,
     TypedLLMOutput,
     TypedLLMResult,
 )
@@ -82,7 +86,7 @@ async def generate_prompt_items_for_collection(
     llm_provider: LLMProvider,
     prompt_security_policy: PromptSecurityPolicy,
     stageflow: StageflowPipelineSupport,
-    prompt_library: PromptLibrary,
+    prompt_registry: PromptRegistry,
     config: CatalogGenerationRuntimeConfig,
     prompt_item_plan_output: TypedLLMOutput,
     prompt_item_worker_output: TypedLLMOutput,
@@ -118,13 +122,10 @@ async def generate_prompt_items_for_collection(
                 .order_by(PromptItemRecord.created_at)
                 .all()
             )
-            typed_result = await generate_prompt_item_plan_batch(
-                ctx=ctx,
-                prompt_library=prompt_library,
+            prompt_request = build_prompt_item_plan_prompt_request(
                 config=config,
                 llm_provider=llm_provider,
                 prompt_security_policy=prompt_security_policy,
-                prompt_item_plan_output=prompt_item_plan_output,
                 collection=collection,
                 existing_prompt_items=existing_prompt_items,
                 structured_command=structured_command,
@@ -137,6 +138,29 @@ async def generate_prompt_items_for_collection(
             )
         return ok_output(
             StageflowStageResult(
+                payload=prompt_request,
+                summary={"prompt_name": prompt_request.name, "prompt_version": prompt_request.version},
+            )
+        )
+
+    async def plan_render(ctx: StageContext) -> Any:
+        renderer = create_prompt_render_stage(
+            prompt_registry=prompt_registry,
+            request_stage_name="plan_transform",
+        )
+        return await renderer(ctx)
+
+    async def plan_llm_transform(ctx: StageContext) -> Any:
+        typed_result = await generate_prompt_item_plan_batch_from_prompt(
+            ctx=ctx,
+            structured_command=structured_command,
+            config=config,
+            llm_provider=llm_provider,
+            prompt_item_plan_output=prompt_item_plan_output,
+            rendered_prompt=payload_from_inputs(ctx, "plan_render"),
+        )
+        return ok_output(
+            StageflowStageResult(
                 payload=typed_result,
                 summary={
                     "planned_prompt_items": len(
@@ -147,7 +171,7 @@ async def generate_prompt_items_for_collection(
         )
 
     async def plan_guard(ctx: StageContext) -> Any:
-        typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "plan_transform"))
+        typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "plan_llm_transform"))
         batch = cast(GeneratedPromptItemPlanBatch, typed_result.parsed)
         validate_prompt_item_plan_batch(
             config=config,
@@ -171,7 +195,7 @@ async def generate_prompt_items_for_collection(
             collection = collection_or_error(session, collection_id)
         prompt_item_results = await run_prompt_item_workers(
             parent_ctx=ctx,
-            prompt_library=prompt_library,
+            prompt_registry=prompt_registry,
             config=config,
             llm_provider=llm_provider,
             prompt_item_worker_output=prompt_item_worker_output,
@@ -284,7 +308,19 @@ async def generate_prompt_items_for_collection(
             dependencies=("input_guard",),
         ),
         stage(
-            "plan_guard", cast(Any, plan_guard), StageKind.GUARD, dependencies=("plan_transform",)
+            "plan_render",
+            cast(Any, plan_render),
+            StageKind.TRANSFORM,
+            dependencies=("plan_transform",),
+        ),
+        stage(
+            "plan_llm_transform",
+            cast(Any, plan_llm_transform),
+            StageKind.TRANSFORM,
+            dependencies=("plan_render",),
+        ),
+        stage(
+            "plan_guard", cast(Any, plan_guard), StageKind.GUARD, dependencies=("plan_llm_transform",)
         ),
         stage(
             "prompt_items_work",

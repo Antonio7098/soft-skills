@@ -15,10 +15,13 @@ from soft_skills_backend.modules.admin import (
     AdminFeatureCollectionCommand,
     AdminLearnerRelationshipCommand,
     AdminLearnerRelationshipView,
+    ArchivePromptCommand,
     AttemptAuditView,
+    ComparePromptsCommand,
     CohortAnalyticsView,
     CollectionVerificationAuditView,
     CollectionVerificationQueueItemView,
+    CreatePromptCommand,
     CreateRubricCommand,
     CreateRubricCriterionCommand,
     LearnerAnalyticsView,
@@ -27,13 +30,187 @@ from soft_skills_backend.modules.admin import (
     PipelineMetricsView,
     PipelineRunSummaryView,
     PipelineTraceView,
+    PromptAnalyticsView,
+    PromptCompareView,
+    PromptSummaryView,
+    PromptVersionView,
+    PublishPromptCommand,
     RubricCriterionUpdateCommand,
     RubricView,
+    UpdatePromptCommand,
     UpdateRubricCommand,
 )
 from soft_skills_backend.modules.catalog import CollectionView
 
 router = APIRouter()
+
+
+@router.get("/prompts", response_model=ApiEnvelope[list[PromptSummaryView]])
+async def list_prompts(
+    request: Request,
+) -> ApiEnvelope[list[PromptSummaryView]]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.list_prompts(actor))
+
+
+@router.get("/prompts/{name}/versions", response_model=ApiEnvelope[list[PromptVersionView]])
+async def list_prompt_versions(
+    request: Request,
+    name: str,
+) -> ApiEnvelope[list[PromptVersionView]]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.list_prompt_versions(actor, name))
+
+
+@router.get("/prompts/{name}/versions/{version}", response_model=ApiEnvelope[PromptVersionView])
+async def get_prompt_version(
+    request: Request,
+    name: str,
+    version: str,
+) -> ApiEnvelope[PromptVersionView]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    result = service.get_prompt_version(actor, name, version)
+    if result is None:
+        from soft_skills_backend.shared.errors import domain_error
+
+        raise domain_error(
+            "Prompt version not found",
+            code="SS-DOMAIN-009",
+            status_code=404,
+            details={"name": name, "version": version},
+        )
+    return ok_response(request, result)
+
+
+@router.post("/prompts", response_model=ApiEnvelope[PromptVersionView])
+async def create_prompt(
+    request: Request,
+    command: CreatePromptCommand,
+) -> ApiEnvelope[PromptVersionView]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.create_prompt(actor, command))
+
+
+@router.put("/prompts/{name}/versions/{version}", response_model=ApiEnvelope[PromptVersionView])
+async def update_prompt(
+    request: Request,
+    name: str,
+    version: str,
+    command: UpdatePromptCommand,
+) -> ApiEnvelope[PromptVersionView]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    result = service.update_prompt(actor, name, version, command)
+    if result is None:
+        from soft_skills_backend.shared.errors import domain_error
+
+        raise domain_error(
+            "Prompt version not found",
+            code="SS-DOMAIN-009",
+            status_code=404,
+            details={"name": name, "version": version},
+        )
+    return ok_response(request, result)
+
+
+@router.post(
+    "/prompts/{name}/versions/{version}/publish", response_model=ApiEnvelope[PromptVersionView]
+)
+async def publish_prompt(
+    request: Request,
+    name: str,
+    version: str,
+    command: PublishPromptCommand,
+) -> ApiEnvelope[PromptVersionView]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    result = service.publish_prompt(actor, name, version, command)
+    if result is None:
+        from soft_skills_backend.shared.errors import domain_error
+
+        raise domain_error(
+            "Prompt version not found",
+            code="SS-DOMAIN-009",
+            status_code=404,
+            details={"name": name, "version": version},
+        )
+    return ok_response(request, result)
+
+
+@router.post(
+    "/prompts/{name}/versions/{version}/archive", response_model=ApiEnvelope[PromptVersionView]
+)
+async def archive_prompt(
+    request: Request,
+    name: str,
+    version: str,
+    command: ArchivePromptCommand,
+) -> ApiEnvelope[PromptVersionView]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    result = service.archive_prompt(actor, name, version, command)
+    if result is None:
+        from soft_skills_backend.shared.errors import domain_error
+
+        raise domain_error(
+            "Prompt version not found",
+            code="SS-DOMAIN-009",
+            status_code=404,
+            details={"name": name, "version": version},
+        )
+    return ok_response(request, result)
+
+
+@router.get(
+    "/prompts/{name}/versions/{version}/analytics",
+    response_model=ApiEnvelope[PromptAnalyticsView],
+)
+async def get_prompt_analytics(
+    request: Request,
+    name: str,
+    version: str,
+) -> ApiEnvelope[PromptAnalyticsView]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    result = service.get_prompt_analytics(actor, name, version)
+    if result is None:
+        from soft_skills_backend.shared.errors import domain_error
+
+        raise domain_error(
+            "Prompt version not found",
+            code="SS-DOMAIN-009",
+            status_code=404,
+            details={"name": name, "version": version},
+        )
+    return ok_response(request, result)
+
+
+@router.post("/prompts/compare", response_model=ApiEnvelope[PromptCompareView])
+async def compare_prompts(
+    request: Request,
+    command: ComparePromptsCommand,
+) -> ApiEnvelope[PromptCompareView]:
+    actor = require_admin_actor(request)
+    service = get_admin_service(request)
+    result = service.compare_prompts(actor, command)
+    if result is None:
+        from soft_skills_backend.shared.errors import domain_error
+
+        raise domain_error(
+            "One or more prompt versions were not found",
+            code="SS-DOMAIN-009",
+            status_code=404,
+            details={
+                "name": command.name,
+                "version_a": command.version_a,
+                "version_b": command.version_b,
+            },
+        )
+    return ok_response(request, result)
 
 
 @router.get(

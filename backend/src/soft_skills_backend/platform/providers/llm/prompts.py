@@ -149,7 +149,9 @@ CREATOR_PROMPT_ITEM_OUTPUT_FORMAT = """Return JSON with these required fields ex
       - examples: array of strings
 Rules:
 - Preserve prompt_type, difficulty, target_skill_slugs, and rubric_id exactly as requested.
+- If prompt_type is quick_practice_prompt, target_skill_slugs must be an empty array.
 - If prompt_type is quick_practice_prompt, generated_rubric is required and must define a question-specific pass/fail rubric for this exact prompt.
+- Quick-practice rubric criteria are not skill-based. Use criterion_ref as a short rubric check id, and set skill_slug to the same value or null.
 - If prompt_type is not quick_practice_prompt, generated_rubric must be null.
 - Produce editable, realistic workplace practice content.
 - Avoid repeating the title hint verbatim if a better specific title exists.
@@ -293,6 +295,9 @@ Fixed worker metadata:
 Creative brief:
 - title hint: {title_hint}
 - generation brief: {generation_brief}
+Rules:
+- If prompt_type is quick_practice_prompt, return target_skill_slugs as [].
+- Quick-practice criteria are rubric checks, not platform skills.
 {output_format}"""
 
 CREATOR_SCENARIO_WORKER_PROMPT = """Generate one editable SoftSkills scenario draft.

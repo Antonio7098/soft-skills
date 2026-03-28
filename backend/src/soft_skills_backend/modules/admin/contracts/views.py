@@ -22,6 +22,60 @@ class CollectionVerificationReviewView(BaseModel):
     occurred_at: str
 
 
+class PromptSummaryView(BaseModel):
+    """Summary of one prompt family."""
+
+    name: str
+    prompt_type: str
+    latest_version: str
+    status: str
+    created_at: str
+
+
+class PromptVersionView(BaseModel):
+    """Full details for one prompt version."""
+
+    id: int
+    name: str
+    version: str
+    prompt_type: str
+    template: str
+    variables_schema: dict[str, object] = Field(default_factory=dict)
+    output_schema: dict[str, object] | None = None
+    status: str
+    parent_version_id: int | None = None
+    created_at: str
+    updated_at: str
+
+
+class PromptAnalyticsView(BaseModel):
+    """Aggregated render analytics for one prompt version."""
+
+    prompt_version_id: int
+    name: str
+    version: str
+    render_count: int
+    success_count: int
+    failure_count: int
+    avg_latency_ms: float | None = None
+    total_tokens: int
+    last_rendered_at: str | None = None
+
+
+class PromptCompareView(BaseModel):
+    """A/B comparison payload for two prompt versions."""
+
+    name: str
+    version_a: str
+    version_b: str
+    template_a: str
+    template_b: str
+    variables_schema_a: dict[str, object] = Field(default_factory=dict)
+    variables_schema_b: dict[str, object] = Field(default_factory=dict)
+    metrics_a: PromptAnalyticsView | None = None
+    metrics_b: PromptAnalyticsView | None = None
+
+
 class CollectionVerificationQueueItemView(BaseModel):
     """Compact queue view for public collections awaiting review."""
 

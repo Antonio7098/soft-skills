@@ -11,6 +11,11 @@ from stageflow.api import Pipeline, StageKind, stage
 from stageflow.core import StageContext
 
 from soft_skills_backend.engines.config.models import CatalogGenerationRuntimeConfig
+from soft_skills_backend.modules.admin.domain.prompt_registry import PromptRegistry
+from soft_skills_backend.modules.admin.workflows.prompt_render_stage import (
+    PromptRenderRequest,
+    create_prompt_render_stage,
+)
 from soft_skills_backend.modules.catalog.domain.constants import ALLOWED_SCENARIO_ARTIFACT_TYPES
 from soft_skills_backend.modules.catalog.domain.models import (
     GeneratedPromptItemDraft,
@@ -19,7 +24,6 @@ from soft_skills_backend.modules.catalog.domain.models import (
     GeneratedScenarioPlan,
 )
 from soft_skills_backend.modules.practice.workflows.assessment import (
-    PromptLibrary,
     TypedLLMOutput,
     TypedLLMResult,
 )
@@ -43,6 +47,12 @@ from soft_skills_backend.shared.ports.llm import LLMProvider
 from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
 
+def _normalize_prompt_item_skills(prompt_type: str, target_skill_slugs: list[str]) -> list[str]:
+    if prompt_type == "quick_practice_prompt":
+        return []
+    return list(target_skill_slugs)
+
+
 @dataclass(slots=True)
 class WorkerExecutionResult:
     typed_result: TypedLLMResult
@@ -53,7 +63,7 @@ class WorkerExecutionResult:
 async def run_prompt_item_workers(
     *,
     parent_ctx: Any,
-    prompt_library: PromptLibrary,
+    prompt_registry: PromptRegistry,
     config: CatalogGenerationRuntimeConfig,
     llm_provider: LLMProvider,
     prompt_item_worker_output: TypedLLMOutput,
@@ -71,7 +81,7 @@ async def run_prompt_item_workers(
         async with semaphore:
             return await _run_prompt_item_worker(
                 parent_ctx=parent_ctx,
-                prompt_library=prompt_library,
+                prompt_registry=prompt_registry,
                 config=config,
                 llm_provider=llm_provider,
                 prompt_item_worker_output=prompt_item_worker_output,
@@ -94,7 +104,7 @@ async def run_prompt_item_workers(
 async def run_scenario_workers(
     *,
     parent_ctx: Any,
-    prompt_library: PromptLibrary,
+    prompt_registry: PromptRegistry,
     config: CatalogGenerationRuntimeConfig,
     llm_provider: LLMProvider,
     scenario_worker_output: TypedLLMOutput,
@@ -112,7 +122,7 @@ async def run_scenario_workers(
         async with semaphore:
             return await _run_scenario_worker(
                 parent_ctx=parent_ctx,
-                prompt_library=prompt_library,
+                prompt_registry=prompt_registry,
                 config=config,
                 llm_provider=llm_provider,
                 scenario_worker_output=scenario_worker_output,
@@ -135,7 +145,7 @@ async def run_scenario_workers(
 async def _run_prompt_item_worker(
     *,
     parent_ctx: Any,
-    prompt_library: PromptLibrary,
+    prompt_registry: PromptRegistry,
     config: CatalogGenerationRuntimeConfig,
     llm_provider: LLMProvider,
     prompt_item_worker_output: TypedLLMOutput,
@@ -158,9 +168,9 @@ async def _run_prompt_item_worker(
             )
         )
 
-    async def draft_transform(ctx: StageContext) -> Any:
-        rendered_prompt = prompt_library.render(
-            config.prompt_item_worker_prompt_name,
+    async def prompt_request_transform(_ctx: StageContext) -> Any:
+        prompt_request = PromptRenderRequest(
+            name=config.prompt_item_worker_prompt_name,
             version=config.prompt_item_worker_prompt_version,
             variables={
                 "collection_title": collection_title,
@@ -176,6 +186,22 @@ async def _run_prompt_item_worker(
                 "output_format": CREATOR_PROMPT_ITEM_OUTPUT_FORMAT,
             },
         )
+        return ok_output(
+            StageflowStageResult(
+                payload=prompt_request,
+                summary={"prompt_name": prompt_request.name, "prompt_version": prompt_request.version},
+            )
+        )
+
+    async def prompt_render_transform(ctx: StageContext) -> Any:
+        renderer = create_prompt_render_stage(
+            prompt_registry=prompt_registry,
+            request_stage_name="prompt_request_transform",
+        )
+        return await renderer(ctx)
+
+    async def llm_transform(ctx: StageContext) -> Any:
+        rendered_prompt = payload_from_inputs(ctx, "prompt_render_transform")
         typed_result = await prompt_item_worker_output.generate(
             llm_provider,
             messages=[
@@ -201,8 +227,11 @@ async def _run_prompt_item_worker(
         )
 
     async def output_guard(ctx: StageContext) -> Any:
-        typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "draft_transform"))
+        typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "llm_transform"))
         draft = cast(GeneratedPromptItemDraft, typed_result.parsed)
+        draft.target_skill_slugs = _normalize_prompt_item_skills(
+            draft.prompt_type, draft.target_skill_slugs
+        )
         if draft.prompt_type != plan.prompt_type or draft.rubric_id != plan.rubric_id:
             raise validation_error(
                 "Generated prompt item drifted from the worker plan metadata",
@@ -235,16 +264,28 @@ async def _run_prompt_item_worker(
     pipeline = Pipeline.from_stages(
         stage("input_guard", cast(Any, input_guard), StageKind.GUARD),
         stage(
-            "draft_transform",
-            cast(Any, draft_transform),
+            "prompt_request_transform",
+            cast(Any, prompt_request_transform),
             StageKind.TRANSFORM,
             dependencies=("input_guard",),
+        ),
+        stage(
+            "prompt_render_transform",
+            cast(Any, prompt_render_transform),
+            StageKind.TRANSFORM,
+            dependencies=("prompt_request_transform",),
+        ),
+        stage(
+            "llm_transform",
+            cast(Any, llm_transform),
+            StageKind.TRANSFORM,
+            dependencies=("prompt_render_transform",),
         ),
         stage(
             "output_guard",
             cast(Any, output_guard),
             StageKind.GUARD,
-            dependencies=("draft_transform",),
+            dependencies=("llm_transform",),
         ),
         name="catalog_prompt_item_worker",
     )
@@ -278,7 +319,7 @@ async def _run_prompt_item_worker(
 async def _run_scenario_worker(
     *,
     parent_ctx: Any,
-    prompt_library: PromptLibrary,
+    prompt_registry: PromptRegistry,
     config: CatalogGenerationRuntimeConfig,
     llm_provider: LLMProvider,
     scenario_worker_output: TypedLLMOutput,
@@ -296,9 +337,9 @@ async def _run_scenario_worker(
     async def input_guard(_ctx: StageContext) -> Any:
         return ok_output(StageflowStageResult(payload=plan, summary={"rubric_id": plan.rubric_id}))
 
-    async def draft_transform(ctx: StageContext) -> Any:
-        rendered_prompt = prompt_library.render(
-            config.scenario_worker_prompt_name,
+    async def prompt_request_transform(_ctx: StageContext) -> Any:
+        prompt_request = PromptRenderRequest(
+            name=config.scenario_worker_prompt_name,
             version=config.scenario_worker_prompt_version,
             variables={
                 "collection_title": collection_title,
@@ -314,6 +355,22 @@ async def _run_scenario_worker(
                 "output_format": CREATOR_SCENARIO_OUTPUT_FORMAT,
             },
         )
+        return ok_output(
+            StageflowStageResult(
+                payload=prompt_request,
+                summary={"prompt_name": prompt_request.name, "prompt_version": prompt_request.version},
+            )
+        )
+
+    async def prompt_render_transform(ctx: StageContext) -> Any:
+        renderer = create_prompt_render_stage(
+            prompt_registry=prompt_registry,
+            request_stage_name="prompt_request_transform",
+        )
+        return await renderer(ctx)
+
+    async def llm_transform(ctx: StageContext) -> Any:
+        rendered_prompt = payload_from_inputs(ctx, "prompt_render_transform")
         typed_result = await scenario_worker_output.generate(
             llm_provider,
             messages=[
@@ -339,7 +396,7 @@ async def _run_scenario_worker(
         )
 
     async def output_guard(ctx: StageContext) -> Any:
-        typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "draft_transform"))
+        typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "llm_transform"))
         draft = cast(GeneratedScenarioDraft, typed_result.parsed)
         if draft.rubric_id != plan.rubric_id or list(draft.target_skill_slugs) != list(
             plan.target_skill_slugs
@@ -363,16 +420,28 @@ async def _run_scenario_worker(
     pipeline = Pipeline.from_stages(
         stage("input_guard", cast(Any, input_guard), StageKind.GUARD),
         stage(
-            "draft_transform",
-            cast(Any, draft_transform),
+            "prompt_request_transform",
+            cast(Any, prompt_request_transform),
             StageKind.TRANSFORM,
             dependencies=("input_guard",),
+        ),
+        stage(
+            "prompt_render_transform",
+            cast(Any, prompt_render_transform),
+            StageKind.TRANSFORM,
+            dependencies=("prompt_request_transform",),
+        ),
+        stage(
+            "llm_transform",
+            cast(Any, llm_transform),
+            StageKind.TRANSFORM,
+            dependencies=("prompt_render_transform",),
         ),
         stage(
             "output_guard",
             cast(Any, output_guard),
             StageKind.GUARD,
-            dependencies=("draft_transform",),
+            dependencies=("llm_transform",),
         ),
         name="catalog_scenario_worker",
     )

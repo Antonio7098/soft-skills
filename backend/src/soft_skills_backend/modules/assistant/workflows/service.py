@@ -15,10 +15,15 @@ from stageflow.api import Pipeline, StageKind, stage
 from stageflow.core import StageContext, StageOutput
 
 from soft_skills_backend.config import Settings
+from soft_skills_backend.engines.marking.contracts.models import RenderedPrompt
 from soft_skills_backend.engines.marking.use_cases.structured_output import (
-    PromptLibrary,
     StructuredOutputRejectionError,
     TypedLLMOutput,
+)
+from soft_skills_backend.modules.admin.domain.prompt_registry import PromptRegistry
+from soft_skills_backend.modules.admin.workflows.prompt_render_stage import (
+    PromptRenderRequest,
+    create_prompt_render_stage,
 )
 from soft_skills_backend.modules.assistant.contracts.stream import AssistantStreamEvent
 from soft_skills_backend.modules.assistant.contracts.views import AssistantTurnView
@@ -29,8 +34,10 @@ from soft_skills_backend.modules.assistant.infra.realtime import (
 )
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
 from soft_skills_backend.modules.assistant.workflows.prompting import (
+    ASSISTANT_FINAL_RESPONSE_PROMPT_NAME,
+    ASSISTANT_FINAL_RESPONSE_PROMPT_VERSION,
     ASSISTANT_PROMPT_NAME,
-    build_assistant_prompt_library,
+    ASSISTANT_PROMPT_VERSION,
     render_tool_definitions,
 )
 from soft_skills_backend.modules.assistant.workflows.runtime_models import AssistantDecision
@@ -82,6 +89,7 @@ class AssistantWorkflowService:
         practice_service: PracticeService,
         progression_service: ProgressionService,
         stageflow_runtime: StageflowRuntime,
+        prompt_registry: PromptRegistry,
         settings: Settings,
     ) -> None:
         self._settings = settings
@@ -89,8 +97,8 @@ class AssistantWorkflowService:
         self._repository = repository
         self._broker = broker
         self._progression = progression_service
+        self._prompt_registry = prompt_registry
         self._stageflow = StageflowPipelineSupport.from_runtime(stageflow_runtime)
-        self._prompt_library: PromptLibrary = build_assistant_prompt_library()
         self._typed_output = TypedLLMOutput(
             AssistantDecision,
             schema_version="assistant_decision.v1",
@@ -275,17 +283,51 @@ class AssistantWorkflowService:
                 )
             )
 
+        async def planning_prompt_request(ctx: StageContext) -> Any:
+            prompt_request = PromptRenderRequest(
+                name=ASSISTANT_PROMPT_NAME,
+                version=ASSISTANT_PROMPT_VERSION,
+                variables={
+                    "learner_context": json.dumps(
+                        {
+                            "profile": cast(dict[str, Any], payload_from_inputs(ctx, "profile_enrich")),
+                            "progress": cast(
+                                dict[str, Any], payload_from_inputs(ctx, "progress_enrich")
+                            ),
+                            "recent_attempts": cast(
+                                list[dict[str, Any]], payload_from_inputs(ctx, "attempts_enrich")
+                            ),
+                        },
+                        sort_keys=True,
+                    ),
+                    "tool_definitions": render_tool_definitions(),
+                    "conversation_history": "Conversation history is attached as lower-priority messages.",
+                },
+            )
+            return ok_output(
+                StageflowStageResult(
+                    payload=prompt_request,
+                    summary={
+                        "prompt_name": prompt_request.name,
+                        "prompt_version": prompt_request.version,
+                    },
+                )
+            )
+
+        async def planning_prompt_render(ctx: StageContext) -> Any:
+            renderer = create_prompt_render_stage(
+                prompt_registry=self._prompt_registry,
+                request_stage_name="planning_prompt_request",
+            )
+            return await renderer(ctx)
+
         async def assistant_runtime(ctx: StageContext) -> Any:
             result = await self._run_agent_loop(
                 ctx=ctx,
                 execution=execution,
                 active=active,
+                rendered_prompt=cast(RenderedPrompt, payload_from_inputs(ctx, "planning_prompt_render")),
                 history=cast(list[Any], payload_from_inputs(ctx, "history_enrich")),
-                profile=cast(dict[str, Any], payload_from_inputs(ctx, "profile_enrich")),
-                progress=cast(dict[str, Any], payload_from_inputs(ctx, "progress_enrich")),
-                recent_attempts=cast(
-                    list[dict[str, Any]], payload_from_inputs(ctx, "attempts_enrich")
-                ),
             )
             if result.cancelled:
                 reason = result.reason or "cancelled"
@@ -298,6 +340,39 @@ class AssistantWorkflowService:
                     reason=reason,
                     data={"payload": {"status": "cancelled"}, "summary": {"status": "cancelled"}},
                 )
+            return ok_output(
+                StageflowStageResult(
+                    payload=result,
+                    summary={"status": "planned", "prompt_version": result.prompt_version},
+                )
+            )
+
+        async def final_response_prompt_request(ctx: StageContext) -> Any:
+            result = cast(_AssistantLoopResult, payload_from_inputs(ctx, ASSISTANT_RUNTIME_STAGE))
+            prompt_request = PromptRenderRequest(
+                name=ASSISTANT_FINAL_RESPONSE_PROMPT_NAME,
+                version=ASSISTANT_FINAL_RESPONSE_PROMPT_VERSION,
+                variables={"draft_response": result.final_response},
+            )
+            return ok_output(
+                StageflowStageResult(
+                    payload=prompt_request,
+                    summary={
+                        "prompt_name": prompt_request.name,
+                        "prompt_version": prompt_request.version,
+                    },
+                )
+            )
+
+        async def final_response_prompt_render(ctx: StageContext) -> Any:
+            renderer = create_prompt_render_stage(
+                prompt_registry=self._prompt_registry,
+                request_stage_name="final_response_prompt_request",
+            )
+            return await renderer(ctx)
+
+        async def final_response_work(ctx: StageContext) -> Any:
+            result = cast(_AssistantLoopResult, payload_from_inputs(ctx, ASSISTANT_RUNTIME_STAGE))
             (
                 final_response,
                 streamed_model_slug,
@@ -306,8 +381,11 @@ class AssistantWorkflowService:
                 execution=execution,
                 ctx=ctx,
                 active=active,
-                draft_response=result.final_response,
+                rendered_prompt=cast(
+                    RenderedPrompt, payload_from_inputs(ctx, "final_response_prompt_render")
+                ),
                 planning_messages=result.planning_messages or [],
+                draft_response=result.final_response,
             )
             if active.cancel_reason is not None:
                 cancelled = self._repository.mark_turn_cancelled(
@@ -379,15 +457,43 @@ class AssistantWorkflowService:
                 dependencies=("input_guard",),
             ),
             stage(
+                "planning_prompt_request",
+                planning_prompt_request,  # type: ignore[arg-type]
+                StageKind.TRANSFORM,
+                dependencies=("profile_enrich", "progress_enrich", "attempts_enrich"),
+            ),
+            stage(
+                "planning_prompt_render",
+                planning_prompt_render,  # type: ignore[arg-type]
+                StageKind.TRANSFORM,
+                dependencies=("planning_prompt_request",),
+            ),
+            stage(
                 ASSISTANT_RUNTIME_STAGE,
                 assistant_runtime,  # type: ignore[arg-type]
                 StageKind.AGENT,
                 dependencies=(
                     "history_enrich",
-                    "profile_enrich",
-                    "progress_enrich",
-                    "attempts_enrich",
+                    "planning_prompt_render",
                 ),
+            ),
+            stage(
+                "final_response_prompt_request",
+                final_response_prompt_request,  # type: ignore[arg-type]
+                StageKind.TRANSFORM,
+                dependencies=(ASSISTANT_RUNTIME_STAGE,),
+            ),
+            stage(
+                "final_response_prompt_render",
+                final_response_prompt_render,  # type: ignore[arg-type]
+                StageKind.TRANSFORM,
+                dependencies=("final_response_prompt_request",),
+            ),
+            stage(
+                "final_response_work",
+                final_response_work,  # type: ignore[arg-type]
+                StageKind.WORK,
+                dependencies=(ASSISTANT_RUNTIME_STAGE, "final_response_prompt_render"),
             ),
             name="assistant_turn_runtime",
         )
@@ -398,26 +504,9 @@ class AssistantWorkflowService:
         ctx: StageContext,
         execution: AssistantTurnExecutionInput,
         active: ActiveTurnExecution,
+        rendered_prompt: RenderedPrompt,
         history: list[Any],
-        profile: dict[str, Any],
-        progress: dict[str, Any],
-        recent_attempts: list[dict[str, Any]],
     ) -> _AssistantLoopResult:
-        rendered_prompt = self._prompt_library.render(
-            ASSISTANT_PROMPT_NAME,
-            variables={
-                "learner_context": json.dumps(
-                    {
-                        "profile": profile,
-                        "progress": progress,
-                        "recent_attempts": recent_attempts,
-                    },
-                    sort_keys=True,
-                ),
-                "tool_definitions": render_tool_definitions(),
-                "conversation_history": "Conversation history is attached as lower-priority messages.",
-            },
-        )
         messages = [{"role": "system", "content": rendered_prompt.content}]
         for message in history:
             if message.role.value == "assistant":
@@ -519,6 +608,7 @@ class AssistantWorkflowService:
         execution: AssistantTurnExecutionInput,
         ctx: StageContext,
         active: ActiveTurnExecution,
+        rendered_prompt: RenderedPrompt,
         draft_response: str,
         planning_messages: list[dict[str, str]],
     ) -> tuple[str, str | None, dict[str, Any]]:
@@ -526,11 +616,7 @@ class AssistantWorkflowService:
             *planning_messages,
             {
                 "role": "user",
-                "content": (
-                    "Provide the final assistant answer now. Do not call tools. "
-                    "Keep it concise, practical, and grounded in the retrieved system data. "
-                    f"Use this draft plan as guidance:\n{draft_response}"
-                ),
+                "content": rendered_prompt.content,
             },
         ]
         chunks: list[str] = []

@@ -101,3 +101,13 @@ Stageflow workflows in SoftSkills.
 - **Reference File:** `backend/src/soft_skills_backend/platform/workflows/stageflow.py`
 - **Description:** Stageflow subpipeline forks preserve parent `data` in `_parent_data` and give the child a fresh mutable `data` dict. That is easy to miss, and it matters for any application-level controls stored in context data, including timeout budgets and idempotency keys.
 - **Recommendations:** Treat child `data` rehydration as mandatory in local wrappers today. Upstream, Stageflow should document this more prominently or add an opt-in mode that copies a safe subset of parent data into the child.
+
+**Prompt Rendering Works Best As An Explicit Shared Stage** (2026-03-28)
+- **Reference File:** `backend/src/soft_skills_backend/modules/admin/workflows/prompt_render_stage.py`
+- **Description:** Centralizing prompt construction behind a dedicated `prompt_request -> prompt_render -> llm` DAG shape made assistant and catalog workflows materially easier to reason about than embedding prompt lookup and templating inside each LLM transform. The stage boundary also gave one place to enforce strict missing-prompt failure, metrics, and render-event persistence.
+- **Recommendations:** When prompts need governance, observability, or version lineage, treat prompt rendering as its own stage contract rather than an implementation detail inside provider-call code.
+
+**Registry-Backed Prompt Stages Need Deterministic Bootstrap** (2026-03-28)
+- **Reference File:** `backend/src/soft_skills_backend/modules/admin/domain/prompt_registry.py`
+- **Description:** Moving from static in-code prompt libraries to a DB-backed registry introduced a lifecycle dependency that Stageflow itself does not solve: prompts must exist before the render stage runs. In SoftSkills, integration tests construct the app container before migrations, so eager seeding at container build time was not safe and lazy idempotent seeding became the pragmatic bridge.
+- **Recommendations:** When stage execution depends on external configuration state, pair the stage with an explicit bootstrap contract. If bootstrap cannot be guaranteed at app startup, make initialization idempotent and tie it to the first safe post-migration use site.

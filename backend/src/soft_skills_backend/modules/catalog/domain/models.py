@@ -285,7 +285,7 @@ class GeneratedQuickPracticeRubricLevel(BaseModel):
 
 class GeneratedQuickPracticeRubricCriterion(BaseModel):
     criterion_ref: str
-    skill_slug: str
+    skill_slug: str | None = None
     title: str
     description: str
     levels: list[GeneratedQuickPracticeRubricLevel] = Field(min_length=2, max_length=2)

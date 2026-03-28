@@ -13,6 +13,7 @@ class GenerationStage(StrEnum):
     PENDING = "pending"
     INPUT_GUARD = "input_guard"
     BLUEPRINT_TRANSFORM = "blueprint_transform"
+    BLUEPRINT_LLM_TRANSFORM = "blueprint_llm_transform"
     BLUEPRINT_GUARD = "blueprint_guard"
     PROMPT_ITEMS_WORK = "prompt_items_work"
     SCENARIOS_WORK = "scenarios_work"

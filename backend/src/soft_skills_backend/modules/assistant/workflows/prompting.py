@@ -9,13 +9,23 @@ from soft_skills_backend.engines.marking.use_cases.structured_output import Prom
 
 ASSISTANT_PROMPT_NAME = "assistant_orchestrator"
 ASSISTANT_PROMPT_VERSION = "assistant_orchestrator@v1"
+ASSISTANT_FINAL_RESPONSE_PROMPT_NAME = "assistant_final_response"
+ASSISTANT_FINAL_RESPONSE_PROMPT_VERSION = "assistant_final_response@v1"
 
 
 def build_assistant_prompt_library() -> PromptLibrary:
     """Return the versioned prompt registry for assistant decisions."""
 
     library = PromptLibrary()
-    library.register(
+    for template in assistant_prompt_templates():
+        library.register(template, make_default=template.name == ASSISTANT_PROMPT_NAME)
+    return library
+
+
+def assistant_prompt_templates() -> list[PromptTemplate]:
+    """Return the built-in assistant prompt templates."""
+
+    return [
         PromptTemplate(
             name=ASSISTANT_PROMPT_NAME,
             version=ASSISTANT_PROMPT_VERSION,
@@ -43,9 +53,16 @@ def build_assistant_prompt_library() -> PromptLibrary:
                 "Return either tool_calls or final_response, not both."
             ),
         ),
-        make_default=True,
-    )
-    return library
+        PromptTemplate(
+            name=ASSISTANT_FINAL_RESPONSE_PROMPT_NAME,
+            version=ASSISTANT_FINAL_RESPONSE_PROMPT_VERSION,
+            template=(
+                "Provide the final assistant answer now. Do not call tools. "
+                "Keep it concise, practical, and grounded in the retrieved system data. "
+                "Use this draft plan as guidance:\n{draft_response}"
+            ),
+        ),
+    ]
 
 
 def render_tool_definitions() -> str:

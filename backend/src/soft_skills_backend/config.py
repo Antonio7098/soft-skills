@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from functools import lru_cache
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class LLMTaskKind(StrEnum):
+    ASSISTANT = "assistant"
+    MARKING_PER_SKILL = "marking_per_skill"
+    MARKING_AGGREGATION = "marking_aggregation"
+    CREATOR_BLUEPRINT = "creator_blueprint"
+    CREATOR_PROMPT_ITEM = "creator_prompt_item"
+    CREATOR_SCENARIO = "creator_scenario"
 
 
 class Settings(BaseSettings):
@@ -26,9 +36,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+pysqlite:///./softskills.db"
     log_level: str = "INFO"
     stageflow_event_queue_size: int = Field(default=1000, ge=1)
-    provider_name: str = "openai"
-    provider_base_url: str = "https://api.openai.com/v1"
-    provider_model_slug: str = "gpt-4.1-mini"
+    provider_name: str = "openrouter"
+    provider_base_url: str = "https://openrouter.ai/api/v1"
     provider_api_key: str | None = None
     openrouter_api_key: str | None = Field(
         default=None,
@@ -37,14 +46,6 @@ class Settings(BaseSettings):
     openrouter_base_url: str = Field(
         default="https://openrouter.ai/api/v1",
         validation_alias="OPENROUTER_BASE_URL",
-    )
-    llm_marking_model: str | None = Field(
-        default=None,
-        validation_alias="LLM_MARKING_MODEL",
-    )
-    llm_marking_model_backup: str | None = Field(
-        default=None,
-        validation_alias="LLM_MARKING_MODEL_BACKUP",
     )
     smoke_timeout_seconds: float = Field(default=10.0, gt=0)
     provider_max_retries: int = Field(default=2, ge=0, le=5)
@@ -57,6 +58,34 @@ class Settings(BaseSettings):
         default=None,
         validation_alias="OTEL_EXPORTER_OTLP_ENDPOINT",
     )
+
+    llm_assistant_model: str = Field(default="openai/gpt-oss-20b")
+    llm_assistant_prompt_version: str = Field(default="assistant.chat.v1")
+
+    llm_marking_per_skill_model: str | None = Field(default=None)
+    llm_marking_per_skill_prompt_version: str = Field(
+        default="assessment.quick-practice.v1",
+    )
+    llm_marking_aggregation_model: str | None = Field(default=None)
+    llm_marking_aggregation_prompt_version: str = Field(
+        default="assessment.aggregation.v1",
+    )
+
+    llm_creator_blueprint_model: str | None = Field(default=None)
+    llm_creator_blueprint_prompt_version: str = Field(
+        default="creator.collection.structured-blueprint.v2",
+    )
+    llm_creator_prompt_item_model: str | None = Field(default=None)
+    llm_creator_prompt_item_prompt_version: str = Field(
+        default="creator.prompt-item.worker.v1",
+    )
+    llm_creator_scenario_model: str | None = Field(default=None)
+    llm_creator_scenario_prompt_version: str = Field(
+        default="creator.scenario.worker.v1",
+    )
+
+    llm_default_model: str = Field(default="openai/gpt-oss-20b")
+    llm_default_backup_model: str | None = Field(default=None)
 
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
@@ -71,25 +100,45 @@ class Settings(BaseSettings):
     def is_sqlite(self) -> bool:
         return self.database_url.startswith("sqlite")
 
+    def get_llm_model_for_task(self, task: LLMTaskKind) -> str:
+        """Resolve the effective model slug for a given LLM task."""
+        match task:
+            case LLMTaskKind.ASSISTANT:
+                return self.llm_assistant_model
+            case LLMTaskKind.MARKING_PER_SKILL:
+                return self.llm_marking_per_skill_model or self.llm_default_model
+            case LLMTaskKind.MARKING_AGGREGATION:
+                return self.llm_marking_aggregation_model or self.llm_default_model
+            case LLMTaskKind.CREATOR_BLUEPRINT:
+                return self.llm_creator_blueprint_model or self.llm_default_model
+            case LLMTaskKind.CREATOR_PROMPT_ITEM:
+                return self.llm_creator_prompt_item_model or self.llm_default_model
+            case LLMTaskKind.CREATOR_SCENARIO:
+                return self.llm_creator_scenario_model or self.llm_default_model
+
+    def get_llm_prompt_version_for_task(self, task: LLMTaskKind) -> str:
+        """Resolve the prompt version for a given LLM task."""
+        match task:
+            case LLMTaskKind.ASSISTANT:
+                return self.llm_assistant_prompt_version
+            case LLMTaskKind.MARKING_PER_SKILL:
+                return self.llm_marking_per_skill_prompt_version
+            case LLMTaskKind.MARKING_AGGREGATION:
+                return self.llm_marking_aggregation_prompt_version
+            case LLMTaskKind.CREATOR_BLUEPRINT:
+                return self.llm_creator_blueprint_prompt_version
+            case LLMTaskKind.CREATOR_PROMPT_ITEM:
+                return self.llm_creator_prompt_item_prompt_version
+            case LLMTaskKind.CREATOR_SCENARIO:
+                return self.llm_creator_scenario_prompt_version
+
     @property
     def creator_structured_generation_prompt_version(self) -> str:
-        """Compatibility alias for the reviewed structured creator prompt version."""
-
-        from soft_skills_backend.engines.config.loader import (
-            load_catalog_generation_runtime_config,
-        )
-
-        return load_catalog_generation_runtime_config().structured_prompt_version
+        return self.llm_creator_blueprint_prompt_version
 
     @property
     def creator_chat_generation_prompt_version(self) -> str:
-        """Compatibility alias for the reviewed chat creator prompt version."""
-
-        from soft_skills_backend.engines.config.loader import (
-            load_catalog_generation_runtime_config,
-        )
-
-        return load_catalog_generation_runtime_config().chat_prompt_version
+        return self.llm_creator_blueprint_prompt_version
 
 
 @lru_cache(maxsize=1)

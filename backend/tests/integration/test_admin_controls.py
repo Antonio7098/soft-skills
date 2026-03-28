@@ -235,6 +235,74 @@ async def test_admin_verification_workflow_persists_history(app, client, test_se
 
 
 @pytest.mark.asyncio
+async def test_admin_prompt_registry_seeds_builtins_and_supports_crud(
+    app, client, test_settings
+) -> None:
+    del app
+    _migrate(test_settings)
+    admin, org = await _create_org_and_make_admin(
+        client,
+        email="admin-prompts@example.com",
+        display_name="Admin Prompts",
+        org_name="Prompt Admin Org",
+        org_slug="prompt-admin-org",
+    )
+    headers = {"X-User-ID": admin["id"], "X-Organisation-ID": org["id"]}
+
+    list_response = await client.get("/api/admin/prompts", headers=headers)
+    assert list_response.status_code == 200
+    prompt_names = {item["name"] for item in list_response.json()["data"]}
+    assert "assistant_orchestrator" in prompt_names
+    assert "creator-collection-structured-blueprint" in prompt_names
+
+    create_response = await client.post(
+        "/api/admin/prompts",
+        headers=headers,
+        json={
+            "name": "admin-test-prompt",
+            "version": "v1",
+            "prompt_type": "generation",
+            "template": "Write about {topic} for {audience}.",
+            "variables_schema": {
+                "type": "object",
+                "properties": {
+                    "topic": {"type": "string"},
+                    "audience": {"type": "string"},
+                },
+                "required": ["topic", "audience"],
+            },
+        },
+    )
+    assert create_response.status_code == 200
+    created = create_response.json()["data"]
+    assert created["status"] == "draft"
+
+    publish_response = await client.post(
+        "/api/admin/prompts/admin-test-prompt/versions/v1/publish",
+        headers=headers,
+        json={},
+    )
+    assert publish_response.status_code == 200
+    assert publish_response.json()["data"]["status"] == "published"
+
+    version_response = await client.get(
+        "/api/admin/prompts/admin-test-prompt/versions/v1",
+        headers=headers,
+    )
+    assert version_response.status_code == 200
+    assert version_response.json()["data"]["name"] == "admin-test-prompt"
+
+    analytics_response = await client.get(
+        "/api/admin/prompts/admin-test-prompt/versions/v1/analytics",
+        headers=headers,
+    )
+    assert analytics_response.status_code == 200
+    analytics = analytics_response.json()["data"]
+    assert analytics["render_count"] == 0
+    assert analytics["failure_count"] == 0
+
+
+@pytest.mark.asyncio
 async def test_admin_analytics_and_audit_are_redacted_and_admin_only(
     app, client, test_settings
 ) -> None:

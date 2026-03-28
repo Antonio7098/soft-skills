@@ -168,7 +168,9 @@ def validate_prompt_command(
             code="SS-VALIDATION-005",
             details={"prompt_type": command.prompt_type},
         )
-    require_existing_skills(session, command.target_skill_slugs)
+    is_quick_practice = command.prompt_type == "quick_practice_prompt"
+    if not is_quick_practice:
+        require_existing_skills(session, command.target_skill_slugs)
     require_existing_rubrics(session, [command.rubric_id])
     rubric = session.get(RubricRecord, command.rubric_id)
     if rubric is None:
@@ -180,7 +182,9 @@ def validate_prompt_command(
             code="SS-VALIDATION-006",
             details={"prompt_type": command.prompt_type, "rubric_id": command.rubric_id},
         )
-    if not set(command.target_skill_slugs).issubset(set(collection.target_skill_slugs)):
+    if not is_quick_practice and not set(command.target_skill_slugs).issubset(
+        set(collection.target_skill_slugs)
+    ):
         raise validation_error(
             "Prompt item skills must be a subset of the collection skills",
             code="SS-VALIDATION-007",

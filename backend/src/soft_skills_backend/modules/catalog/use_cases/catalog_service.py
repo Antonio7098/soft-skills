@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from stageflow.agent.security import PromptSecurityPolicy
 
 from soft_skills_backend.config import Settings
+from soft_skills_backend.modules.admin.domain.prompt_registry import PromptRegistry
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
     ChatCollectionGenerationCommand,
     CollectionCreateCommand,
@@ -58,6 +59,7 @@ class CatalogService:
         session_factory: sessionmaker[Session],
         workflow_events: SqlAlchemyWorkflowEventRepository,
         llm_provider: LLMProvider,
+        prompt_registry: PromptRegistry,
         stageflow_runtime: StageflowRuntime,
         generation_broker: GenerationRealtimeBroker | None = None,
     ) -> None:
@@ -85,6 +87,7 @@ class CatalogService:
             events=events,
             llm_provider=llm_provider,
             prompt_security_policy=PromptSecurityPolicy(),
+            prompt_registry=prompt_registry,
             stageflow_runtime=stageflow_runtime,
             broker=generation_broker,
         )

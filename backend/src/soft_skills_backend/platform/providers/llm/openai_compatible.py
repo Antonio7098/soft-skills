@@ -11,7 +11,7 @@ from typing import Any, cast
 
 import httpx
 
-from soft_skills_backend.config import Settings
+from soft_skills_backend.config import LLMTaskKind, Settings
 from soft_skills_backend.shared.errors import AppError, provider_error, validation_error
 from soft_skills_backend.shared.ports.llm import (
     LLMProvider,
@@ -75,10 +75,12 @@ class OpenAICompatibleLLMProvider(LLMProvider):
         *,
         settings: Settings,
         provider_call_logger: Any,
+        task: LLMTaskKind | None = None,
     ) -> None:
         self._settings = settings
         self._provider_call_logger = provider_call_logger
-        self._resolved = resolve_llm_provider_config(settings)
+        self._task = task
+        self._resolved = resolve_llm_provider_config(settings, task)
 
     @property
     def provider_name(self) -> str:
@@ -508,17 +510,22 @@ class OpenAICompatibleLLMProvider(LLMProvider):
         return self._resolved.model_slug
 
 
-def resolve_llm_provider_config(settings: Settings) -> ResolvedLLMProviderConfig:
+def resolve_llm_provider_config(
+    settings: Settings,
+    task: LLMTaskKind | None = None,
+) -> ResolvedLLMProviderConfig:
     """Resolve provider details, including OpenRouter environment aliases."""
 
     provider_name = settings.provider_name
     base_url = settings.provider_base_url
     api_key = settings.provider_api_key
-    model_slug = settings.provider_model_slug
+    model_slug = settings.llm_default_model
+    backup_model_slug = settings.llm_default_backup_model
 
-    if settings.llm_marking_model:
-        model_slug = settings.llm_marking_model
-    backup_model_slug = settings.llm_marking_model_backup
+    if task is not None:
+        model_slug = settings.get_llm_model_for_task(task)
+    elif settings.llm_marking_per_skill_model:
+        model_slug = settings.llm_marking_per_skill_model
 
     if api_key is None and settings.openrouter_api_key:
         api_key = settings.openrouter_api_key
@@ -526,8 +533,6 @@ def resolve_llm_provider_config(settings: Settings) -> ResolvedLLMProviderConfig
             provider_name = "openrouter"
         if base_url == "https://api.openai.com/v1":
             base_url = settings.openrouter_base_url
-        if settings.llm_marking_model:
-            model_slug = settings.llm_marking_model
 
     return ResolvedLLMProviderConfig(
         provider_name=provider_name,

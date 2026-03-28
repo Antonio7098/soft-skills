@@ -23,6 +23,7 @@ class TestGenerationStage:
         assert GenerationStage.PENDING == "pending"
         assert GenerationStage.INPUT_GUARD == "input_guard"
         assert GenerationStage.BLUEPRINT_TRANSFORM == "blueprint_transform"
+        assert GenerationStage.BLUEPRINT_LLM_TRANSFORM == "blueprint_llm_transform"
         assert GenerationStage.BLUEPRINT_GUARD == "blueprint_guard"
         assert GenerationStage.PROMPT_ITEMS_WORK == "prompt_items_work"
         assert GenerationStage.SCENARIOS_WORK == "scenarios_work"

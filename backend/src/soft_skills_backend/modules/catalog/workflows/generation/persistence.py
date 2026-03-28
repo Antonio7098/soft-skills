@@ -350,6 +350,7 @@ def _persist_generated_quick_practice_rubric(
             details={"title": prompt_item.title},
         )
     rubric_id = f"quick_practice_generated_{uuid4().hex}@v1"
+    criterion_refs = [criterion.criterion_ref for criterion in generated_rubric.criteria]
     session.add(
         RubricRecord(
             rubric_id=rubric_id,
@@ -358,16 +359,17 @@ def _persist_generated_quick_practice_rubric(
             content_type="quick_practice_prompt",
             schema_version="v1",
             name=generated_rubric.title,
-            criteria=[criterion.skill_slug for criterion in generated_rubric.criteria],
+            criteria=criterion_refs,
         )
     )
     for position, criterion in enumerate(generated_rubric.criteria, start=1):
+        criterion_key = criterion.skill_slug or criterion.criterion_ref
         session.add(
             RubricCriterionRecord(
                 rubric_id=rubric_id,
                 rubric_version="v1",
                 criterion_ref=criterion.criterion_ref,
-                skill_slug=criterion.skill_slug,
+                skill_slug=criterion_key,
                 title=criterion.title,
                 description=criterion.description,
                 weight=1.0,

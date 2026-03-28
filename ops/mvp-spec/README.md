@@ -30,7 +30,7 @@ The canon is now grouped into subfolders to keep related artifacts together:
 - `foundational/`
   - `PRD.md`, `product-spec.md`, `domain-model.md`, `technical-architecture.md`, `stageflow-guide.md`
 - `platform/`
-  - `assessment-and-progression.md`, `soft-skill-progression.md`, `soft-skill-recommendation.md`
+  - `assessment-and-progression.md`, `soft-skill-progression.md`, `soft-skill-recommendation.md`, `swappable-auth-adapters.md`
 - `engines/`
   - `marking-engine.md`, `marking-overhaul-plan.md`, `recommendation-engine.md`, `progression-engine.md`
 - `operations/`

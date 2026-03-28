@@ -138,19 +138,27 @@ def validate_generated_collection_draft(
                     code="SS-VALIDATION-080",
                     details={"title": prompt_item.title},
                 )
-            expected_skill_slugs = set(prompt_item.target_skill_slugs)
-            actual_skill_slugs = {
-                criterion.skill_slug for criterion in prompt_item.generated_rubric.criteria
-            }
-            if actual_skill_slugs != expected_skill_slugs:
+            if prompt_item.target_skill_slugs:
                 raise validation_error(
-                    "Generated quick-practice rubric skills must match the prompt item target skills",
+                    "Generated quick-practice prompt items must not carry target skills",
                     code="SS-VALIDATION-081",
                     details={
-                        "expected_skill_slugs": sorted(expected_skill_slugs),
-                        "actual_skill_slugs": sorted(actual_skill_slugs),
                         "title": prompt_item.title,
+                        "target_skill_slugs": list(prompt_item.target_skill_slugs),
                     },
+                )
+            criterion_refs = [
+                criterion.criterion_ref.strip()
+                for criterion in prompt_item.generated_rubric.criteria
+                if criterion.criterion_ref.strip()
+            ]
+            if len(criterion_refs) != len(prompt_item.generated_rubric.criteria) or len(
+                set(criterion_refs)
+            ) != len(criterion_refs):
+                raise validation_error(
+                    "Generated quick-practice rubric criteria must have unique non-blank identifiers",
+                    code="SS-VALIDATION-084",
+                    details={"title": prompt_item.title},
                 )
             for criterion in prompt_item.generated_rubric.criteria:
                 levels = sorted(level.level for level in criterion.levels)

@@ -89,6 +89,14 @@ class DefaultAssessmentMarkingProvider:
     def model_slug(self) -> str:
         return self._llm_provider.model_slug
 
+    def _required_rubric_skills(
+        self, prompt_payload: ResolvedAttemptPayload
+    ) -> list[str] | None:
+        if prompt_payload.prompt.practice_type == PracticeType.QUICK_PRACTICE:
+            if not prompt_payload.prompt.target_skill_slugs:
+                return None
+        return list(prompt_payload.prompt.target_skill_slugs)
+
     async def mark_attempt(
         self,
         *,
@@ -99,7 +107,7 @@ class DefaultAssessmentMarkingProvider:
         config = load_marking_runtime_config()
         rubric = self._rubric_repository.get_rubric_definition(
             prompt_payload.prompt.rubric_id,
-            required_skill_slugs=prompt_payload.prompt.target_skill_slugs,
+            required_skill_slugs=self._required_rubric_skills(prompt_payload),
         )
         per_skill_results = await self._assess_skills(
             prompt_payload=prompt_payload,

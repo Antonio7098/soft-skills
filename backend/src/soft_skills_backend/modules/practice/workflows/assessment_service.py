@@ -8,7 +8,7 @@ from stageflow.core import StageContext
 
 from soft_skills_backend.engines.config import load_marking_runtime_config
 from soft_skills_backend.engines.marking.domain.rubric_repository import RubricRepository
-from soft_skills_backend.modules.practice.domain.practice import validate_assessment_draft
+from soft_skills_backend.modules.practice.domain.practice import PracticeType, validate_assessment_draft
 from soft_skills_backend.modules.practice.models import ValidatedAssessmentPayload
 from soft_skills_backend.modules.practice.workflows.assessment.marking_provider import (
     AssessmentMarkingProvider,
@@ -30,6 +30,14 @@ from soft_skills_backend.shared.errors import AppError, scoring_error
 from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
 from ..infra.repository import PracticeRepository
+
+
+def _required_rubric_skills(prompt_payload: ResolvedAttemptPayload) -> list[str] | None:
+    if prompt_payload.prompt.practice_type == PracticeType.QUICK_PRACTICE:
+        return None if not prompt_payload.prompt.target_skill_slugs else list(
+            prompt_payload.prompt.target_skill_slugs
+        )
+    return list(prompt_payload.prompt.target_skill_slugs)
 
 
 class AssessmentService:
@@ -150,7 +158,7 @@ class AssessmentService:
         try:
             rubric_definition = self._rubric_repository.get_rubric_definition(
                 prompt_payload.prompt.rubric_id,
-                required_skill_slugs=prompt_payload.prompt.target_skill_slugs,
+                required_skill_slugs=_required_rubric_skills(prompt_payload),
             )
             validate_assessment_draft(
                 response_text=prompt_payload.response_text,

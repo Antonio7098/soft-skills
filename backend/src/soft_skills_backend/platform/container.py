@@ -12,6 +12,8 @@ from soft_skills_backend.engines.marking.domain.rubric_repository import (
     SqlAlchemyRubricRepository,
 )
 from soft_skills_backend.entrypoints.http.health import HealthService
+from soft_skills_backend.modules.admin.domain.prompt_registry import PromptRegistry
+from soft_skills_backend.modules.admin.infra.prompt_repository import PromptRepository
 from soft_skills_backend.modules.admin import AdminService
 from soft_skills_backend.modules.assistant import AssistantService
 from soft_skills_backend.modules.assistant.infra.realtime import AssistantRealtimeBroker
@@ -118,13 +120,17 @@ def build_container(settings: Settings) -> AppContainer:
         execution_trace_repository=pipeline_execution_traces,
     )
     auth_provider = HeaderAuthProvider(session_factory, workflow_events=workflow_events)
+    prompt_repository = PromptRepository(session_factory)
+    prompt_registry = PromptRegistry(settings=settings, prompts=prompt_repository)
     identity_service = IdentityService(
         session_factory=session_factory,
         workflow_events=workflow_events,
     )
     admin_service = AdminService(
+        settings=settings,
         session_factory=session_factory,
         workflow_events=workflow_events,
+        prompt_repository=prompt_repository,
         pipeline_definitions=pipeline_definitions,
         stage_definitions=stage_definitions,
         pipeline_execution_traces=pipeline_execution_traces,
@@ -146,6 +152,7 @@ def build_container(settings: Settings) -> AppContainer:
         session_factory=session_factory,
         workflow_events=workflow_events,
         llm_provider=llm_provider,
+        prompt_registry=prompt_registry,
         stageflow_runtime=stageflow_runtime,
         generation_broker=generation_broker,
     )
@@ -195,6 +202,7 @@ def build_container(settings: Settings) -> AppContainer:
             practice_service=practice_service,
             progression_service=progression_service,
             stageflow_runtime=stageflow_runtime,
+            prompt_registry=prompt_registry,
             settings=settings,
         ),
         background_tasks=background_tasks,

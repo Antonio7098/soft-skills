@@ -12,6 +12,10 @@ from stageflow.api import Pipeline, StageKind, stage
 from stageflow.core import StageContext
 
 from soft_skills_backend.engines.config.models import CatalogGenerationRuntimeConfig
+from soft_skills_backend.modules.admin.domain.prompt_registry import PromptRegistry
+from soft_skills_backend.modules.admin.workflows.prompt_render_stage import (
+    create_prompt_render_stage,
+)
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
     ChatCollectionGenerationCommand,
     StructuredCollectionGenerationCommand,
@@ -32,7 +36,8 @@ from soft_skills_backend.modules.catalog.workflows.generation.persistence import
     persist_generated_collection,
 )
 from soft_skills_backend.modules.catalog.workflows.generation.prompting import (
-    generate_collection_blueprint,
+    build_collection_blueprint_prompt_request,
+    generate_collection_blueprint_from_prompt,
 )
 from soft_skills_backend.modules.catalog.workflows.generation.validation import (
     validate_collection_blueprint,
@@ -44,7 +49,6 @@ from soft_skills_backend.modules.catalog.workflows.generation.workers import (
     run_scenario_workers,
 )
 from soft_skills_backend.modules.practice.workflows.assessment import (
-    PromptLibrary,
     TypedLLMOutput,
     TypedLLMResult,
 )
@@ -77,7 +81,7 @@ async def generate_collection(
     llm_provider: LLMProvider,
     prompt_security_policy: PromptSecurityPolicy,
     stageflow: StageflowPipelineSupport,
-    prompt_library: PromptLibrary,
+    prompt_registry: PromptRegistry,
     config: CatalogGenerationRuntimeConfig,
     blueprint_output: TypedLLMOutput,
     prompt_item_worker_output: TypedLLMOutput,
@@ -105,21 +109,44 @@ async def generate_collection(
         )
 
     async def blueprint_transform(ctx: StageContext) -> Any:
-        typed_result = await generate_collection_blueprint(
-            ctx=ctx,
-            prompt_library=prompt_library,
+        prompt_request = build_collection_blueprint_prompt_request(
             config=config,
             llm_provider=llm_provider,
             prompt_security_policy=prompt_security_policy,
-            blueprint_output=blueprint_output,
             structured_command=structured_command,
             chat_command=chat_command,
             sanitize_text=sanitize_text,
         )
+        return ok_output(
+            StageflowStageResult(
+                payload=prompt_request,
+                summary={
+                    "prompt_name": prompt_request.name,
+                    "prompt_version": prompt_request.version,
+                },
+            )
+        )
+
+    async def blueprint_render(ctx: StageContext) -> Any:
+        renderer = create_prompt_render_stage(
+            prompt_registry=prompt_registry,
+            request_stage_name="blueprint_transform",
+        )
+        return await renderer(ctx)
+
+    async def blueprint_llm_transform(ctx: StageContext) -> Any:
+        typed_result = await generate_collection_blueprint_from_prompt(
+            ctx=ctx,
+            config=config,
+            llm_provider=llm_provider,
+            blueprint_output=blueprint_output,
+            rendered_prompt=payload_from_inputs(ctx, "blueprint_render"),
+            structured_command=structured_command,
+        )
         if progress_callback:
             blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
             progress_callback(
-                "blueprint_transform",
+                "blueprint_llm_transform",
                 15.0,
                 {
                     "mode": mode,
@@ -140,7 +167,7 @@ async def generate_collection(
     async def blueprint_guard(ctx: StageContext) -> Any:
         if progress_callback:
             progress_callback("blueprint_guard", 20.0, {})
-        typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_transform"))
+        typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_llm_transform"))
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
         validate_collection_blueprint(
             config=config,
@@ -167,7 +194,7 @@ async def generate_collection(
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
         prompt_item_results = await run_prompt_item_workers(
             parent_ctx=ctx,
-            prompt_library=prompt_library,
+            prompt_registry=prompt_registry,
             config=config,
             llm_provider=llm_provider,
             prompt_item_worker_output=prompt_item_worker_output,
@@ -214,7 +241,7 @@ async def generate_collection(
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
         scenario_results = await run_scenario_workers(
             parent_ctx=ctx,
-            prompt_library=prompt_library,
+            prompt_registry=prompt_registry,
             config=config,
             llm_provider=llm_provider,
             scenario_worker_output=scenario_worker_output,
@@ -379,10 +406,22 @@ async def generate_collection(
             dependencies=("input_guard",),
         ),
         stage(
+            "blueprint_render",
+            cast(Any, blueprint_render),
+            StageKind.TRANSFORM,
+            dependencies=("blueprint_transform",),
+        ),
+        stage(
+            "blueprint_llm_transform",
+            cast(Any, blueprint_llm_transform),
+            StageKind.TRANSFORM,
+            dependencies=("blueprint_render",),
+        ),
+        stage(
             "blueprint_guard",
             cast(Any, blueprint_guard),
             StageKind.GUARD,
-            dependencies=("blueprint_transform",),
+            dependencies=("blueprint_llm_transform",),
         ),
         stage(
             "prompt_items_work",

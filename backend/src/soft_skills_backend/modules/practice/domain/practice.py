@@ -234,6 +234,8 @@ def validate_assessment_draft(
     """Enforce explainability and scoring guards before persistence."""
 
     expected_skills = list(dict.fromkeys(required_skill_slugs))
+    if not expected_skills and rubric_definition is not None:
+        expected_skills = [criterion.criterion_ref for criterion in rubric_definition.criteria]
     response_normalized = _normalize_text(response_text)
     evidence_by_skill: dict[str, list[EvidenceReference]] = {}
     prompt = PromptContract(

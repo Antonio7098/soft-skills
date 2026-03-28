@@ -9,7 +9,7 @@ from typing import Any, cast
 from sqlalchemy.orm import Session, sessionmaker
 from stageflow.core import StageContext
 
-from soft_skills_backend.config import Settings
+from soft_skills_backend.config import LLMTaskKind, Settings
 from soft_skills_backend.engines.config import load_marking_runtime_config
 from soft_skills_backend.engines.marking.domain.rubric_repository import SqlAlchemyRubricRepository
 from soft_skills_backend.modules.evaluation.contracts.commands import EvaluationRunCommand
@@ -120,7 +120,9 @@ class MarkingBenchmarkRunner:
     ) -> None:
         required_rubric_ids = {case.prompt.rubric_id for case in selected_cases}
         rubric_map = {
-            rubric.rubric_id: rubric for rubric in dataset.rubrics if rubric.rubric_id in required_rubric_ids
+            rubric.rubric_id: rubric
+            for rubric in dataset.rubrics
+            if rubric.rubric_id in required_rubric_ids
         }
         missing = sorted(required_rubric_ids.difference(rubric_map))
         if missing:
@@ -172,7 +174,11 @@ class MarkingBenchmarkRunner:
 
     def _build_marker(self, model_slug: str) -> DefaultAssessmentMarkingProvider:
         settings = self._settings.model_copy(
-            update={"llm_marking_model": model_slug, "llm_marking_model_backup": None}
+            update={
+                "llm_marking_per_skill_model": model_slug,
+                "llm_marking_aggregation_model": model_slug,
+                "llm_default_backup_model": None,
+            }
         )
         provider = self._provider_factory(settings, self._provider_call_logger)
         return DefaultAssessmentMarkingProvider(
@@ -461,7 +467,7 @@ class MarkingBenchmarkRunner:
         )
 
     def _default_model_slug(self) -> str:
-        return self._settings.llm_marking_model or self._settings.provider_model_slug
+        return self._settings.get_llm_model_for_task(LLMTaskKind.MARKING_PER_SKILL)
 
     def _default_provider_factory(self, settings: Settings, provider_call_logger: Any) -> Any:
         return OpenAICompatibleLLMProvider(

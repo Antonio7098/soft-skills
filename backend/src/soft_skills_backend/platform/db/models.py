@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, Float, JSON, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from soft_skills_backend.platform.db.base import Base
@@ -366,6 +366,61 @@ class ContentGenerationArtifactRecord(Base):
     output_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     raw_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class PromptVersionRecord(Base):
+    """Database-backed versioned prompt template."""
+
+    __tablename__ = "prompt_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128), index=True)
+    version: Mapped[str] = mapped_column(String(64), index=True)
+    prompt_type: Mapped[str] = mapped_column(String(32), index=True)
+    template: Mapped[str] = mapped_column(Text)
+    variables_schema: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    output_schema: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    parent_version_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    __table_args__ = (Index("ix_prompt_versions_name_version", "name", "version", unique=True),)
+
+
+class PromptRenderMetricsRecord(Base):
+    """Aggregated prompt render metrics by prompt version."""
+
+    __tablename__ = "prompt_render_metrics"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    prompt_version_id: Mapped[int] = mapped_column(Integer, index=True)
+    render_count: Mapped[int] = mapped_column(Integer, default=0)
+    success_count: Mapped[int] = mapped_column(Integer, default=0)
+    failure_count: Mapped[int] = mapped_column(Integer, default=0)
+    avg_latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    total_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    last_rendered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("ix_prompt_render_metrics_version_id", "prompt_version_id", unique=True),
+    )
+
+
+class PromptRenderEventRecord(Base):
+    """One prompt render event for lineage and audit."""
+
+    __tablename__ = "prompt_render_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    prompt_version_id: Mapped[int] = mapped_column(Integer, index=True)
+    success: Mapped[bool] = mapped_column(Boolean)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    rendered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class PracticeRunRecord(Base):

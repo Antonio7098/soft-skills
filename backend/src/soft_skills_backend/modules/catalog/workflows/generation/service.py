@@ -12,6 +12,7 @@ from stageflow.agent.security import PromptSecurityError, PromptSecurityPolicy
 
 from soft_skills_backend.config import Settings
 from soft_skills_backend.engines.config import load_catalog_generation_runtime_config
+from soft_skills_backend.modules.admin.domain.prompt_registry import PromptRegistry
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
     ChatCollectionGenerationCommand,
     StructuredCollectionGenerationCommand,
@@ -43,9 +44,6 @@ from soft_skills_backend.modules.catalog.workflows.generation.collection_pipelin
 from soft_skills_backend.modules.catalog.workflows.generation.prompt_item_pipeline import (
     generate_prompt_items_for_collection,
 )
-from soft_skills_backend.modules.catalog.workflows.generation.prompt_library import (
-    build_catalog_generation_prompt_library,
-)
 from soft_skills_backend.modules.practice.workflows.assessment import TypedLLMOutput
 from soft_skills_backend.platform.db.models import RubricRecord
 from soft_skills_backend.platform.workflows.stageflow import StageflowPipelineSupport
@@ -73,6 +71,7 @@ class CatalogGenerationService:
         events: CatalogEventRecorder,
         llm_provider: LLMProvider,
         prompt_security_policy: PromptSecurityPolicy,
+        prompt_registry: PromptRegistry,
         stageflow_runtime: StageflowRuntime,
         broker: GenerationRealtimeBroker | None = None,
     ) -> None:
@@ -81,8 +80,8 @@ class CatalogGenerationService:
         self._events = events
         self._llm_provider = llm_provider
         self._prompt_security_policy = prompt_security_policy
+        self._prompt_registry = prompt_registry
         self._stageflow = StageflowPipelineSupport.from_runtime(stageflow_runtime)
-        self._prompt_library = build_catalog_generation_prompt_library(settings)
         self._config = load_catalog_generation_runtime_config()
         self._blueprint_output = TypedLLMOutput(
             GeneratedCollectionBlueprint,
@@ -154,7 +153,7 @@ class CatalogGenerationService:
             llm_provider=self._llm_provider,
             prompt_security_policy=self._prompt_security_policy,
             stageflow=self._stageflow,
-            prompt_library=self._prompt_library,
+            prompt_registry=self._prompt_registry,
             config=self._config,
             blueprint_output=self._blueprint_output,
             prompt_item_worker_output=self._prompt_item_worker_output,
@@ -186,7 +185,7 @@ class CatalogGenerationService:
             llm_provider=self._llm_provider,
             prompt_security_policy=self._prompt_security_policy,
             stageflow=self._stageflow,
-            prompt_library=self._prompt_library,
+            prompt_registry=self._prompt_registry,
             config=self._config,
             blueprint_output=self._blueprint_output,
             prompt_item_worker_output=self._prompt_item_worker_output,
@@ -220,7 +219,7 @@ class CatalogGenerationService:
             llm_provider=self._llm_provider,
             prompt_security_policy=self._prompt_security_policy,
             stageflow=self._stageflow,
-            prompt_library=self._prompt_library,
+            prompt_registry=self._prompt_registry,
             config=self._config,
             prompt_item_plan_output=self._prompt_item_plan_output,
             prompt_item_worker_output=self._prompt_item_worker_output,
@@ -253,7 +252,7 @@ class CatalogGenerationService:
             llm_provider=self._llm_provider,
             prompt_security_policy=self._prompt_security_policy,
             stageflow=self._stageflow,
-            prompt_library=self._prompt_library,
+            prompt_registry=self._prompt_registry,
             config=self._config,
             prompt_item_plan_output=self._prompt_item_plan_output,
             prompt_item_worker_output=self._prompt_item_worker_output,
@@ -326,7 +325,7 @@ class CatalogGenerationService:
                 llm_provider=self._llm_provider,
                 prompt_security_policy=self._prompt_security_policy,
                 stageflow=self._stageflow,
-                prompt_library=self._prompt_library,
+                prompt_registry=self._prompt_registry,
                 config=self._config,
                 blueprint_output=self._blueprint_output,
                 prompt_item_worker_output=self._prompt_item_worker_output,
@@ -432,7 +431,7 @@ class CatalogGenerationService:
                 llm_provider=self._llm_provider,
                 prompt_security_policy=self._prompt_security_policy,
                 stageflow=self._stageflow,
-                prompt_library=self._prompt_library,
+                prompt_registry=self._prompt_registry,
                 config=self._config,
                 blueprint_output=self._blueprint_output,
                 prompt_item_worker_output=self._prompt_item_worker_output,

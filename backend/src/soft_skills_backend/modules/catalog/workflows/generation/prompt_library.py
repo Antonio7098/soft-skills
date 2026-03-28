@@ -21,55 +21,46 @@ from soft_skills_backend.platform.providers.llm.prompts import (
 def build_catalog_generation_prompt_library(settings: Settings) -> PromptLibrary:
     """Build the versioned prompt library for creator generation."""
 
+    library = PromptLibrary()
+    for template in catalog_generation_prompt_templates(settings):
+        library.register(template, make_default=True)
+    return library
+
+
+def catalog_generation_prompt_templates(settings: Settings) -> list[PromptTemplate]:
+    """Return the built-in catalog generation prompt templates."""
+
     del settings
     config = load_catalog_generation_runtime_config()
-    library = PromptLibrary()
-    library.register(
+    return [
         PromptTemplate(
             name=config.structured_prompt_name,
             version=config.structured_prompt_version,
             template=CREATOR_STRUCTURED_COLLECTION_BLUEPRINT_PROMPT,
         ),
-        make_default=True,
-    )
-    library.register(
         PromptTemplate(
             name=config.chat_prompt_name,
             version=config.chat_prompt_version,
             template=CREATOR_CHAT_COLLECTION_BLUEPRINT_PROMPT,
         ),
-        make_default=True,
-    )
-    library.register(
         PromptTemplate(
             name=config.prompt_item_structured_prompt_name,
             version=config.prompt_item_structured_prompt_version,
             template=CREATOR_STRUCTURED_PROMPT_ITEM_PLAN_PROMPT,
         ),
-        make_default=True,
-    )
-    library.register(
         PromptTemplate(
             name=config.prompt_item_chat_prompt_name,
             version=config.prompt_item_chat_prompt_version,
             template=CREATOR_CHAT_PROMPT_ITEM_PLAN_PROMPT,
         ),
-        make_default=True,
-    )
-    library.register(
         PromptTemplate(
             name=config.prompt_item_worker_prompt_name,
             version=config.prompt_item_worker_prompt_version,
             template=CREATOR_PROMPT_ITEM_WORKER_PROMPT,
         ),
-        make_default=True,
-    )
-    library.register(
         PromptTemplate(
             name=config.scenario_worker_prompt_name,
             version=config.scenario_worker_prompt_version,
             template=CREATOR_SCENARIO_WORKER_PROMPT,
         ),
-        make_default=True,
-    )
-    return library
+    ]

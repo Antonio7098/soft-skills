@@ -269,10 +269,6 @@ Sprint 13 was too large and has been split into 9 focused sprints for better man
 **Status:** Not Started
 **Detail:** [ops/sprints/sprint-13h-user-cohort-analytics.md](ops/sprints/sprint-13h-user-cohort-analytics.md)
 
-### Sprint 13i: Policy Layer
-**Status:** Not Started
-**Detail:** [ops/sprints/sprint-13i-policy-layer.md](ops/sprints/sprint-13i-policy-layer.md)
-
 **Combined Exit Criteria:** The backend provides comprehensive event logging, observability infrastructure, and APIs sufficient for admin dashboard visibility.
 
 ---

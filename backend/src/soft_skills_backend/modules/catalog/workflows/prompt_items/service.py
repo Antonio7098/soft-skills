@@ -34,6 +34,12 @@ from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import domain_error
 
 
+def _normalize_prompt_item_skills(prompt_type: str, target_skill_slugs: list[str]) -> list[str]:
+    if prompt_type == "quick_practice_prompt":
+        return []
+    return list(target_skill_slugs)
+
+
 class PromptItemService:
     """Own prompt item authoring operations."""
 
@@ -87,7 +93,9 @@ class PromptItemService:
                     prompt_text=command.prompt_text,
                     difficulty=command.difficulty,
                     lifecycle_state="draft",
-                    target_skill_slugs=list(command.target_skill_slugs),
+                    target_skill_slugs=_normalize_prompt_item_skills(
+                        command.prompt_type, command.target_skill_slugs
+                    ),
                     rubric_id=command.rubric_id,
                     created_at=datetime.now(UTC),
                     updated_at=datetime.now(UTC),
@@ -173,7 +181,9 @@ class PromptItemService:
                 prompt_item.title = command.title
                 prompt_item.prompt_text = command.prompt_text
                 prompt_item.difficulty = command.difficulty
-                prompt_item.target_skill_slugs = list(command.target_skill_slugs)
+                prompt_item.target_skill_slugs = _normalize_prompt_item_skills(
+                    command.prompt_type, command.target_skill_slugs
+                )
                 prompt_item.rubric_id = command.rubric_id
                 prompt_item.updated_at = datetime.now(UTC)
                 collection.updated_at = datetime.now(UTC)

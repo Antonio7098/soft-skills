@@ -202,7 +202,7 @@ class GenerationStreamingSmoke(SmokeCase):
                                     else str(payload)
                                 )
                                 break
-                            elif stage == "blueprint_transform" and not blueprint:
+                            elif stage == "blueprint_llm_transform" and not blueprint:
                                 payload = event_data.get("payload", {})
                                 blueprint = BlueprintPayload(
                                     title=payload.get("title"),
