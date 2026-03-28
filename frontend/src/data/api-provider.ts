@@ -11,6 +11,36 @@ import type {
   PracticeRunView,
   PracticeSessionView,
   CollectionGenerationView,
+  AdminUserView,
+  AdminUserListView,
+  BulkOperationResultView,
+  UserActivityView,
+  LearnerAnalyticsView,
+  AdminLearnerRelationshipView,
+  AnalyticsOverviewView,
+  CohortAnalyticsView,
+  CohortComparisonView,
+  CollectionVerificationQueueItemView,
+  CollectionVerificationAuditView,
+  EvaluationSuiteView,
+  EvaluationRunView,
+  EvaluationDashboardView,
+  EvaluationComparisonView,
+  BenchmarkDashboardView,
+  EvaluationCaseDetailView,
+  PromptSummaryView,
+  PromptVersionView,
+  PromptAnalyticsView,
+  PromptCompareView,
+  PipelineDefinitionView,
+  PipelineDAGView,
+  PipelineRunSummaryView,
+  PipelineTraceView,
+  PipelineMetricsView,
+  RubricView,
+  WorkflowEventView,
+  PaginatedWorkflowEventsView,
+  AttemptAuditView,
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
@@ -139,4 +169,201 @@ export const apiDataProvider: DataProvider = {
   getAttemptHistory: async () => {
     throw new Error('Attempt history API not yet implemented - use mock provider');
   },
+
+  // --- Admin: Users & User Management ----------------------------------------
+  listAdminUsers: (params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
+    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.role) searchParams.set('role', params.role);
+    if (params?.is_active !== undefined) searchParams.set('is_active', String(params.is_active));
+    const qs = searchParams.toString();
+    return request<AdminUserListView>(`/admin/users${qs ? `?${qs}` : ''}`);
+  },
+  getAdminUser: (userId) => request<AdminUserView | null>(`/admin/users/${userId}`),
+  updateAdminUserRole: (userId, role) =>
+    request<AdminUserView>(`/admin/users/${userId}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  updateAdminUserStatus: (userId, isActive) =>
+    request<AdminUserView>(`/admin/users/${userId}/status`, { method: 'PATCH', body: JSON.stringify({ is_active: isActive }) }),
+  createAdminUser: (cmd) => request<AdminUserView>('/admin/users', { method: 'POST', body: JSON.stringify(cmd) }),
+  bulkAdminUserOperation: (cmd) =>
+    request<BulkOperationResultView>('/admin/users/bulk', { method: 'POST', body: JSON.stringify(cmd) }),
+  getUserActivity: (userId) => request<UserActivityView>(`/admin/users/${userId}/activity`),
+
+  // --- Admin: Learners & Relationships --------------------------------------
+  getLearnerAnalytics: (learnerId, params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.from_date) searchParams.set('from_date', params.from_date);
+    if (params?.to_date) searchParams.set('to_date', params.to_date);
+    const qs = searchParams.toString();
+    return request<LearnerAnalyticsView>(`/admin/learners/${learnerId}/analytics${qs ? `?${qs}` : ''}`);
+  },
+  getLearnerRelationship: (learnerId) =>
+    request<AdminLearnerRelationshipView | null>(`/admin/learners/${learnerId}/relationship`),
+  upsertLearnerRelationship: (learnerId, relationshipType) =>
+    request<AdminLearnerRelationshipView>(`/admin/learners/${learnerId}/relationship`, {
+      method: 'PUT',
+      body: JSON.stringify({ relationship_type: relationshipType }),
+    }),
+  deleteLearnerRelationship: (learnerId) =>
+    request<{ status: string }>(`/admin/learners/${learnerId}/relationship`, { method: 'DELETE' }),
+
+  // --- Admin: Analytics Overview ---------------------------------------------
+  getAnalyticsOverview: (params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.from_date) searchParams.set('from_date', params.from_date);
+    if (params?.to_date) searchParams.set('to_date', params.to_date);
+    const qs = searchParams.toString();
+    return request<AnalyticsOverviewView>(`/admin/analytics/overview${qs ? `?${qs}` : ''}`);
+  },
+  getCohortAnalytics: (params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.target_role) searchParams.set('target_role', params.target_role);
+    if (params?.from_date) searchParams.set('from_date', params.from_date);
+    if (params?.to_date) searchParams.set('to_date', params.to_date);
+    const qs = searchParams.toString();
+    return request<CohortAnalyticsView>(`/admin/cohorts/analytics${qs ? `?${qs}` : ''}`);
+  },
+  getCohortsComparison: (params) => {
+    const searchParams = new URLSearchParams();
+    if (params.cohort_keys) searchParams.set('cohort_keys', params.cohort_keys);
+    if (params?.from_date) searchParams.set('from_date', params.from_date);
+    if (params?.to_date) searchParams.set('to_date', params.to_date);
+    const qs = searchParams.toString();
+    return request<CohortComparisonView>(`/admin/cohorts/comparison${qs ? `?${qs}` : ''}`);
+  },
+
+  // --- Admin: Collections & Verification -----------------------------------
+  getVerificationQueue: () => request<CollectionVerificationQueueItemView[]>('/admin/collections/verification-queue'),
+  getCollectionVerification: (collectionId) =>
+    request<CollectionVerificationAuditView>(`/admin/collections/${collectionId}/verification`),
+  updateCollectionVerification: (collectionId, cmd) =>
+    request<CollectionVerificationAuditView>(`/admin/collections/${collectionId}/verification`, {
+      method: 'POST',
+      body: JSON.stringify(cmd),
+    }),
+  updateCollectionFeature: (collectionId, featured) =>
+    request<CollectionView>(`/admin/collections/${collectionId}/feature`, {
+      method: 'PATCH',
+      body: JSON.stringify({ featured }),
+    }),
+
+  // --- Admin: Evaluation Dashboard -------------------------------------------
+  listEvalSuites: () => request<EvaluationSuiteView[]>('/admin/evaluations/suites'),
+  listEvalRuns: (params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    const qs = searchParams.toString();
+    return request<EvaluationRunView[]>(`/admin/evaluations/runs${qs ? `?${qs}` : ''}`);
+  },
+  getEvalRun: (runId) => request<EvaluationRunView>(`/admin/evaluations/runs/${runId}`),
+  triggerEvalRun: (cmd) =>
+    request<EvaluationRunView>('/admin/evaluations/runs', { method: 'POST', body: JSON.stringify(cmd) }),
+  getEvalDashboard: (params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.from_date) searchParams.set('from_date', params.from_date);
+    if (params?.to_date) searchParams.set('to_date', params.to_date);
+    const qs = searchParams.toString();
+    return request<EvaluationDashboardView>(`/admin/evaluations/dashboard${qs ? `?${qs}` : ''}`);
+  },
+  getEvalRunsComparison: (params) => {
+    const searchParams = new URLSearchParams();
+    if (params.run_ids) searchParams.set('run_ids', params.run_ids);
+    if (params?.from_date) searchParams.set('from_date', params.from_date);
+    if (params?.to_date) searchParams.set('to_date', params.to_date);
+    const qs = searchParams.toString();
+    return request<EvaluationComparisonView>(`/admin/evaluations/runs/compare${qs ? `?${qs}` : ''}`);
+  },
+  getEvalBenchmark: (params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.from_date) searchParams.set('from_date', params.from_date);
+    if (params?.to_date) searchParams.set('to_date', params.to_date);
+    const qs = searchParams.toString();
+    return request<BenchmarkDashboardView>(`/admin/evaluations/benchmark${qs ? `?${qs}` : ''}`);
+  },
+  getEvalCaseDetail: (caseId) => request<EvaluationCaseDetailView>(`/admin/evaluations/cases/${caseId}`),
+
+  // --- Admin: Prompts --------------------------------------------------------
+  listPrompts: () => request<PromptSummaryView[]>('/admin/prompts'),
+  listPromptVersions: (name) => request<PromptVersionView[]>(`/admin/prompts/${encodeURIComponent(name)}/versions`),
+  getPromptVersion: (name, version) =>
+    request<PromptVersionView>(`/admin/prompts/${encodeURIComponent(name)}/versions/${encodeURIComponent(version)}`),
+  createPrompt: (cmd) => request<PromptVersionView>('/admin/prompts', { method: 'POST', body: JSON.stringify(cmd) }),
+  updatePrompt: (name, version, cmd) =>
+    request<PromptVersionView>(`/admin/prompts/${encodeURIComponent(name)}/versions/${encodeURIComponent(version)}`, {
+      method: 'PUT',
+      body: JSON.stringify(cmd),
+    }),
+  publishPrompt: (name, version) =>
+    request<PromptVersionView>(`/admin/prompts/${encodeURIComponent(name)}/versions/${encodeURIComponent(version)}/publish`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  archivePrompt: (name, version) =>
+    request<PromptVersionView>(`/admin/prompts/${encodeURIComponent(name)}/versions/${encodeURIComponent(version)}/archive`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  getPromptAnalytics: (name, version) =>
+    request<PromptAnalyticsView>(`/admin/prompts/${encodeURIComponent(name)}/versions/${encodeURIComponent(version)}/analytics`),
+  comparePrompts: (cmd) => request<PromptCompareView>('/admin/prompts/compare', { method: 'POST', body: JSON.stringify(cmd) }),
+
+  // --- Admin: Pipelines ------------------------------------------------------
+  listPipelines: () => request<PipelineDefinitionView[]>('/admin/pipelines'),
+  getPipelineDAG: (pipelineName) => request<PipelineDAGView>(`/admin/pipelines/${encodeURIComponent(pipelineName)}`),
+  listPipelineRuns: (pipelineName, params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
+    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    const qs = searchParams.toString();
+    return request<PipelineRunSummaryView[]>(`/admin/pipelines/${encodeURIComponent(pipelineName)}/runs${qs ? `?${qs}` : ''}`);
+  },
+  getPipelineTrace: (pipelineName, pipelineRunId) =>
+    request<PipelineTraceView>(`/admin/pipelines/${encodeURIComponent(pipelineName)}/runs/${encodeURIComponent(pipelineRunId)}/trace`),
+  getPipelineMetrics: (pipelineName) =>
+    request<PipelineMetricsView>(`/admin/pipelines/${encodeURIComponent(pipelineName)}/metrics`),
+
+  // --- Admin: Rubrics --------------------------------------------------------
+  listRubrics: () => request<RubricView[]>('/admin/rubrics'),
+  getRubric: (rubricId) => request<RubricView>(`/admin/rubrics/${encodeURIComponent(rubricId)}`),
+  createRubric: (cmd) => request<RubricView>('/admin/rubrics', { method: 'POST', body: JSON.stringify(cmd) }),
+  updateRubric: (rubricId, cmd) =>
+    request<RubricView>(`/admin/rubrics/${encodeURIComponent(rubricId)}`, { method: 'PATCH', body: JSON.stringify(cmd) }),
+  deleteRubric: (rubricId) =>
+    request<{ status: string }>(`/admin/rubrics/${encodeURIComponent(rubricId)}`, { method: 'DELETE' }),
+  addRubricCriterion: (rubricId, criterion) =>
+    request<RubricView>(`/admin/rubrics/${encodeURIComponent(rubricId)}/criteria`, {
+      method: 'POST',
+      body: JSON.stringify(criterion),
+    }),
+  updateRubricCriterion: (rubricId, criterionRef, criterion) =>
+    request<RubricView>(`/admin/rubrics/${encodeURIComponent(rubricId)}/criteria/${encodeURIComponent(criterionRef)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(criterion),
+    }),
+  deleteRubricCriterion: (rubricId, criterionRef) =>
+    request<RubricView>(`/admin/rubrics/${encodeURIComponent(rubricId)}/criteria/${encodeURIComponent(criterionRef)}`, {
+      method: 'DELETE',
+    }),
+
+  // --- Admin: Audit & Events -------------------------------------------------
+  listWorkflowEvents: (params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.event_type) searchParams.set('event_type', params.event_type);
+    if (params?.trace_id) searchParams.set('trace_id', params.trace_id);
+    if (params?.workflow_id) searchParams.set('workflow_id', params.workflow_id);
+    if (params?.request_id) searchParams.set('request_id', params.request_id);
+    if (params?.error_code) searchParams.set('error_code', params.error_code);
+    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
+    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    const qs = searchParams.toString();
+    return request<PaginatedWorkflowEventsView>(`/events${qs ? `?${qs}` : ''}`);
+  },
+  getWorkflowEvent: (eventId) => request<WorkflowEventView>(`/events/${encodeURIComponent(eventId)}`),
+  updateWorkflowEvent: (eventId, cmd) =>
+    request<WorkflowEventView>(`/events/${encodeURIComponent(eventId)}`, { method: 'PATCH', body: JSON.stringify(cmd) }),
+  deleteWorkflowEvent: (eventId) =>
+    request<{ status: string }>(`/events/${encodeURIComponent(eventId)}`, { method: 'DELETE' }),
+  getAttemptAudit: (attemptId) => request<AttemptAuditView>(`/admin/attempts/${attemptId}/audit`),
 };
