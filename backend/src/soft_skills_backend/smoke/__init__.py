@@ -17,6 +17,7 @@ from .suites.assessment_marking import (
 )
 from .suites.assistant_runtime import (
     AssistantGenerationRuntimeSmoke,
+    AssistantPracticeRuntimeSmoke,
     AssistantReadRuntimeSmoke,
     AssistantStreamRuntimeSmoke,
 )
@@ -30,6 +31,7 @@ from .suites.content_generation import (
 )
 from .suites.eval_dashboard_smoke import EvalDashboardSmoke
 from .suites.evaluation_smoke import EvaluationSmoke
+from .suites.full_user_journey import FullUserJourneySmoke
 from .suites.generation_streaming import GenerationStreamingSmoke
 from .suites.organisation_smoke import OrganisationSmoke
 from .suites.pipeline_visualization import PipelineVisualizationSmoke
@@ -47,6 +49,7 @@ def build_default_registry() -> SmokeRegistry:
             ProviderBaselineSmoke(),
             AssistantReadRuntimeSmoke(),
             AssistantGenerationRuntimeSmoke(),
+            AssistantPracticeRuntimeSmoke(),
             AssistantStreamRuntimeSmoke(),
             StructuredGenerationSmoke(),
             ChatGenerationSmoke(),
@@ -68,6 +71,7 @@ def build_default_registry() -> SmokeRegistry:
             AdminAnalyticsSmoke(),
             PipelineVisualizationSmoke(),
             TelemetrySmoke(),
+            FullUserJourneySmoke(),
         ]
     )
 

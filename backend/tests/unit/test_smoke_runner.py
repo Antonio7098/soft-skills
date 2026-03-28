@@ -52,6 +52,7 @@ def test_default_registry_includes_practice_run_lifecycle_smoke() -> None:
         "provider-baseline",
         "assistant-read-runtime",
         "assistant-generation-runtime",
+        "assistant-practice-runtime",
         "assistant-stream-runtime",
         "generation-structured",
         "generation-chat",
@@ -73,4 +74,5 @@ def test_default_registry_includes_practice_run_lifecycle_smoke() -> None:
         "admin-analytics",
         "pipeline-visualization",
         "telemetry",
+        "full-user-journey",
     ]

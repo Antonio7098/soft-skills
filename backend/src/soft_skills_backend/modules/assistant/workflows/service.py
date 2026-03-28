@@ -41,6 +41,9 @@ from soft_skills_backend.modules.assistant.workflows.prompting import (
     ASSISTANT_PROMPT_VERSION,
     render_tool_definitions,
 )
+from soft_skills_backend.modules.assistant.workflows.practice_facilitation import (
+    AssistantPracticeState,
+)
 from soft_skills_backend.modules.assistant.workflows.runtime_models import AssistantDecision
 from soft_skills_backend.modules.assistant.workflows.tools import (
     ASSISTANT_RUNTIME_STAGE,
@@ -66,6 +69,16 @@ from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 MAX_TOOL_ITERATIONS = 6
 _GENERATION_REQUEST_PATTERN = re.compile(
     r"\b(generate|create|draft|make|add|build)\b",
+    re.IGNORECASE,
+)
+_PRACTICE_STOP_PATTERN = re.compile(
+    r"\b(stop|end|cancel|quit|leave|exit)\b",
+    re.IGNORECASE,
+)
+_PRACTICE_RECALL_PATTERN = re.compile(
+    r"\b(repeat|restate|remind)\b|"
+    r"\bwhat (?:is|was)\b.*\b(question|prompt)\b|"
+    r"\bshow\b.*\b(question|prompt)\b",
     re.IGNORECASE,
 )
 
@@ -288,6 +301,20 @@ class AssistantWorkflowService:
                 )
             )
 
+        async def session_state_enrich(_ctx: StageContext) -> Any:
+            state = AssistantPracticeState.from_session_metadata(
+                self._repository.load_session_metadata(
+                    actor=execution.actor,
+                    session_id=execution.session_id,
+                )
+            )
+            return ok_output(
+                StageflowStageResult(
+                    payload=state,
+                    summary={"practice_active": state.is_active()},
+                )
+            )
+
         async def planning_prompt_request(ctx: StageContext) -> Any:
             prompt_request = PromptRenderRequest(
                 name=ASSISTANT_PROMPT_NAME,
@@ -305,6 +332,10 @@ class AssistantWorkflowService:
                         },
                         sort_keys=True,
                     ),
+                    "practice_state": cast(
+                        AssistantPracticeState,
+                        payload_from_inputs(ctx, "session_state_enrich"),
+                    ).model_dump_json(),
                     "tool_definitions": render_tool_definitions(),
                     "conversation_history": "Conversation history is attached as lower-priority messages.",
                 },
@@ -333,6 +364,10 @@ class AssistantWorkflowService:
                 active=active,
                 rendered_prompt=cast(RenderedPrompt, payload_from_inputs(ctx, "planning_prompt_render")),
                 history=cast(list[Any], payload_from_inputs(ctx, "history_enrich")),
+                practice_state=cast(
+                    AssistantPracticeState,
+                    payload_from_inputs(ctx, "session_state_enrich"),
+                ),
             )
             if result.cancelled:
                 reason = result.reason or "cancelled"
@@ -462,10 +497,21 @@ class AssistantWorkflowService:
                 dependencies=("input_guard",),
             ),
             stage(
+                "session_state_enrich",
+                session_state_enrich,  # type: ignore[arg-type]
+                StageKind.ENRICH,
+                dependencies=("input_guard",),
+            ),
+            stage(
                 "planning_prompt_request",
                 planning_prompt_request,  # type: ignore[arg-type]
                 StageKind.TRANSFORM,
-                dependencies=("profile_enrich", "progress_enrich", "attempts_enrich"),
+                dependencies=(
+                    "profile_enrich",
+                    "progress_enrich",
+                    "attempts_enrich",
+                    "session_state_enrich",
+                ),
             ),
             stage(
                 "planning_prompt_render",
@@ -480,6 +526,7 @@ class AssistantWorkflowService:
                 dependencies=(
                     "history_enrich",
                     "planning_prompt_render",
+                    "session_state_enrich",
                 ),
             ),
             stage(
@@ -511,9 +558,10 @@ class AssistantWorkflowService:
         active: ActiveTurnExecution,
         rendered_prompt: RenderedPrompt,
         history: list[Any],
+        practice_state: AssistantPracticeState,
     ) -> _AssistantLoopResult:
         messages = [{"role": "system", "content": rendered_prompt.content}]
-        required_tool_name = _required_generation_tool_name(history)
+        required_tool_name = _required_tool_name(history, practice_state)
         corrective_prompt_sent = False
         has_executed_tool = False
         for message in history:
@@ -561,7 +609,7 @@ class AssistantWorkflowService:
                         {
                             "role": "system",
                             "content": (
-                                "The latest user request explicitly requires content generation. "
+                                "The latest user request requires a specific tool action. "
                                 f"You must call the `{required_tool_name}` tool next and must not "
                                 "return final_response until the tool result is available."
                             ),
@@ -599,6 +647,7 @@ class AssistantWorkflowService:
                     request_id=execution.request_id,
                     trace_id=execution.trace_id,
                     workflow_id=execution.workflow_id,
+                    session_id=execution.session_id,
                     turn_id=execution.turn_id,
                     stream_token=execution.stream_token,
                 ),
@@ -884,15 +933,16 @@ def _chunk_text(text: str, *, chunk_size: int = 80) -> list[str]:
         chunks.append(current)
     return chunks
 
-def _required_generation_tool_name(history: list[Any]) -> str | None:
-    latest_user_message = next(
-        (
-            str(message.content)
-            for message in reversed(history)
-            if getattr(getattr(message, "role", None), "value", None) == "user"
-        ),
-        "",
-    )
+def _required_tool_name(history: list[Any], practice_state: AssistantPracticeState) -> str | None:
+    latest_user_message = _latest_user_message(history)
+    if practice_state.is_active() and _is_practice_recall_message(latest_user_message):
+        return "get_active_practice"
+    if practice_state.is_active() and not _is_practice_control_message(latest_user_message):
+        return "submit_active_practice_response"
+    return _required_generation_tool_name(latest_user_message)
+
+
+def _required_generation_tool_name(latest_user_message: str) -> str | None:
     if not latest_user_message or _GENERATION_REQUEST_PATTERN.search(latest_user_message) is None:
         return None
     lowered = latest_user_message.lower()
@@ -903,6 +953,25 @@ def _required_generation_tool_name(history: list[Any]) -> str | None:
     if "prompt item" in lowered or "prompt-item" in lowered:
         return "generate_prompt_items"
     return "generate_collection"
+
+
+def _latest_user_message(history: list[Any]) -> str:
+    return next(
+        (
+            str(message.content)
+            for message in reversed(history)
+            if getattr(getattr(message, "role", None), "value", None) == "user"
+        ),
+        "",
+    )
+
+
+def _is_practice_control_message(message: str) -> bool:
+    return bool(message and _PRACTICE_STOP_PATTERN.search(message))
+
+
+def _is_practice_recall_message(message: str) -> bool:
+    return bool(message and _PRACTICE_RECALL_PATTERN.search(message))
 
 
 def _utcnow() -> datetime:

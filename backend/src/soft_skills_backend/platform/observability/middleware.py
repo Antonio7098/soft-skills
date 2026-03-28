@@ -62,6 +62,7 @@ class RequestContextMiddleware:
         query_params = dict(self._parse_query_params(scope.get("query_string", b"")))
         user_agent = headers.get("user-agent", "")[:256] if headers.get("user-agent") else None
 
+        received_event_task: asyncio.Task[None] | None = None
         if self._workflow_events is not None:
             received_event = WorkflowEvent(
                 event_type="http.request.received.v1",
@@ -76,7 +77,7 @@ class RequestContextMiddleware:
                     "client_ip": client_ip,
                 },
             )
-            asyncio.get_running_loop().create_task(
+            received_event_task = asyncio.create_task(
                 asyncio.to_thread(self._workflow_events.record, received_event)
             )
 
@@ -106,6 +107,8 @@ class RequestContextMiddleware:
             error_code = getattr(exc, "code", None)
             raise
         finally:
+            if received_event_task is not None:
+                await received_event_task
             duration_ms = int((perf_counter() - start_time) * 1000)
             logger.info(
                 "http.request.completed",
@@ -129,9 +132,7 @@ class RequestContextMiddleware:
                         "error_code": error_code,
                     },
                 )
-                asyncio.get_running_loop().create_task(
-                    asyncio.to_thread(self._workflow_events.record, completed_event)
-                )
+                await asyncio.to_thread(self._workflow_events.record, completed_event)
             clear_request_context()
 
     def _extract_client_ip(self, scope: Scope) -> str | None:

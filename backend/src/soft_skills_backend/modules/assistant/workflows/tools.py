@@ -12,6 +12,10 @@ from stageflow.core import StageContext
 
 from soft_skills_backend.modules.assistant.infra.realtime import AssistantRealtimeBroker
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
+from soft_skills_backend.modules.assistant.workflows.practice_facilitation import (
+    AssistantPracticeCoordinator,
+    StartCollectionPracticeToolArgs,
+)
 from soft_skills_backend.modules.assistant.workflows.runtime_models import AssistantToolRequest
 from soft_skills_backend.modules.catalog import CatalogService
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
@@ -47,6 +51,7 @@ class ToolExecutionContext:
     request_id: str
     trace_id: str
     workflow_id: str
+    session_id: str
     turn_id: str
     stream_token: str
 
@@ -68,6 +73,11 @@ class AssistantToolExecutor:
         self._catalog = catalog_service
         self._practice = practice_service
         self._stageflow = stageflow_support
+        self._practice_tools = AssistantPracticeCoordinator(
+            repository=repository,
+            catalog_service=catalog_service,
+            practice_service=practice_service,
+        )
 
     async def execute_many(
         self,
@@ -221,6 +231,36 @@ class AssistantToolExecutor:
             attempt_id = _require_string(arguments, "attempt_id")
             attempt = self._practice.get_attempt(execution.actor, attempt_id)
             return {"attempt": attempt.model_dump(mode="json")}, None
+        if tool_request.tool_name == "start_collection_practice":
+            result = await self._practice_tools.start_collection_practice(
+                actor=execution.actor,
+                session_id=execution.session_id,
+                request_id=execution.request_id,
+                trace_id=execution.trace_id,
+                args=StartCollectionPracticeToolArgs.model_validate(arguments),
+            )
+            return {"practice": result.model_dump(mode="json")}, None
+        if tool_request.tool_name == "get_active_practice":
+            result = self._practice_tools.get_active_practice(
+                actor=execution.actor,
+                session_id=execution.session_id,
+            )
+            return {"practice": result.model_dump(mode="json")}, None
+        if tool_request.tool_name == "submit_active_practice_response":
+            result = await self._practice_tools.submit_active_practice_response(
+                actor=execution.actor,
+                session_id=execution.session_id,
+                request_id=execution.request_id,
+                trace_id=execution.trace_id,
+                response_text=_optional_string(arguments, "response_text"),
+            )
+            return {"practice": result.model_dump(mode="json")}, None
+        if tool_request.tool_name == "end_active_practice":
+            result = self._practice_tools.end_active_practice(
+                actor=execution.actor,
+                session_id=execution.session_id,
+            )
+            return {"practice": result.model_dump(mode="json")}, None
         if tool_request.tool_name == "generate_collection":
             return await self._run_generate_collection(
                 parent_ctx=stage_ctx,
@@ -377,6 +417,20 @@ def _require_string(payload: dict[str, Any], key: str) -> str:
         "Assistant tool argument was missing",
         code="SS-VALIDATION-203",
         details={"argument": key},
+    )
+
+
+def _optional_string(payload: dict[str, Any], key: str) -> str | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if isinstance(value, str):
+        cleaned = value.strip()
+        return cleaned or None
+    raise validation_error(
+        "Assistant tool argument had the wrong type",
+        code="SS-VALIDATION-215",
+        details={"argument": key, "expected_type": "string"},
     )
 
 

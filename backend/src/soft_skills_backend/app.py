@@ -51,6 +51,7 @@ def create_app(settings: Settings | None = None, container: AppContainer | None 
             yield
         finally:
             await resolved_container.background_tasks.shutdown()
+            await resolved_container.shutdown()
             resolved_container.dispose()
             logger.info("application.shutdown")
 

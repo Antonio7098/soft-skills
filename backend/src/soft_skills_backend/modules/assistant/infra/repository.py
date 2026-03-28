@@ -240,6 +240,24 @@ class AssistantRepository:
             )
             return [self._build_message_view(record) for record in reversed(records)]
 
+    def load_session_metadata(self, *, actor: Actor, session_id: str) -> dict[str, Any]:
+        with self._session_factory() as session:
+            record = self._load_owned_session(session, actor, session_id)
+            return dict(record.metadata_payload)
+
+    def update_session_metadata(
+        self,
+        *,
+        actor: Actor,
+        session_id: str,
+        metadata_payload: dict[str, Any],
+    ) -> None:
+        with self._session_factory() as session:
+            record = self._load_owned_session(session, actor, session_id)
+            record.metadata_payload = dict(metadata_payload)
+            record.updated_at = datetime.now(UTC)
+            session.commit()
+
     def list_messages(self, *, actor: Actor, session_id: str) -> list[AssistantMessageView]:
         with self._session_factory() as session:
             self._load_owned_session(session, actor, session_id)

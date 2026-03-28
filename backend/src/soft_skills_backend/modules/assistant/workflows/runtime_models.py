@@ -11,6 +11,10 @@ AssistantToolName = Literal[
     "get_collection",
     "list_recent_attempts",
     "get_attempt",
+    "start_collection_practice",
+    "get_active_practice",
+    "submit_active_practice_response",
+    "end_active_practice",
     "generate_collection",
     "generate_prompt_items",
 ]

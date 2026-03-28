@@ -21,7 +21,11 @@ from soft_skills_backend.smoke.support.environment import (
     SmokeApplicationSessionFactory,
 )
 
-from .contracts import AssistantRuntimeSmokeResult, AssistantStreamSmokeResult
+from .contracts import (
+    AssistantPracticeRuntimeSmokeResult,
+    AssistantRuntimeSmokeResult,
+    AssistantStreamSmokeResult,
+)
 
 ASSISTANT_SMOKE_TIMEOUT_SECONDS = 420.0
 
@@ -181,6 +185,189 @@ class AssistantGenerationRuntimeSmoke(_AssistantRuntimeSmoke):
             "session_id": str(session_payload["id"]),
             "turn_id": str(turn_payload["id"]),
             "turn_status": str(turn["status"]),
+            "tool_names": tool_names,
+            "message_count": len(messages),
+            "assistant_message_preview": str(assistant_message.get("content", ""))[:160],
+        }
+
+
+class AssistantPracticeRuntimeSmoke(_AssistantRuntimeSmoke):
+    """Provider-backed multi-turn assistant practice facilitation flow."""
+
+    def __init__(
+        self,
+        *,
+        preflight: ProviderSmokePreflight | None = None,
+        session_factory: SmokeApplicationSessionFactory | None = None,
+        flow_timeout_seconds: float = ASSISTANT_SMOKE_TIMEOUT_SECONDS,
+    ) -> None:
+        super().__init__(
+            name="assistant-practice-runtime",
+            description="Run a provider-backed assistant practice session across multiple turns.",
+            preflight=preflight,
+            session_factory=session_factory,
+            flow_timeout_seconds=flow_timeout_seconds,
+        )
+
+    def run(self, context: SmokeContext) -> AssistantPracticeRuntimeSmokeResult:  # type: ignore[override]
+        self._preflight.assert_ready(context.settings)
+        try:
+            return asyncio.run(
+                asyncio.wait_for(
+                    self._run_practice(context.settings),
+                    timeout=self._flow_timeout_seconds,
+                )
+            )
+        except TimeoutError as exc:
+            raise provider_error(
+                "Smoke flow exceeded the allowed runtime budget",
+                code="SS-PROVIDER-012",
+                details={"timeout_seconds": self._flow_timeout_seconds},
+            ) from exc
+
+    async def _run_practice(self, settings: Settings) -> AssistantPracticeRuntimeSmokeResult:
+        async with self._session_factory.open(settings) as backend:
+            actors = await SmokeActorBootstrap(backend).prepare()
+            payload = await self._run_flow(backend, actors.learner_id)
+            return AssistantPracticeRuntimeSmokeResult.model_validate(payload)
+
+    async def _run_flow(self, backend: SmokeBackendClient, user_id: str) -> JsonObject:
+        collection_id = await backend.create_collection(
+            user_id=user_id,
+            title="Assistant Practice Smoke",
+            content_format_mix=["quick_practice_prompt"],
+            target_skill_slugs=["active-listening", "expectation-setting"],
+            target_competency_slugs=["stakeholder-management"],
+            rubric_ids=["quick_practice_reset_timeline@v1"],
+        )
+        await backend.create_prompt_item(
+            collection_id=collection_id,
+            user_id=user_id,
+            operation="create assistant practice smoke prompt 1",
+            payload={
+                "prompt_type": "quick_practice_prompt",
+                "title": "Reset the timeline",
+                "prompt_text": (
+                    "A client asks for an impossible delivery date. Respond with empathy and a realistic next step."
+                ),
+                "difficulty": "intermediate",
+                "target_skill_slugs": ["active-listening", "expectation-setting"],
+                "rubric_id": "quick_practice_reset_timeline@v1",
+            },
+        )
+        await backend.create_prompt_item(
+            collection_id=collection_id,
+            user_id=user_id,
+            operation="create assistant practice smoke prompt 2",
+            payload={
+                "prompt_type": "quick_practice_prompt",
+                "title": "Handle a scope push",
+                "prompt_text": (
+                    "A stakeholder wants extra scope without moving the deadline. Respond with a clear tradeoff."
+                ),
+                "difficulty": "intermediate",
+                "target_skill_slugs": ["active-listening", "expectation-setting"],
+                "rubric_id": "quick_practice_reset_timeline@v1",
+            },
+        )
+
+        session_payload = await backend.create_assistant_session(
+            user_id=user_id,
+            title="Assistant Practice Smoke",
+        )
+        session_id = str(session_payload["id"])
+
+        turn_ids: list[str] = []
+        tool_names: list[str] = []
+
+        start_turn = await backend.create_assistant_turn(
+            user_id=user_id,
+            session_id=session_id,
+            message=(
+                f"Start a two-question practice session from collection {collection_id}. "
+                "Ask me the first question and wait for my answer."
+            ),
+        )
+        turn_ids.append(str(start_turn["id"]))
+        completed_start_turn = await backend.wait_for_assistant_turn(
+            user_id=user_id,
+            session_id=session_id,
+            turn_id=str(start_turn["id"]),
+            timeout_seconds=240.0,
+        )
+        tool_names.extend(
+            str(tool["tool_name"])
+            for tool in cast(list[JsonObject], completed_start_turn.get("tool_calls", []))
+        )
+        practice_run_id = str(
+            cast(list[JsonObject], completed_start_turn["tool_calls"])[0]["result"]["practice"][
+                "practice_run_id"
+            ]
+        )
+
+        first_answer_turn = await backend.create_assistant_turn(
+            user_id=user_id,
+            session_id=session_id,
+            message=(
+                "I understand why the date matters. The earliest realistic option is next Friday, "
+                "and I can confirm any scope tradeoff with the team tomorrow afternoon."
+            ),
+        )
+        turn_ids.append(str(first_answer_turn["id"]))
+        completed_first_answer_turn = await backend.wait_for_assistant_turn(
+            user_id=user_id,
+            session_id=session_id,
+            turn_id=str(first_answer_turn["id"]),
+            timeout_seconds=240.0,
+        )
+        tool_names.extend(
+            str(tool["tool_name"])
+            for tool in cast(list[JsonObject], completed_first_answer_turn.get("tool_calls", []))
+        )
+
+        second_answer_turn = await backend.create_assistant_turn(
+            user_id=user_id,
+            session_id=session_id,
+            message=(
+                "I hear the urgency. If we add the scope now, we need to move the date by two days, "
+                "or we keep the date and defer the new request until the next checkpoint."
+            ),
+        )
+        turn_ids.append(str(second_answer_turn["id"]))
+        completed_second_answer_turn = await backend.wait_for_assistant_turn(
+            user_id=user_id,
+            session_id=session_id,
+            turn_id=str(second_answer_turn["id"]),
+            timeout_seconds=240.0,
+        )
+        tool_names.extend(
+            str(tool["tool_name"])
+            for tool in cast(list[JsonObject], completed_second_answer_turn.get("tool_calls", []))
+        )
+
+        messages = await backend.list_assistant_messages(
+            user_id=user_id,
+            session_id=session_id,
+        )
+        assistant_message = cast(JsonObject, messages[-1]) if messages else {}
+        if "start_collection_practice" not in tool_names:
+            raise provider_error(
+                "Assistant practice smoke did not invoke the practice-start tool",
+                code="SS-PROVIDER-011",
+                details={"tool_names": tool_names},
+            )
+        submit_count = sum(tool_name == "submit_active_practice_response" for tool_name in tool_names)
+        if submit_count < 2:
+            raise provider_error(
+                "Assistant practice smoke did not submit both active practice answers",
+                code="SS-PROVIDER-011",
+                details={"tool_names": tool_names, "submit_count": submit_count},
+            )
+        return {
+            "status": "ok",
+            "session_id": session_id,
+            "practice_run_id": practice_run_id,
+            "turn_ids": turn_ids,
             "tool_names": tool_names,
             "message_count": len(messages),
             "assistant_message_preview": str(assistant_message.get("content", ""))[:160],

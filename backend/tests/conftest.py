@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 from collections.abc import AsyncGenerator
 from pathlib import Path
@@ -32,6 +33,15 @@ def app(test_settings: Settings):
 
 @pytest_asyncio.fixture()
 async def client(app) -> AsyncGenerator[httpx.AsyncClient, None]:
+    loop = asyncio.get_running_loop()
+    app.state.container.background_tasks.attach(loop)
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as async_client:
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://testserver",
+    ) as async_client:
         yield async_client
+    await app.state.container.background_tasks.shutdown()
+    await app.state.container.shutdown()
+    app.state.container.dispose()
+    await loop.shutdown_default_executor()
