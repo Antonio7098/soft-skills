@@ -13,20 +13,24 @@ import type {
   CollectionGenerationView,
 } from './types';
 
-// ---------------------------------------------------------------------------
-// ApiDataProvider — thin wrapper over the real backend REST API.
-// All methods mirror the backend FastAPI routes.
-// ---------------------------------------------------------------------------
-
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
 
+function getAuthHeaders(): Record<string, string> {
+  const userId = sessionStorage.getItem('ss_user_id');
+  if (!userId) return {};
+  return { 'X-User-ID': userId };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...getAuthHeaders(),
+    ...init?.headers,
+  };
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
+    headers,
   });
 
   if (!res.ok) {
@@ -38,9 +42,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return envelope.data as T;
 }
 
+export function setUserId(userId: string): void {
+  sessionStorage.setItem('ss_user_id', userId);
+}
+
+export function clearUserId(): void {
+  sessionStorage.removeItem('ss_user_id');
+}
+
+export function getUserId(): string | null {
+  return sessionStorage.getItem('ss_user_id');
+}
+
 export const apiDataProvider: DataProvider = {
   // --- Auth / Identity -----------------------------------------------------
-  register: (cmd) => request<UserView>('/auth/register', { method: 'POST', body: JSON.stringify(cmd) }),
+  register: (cmd) => {
+    const result = request<UserView>('/auth/register', { method: 'POST', body: JSON.stringify(cmd) });
+    result.then((user) => setUserId(user.id)).catch(() => {});
+    return result;
+  },
   getMe: () => request<UserView>('/users/me'),
   updateProfile: (cmd) => request<UserView>('/users/me/profile', { method: 'PATCH', body: JSON.stringify(cmd) }),
 
@@ -54,6 +74,10 @@ export const apiDataProvider: DataProvider = {
     if (filters?.skill_slug) params.set('skill_slug', filters.skill_slug);
     if (filters?.competency_slug) params.set('competency_slug', filters.competency_slug);
     if (filters?.include_private !== undefined) params.set('include_private', String(filters.include_private));
+    if (filters?.saved_only) params.set('saved_only', 'true');
+    if (filters?.discovery_tier) params.set('discovery_tier', filters.discovery_tier);
+    if (filters?.author_user_id) params.set('author_user_id', filters.author_user_id);
+    if (filters?.organisation_id) params.set('organisation_id', filters.organisation_id);
     const qs = params.toString();
     return request<CollectionView[]>(`/collections${qs ? `?${qs}` : ''}`);
   },
@@ -77,21 +101,30 @@ export const apiDataProvider: DataProvider = {
     request<AttemptView>(`/attempts/${attemptId}/submit`, { method: 'POST', body: JSON.stringify(cmd) }),
   getAttempt: (attemptId) => request<AttemptView>(`/attempts/${attemptId}`),
 
-  // --- Interview -----------------------------------------------------------
+  // --- Interview (maps to same backend endpoint, returns PracticeSessionView) ---
   startInterviewSession: (promptItemId) =>
     request<InterviewSessionView>('/attempts/interview/sessions', { method: 'POST', body: JSON.stringify({ prompt_item_id: promptItemId }) }),
-  submitInterviewTurn: (sessionId, cmd) =>
-    request<InterviewSessionView>(`/attempts/interview/sessions/${sessionId}/turns`, { method: 'POST', body: JSON.stringify(cmd) }),
+  submitInterviewTurn: (_sessionId, _cmd) => {
+    throw new Error('submitInterviewTurn not yet implemented in backend - use mock provider');
+  },
 
-  // --- Scenario ------------------------------------------------------------
+  // --- Scenario (maps to same backend endpoint, returns PracticeSessionView) ---
   startScenarioSession: (scenarioId) =>
     request<ScenarioSessionView>('/attempts/scenario/sessions', { method: 'POST', body: JSON.stringify({ scenario_id: scenarioId }) }),
-  submitScenarioStep: (sessionId, cmd) =>
-    request<ScenarioSessionView>(`/attempts/scenario/sessions/${sessionId}/steps`, { method: 'POST', body: JSON.stringify(cmd) }),
+  submitScenarioStep: (_sessionId, _cmd) => {
+    throw new Error('submitScenarioStep not yet implemented in backend - use mock provider');
+  },
 
-  // --- Practice Runs (Aggregate) ---------------------------------------------
-  createPracticeRun: (cmd) =>
-    request<PracticeRunView>('/practice-runs', { method: 'POST', body: JSON.stringify(cmd) }),
+  // --- Practice Runs (Aggregate) -------------------------------------------
+  createPracticeRun: (cmd) => {
+    const adapted = {
+      items: cmd.selected_items.map((item) => ({
+        ...item,
+        practice_type: item.item_type === 'prompt_item' ? 'quick_practice' : item.item_type,
+      })),
+    };
+    return request<PracticeRunView>('/practice-runs', { method: 'POST', body: JSON.stringify(adapted) });
+  },
   listPracticeRuns: () =>
     request<PracticeRunView[]>('/practice-runs'),
   getPracticeRun: (runId) =>
@@ -99,11 +132,11 @@ export const apiDataProvider: DataProvider = {
   getPracticeSessions: (runId) =>
     request<PracticeSessionView[]>(`/practice-runs/${runId}/sessions`),
 
-  // --- Progress (no backend endpoint yet — stub) ---------------------------
+  // --- Progress -----------------------------------------------------------
   getCompetencyProgress: async () => {
-    throw new Error('Progress API not yet implemented');
+    throw new Error('Progress API not yet implemented - use mock provider');
   },
   getAttemptHistory: async () => {
-    throw new Error('Attempt history API not yet implemented');
+    throw new Error('Attempt history API not yet implemented - use mock provider');
   },
 };
