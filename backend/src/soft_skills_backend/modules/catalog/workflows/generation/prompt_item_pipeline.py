@@ -33,7 +33,7 @@ from soft_skills_backend.modules.catalog.domain.validators import (
     validate_prompt_command,
     validate_prompt_item_generation_request,
 )
-from soft_skills_backend.modules.catalog.infra.events import CatalogEventRecorder
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.modules.catalog.workflows.generation.persistence import (
     build_planner_artifact,
     build_worker_artifact,
@@ -82,7 +82,7 @@ async def generate_prompt_items_for_collection(
     structured_command: StructuredPromptItemGenerationCommand | None,
     chat_command: ChatPromptItemGenerationCommand | None,
     session_factory: sessionmaker[Session],
-    events: CatalogEventRecorder,
+    events: WorkflowEventRecorder,
     llm_provider: LLMProvider,
     prompt_security_policy: PromptSecurityPolicy,
     stageflow: StageflowPipelineSupport,
@@ -139,7 +139,10 @@ async def generate_prompt_items_for_collection(
         return ok_output(
             StageflowStageResult(
                 payload=prompt_request,
-                summary={"prompt_name": prompt_request.name, "prompt_version": prompt_request.version},
+                summary={
+                    "prompt_name": prompt_request.name,
+                    "prompt_version": prompt_request.version,
+                },
             )
         )
 
@@ -320,7 +323,10 @@ async def generate_prompt_items_for_collection(
             dependencies=("plan_render",),
         ),
         stage(
-            "plan_guard", cast(Any, plan_guard), StageKind.GUARD, dependencies=("plan_llm_transform",)
+            "plan_guard",
+            cast(Any, plan_guard),
+            StageKind.GUARD,
+            dependencies=("plan_llm_transform",),
         ),
         stage(
             "prompt_items_work",

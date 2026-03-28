@@ -23,7 +23,7 @@ from soft_skills_backend.modules.catalog.domain.models import (
     GenerationManifest,
     GenerationWorkerArtifact,
 )
-from soft_skills_backend.modules.catalog.infra.events import CatalogEventRecorder
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.modules.catalog.workflows.generation.workers import WorkerExecutionResult
 from soft_skills_backend.modules.practice.workflows.assessment import TypedLLMResult
 from soft_skills_backend.platform.db.models import (
@@ -44,7 +44,7 @@ from soft_skills_backend.shared.errors import domain_error
 def persist_generated_collection(
     *,
     session_factory: sessionmaker[Session],
-    events: CatalogEventRecorder,
+    events: WorkflowEventRecorder,
     config: CatalogGenerationRuntimeConfig,
     actor: Actor,
     request_id: str,
@@ -201,7 +201,7 @@ def persist_generated_collection(
 def persist_generated_prompt_items(
     *,
     session_factory: sessionmaker[Session],
-    events: CatalogEventRecorder,
+    events: WorkflowEventRecorder,
     config: CatalogGenerationRuntimeConfig,
     actor: Actor,
     request_id: str,

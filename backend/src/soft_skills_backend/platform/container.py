@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -91,6 +92,16 @@ class AppContainer:
     pipeline_execution_traces: SqlAlchemyPipelineExecutionTraceRepository
     stageflow_runtime: StageflowRuntime
     background_tasks: BackgroundTaskRunner
+
+    async def shutdown(self) -> None:
+        """Clean up async infrastructure resources."""
+
+        runtime_objects = self.stageflow_runtime.runtime_objects or {}
+        event_sink = runtime_objects.get("event_sink")
+        if event_sink is not None:
+            stop = getattr(event_sink, "stop", None)
+            if callable(stop):
+                await stop(drain=True)
 
     def dispose(self) -> None:
         """Clean up infrastructure resources."""

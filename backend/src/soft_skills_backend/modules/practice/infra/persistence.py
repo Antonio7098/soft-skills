@@ -48,13 +48,13 @@ from soft_skills_backend.shared.errors import (
 )
 
 from ..contracts.views import build_attempt_view, build_practice_run_view, utcnow, utcnow_iso
-from .events import PracticeEventRecorder
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 
 
 def persist_session_start(
     *,
     session_factory: sessionmaker[Session],
-    events: PracticeEventRecorder,
+    events: WorkflowEventRecorder,
     ctx: StageContext,
     actor: Actor,
     transform_payload: SessionTransformPayload,
@@ -149,7 +149,7 @@ def persist_session_start(
 def persist_practice_run_start(
     *,
     session_factory: sessionmaker[Session],
-    events: PracticeEventRecorder,
+    events: WorkflowEventRecorder,
     ctx: StageContext,
     actor: Actor,
     transform_payload: PracticeRunTransformPayload,
@@ -275,7 +275,7 @@ def persist_practice_run_start(
 def persist_attempt_submission(
     *,
     session_factory: sessionmaker[Session],
-    events: PracticeEventRecorder,
+    events: WorkflowEventRecorder,
     ctx: StageContext,
     guard: AttemptGuardPayload,
 ) -> StageflowStageResult:
@@ -349,7 +349,7 @@ def mark_attempt_assessing(
 def persist_assessment(
     *,
     session_factory: sessionmaker[Session],
-    events: PracticeEventRecorder,
+    events: WorkflowEventRecorder,
     ctx: StageContext,
     guard: AttemptGuardPayload,
     assessment: ValidatedAssessmentPayload,
@@ -458,7 +458,7 @@ def persist_rejected_assessment(
     *,
     session_factory: sessionmaker[Session],
     settings: Settings,
-    events: PracticeEventRecorder,
+    events: WorkflowEventRecorder,
     attempt_id: str,
     request_id: str,
     trace_id: str,
@@ -534,7 +534,7 @@ def persist_rejected_assessment(
 def mark_attempt_failed(
     *,
     session_factory: sessionmaker[Session],
-    events: PracticeEventRecorder,
+    events: WorkflowEventRecorder,
     attempt_id: str,
     request_id: str,
     trace_id: str,

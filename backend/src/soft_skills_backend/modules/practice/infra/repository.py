@@ -33,7 +33,7 @@ from ..contracts.views import (
     build_practice_run_list_item,
     build_practice_run_view,
 )
-from .events import PracticeEventRecorder
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from .persistence import (
     mark_attempt_assessing,
     mark_attempt_failed,
@@ -66,7 +66,9 @@ class PracticeRepository:
     ) -> None:
         self._settings = settings
         self._session_factory = session_factory
-        self._events = PracticeEventRecorder(workflow_events)
+        self._events = WorkflowEventRecorder(
+            workflow_events, logger_name="soft_skills_backend.practice"
+        )
 
     def load_start_prompt_context(
         self,

@@ -29,7 +29,7 @@ from soft_skills_backend.modules.catalog.domain.models import (
     GenerationManifest,
 )
 from soft_skills_backend.modules.catalog.domain.validators import validate_generation_request
-from soft_skills_backend.modules.catalog.infra.events import CatalogEventRecorder
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.modules.catalog.workflows.generation.persistence import (
     build_planner_artifact,
     build_worker_artifact,
@@ -77,7 +77,7 @@ async def generate_collection(
     structured_command: StructuredCollectionGenerationCommand | None,
     chat_command: ChatCollectionGenerationCommand | None,
     session_factory: sessionmaker[Session],
-    events: CatalogEventRecorder,
+    events: WorkflowEventRecorder,
     llm_provider: LLMProvider,
     prompt_security_policy: PromptSecurityPolicy,
     stageflow: StageflowPipelineSupport,

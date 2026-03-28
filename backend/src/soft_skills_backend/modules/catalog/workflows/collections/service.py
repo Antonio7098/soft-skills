@@ -32,7 +32,7 @@ from soft_skills_backend.modules.catalog.domain.validators import (
     validate_collection_unsave,
     validate_lifecycle_transition,
 )
-from soft_skills_backend.modules.catalog.infra.events import CatalogEventRecorder
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.db.models import (
     CollectionRatingRecord,
     CollectionRecord,
@@ -59,7 +59,7 @@ class CollectionService:
         self,
         *,
         session_factory: sessionmaker[Session],
-        events: CatalogEventRecorder,
+        events: WorkflowEventRecorder,
         stageflow_runtime: StageflowRuntime,
     ) -> None:
         self._session_factory = session_factory

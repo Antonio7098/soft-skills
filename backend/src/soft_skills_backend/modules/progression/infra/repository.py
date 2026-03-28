@@ -64,7 +64,7 @@ from soft_skills_backend.shared.errors import (
     validation_error,
 )
 
-from .events import ProgressionEventRecorder
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 
 
 def _utcnow() -> datetime:
@@ -101,7 +101,9 @@ class ProgressionRepository:
         workflow_events: SqlAlchemyWorkflowEventRepository,
     ) -> None:
         self._session_factory = session_factory
-        self._events = ProgressionEventRecorder(workflow_events)
+        self._events = WorkflowEventRecorder(
+            workflow_events, logger_name="soft_skills_backend.progression"
+        )
 
     def load_refresh_input(self, assessment_id: str) -> ProgressionRefreshInput:
         with self._session_factory() as session:

@@ -33,7 +33,7 @@ from soft_skills_backend.modules.catalog.domain.models import (
     GeneratedPromptItemPlanBatch,
     GeneratedScenarioDraft,
 )
-from soft_skills_backend.modules.catalog.infra.events import CatalogEventRecorder
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.modules.catalog.infra.realtime import (
     GenerationExecution,
     GenerationRealtimeBroker,
@@ -68,7 +68,7 @@ class CatalogGenerationService:
         *,
         settings: Settings,
         session_factory: sessionmaker[Session],
-        events: CatalogEventRecorder,
+        events: WorkflowEventRecorder,
         llm_provider: LLMProvider,
         prompt_security_policy: PromptSecurityPolicy,
         prompt_registry: PromptRegistry,

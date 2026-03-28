@@ -20,7 +20,7 @@ from soft_skills_backend.modules.catalog.domain.validators import (
     require_collection_owner_or_admin,
     validate_scenario_command,
 )
-from soft_skills_backend.modules.catalog.infra.events import CatalogEventRecorder
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.modules.catalog.workflows.collections.service import CollectionService
 from soft_skills_backend.platform.db.models import (
     CollectionRecord,
@@ -48,7 +48,7 @@ class ScenarioService:
         self,
         *,
         session_factory: sessionmaker[Session],
-        events: CatalogEventRecorder,
+        events: WorkflowEventRecorder,
         collections: CollectionService,
         stageflow_runtime: StageflowRuntime,
     ) -> None:

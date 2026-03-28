@@ -29,13 +29,13 @@ from soft_skills_backend.modules.evaluation.domain.evaluation import (
     EvaluationComputation,
     builtin_suites,
 )
-from soft_skills_backend.modules.evaluation.infra.events import EvaluationEventRecorder
 from soft_skills_backend.platform.db.models import (
     EvaluationCaseResultRecord,
     EvaluationRunRecord,
     EvaluationSuiteRecord,
 )
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.workflows.stageflow import (
     metadata_value,
     pipeline_run_id_from_context,
@@ -59,7 +59,9 @@ class EvaluationRepository:
         workflow_events: SqlAlchemyWorkflowEventRepository,
     ) -> None:
         self._session_factory = session_factory
-        self._events = EvaluationEventRecorder(workflow_events)
+        self._events = WorkflowEventRecorder(
+            workflow_events, logger_name="soft_skills_backend.evaluation"
+        )
 
     def sync_builtin_suites(self) -> None:
         now = _utcnow()
