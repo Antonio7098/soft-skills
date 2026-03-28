@@ -37,7 +37,7 @@ async def create_session(
     request: Request,
     command: CreateAssistantSessionCommand,
 ) -> ApiEnvelope[AssistantSessionView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_assistant_service(request)
     payload = service.create_session(actor, _correlation_from_request(request), command)
     return ok_response(request, payload)
@@ -45,24 +45,26 @@ async def create_session(
 
 @router.get("/sessions", response_model=ApiEnvelope[list[AssistantSessionView]])
 async def list_sessions(request: Request) -> ApiEnvelope[list[AssistantSessionView]]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_assistant_service(request)
     return ok_response(request, service.list_sessions(actor))
 
 
 @router.get("/sessions/{session_id}", response_model=ApiEnvelope[AssistantSessionView])
 async def get_session(request: Request, session_id: str) -> ApiEnvelope[AssistantSessionView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_assistant_service(request)
     return ok_response(request, service.get_session(actor, session_id))
 
 
-@router.get("/sessions/{session_id}/messages", response_model=ApiEnvelope[list[AssistantMessageView]])
+@router.get(
+    "/sessions/{session_id}/messages", response_model=ApiEnvelope[list[AssistantMessageView]]
+)
 async def list_messages(
     request: Request,
     session_id: str,
 ) -> ApiEnvelope[list[AssistantMessageView]]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_assistant_service(request)
     return ok_response(request, service.list_messages(actor, session_id))
 
@@ -73,7 +75,7 @@ async def create_turn(
     session_id: str,
     command: CreateAssistantTurnCommand,
 ) -> ApiEnvelope[AssistantTurnView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_assistant_service(request)
     payload = service.create_turn(actor, _correlation_from_request(request), session_id, command)
     return ok_response(request, payload)
@@ -85,7 +87,7 @@ async def cancel_turn(
     turn_id: str,
     command: CancelAssistantTurnCommand,
 ) -> ApiEnvelope[AssistantTurnView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_assistant_service(request)
     payload = await service.cancel_turn(actor, turn_id, command)
     return ok_response(request, payload)
@@ -93,7 +95,7 @@ async def cancel_turn(
 
 @router.get("/turns/{turn_id}", response_model=ApiEnvelope[AssistantTurnView])
 async def get_turn(request: Request, turn_id: str) -> ApiEnvelope[AssistantTurnView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_assistant_service(request)
     return ok_response(request, service.get_turn(actor, turn_id))
 

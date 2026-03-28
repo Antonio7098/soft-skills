@@ -455,3 +455,83 @@ class PipelineMetricsView(BaseModel):
     failure_count: int = 0
     cancel_count: int = 0
     stage_metrics: list[StageMetricsView] = Field(default_factory=list)
+
+
+class AdminUserView(BaseModel):
+    """Admin view of a user."""
+
+    user_id: str
+    email: str
+    display_name: str
+    auth_provider: str
+    is_active: bool
+    organisation_id: str | None = None
+    organisation_role: str | None = None
+    created_at: str | None = None
+
+
+class AdminUserListView(BaseModel):
+    """Paginated list of users."""
+
+    users: list[AdminUserView]
+    total: int
+    offset: int
+    limit: int
+
+
+class UserSessionView(BaseModel):
+    """One user session."""
+
+    session_id: str
+    practice_type: str
+    content_item_id: str
+    status: str
+    created_at: str | None = None
+    completed_at: str | None = None
+
+
+class UserAttemptSummaryView(BaseModel):
+    """One user attempt summary."""
+
+    attempt_id: str
+    session_id: str
+    practice_type: str
+    content_item_id: str
+    content_item_type: str
+    status: str
+    overall_score: int | None = None
+    submitted_at: str | None = None
+    assessed_at: str | None = None
+
+
+class UserLoginEventView(BaseModel):
+    """One login event."""
+
+    event_type: str
+    occurred_at: str | None = None
+    trace_id: str | None = None
+
+
+class UserActivityView(BaseModel):
+    """User activity summary for admin view."""
+
+    user_id: str
+    email: str
+    display_name: str
+    organisation_id: str | None = None
+    organisation_role: str | None = None
+    total_sessions: int = 0
+    total_attempts: int = 0
+    recent_sessions: list[UserSessionView] = Field(default_factory=list)
+    recent_attempts: list[UserAttemptSummaryView] = Field(default_factory=list)
+    recent_logins: list[UserLoginEventView] = Field(default_factory=list)
+
+
+class BulkOperationResultView(BaseModel):
+    """Result of a bulk operation."""
+
+    operation: str
+    requested_count: int
+    success_count: int
+    failure_count: int
+    failed_user_ids: list[str] = Field(default_factory=list)

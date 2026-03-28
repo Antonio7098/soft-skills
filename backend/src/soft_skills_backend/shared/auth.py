@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, TypedDict
 
 from fastapi import Request
 from sqlalchemy.orm import Session, sessionmaker
@@ -13,6 +13,31 @@ from soft_skills_backend.shared.errors import auth_error
 
 if TYPE_CHECKING:
     from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
+
+
+class ProviderSession(TypedDict):
+    """Normalized session data from any provider."""
+
+    user_id: str
+    email: str
+    org_id: str | None
+    org_role: str | None
+
+
+class AuthAdapter(Protocol):
+    """Swappable auth provider interface."""
+
+    async def get_actor(self, request: Request) -> "Actor | None":
+        """Resolve authenticated actor from request, or None if not authenticated."""
+
+    async def validate_session(self, token: str) -> ProviderSession | None:
+        """Validate provider-specific token and return session info."""
+
+    async def require_actor(self, request: Request) -> "Actor":
+        """Require authenticated actor or raise auth error."""
+
+    async def require_org_admin(self, request: Request) -> "Actor":
+        """Require org admin actor or raise auth error."""
 
 
 @dataclass(slots=True)
@@ -80,7 +105,12 @@ class HeaderAuthProvider:
             return None, None
         return membership.organisation_id, membership.role
 
-    def optional_actor(self, request: Request) -> Actor | None:
+    async def validate_session(self, token: str) -> ProviderSession | None:
+        """Native/header provider does not validate tokens - returns None."""
+        return None
+
+    async def get_actor(self, request: Request) -> Actor | None:
+        """Resolve authenticated actor from request, or None if not authenticated."""
         user_id = request.headers.get("X-User-ID")
         if not user_id:
             return None
@@ -112,7 +142,8 @@ class HeaderAuthProvider:
                 organisation_role=org_context[1],
             )
 
-    def require_actor(self, request: Request) -> Actor:
+    async def require_actor(self, request: Request) -> Actor:
+        """Require authenticated actor or raise auth error."""
         user_id = request.headers.get("X-User-ID")
         if not user_id:
             self._record_auth_event(
@@ -121,13 +152,14 @@ class HeaderAuthProvider:
                 details={"reason": "missing_header"},
             )
             raise auth_error("Authentication is required", details={"header": "X-User-ID"})
-        actor = self.optional_actor(request)
+        actor = await self.get_actor(request)
         if actor is None:
             raise auth_error("Authentication is required", details={"header": "X-User-ID"})
         return actor
 
-    def require_org_admin(self, request: Request) -> Actor:
-        actor = self.require_actor(request)
+    async def require_org_admin(self, request: Request) -> Actor:
+        """Require org admin actor or raise auth error."""
+        actor = await self.require_actor(request)
         if not actor.is_org_admin:
             self._record_auth_event(
                 "auth.access_denied.v1",

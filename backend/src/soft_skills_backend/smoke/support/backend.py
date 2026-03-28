@@ -647,6 +647,131 @@ class SmokeBackendClient:
         self.require_ok(response, f"get evaluation case detail {case_id}")
         return self.data(response)
 
+    async def admin_list_users(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        offset: int = 0,
+        limit: int = 50,
+        search: str | None = None,
+        role: str | None = None,
+        is_active: bool | None = None,
+    ) -> JsonObject:
+        params: dict[str, str | int | bool] = {"offset": offset, "limit": limit}
+        if search:
+            params["search"] = search
+        if role:
+            params["role"] = role
+        if is_active is not None:
+            params["is_active"] = str(is_active).lower()
+        response = await self._client.get(
+            "/api/admin/users",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            params=params,
+        )
+        self.require_ok(response, "admin list users")
+        return self.data(response)
+
+    async def admin_get_user(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        target_user_id: str,
+    ) -> JsonObject:
+        response = await self._client.get(
+            f"/api/admin/users/{target_user_id}",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+        )
+        self.require_ok(response, f"admin get user {target_user_id}")
+        return self.data(response)
+
+    async def admin_update_user_role(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        target_user_id: str,
+        role: str,
+    ) -> JsonObject:
+        response = await self._client.put(
+            f"/api/admin/users/{target_user_id}/role",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            json={"role": role},
+        )
+        self.require_ok(response, f"admin update user role for {target_user_id}")
+        return self.data(response)
+
+    async def admin_update_user_status(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        target_user_id: str,
+        is_active: bool,
+    ) -> JsonObject:
+        response = await self._client.patch(
+            f"/api/admin/users/{target_user_id}/status",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            json={"is_active": is_active},
+        )
+        self.require_ok(response, f"admin update user status for {target_user_id}")
+        return self.data(response)
+
+    async def admin_add_user(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        email: str,
+        role: str = "member",
+    ) -> JsonObject:
+        response = await self._client.post(
+            "/api/admin/users",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            json={"email": email, "role": role},
+        )
+        self.require_ok(response, f"admin add user {email}")
+        return self.data(response)
+
+    async def admin_bulk_user_operation(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        user_ids: list[str],
+        operation: str,
+        payload: dict[str, object] | None = None,
+    ) -> JsonObject:
+        json_body: dict[str, object] = {
+            "user_ids": user_ids,
+            "operation": operation,
+        }
+        if payload:
+            json_body["payload"] = payload
+        response = await self._client.post(
+            "/api/admin/users/bulk",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            json=json_body,
+        )
+        self.require_ok(response, f"admin bulk user operation {operation}")
+        return self.data(response)
+
+    async def admin_get_user_activity(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        target_user_id: str,
+    ) -> JsonObject:
+        response = await self._client.get(
+            f"/api/admin/users/{target_user_id}/activity",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+        )
+        self.require_ok(response, f"admin get user activity for {target_user_id}")
+        return self.data(response)
+
     @staticmethod
     def data(response: httpx.Response) -> JsonObject:
         return cast(JsonObject, response.json()["data"])

@@ -31,7 +31,7 @@ async def list_events(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> ApiEnvelope[PaginatedWorkflowEventsView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_events_service(request)
     return ok_response(
         request,
@@ -50,7 +50,7 @@ async def list_events(
 
 @router.get("/{event_id}", response_model=ApiEnvelope[WorkflowEventView])
 async def get_event(request: Request, event_id: str) -> ApiEnvelope[WorkflowEventView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_events_service(request)
     result = service.get_event(actor, event_id)
     if result is None:
@@ -66,7 +66,7 @@ async def update_event(
     event_id: str,
     command: UpdateWorkflowEventCommand,
 ) -> ApiEnvelope[WorkflowEventView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_events_service(request)
     result = service.update_event(actor, event_id, command)
     if result is None:
@@ -78,7 +78,7 @@ async def update_event(
 
 @router.delete("/{event_id}", response_model=ApiEnvelope[dict[str, str]])
 async def delete_event(request: Request, event_id: str) -> ApiEnvelope[dict[str, str]]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_events_service(request)
     deleted = service.delete_event(actor, event_id)
     if not deleted:

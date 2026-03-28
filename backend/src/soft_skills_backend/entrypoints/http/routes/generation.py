@@ -50,7 +50,7 @@ async def start_structured_generation(
     request: Request,
     command: StructuredCollectionGenerationCommand,
 ) -> ApiEnvelope[dict[str, Any]]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     container = request.app.state.container
     catalog_service: CatalogGenerationService = container.catalog_service._generation
     broker: GenerationRealtimeBroker = container.generation_broker
@@ -99,7 +99,7 @@ async def start_chat_generation(
     request: Request,
     command: ChatCollectionGenerationCommand,
 ) -> ApiEnvelope[dict[str, Any]]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     container = request.app.state.container
     catalog_service: CatalogGenerationService = container.catalog_service._generation
     broker: GenerationRealtimeBroker = container.generation_broker

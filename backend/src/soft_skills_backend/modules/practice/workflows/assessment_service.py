@@ -8,7 +8,10 @@ from stageflow.core import StageContext
 
 from soft_skills_backend.engines.config import load_marking_runtime_config
 from soft_skills_backend.engines.marking.domain.rubric_repository import RubricRepository
-from soft_skills_backend.modules.practice.domain.practice import PracticeType, validate_assessment_draft
+from soft_skills_backend.modules.practice.domain.practice import (
+    PracticeType,
+    validate_assessment_draft,
+)
 from soft_skills_backend.modules.practice.models import ValidatedAssessmentPayload
 from soft_skills_backend.modules.practice.workflows.assessment.marking_provider import (
     AssessmentMarkingProvider,

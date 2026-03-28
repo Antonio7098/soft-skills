@@ -13,13 +13,13 @@ router = APIRouter()
 
 @router.get("/me", response_model=ApiEnvelope[UserView])
 async def get_me(request: Request) -> ApiEnvelope[UserView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_identity_service(request)
     return ok_response(request, service.get_user(actor.user_id))
 
 
 @router.patch("/me/profile", response_model=ApiEnvelope[UserView])
 async def update_profile(request: Request, command: UpdateProfileCommand) -> ApiEnvelope[UserView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_identity_service(request)
     return ok_response(request, service.update_profile(actor.user_id, command))

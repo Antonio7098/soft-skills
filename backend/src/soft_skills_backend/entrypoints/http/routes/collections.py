@@ -55,7 +55,7 @@ async def list_collections(
     author_user_id: str | None = Query(default=None),
 ) -> ApiEnvelope[list[CollectionView]]:
     service = get_catalog_service(request)
-    actor = optional_actor(request)
+    actor = await optional_actor(request)
     filters = CollectionListFilters(
         difficulty=difficulty,
         skill_slug=skill_slug,
@@ -72,7 +72,7 @@ async def list_collections(
 async def create_collection(
     request: Request, command: CollectionCreateCommand
 ) -> ApiEnvelope[CollectionView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.create_collection(
@@ -89,7 +89,7 @@ async def create_collection(
 async def generate_structured_draft(
     request: Request, command: StructuredCollectionGenerationCommand
 ) -> ApiEnvelope[CollectionGenerationView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.generate_structured_draft(
@@ -106,7 +106,7 @@ async def generate_structured_draft(
 async def generate_chat_draft(
     request: Request, command: ChatCollectionGenerationCommand
 ) -> ApiEnvelope[CollectionGenerationView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.generate_chat_draft(
@@ -121,7 +121,7 @@ async def generate_chat_draft(
 
 @router.get("/{collection_id}", response_model=ApiEnvelope[CollectionView])
 async def get_collection(request: Request, collection_id: str) -> ApiEnvelope[CollectionView]:
-    actor = optional_actor(request)
+    actor = await optional_actor(request)
     service = get_catalog_service(request)
     return ok_response(request, service.get_collection(actor, collection_id))
 
@@ -130,7 +130,7 @@ async def get_collection(request: Request, collection_id: str) -> ApiEnvelope[Co
 async def update_collection(
     request: Request, collection_id: str, command: CollectionUpdateCommand
 ) -> ApiEnvelope[CollectionView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.update_collection(
@@ -146,7 +146,7 @@ async def update_collection(
 
 @router.post("/{collection_id}/save", response_model=ApiEnvelope[CollectionView])
 async def save_collection(request: Request, collection_id: str) -> ApiEnvelope[CollectionView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.save_collection(
@@ -161,7 +161,7 @@ async def save_collection(request: Request, collection_id: str) -> ApiEnvelope[C
 
 @router.delete("/{collection_id}/save", response_model=ApiEnvelope[CollectionView])
 async def unsave_collection(request: Request, collection_id: str) -> ApiEnvelope[CollectionView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.unsave_collection(
@@ -178,7 +178,7 @@ async def unsave_collection(request: Request, collection_id: str) -> ApiEnvelope
 async def rate_collection(
     request: Request, collection_id: str, command: CollectionRateCommand
 ) -> ApiEnvelope[CollectionView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.rate_collection(
@@ -194,7 +194,7 @@ async def rate_collection(
 
 @router.delete("/{collection_id}/rate", response_model=ApiEnvelope[CollectionView])
 async def unrate_collection(request: Request, collection_id: str) -> ApiEnvelope[CollectionView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.unrate_collection(
@@ -215,7 +215,7 @@ async def discover_collections(
     competency_slug: str | None = Query(default=None),
 ) -> ApiEnvelope[list[CollectionView]]:
     service = get_catalog_service(request)
-    actor = optional_actor(request)
+    actor = await optional_actor(request)
     filters = CollectionListFilters(
         difficulty=difficulty,
         skill_slug=skill_slug,
@@ -230,7 +230,7 @@ async def discover_collections(
 async def update_collection_lifecycle(
     request: Request, collection_id: str, command: CollectionLifecycleCommand
 ) -> ApiEnvelope[CollectionView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.update_collection_lifecycle(
@@ -248,7 +248,7 @@ async def update_collection_lifecycle(
 async def add_prompt_item(
     request: Request, collection_id: str, command: PromptItemCreateCommand
 ) -> ApiEnvelope[PromptItemView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.add_prompt_item(
@@ -271,7 +271,7 @@ async def generate_prompt_items_structured(
     collection_id: str,
     command: StructuredPromptItemGenerationCommand,
 ) -> ApiEnvelope[PromptItemGenerationView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.generate_prompt_items_structured(
@@ -294,7 +294,7 @@ async def generate_prompt_items_chat(
     collection_id: str,
     command: ChatPromptItemGenerationCommand,
 ) -> ApiEnvelope[PromptItemGenerationView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.generate_prompt_items_chat(
@@ -318,7 +318,7 @@ async def update_prompt_item(
     prompt_item_id: str,
     command: PromptItemUpdateCommand,
 ) -> ApiEnvelope[PromptItemView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.update_prompt_item(
@@ -337,7 +337,7 @@ async def update_prompt_item(
 async def add_scenario(
     request: Request, collection_id: str, command: ScenarioCreateCommand
 ) -> ApiEnvelope[ScenarioView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.add_scenario(
@@ -361,7 +361,7 @@ async def update_scenario(
     scenario_id: str,
     command: ScenarioUpdateCommand,
 ) -> ApiEnvelope[ScenarioView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     correlation = _correlation_from_request(request)
     payload = await service.update_scenario(

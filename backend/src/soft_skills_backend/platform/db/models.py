@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, Float, JSON, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from soft_skills_backend.platform.db.base import Base
@@ -82,6 +82,7 @@ class UserAccountRecord(Base):
     display_name: Mapped[str] = mapped_column(String(255))
     auth_provider: Mapped[str] = mapped_column(String(64))
     auth_subject: Mapped[str] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
@@ -400,7 +401,9 @@ class PromptRenderMetricsRecord(Base):
     failure_count: Mapped[int] = mapped_column(Integer, default=0)
     avg_latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     total_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    last_rendered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_rendered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         Index("ix_prompt_render_metrics_version_id", "prompt_version_id", unique=True),

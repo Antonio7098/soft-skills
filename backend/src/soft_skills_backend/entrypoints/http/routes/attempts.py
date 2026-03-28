@@ -32,7 +32,7 @@ async def start_quick_practice_session(
     request: Request,
     command: StartPracticeSessionCommand,
 ) -> ApiEnvelope[PracticeSessionView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_practice_service(request)
     payload = await service.start_session(actor, _correlation_from_request(request), command)
     return ok_response(request, payload)
@@ -43,7 +43,7 @@ async def start_interview_session(
     request: Request,
     command: StartInterviewSessionCommand,
 ) -> ApiEnvelope[PracticeSessionView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_practice_service(request)
     payload = await service.start_interview_session(
         actor,
@@ -58,7 +58,7 @@ async def start_scenario_session(
     request: Request,
     command: StartScenarioSessionCommand,
 ) -> ApiEnvelope[PracticeSessionView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_practice_service(request)
     payload = await service.start_scenario_session(
         actor,
@@ -74,7 +74,7 @@ async def submit_attempt(
     attempt_id: str,
     command: SubmitAttemptCommand,
 ) -> ApiEnvelope[AttemptView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_practice_service(request)
     payload = await service.submit_attempt(
         actor,
@@ -87,6 +87,6 @@ async def submit_attempt(
 
 @router.get("/{attempt_id}", response_model=ApiEnvelope[AttemptView])
 async def get_attempt(request: Request, attempt_id: str) -> ApiEnvelope[AttemptView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_practice_service(request)
     return ok_response(request, service.get_attempt(actor, attempt_id))

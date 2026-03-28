@@ -21,14 +21,14 @@ router = APIRouter()
 
 @router.get("/me", response_model=ApiEnvelope[ProgressDashboardView])
 async def get_my_progress(request: Request) -> ApiEnvelope[ProgressDashboardView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_progression_service(request)
     return ok_response(request, service.get_dashboard(actor, actor.user_id))
 
 
 @router.get("/me/recommendations", response_model=ApiEnvelope[RecommendationView])
 async def get_my_recommendations(request: Request) -> ApiEnvelope[RecommendationView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_progression_service(request)
     return ok_response(request, service.get_recommendation(actor, actor.user_id))
 
@@ -38,7 +38,7 @@ async def recalculate_progress(
     request: Request,
     command: ProgressRecalculationCommand,
 ) -> ApiEnvelope[ProgressRecalculationView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_progression_service(request)
     payload = await service.recalculate(
         actor,

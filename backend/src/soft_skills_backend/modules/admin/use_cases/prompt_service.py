@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from soft_skills_backend.config import Settings
 from soft_skills_backend.modules.admin.contracts.commands import (
     ArchivePromptCommand,
     ComparePromptsCommand,
@@ -17,7 +18,6 @@ from soft_skills_backend.modules.admin.contracts.views import (
     PromptSummaryView,
     PromptVersionView,
 )
-from soft_skills_backend.config import Settings
 from soft_skills_backend.modules.admin.domain.prompt_validation import (
     PromptValidationError,
     validate_prompt_definition,

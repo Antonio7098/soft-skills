@@ -38,7 +38,7 @@ router = APIRouter()
 async def create_organisation(
     request: Request, command: CreateOrganisationCommand
 ) -> ApiEnvelope[OrganisationView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_organisation_service(request)
     correlation = _correlation_from_request(request)
     payload = service.create_organisation(
@@ -53,7 +53,7 @@ async def create_organisation(
 
 @router.get("/{organisation_id}", response_model=ApiEnvelope[OrganisationView])
 async def get_organisation(request: Request, organisation_id: str) -> ApiEnvelope[OrganisationView]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_organisation_service(request)
     return ok_response(request, service.get_organisation(actor, organisation_id))
 
@@ -62,7 +62,7 @@ async def get_organisation(request: Request, organisation_id: str) -> ApiEnvelop
 async def update_organisation(
     request: Request, organisation_id: str, command: UpdateOrganisationCommand
 ) -> ApiEnvelope[OrganisationView]:
-    actor = require_org_admin_actor(request)
+    actor = await require_org_admin_actor(request)
     service = get_organisation_service(request)
     correlation = _correlation_from_request(request)
     payload = service.update_organisation(
@@ -80,7 +80,7 @@ async def update_organisation(
 async def list_members(
     request: Request, organisation_id: str
 ) -> ApiEnvelope[list[OrganisationMemberView]]:
-    actor = require_org_admin_actor(request)
+    actor = await require_org_admin_actor(request)
     service = get_organisation_service(request)
     return ok_response(request, service.list_members(actor, organisation_id))
 
@@ -89,7 +89,7 @@ async def list_members(
 async def add_member(
     request: Request, organisation_id: str, command: AddMemberCommand
 ) -> ApiEnvelope[OrganisationMemberView]:
-    actor = require_org_admin_actor(request)
+    actor = await require_org_admin_actor(request)
     service = get_organisation_service(request)
     correlation = _correlation_from_request(request)
     payload = service.add_member(
@@ -112,7 +112,7 @@ async def update_member(
     user_id: str,
     command: UpdateMemberCommand,
 ) -> ApiEnvelope[OrganisationMemberView]:
-    actor = require_org_admin_actor(request)
+    actor = await require_org_admin_actor(request)
     service = get_organisation_service(request)
     correlation = _correlation_from_request(request)
     payload = service.update_member(
@@ -129,7 +129,7 @@ async def update_member(
 
 @router.delete("/{organisation_id}/members/{user_id}")
 async def remove_member(request: Request, organisation_id: str, user_id: str) -> ApiEnvelope[None]:
-    actor = require_org_admin_actor(request)
+    actor = await require_org_admin_actor(request)
     service = get_organisation_service(request)
     correlation = _correlation_from_request(request)
     service.remove_member(
@@ -151,7 +151,7 @@ async def list_org_collections(
     skill_slug: str | None = Query(default=None),
     competency_slug: str | None = Query(default=None),
 ) -> ApiEnvelope[list[CollectionView]]:
-    actor = require_actor(request)
+    actor = await require_actor(request)
     service = get_catalog_service(request)
     filters = CollectionListFilters(
         difficulty=difficulty,

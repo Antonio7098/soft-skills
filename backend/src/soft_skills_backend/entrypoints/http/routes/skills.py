@@ -22,6 +22,6 @@ async def get_catalog(request: Request) -> ApiEnvelope[TaxonomySnapshot]:
 
 @router.post("/bootstrap-canon", response_model=ApiEnvelope[TaxonomySnapshot])
 async def bootstrap_catalog(request: Request) -> ApiEnvelope[TaxonomySnapshot]:
-    require_actor(request)
+    await require_actor(request)
     service = get_taxonomy_service(request)
     return ok_response(request, service.bootstrap())

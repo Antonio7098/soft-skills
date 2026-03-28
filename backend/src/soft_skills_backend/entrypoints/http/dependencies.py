@@ -19,7 +19,7 @@ from soft_skills_backend.modules.practice import PracticeService
 from soft_skills_backend.modules.progression import ProgressionService
 from soft_skills_backend.modules.taxonomy import TaxonomyService
 from soft_skills_backend.platform.container import AppContainer
-from soft_skills_backend.shared.auth import Actor, HeaderAuthProvider
+from soft_skills_backend.shared.auth import Actor, AuthAdapter
 
 
 def get_container(request: Request) -> AppContainer:
@@ -34,20 +34,20 @@ def get_health_service(request: Request) -> HealthService:
     return get_container(request).health_service
 
 
-def get_auth_provider(request: Request) -> HeaderAuthProvider:
+def get_auth_provider(request: Request) -> AuthAdapter:
     return get_container(request).auth_provider
 
 
-def require_actor(request: Request) -> Actor:
-    return get_auth_provider(request).require_actor(request)
+async def require_actor(request: Request) -> Actor:
+    return await get_auth_provider(request).require_actor(request)
 
 
-def require_admin_actor(request: Request) -> Actor:
-    return get_auth_provider(request).require_org_admin(request)
+async def require_admin_actor(request: Request) -> Actor:
+    return await get_auth_provider(request).require_org_admin(request)
 
 
-def require_verification_actor(request: Request, collection_id: str) -> Actor:
-    actor = require_actor(request)
+async def require_verification_actor(request: Request, collection_id: str) -> Actor:
+    actor = await require_actor(request)
     if actor.organisation_id is None:
         return actor
     if not actor.is_org_admin:
@@ -62,12 +62,12 @@ def require_verification_actor(request: Request, collection_id: str) -> Actor:
     return actor
 
 
-def require_org_admin_actor(request: Request) -> Actor:
-    return get_auth_provider(request).require_org_admin(request)
+async def require_org_admin_actor(request: Request) -> Actor:
+    return await require_admin_actor(request)
 
 
-def optional_actor(request: Request) -> Actor | None:
-    return get_auth_provider(request).optional_actor(request)
+async def optional_actor(request: Request) -> Actor | None:
+    return await get_auth_provider(request).get_actor(request)
 
 
 def get_identity_service(request: Request) -> IdentityService:

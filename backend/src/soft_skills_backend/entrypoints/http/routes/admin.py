@@ -11,16 +11,23 @@ from soft_skills_backend.entrypoints.http.dependencies import (
 )
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
 from soft_skills_backend.modules.admin import (
+    AdminAddUserCommand,
     AdminCollectionVerificationCommand,
     AdminFeatureCollectionCommand,
     AdminLearnerRelationshipCommand,
     AdminLearnerRelationshipView,
+    AdminUserListView,
+    AdminUserRoleCommand,
+    AdminUserStatusCommand,
+    AdminUserView,
     ArchivePromptCommand,
     AttemptAuditView,
-    ComparePromptsCommand,
+    BulkOperationResultView,
+    BulkUserOperationCommand,
     CohortAnalyticsView,
     CollectionVerificationAuditView,
     CollectionVerificationQueueItemView,
+    ComparePromptsCommand,
     CreatePromptCommand,
     CreateRubricCommand,
     CreateRubricCriterionCommand,
@@ -39,17 +46,111 @@ from soft_skills_backend.modules.admin import (
     RubricView,
     UpdatePromptCommand,
     UpdateRubricCommand,
+    UserActivityView,
 )
 from soft_skills_backend.modules.catalog import CollectionView
 
 router = APIRouter()
 
 
+@router.get("/users", response_model=ApiEnvelope[AdminUserListView])
+async def list_users(
+    request: Request,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
+    search: str | None = Query(default=None),
+    role: str | None = Query(default=None),
+    is_active: bool | None = Query(default=None),
+) -> ApiEnvelope[AdminUserListView]:
+    """List users with pagination, search, and filters."""
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(
+        request,
+        service.list_users(
+            actor,
+            offset=offset,
+            limit=limit,
+            search=search,
+            role=role,
+            is_active=is_active,
+        ),
+    )
+
+
+@router.get("/users/{user_id}", response_model=ApiEnvelope[AdminUserView | None])
+async def get_user(
+    request: Request,
+    user_id: str,
+) -> ApiEnvelope[AdminUserView | None]:
+    """Get a specific user by ID."""
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.get_user(actor, user_id))
+
+
+@router.put("/users/{user_id}/role", response_model=ApiEnvelope[AdminUserView])
+async def update_user_role(
+    request: Request,
+    user_id: str,
+    command: AdminUserRoleCommand,
+) -> ApiEnvelope[AdminUserView]:
+    """Change a user's role within the organisation."""
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.update_user_role(actor, user_id, command))
+
+
+@router.patch("/users/{user_id}/status", response_model=ApiEnvelope[AdminUserView])
+async def update_user_status(
+    request: Request,
+    user_id: str,
+    command: AdminUserStatusCommand,
+) -> ApiEnvelope[AdminUserView]:
+    """Suspend or activate a user."""
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.update_user_status(actor, user_id, command))
+
+
+@router.post("/users", response_model=ApiEnvelope[AdminUserView])
+async def add_user_to_org(
+    request: Request,
+    command: AdminAddUserCommand,
+) -> ApiEnvelope[AdminUserView]:
+    """Add a user to an organisation."""
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.add_user_to_org(actor, command))
+
+
+@router.post("/users/bulk", response_model=ApiEnvelope[BulkOperationResultView])
+async def bulk_user_operation(
+    request: Request,
+    command: BulkUserOperationCommand,
+) -> ApiEnvelope[BulkOperationResultView]:
+    """Perform bulk operations on users."""
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.bulk_user_operation(actor, command))
+
+
+@router.get("/users/{user_id}/activity", response_model=ApiEnvelope[UserActivityView | None])
+async def get_user_activity(
+    request: Request,
+    user_id: str,
+) -> ApiEnvelope[UserActivityView | None]:
+    """Get activity summary for a user."""
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.get_user_activity(actor, user_id))
+
+
 @router.get("/prompts", response_model=ApiEnvelope[list[PromptSummaryView]])
 async def list_prompts(
     request: Request,
 ) -> ApiEnvelope[list[PromptSummaryView]]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.list_prompts(actor))
 
@@ -59,7 +160,7 @@ async def list_prompt_versions(
     request: Request,
     name: str,
 ) -> ApiEnvelope[list[PromptVersionView]]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.list_prompt_versions(actor, name))
 
@@ -70,7 +171,7 @@ async def get_prompt_version(
     name: str,
     version: str,
 ) -> ApiEnvelope[PromptVersionView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     result = service.get_prompt_version(actor, name, version)
     if result is None:
@@ -90,7 +191,7 @@ async def create_prompt(
     request: Request,
     command: CreatePromptCommand,
 ) -> ApiEnvelope[PromptVersionView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.create_prompt(actor, command))
 
@@ -102,7 +203,7 @@ async def update_prompt(
     version: str,
     command: UpdatePromptCommand,
 ) -> ApiEnvelope[PromptVersionView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     result = service.update_prompt(actor, name, version, command)
     if result is None:
@@ -126,7 +227,7 @@ async def publish_prompt(
     version: str,
     command: PublishPromptCommand,
 ) -> ApiEnvelope[PromptVersionView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     result = service.publish_prompt(actor, name, version, command)
     if result is None:
@@ -150,7 +251,7 @@ async def archive_prompt(
     version: str,
     command: ArchivePromptCommand,
 ) -> ApiEnvelope[PromptVersionView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     result = service.archive_prompt(actor, name, version, command)
     if result is None:
@@ -174,7 +275,7 @@ async def get_prompt_analytics(
     name: str,
     version: str,
 ) -> ApiEnvelope[PromptAnalyticsView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     result = service.get_prompt_analytics(actor, name, version)
     if result is None:
@@ -194,7 +295,7 @@ async def compare_prompts(
     request: Request,
     command: ComparePromptsCommand,
 ) -> ApiEnvelope[PromptCompareView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     result = service.compare_prompts(actor, command)
     if result is None:
@@ -220,7 +321,7 @@ async def compare_prompts(
 async def list_collection_verification_queue(
     request: Request,
 ) -> ApiEnvelope[list[CollectionVerificationQueueItemView]]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.list_collection_verification_queue(actor))
 
@@ -233,7 +334,7 @@ async def get_collection_verification(
     request: Request,
     collection_id: str,
 ) -> ApiEnvelope[CollectionVerificationAuditView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.get_collection_verification(actor, collection_id))
 
@@ -247,7 +348,7 @@ async def update_collection_verification(
     collection_id: str,
     command: AdminCollectionVerificationCommand,
 ) -> ApiEnvelope[CollectionVerificationAuditView]:
-    actor = require_verification_actor(request, collection_id)
+    actor = await require_verification_actor(request, collection_id)
     service = get_admin_service(request)
     payload = service.update_collection_verification(
         actor,
@@ -265,7 +366,7 @@ async def get_learner_analytics(
     request: Request,
     learner_id: str,
 ) -> ApiEnvelope[LearnerAnalyticsView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.get_learner_analytics(actor, learner_id))
 
@@ -278,7 +379,7 @@ async def get_learner_relationship(
     request: Request,
     learner_id: str,
 ) -> ApiEnvelope[AdminLearnerRelationshipView | None]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.get_learner_relationship(actor, learner_id))
 
@@ -292,7 +393,7 @@ async def upsert_learner_relationship(
     learner_id: str,
     command: AdminLearnerRelationshipCommand,
 ) -> ApiEnvelope[AdminLearnerRelationshipView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(
         request, service.upsert_learner_relationship(actor, learner_id=learner_id, command=command)
@@ -304,7 +405,7 @@ async def delete_learner_relationship(
     request: Request,
     learner_id: str,
 ) -> ApiEnvelope[dict[str, str]]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     service.delete_learner_relationship(actor, learner_id=learner_id)
     return ok_response(request, {"status": "deleted"})
@@ -315,7 +416,7 @@ async def get_cohort_analytics(
     request: Request,
     target_role: str | None = Query(default=None),
 ) -> ApiEnvelope[CohortAnalyticsView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.get_cohort_analytics(actor, target_role))
 
@@ -325,7 +426,7 @@ async def get_attempt_audit(
     request: Request,
     attempt_id: str,
 ) -> ApiEnvelope[AttemptAuditView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.get_attempt_audit(actor, attempt_id))
 
@@ -336,7 +437,7 @@ async def feature_collection(
     collection_id: str,
     command: AdminFeatureCollectionCommand,
 ) -> ApiEnvelope[CollectionView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     payload = service.feature_collection(
         actor,
@@ -350,7 +451,7 @@ async def feature_collection(
 async def list_rubrics(
     request: Request,
 ) -> ApiEnvelope[list[RubricView]]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.list_rubrics(actor))
 
@@ -360,7 +461,7 @@ async def get_rubric(
     request: Request,
     rubric_id: str,
 ) -> ApiEnvelope[RubricView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.get_rubric(actor, rubric_id))
 
@@ -370,7 +471,7 @@ async def create_rubric(
     request: Request,
     command: CreateRubricCommand,
 ) -> ApiEnvelope[RubricView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.create_rubric(actor, command))
 
@@ -381,7 +482,7 @@ async def update_rubric(
     rubric_id: str,
     command: UpdateRubricCommand,
 ) -> ApiEnvelope[RubricView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.update_rubric(actor, rubric_id, command))
 
@@ -391,7 +492,7 @@ async def delete_rubric(
     request: Request,
     rubric_id: str,
 ) -> ApiEnvelope[dict[str, str]]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     service.delete_rubric(actor, rubric_id)
     return ok_response(request, {"status": "deleted"})
@@ -403,7 +504,7 @@ async def create_rubric_criterion(
     rubric_id: str,
     command: CreateRubricCriterionCommand,
 ) -> ApiEnvelope[RubricView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.create_rubric_criterion(actor, rubric_id, command))
 
@@ -417,7 +518,7 @@ async def update_rubric_criterion(
     criterion_ref: str,
     command: RubricCriterionUpdateCommand,
 ) -> ApiEnvelope[RubricView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(
         request, service.update_rubric_criterion(actor, rubric_id, criterion_ref, command)
@@ -432,7 +533,7 @@ async def delete_rubric_criterion(
     rubric_id: str,
     criterion_ref: str,
 ) -> ApiEnvelope[RubricView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.delete_rubric_criterion(actor, rubric_id, criterion_ref))
 
@@ -441,7 +542,7 @@ async def delete_rubric_criterion(
 async def list_pipelines(
     request: Request,
 ) -> ApiEnvelope[list[PipelineDefinitionView]]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(request, service.list_pipelines(actor))
 
@@ -451,7 +552,7 @@ async def get_pipeline_dag(
     request: Request,
     pipeline_name: str,
 ) -> ApiEnvelope[PipelineDAGView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     result = service.get_pipeline_dag(actor, pipeline_name)
     if result is None:
@@ -475,7 +576,7 @@ async def list_pipeline_runs(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=100),
 ) -> ApiEnvelope[list[PipelineRunSummaryView]]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(
         request, service.list_pipeline_runs(actor, pipeline_name, offset=offset, limit=limit)
@@ -491,7 +592,7 @@ async def get_pipeline_trace(
     pipeline_name: str,
     pipeline_run_id: str,
 ) -> ApiEnvelope[PipelineTraceView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     result = service.get_pipeline_trace(actor, pipeline_name, pipeline_run_id)
     if result is None:
@@ -511,7 +612,7 @@ async def get_pipeline_metrics(
     request: Request,
     pipeline_name: str,
 ) -> ApiEnvelope[PipelineMetricsView]:
-    actor = require_admin_actor(request)
+    actor = await require_admin_actor(request)
     service = get_admin_service(request)
     result = service.get_pipeline_metrics(actor, pipeline_name)
     if result is None:

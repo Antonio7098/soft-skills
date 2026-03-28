@@ -12,9 +12,9 @@ from soft_skills_backend.engines.marking.domain.rubric_repository import (
     SqlAlchemyRubricRepository,
 )
 from soft_skills_backend.entrypoints.http.health import HealthService
+from soft_skills_backend.modules.admin import AdminService
 from soft_skills_backend.modules.admin.domain.prompt_registry import PromptRegistry
 from soft_skills_backend.modules.admin.infra.prompt_repository import PromptRepository
-from soft_skills_backend.modules.admin import AdminService
 from soft_skills_backend.modules.assistant import AssistantService
 from soft_skills_backend.modules.assistant.infra.realtime import AssistantRealtimeBroker
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
@@ -59,7 +59,7 @@ from soft_skills_backend.platform.workflows.stageflow_runtime import (
     StageflowRuntime,
     build_stageflow_runtime,
 )
-from soft_skills_backend.shared.auth import HeaderAuthProvider
+from soft_skills_backend.shared.auth import AuthAdapter, HeaderAuthProvider
 
 
 @dataclass(slots=True)
@@ -70,7 +70,7 @@ class AppContainer:
     engine: Engine
     session_factory: sessionmaker[Session]
     health_service: HealthService
-    auth_provider: HeaderAuthProvider
+    auth_provider: AuthAdapter
     identity_service: IdentityService
     admin_service: AdminService
     taxonomy_service: TaxonomyService

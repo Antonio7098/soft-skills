@@ -151,3 +151,72 @@ class CreateRubricCriterionCommand(BaseModel):
     required: bool = True
     position: int = 0
     levels: list[RubricCriterionLevelCommand] = Field(min_length=1)
+
+
+class AdminUserRoleCommand(BaseModel):
+    """Change user role within an organisation."""
+
+    role: str
+
+    @field_validator("role")
+    @classmethod
+    def _require_valid_role(cls, value: str) -> str:
+        cleaned = value.strip().lower()
+        if cleaned not in ("admin", "member"):
+            raise ValueError("role must be 'admin' or 'member'")
+        return cleaned
+
+
+class AdminUserStatusCommand(BaseModel):
+    """Toggle user active status."""
+
+    is_active: bool
+
+
+class AdminAddUserCommand(BaseModel):
+    """Add a user to an organisation."""
+
+    email: str
+    role: str = "member"
+
+    @field_validator("email")
+    @classmethod
+    def _require_valid_email(cls, value: str) -> str:
+        cleaned = value.strip().lower()
+        if not cleaned:
+            raise ValueError("email must not be blank")
+        if "@" not in cleaned:
+            raise ValueError("email must be a valid email address")
+        return cleaned
+
+    @field_validator("role")
+    @classmethod
+    def _require_valid_role(cls, value: str) -> str:
+        cleaned = value.strip().lower()
+        if cleaned not in ("admin", "member"):
+            raise ValueError("role must be 'admin' or 'member'")
+        return cleaned
+
+
+class BulkUserOperationCommand(BaseModel):
+    """Bulk user operations."""
+
+    user_ids: list[str] = Field(min_length=1, max_length=100)
+    operation: str
+    payload: dict[str, object] | None = None
+
+    @field_validator("operation")
+    @classmethod
+    def _require_valid_operation(cls, value: str) -> str:
+        cleaned = value.strip().lower()
+        valid_operations = ("suspend", "activate", "change_role", "export")
+        if cleaned not in valid_operations:
+            raise ValueError(f"operation must be one of: {', '.join(valid_operations)}")
+        return cleaned
+
+    @field_validator("user_ids")
+    @classmethod
+    def _require_user_ids(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("user_ids must not be empty")
+        return value
