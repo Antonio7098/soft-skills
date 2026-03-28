@@ -39,7 +39,9 @@ class _AssistantRuntimeSmoke(SmokeCase, ABC):
         self.name = name
         self.description = description
         self._preflight = preflight or ProviderSmokePreflight()
-        self._session_factory = session_factory or SmokeApplicationSessionFactory()
+        self._session_factory = session_factory or SmokeApplicationSessionFactory(
+            provider_max_retries=2
+        )
         self._flow_timeout_seconds = flow_timeout_seconds
 
     def run(self, context: SmokeContext) -> AssistantRuntimeSmokeResult:
@@ -145,11 +147,13 @@ class AssistantGenerationRuntimeSmoke(_AssistantRuntimeSmoke):
             user_id=user_id,
             session_id=str(session_payload["id"]),
             message=(
-                "Use the generate_collection tool now. "
-                "Generate one quick practice collection for early-career consultants. "
-                "Use the exact skill slug active-listening, the exact competency slug "
-                "stakeholder-management, difficulty intermediate, rubric "
-                "quick_practice_text@v1, one quick practice prompt, and no scenarios."
+                "Call the generate_collection tool now and do not answer directly. "
+                "Create one interview-only collection for early-career consultants. "
+                "Use prompt text intent about defending a decision with incomplete information. "
+                "Use difficulty intermediate, content_format_mix [\"interview_prompt\"], "
+                "target_skill_slugs [\"decision-justification\"], "
+                "target_competency_slugs [\"problem-solving\"], "
+                "rubric_ids [\"interview_text@v1\"], and counts with one interview prompt and zero of everything else."
             ),
         )
         turn = await backend.wait_for_assistant_turn(

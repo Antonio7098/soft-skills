@@ -46,7 +46,7 @@ async def test_openai_compatible_provider_enforces_total_timeout(
             _env_file=None,  # type: ignore[call-arg]
             provider_api_key="test-key",
             provider_base_url="https://example.com/v1",
-            provider_model_slug="test-model",
+            llm_default_model="test-model",
             smoke_timeout_seconds=0.01,
             provider_max_retries=0,
         ),
@@ -121,8 +121,8 @@ async def test_openai_compatible_provider_switches_to_backup_model_on_third_atte
             _env_file=None,  # type: ignore[call-arg]
             provider_api_key="test-key",
             provider_base_url="https://example.com/v1",
-            provider_model_slug="primary-model",
-            llm_marking_model_backup="backup-model",
+            llm_default_model="primary-model",
+            llm_default_backup_model="backup-model",
             provider_max_retries=2,
         ),
         provider_call_logger=_NoOpProviderCallLogger(),

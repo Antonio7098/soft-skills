@@ -170,7 +170,7 @@ class FakeEvaluationProvider:
 
 def _fake_provider_factory(settings, provider_call_logger):
     del provider_call_logger
-    model_slug = settings.llm_marking_model or settings.provider_model_slug
+    model_slug = settings.llm_marking_per_skill_model or settings.llm_default_model
     return FakeEvaluationProvider(model_slug)
 
 

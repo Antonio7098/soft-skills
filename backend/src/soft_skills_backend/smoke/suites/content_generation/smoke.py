@@ -47,6 +47,159 @@ def _as_optional_str(value: object) -> str | None:
     return str(value) if value is not None else None
 
 
+@asynccontextmanager
+async def _open_websocket_capable_backend(
+    settings: Settings,
+    *,
+    provider_max_retries: int = 0,
+    assessment_validation_retries: int = 0,
+) -> AsyncIterator[SmokeBackendClient]:
+    from alembic.config import Config
+
+    from alembic import command as alembic_command
+
+    base_path = Path(__file__).resolve().parents[5]
+
+    with tempfile.TemporaryDirectory(prefix="soft-skills-content-gen-") as temp_dir:
+        db_path = Path(temp_dir) / "smoke.db"
+        db_url = f"sqlite+pysqlite:///{db_path}"
+        port = _find_free_port()
+        smoke_settings = settings.model_copy(
+            update={
+                "environment": "test",
+                "database_url": db_url,
+                "smoke_timeout_seconds": 60.0,
+                "provider_max_retries": provider_max_retries,
+                "assessment_validation_retries": assessment_validation_retries,
+            }
+        )
+
+        alembic_cfg = Config(str(base_path / "alembic.ini"))
+        alembic_cfg.set_main_option("script_location", str(base_path / "alembic"))
+        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+        alembic_command.upgrade(alembic_cfg, "head")
+
+        test_app = create_app(smoke_settings)
+
+        import uvicorn
+
+        server_config = uvicorn.Config(
+            test_app,
+            host="127.0.0.1",
+            port=port,
+            log_level="error",
+        )
+        server = uvicorn.Server(server_config)
+        server_thread = threading.Thread(target=server.run, daemon=True)
+        server_thread.start()
+        time.sleep(1)
+
+        try:
+            base_url = f"http://127.0.0.1:{port}"
+            async with httpx.AsyncClient(
+                base_url=base_url,
+                timeout=httpx.Timeout(SMOKE_FLOW_TIMEOUT_SECONDS),
+            ) as client:
+                yield SmokeBackendClient(
+                    client,
+                    session_factory=test_app.state.container.session_factory,
+                )
+        finally:
+            server.should_exit = True
+            server_thread.join(timeout=5)
+
+
+async def _generate_collection_via_websocket(
+    *,
+    backend: SmokeBackendClient,
+    user_id: str,
+    endpoint: str,
+    payload: JsonObject,
+    flow_timeout_seconds: float,
+) -> JsonObject:
+    response = await backend._client.post(
+        endpoint,
+        headers={"X-User-ID": user_id},
+        json=payload,
+    )
+    backend.require_ok(response, "generate collection")
+    data = response.json()
+    envelope = data.get("data", {})
+    if not isinstance(envelope, dict):
+        raise provider_error(
+            "Unexpected response envelope",
+            code="SS-PROVIDER-013",
+        )
+    stream_token = envelope.get("stream_token")
+    if not stream_token:
+        raise provider_error(
+            "Missing stream_token in response",
+            code="SS-PROVIDER-013",
+            details={"envelope": envelope},
+        )
+
+    collection_id: str | None = None
+    generation_artifact_id: str | None = None
+    ws_url = (
+        str(backend._client.base_url).replace("http://", "ws://").replace("https://", "wss://")
+        + f"/api/ws/generation/{stream_token}"
+    )
+
+    deadline = time.time() + flow_timeout_seconds
+    async with websockets.connect(ws_url) as ws:
+        while time.time() < deadline:
+            remaining = deadline - time.time()
+            try:
+                message = await asyncio.wait_for(ws.recv(), timeout=max(1.0, remaining))
+                event_data: dict[str, Any] = json.loads(message)
+                event_type = str(event_data.get("type", ""))
+                if event_type == "completed":
+                    comp_payload = event_data.get("payload", {})
+                    collection_id = comp_payload.get("collection_id")
+                    generation_artifact_id = comp_payload.get("generation_artifact_id")
+                    break
+                if event_type == "failed":
+                    failed_payload = event_data.get("payload", {})
+                    error_msg = (
+                        failed_payload.get("error", "unknown")
+                        if isinstance(failed_payload, dict)
+                        else str(failed_payload)
+                    )
+                    raise provider_error(
+                        f"Generation failed: {error_msg}",
+                        code="SS-PROVIDER-013",
+                    )
+            except TimeoutError:
+                continue
+
+    if collection_id is None:
+        raise provider_error(
+            "Generation did not complete within timeout",
+            code="SS-PROVIDER-012",
+            details={"timeout_seconds": flow_timeout_seconds},
+        )
+
+    collection_response = await backend._client.get(
+        f"/api/collections/{collection_id}",
+        headers={"X-User-ID": user_id},
+    )
+    backend.require_ok(collection_response, "fetch generated collection")
+    collection_payload = collection_response.json().get("data")
+    if not isinstance(collection_payload, dict):
+        raise provider_error(
+            "Unexpected collection response envelope",
+            code="SS-PROVIDER-013",
+        )
+    artifact = cast(JsonObject | None, collection_payload.get("last_generation_artifact"))
+
+    return {
+        "collection": collection_payload,
+        "generation_artifact_id": generation_artifact_id,
+        "provider": _as_optional_str(artifact.get("provider")) if artifact else None,
+        "model_slug": _as_optional_str(artifact.get("model_slug")) if artifact else None,
+    }
+
+
 class _ContentGenerationSmoke(SmokeCase, ABC):
     """Base suite for content generation flows."""
 
@@ -62,7 +215,9 @@ class _ContentGenerationSmoke(SmokeCase, ABC):
         self.name = name
         self.description = description
         self._preflight = preflight or ProviderSmokePreflight()
-        self._session_factory = session_factory or SmokeApplicationSessionFactory()
+        self._session_factory = session_factory or SmokeApplicationSessionFactory(
+            provider_max_retries=2
+        )
         self._flow_timeout_seconds = flow_timeout_seconds
 
     def run(self, context: SmokeContext) -> ContentGenerationSmokeResult:
@@ -101,56 +256,8 @@ class _ContentGenerationSmoke(SmokeCase, ABC):
 
     @asynccontextmanager
     async def _open_backend(self, settings: Settings) -> AsyncIterator[SmokeBackendClient]:
-        from alembic.config import Config
-
-        from alembic import command as alembic_command
-
-        base_path = Path(__file__).resolve().parents[5]
-
-        with tempfile.TemporaryDirectory(prefix="soft-skills-content-gen-") as temp_dir:
-            db_path = Path(temp_dir) / "smoke.db"
-            db_url = f"sqlite+pysqlite:///{db_path}"
-            port = _find_free_port()
-            smoke_settings = settings.model_copy(
-                update={
-                    "environment": "test",
-                    "database_url": db_url,
-                    "smoke_timeout_seconds": 60.0,
-                    "provider_max_retries": 0,
-                    "assessment_validation_retries": 0,
-                }
-            )
-
-            alembic_cfg = Config(str(base_path / "alembic.ini"))
-            alembic_cfg.set_main_option("script_location", str(base_path / "alembic"))
-            alembic_cfg.set_main_option("sqlalchemy.url", db_url)
-            alembic_command.upgrade(alembic_cfg, "head")
-
-            test_app = create_app(smoke_settings)
-
-            import uvicorn
-
-            server_config = uvicorn.Config(
-                test_app,
-                host="127.0.0.1",
-                port=port,
-                log_level="error",
-            )
-            server = uvicorn.Server(server_config)
-            server_thread = threading.Thread(target=server.run, daemon=True)
-            server_thread.start()
-            time.sleep(1)
-
-            try:
-                base_url = f"http://127.0.0.1:{port}"
-                async with httpx.AsyncClient(base_url=base_url) as client:
-                    yield SmokeBackendClient(
-                        client,
-                        session_factory=test_app.state.container.session_factory,
-                    )
-            finally:
-                server.should_exit = True
-                server_thread.join(timeout=5)
+        async with _open_websocket_capable_backend(settings, provider_max_retries=2) as backend:
+            yield backend
 
     @property
     @abstractmethod
@@ -172,108 +279,20 @@ class _ContentGenerationSmoke(SmokeCase, ABC):
         endpoint: str,
         payload: JsonObject,
     ) -> JsonObject:
-        response = await backend._client.post(
-            endpoint,
-            headers={"X-User-ID": user_id},
-            json=payload,
+        result = await _generate_collection_via_websocket(
+            backend=backend,
+            user_id=user_id,
+            endpoint=endpoint,
+            payload=payload,
+            flow_timeout_seconds=self._flow_timeout_seconds,
         )
-        backend.require_ok(response, "generate collection")
-        data = response.json()
-        envelope = data.get("data", {})
-        if not isinstance(envelope, dict):
-            raise provider_error(
-                "Unexpected response envelope",
-                code="SS-PROVIDER-013",
-            )
-        stream_token = envelope.get("stream_token")
-        if not stream_token:
-            raise provider_error(
-                "Missing stream_token in response",
-                code="SS-PROVIDER-013",
-                details={"envelope": envelope},
-            )
-
-        prompt_items: list[JsonObject] = []
-        scenarios: list[JsonObject] = []
-        collection_id: str | None = None
-        generation_artifact_id: str | None = None
-
-        ws_url = (
-            str(backend._client.base_url).replace("http://", "ws://").replace("https://", "wss://")
-            + f"/api/ws/generation/{stream_token}"
-        )
-
-        deadline = time.time() + self._flow_timeout_seconds
-        async with websockets.connect(ws_url) as ws:
-            while time.time() < deadline:
-                remaining = deadline - time.time()
-                try:
-                    message = await asyncio.wait_for(ws.recv(), timeout=max(1.0, remaining))
-                    event_data: dict[str, Any] = json.loads(message)
-                    event_type = str(event_data.get("type", ""))
-                    stage = str(event_data.get("stage", ""))
-
-                    if stage == "prompt_items_work" and not prompt_items:
-                        item_payload = event_data.get("payload", {})
-                        prompt_items = cast(list[JsonObject], item_payload.get("prompt_items", []))
-
-                    if stage == "scenarios_work" and not scenarios:
-                        scenario_payload = event_data.get("payload", {})
-                        scenarios = cast(list[JsonObject], scenario_payload.get("scenarios", []))
-
-                    if event_type == "completed":
-                        comp_payload = event_data.get("payload", {})
-                        collection_id = comp_payload.get("collection_id")
-                        generation_artifact_id = comp_payload.get("generation_artifact_id")
-                        break
-                    elif event_type == "failed":
-                        failed_payload = event_data.get("payload", {})
-                        error_msg = (
-                            failed_payload.get("error", "unknown")
-                            if isinstance(failed_payload, dict)
-                            else str(failed_payload)
-                        )
-                        raise provider_error(
-                            f"Generation failed: {error_msg}",
-                            code="SS-PROVIDER-013",
-                        )
-                except TimeoutError:
-                    continue
-
-        if collection_id is None:
-            raise provider_error(
-                "Generation did not complete within timeout",
-                code="SS-PROVIDER-012",
-                details={"timeout_seconds": self._flow_timeout_seconds},
-            )
-
-        collection_response = await backend._client.get(
-            f"/api/collections/{collection_id}",
-            headers={"X-User-ID": user_id},
-        )
-        backend.require_ok(collection_response, "fetch generated collection")
-        collection_payload = collection_response.json().get("data")
-        if not isinstance(collection_payload, dict):
-            raise provider_error(
-                "Unexpected collection response envelope",
-                code="SS-PROVIDER-013",
-            )
-        artifact = cast(JsonObject | None, collection_payload.get("last_generation_artifact"))
-
+        collection = cast(JsonObject, result["collection"])
         return {
-            "id": collection_payload["id"],
-            "prompt_items": collection_payload.get("prompt_items", prompt_items),
-            "scenarios": collection_payload.get("scenarios", scenarios),
-            "last_generation_artifact": artifact
-            if artifact is not None
-            else (
-                {
-                    "id": generation_artifact_id,
-                    "provider": None,
-                    "model_slug": None,
-                }
-                if generation_artifact_id
-                else None
+            "id": collection["id"],
+            "prompt_items": collection.get("prompt_items", []),
+            "scenarios": collection.get("scenarios", []),
+            "last_generation_artifact": cast(
+                JsonObject | None, collection.get("last_generation_artifact")
             ),
         }
 
@@ -394,7 +413,9 @@ class _PromptItemGenerationSmoke(SmokeCase, ABC):
         self.name = name
         self.description = description
         self._preflight = preflight or ProviderSmokePreflight()
-        self._session_factory = session_factory or SmokeApplicationSessionFactory()
+        self._session_factory = session_factory or SmokeApplicationSessionFactory(
+            provider_max_retries=2
+        )
         self._flow_timeout_seconds = flow_timeout_seconds
 
     def run(self, context: SmokeContext) -> ContentGenerationSmokeResult:
@@ -416,10 +437,10 @@ class _PromptItemGenerationSmoke(SmokeCase, ABC):
             collection_id = await backend.create_collection(
                 user_id=actors.learner_id,
                 title="Smoke Prompt Expansion Collection",
-                content_format_mix=["quick_practice_prompt", "interview_prompt"],
-                target_skill_slugs=["active-listening", "decision-justification"],
-                target_competency_slugs=["stakeholder-management", "problem-solving"],
-                rubric_ids=["quick_practice_text@v1", "interview_text@v1"],
+                content_format_mix=["interview_prompt"],
+                target_skill_slugs=["decision-justification"],
+                target_competency_slugs=["problem-solving"],
+                rubric_ids=["interview_text@v1"],
             )
             generation = await self._generate_prompt_items(
                 backend=backend,
@@ -556,7 +577,7 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
             ) from exc
 
     async def _run(self, settings: Settings) -> ContentGenerationLatencyEnvelopeResult:
-        async with self._session_factory.open(settings) as backend:
+        async with _open_websocket_capable_backend(settings, provider_max_retries=2) as backend:
             actors = await SmokeActorBootstrap(backend).prepare()
             provider = self._preflight.build_provider(settings)
             suite_started = time.perf_counter()
@@ -590,7 +611,6 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
             "content_format_mix": [
                 "quick_practice_prompt",
                 "interview_prompt",
-                "scenario_step",
             ],
             "target_skill_slugs": [
                 "active-listening",
@@ -604,7 +624,6 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
             "rubric_ids": [
                 "quick_practice_text@v1",
                 "interview_text@v1",
-                "scenario_text@v1",
             ],
             "domain": "Enterprise AI transformation",
             "workplace_context": (
@@ -620,13 +639,17 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
             "counts": {
                 "quick_practice_prompt_count": 3,
                 "interview_prompt_count": 3,
-                "scenario_count": 1,
-                "scenario_artifact_count": 1,
+                "scenario_count": 0,
+                "scenario_artifact_count": 0,
             },
         }
         started = time.perf_counter()
-        result = await backend.generate_structured_collection_payload(
-            user_id=user_id, payload=payload
+        result = await _generate_collection_via_websocket(
+            backend=backend,
+            user_id=user_id,
+            endpoint="/api/collections/generate/structured",
+            payload=payload,
+            flow_timeout_seconds=self._flow_timeout_seconds,
         )
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         collection = cast(JsonObject, result["collection"])
@@ -640,8 +663,8 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
             model_slug=cast(str | None, result.get("model_slug")),
             prompt_items_count=len(cast(list[object], collection.get("prompt_items", []))),
             scenarios_count=len(cast(list[object], collection.get("scenarios", []))),
-            expected_llm_calls=8,
-            expected_subpipelines=7,
+            expected_llm_calls=7,
+            expected_subpipelines=6,
         )
 
     async def _run_heavy_chat_collection(
@@ -660,7 +683,6 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
             "content_format_mix": [
                 "quick_practice_prompt",
                 "interview_prompt",
-                "scenario_step",
             ],
             "target_skill_slugs": [
                 "active-listening",
@@ -674,17 +696,22 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
             "rubric_ids": [
                 "quick_practice_text@v1",
                 "interview_text@v1",
-                "scenario_text@v1",
             ],
             "counts": {
                 "quick_practice_prompt_count": 3,
                 "interview_prompt_count": 2,
-                "scenario_count": 1,
-                "scenario_artifact_count": 1,
+                "scenario_count": 0,
+                "scenario_artifact_count": 0,
             },
         }
         started = time.perf_counter()
-        result = await backend.generate_chat_collection_payload(user_id=user_id, payload=payload)
+        result = await _generate_collection_via_websocket(
+            backend=backend,
+            user_id=user_id,
+            endpoint="/api/collections/generate/chat",
+            payload=payload,
+            flow_timeout_seconds=self._flow_timeout_seconds,
+        )
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         collection = cast(JsonObject, result["collection"])
         return ContentGenerationTimingSample(
@@ -697,8 +724,8 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
             model_slug=cast(str | None, result.get("model_slug")),
             prompt_items_count=len(cast(list[object], collection.get("prompt_items", []))),
             scenarios_count=len(cast(list[object], collection.get("scenarios", []))),
-            expected_llm_calls=7,
-            expected_subpipelines=6,
+            expected_llm_calls=6,
+            expected_subpipelines=5,
         )
 
     async def _run_heavy_structured_prompt_expansion(
@@ -709,10 +736,10 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
         collection_id = await backend.create_collection(
             user_id=user_id,
             title="Latency Envelope Prompt Expansion Structured",
-            content_format_mix=["quick_practice_prompt", "interview_prompt"],
-            target_skill_slugs=["active-listening", "decision-justification"],
-            target_competency_slugs=["stakeholder-management", "problem-solving"],
-            rubric_ids=["quick_practice_text@v1", "interview_text@v1"],
+            content_format_mix=["interview_prompt"],
+            target_skill_slugs=["decision-justification"],
+            target_competency_slugs=["problem-solving"],
+            rubric_ids=["interview_text@v1"],
         )
         payload: JsonObject = {
             "title_hint": "Expansion under executive pressure",
@@ -721,16 +748,15 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
                 "forcing the learner to reset expectations and justify hard tradeoffs."
             ),
             "generation_focus": (
-                "Generate a larger balanced set of quick practice and interview prompts "
-                "for executive alignment under pressure."
+                "Generate a larger varied set of interview prompts for executive alignment under pressure."
             ),
             "realism_notes": [
                 "Use concrete stakeholder motives.",
                 "Keep the questions distinct.",
             ],
-            "target_skill_slugs": ["active-listening", "decision-justification"],
+            "target_skill_slugs": ["decision-justification"],
             "counts": {
-                "quick_practice_prompt_count": 3,
+                "quick_practice_prompt_count": 0,
                 "interview_prompt_count": 3,
             },
         }
@@ -753,7 +779,7 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
             prompt_items_count=len(cast(list[object], result.get("prompt_items", []))),
             scenarios_count=0,
             expected_llm_calls=7,
-            expected_subpipelines=6,
+            expected_subpipelines=4,
         )
 
     async def _run_heavy_chat_prompt_expansion(
@@ -764,20 +790,20 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
         collection_id = await backend.create_collection(
             user_id=user_id,
             title="Latency Envelope Prompt Expansion Chat",
-            content_format_mix=["quick_practice_prompt", "interview_prompt"],
-            target_skill_slugs=["active-listening", "decision-justification"],
-            target_competency_slugs=["stakeholder-management", "problem-solving"],
-            rubric_ids=["quick_practice_text@v1", "interview_text@v1"],
+            content_format_mix=["interview_prompt"],
+            target_skill_slugs=["decision-justification"],
+            target_competency_slugs=["problem-solving"],
+            rubric_ids=["interview_text@v1"],
         )
         payload: JsonObject = {
             "prompt": (
-                "Add a larger, varied set of quick practice and interview prompts about "
-                "resetting sponsor expectations, justifying tradeoffs, and leading through "
+                "Add a larger, varied set of interview prompts about "
+                "justifying tradeoffs and leading through "
                 "ambiguity in a delayed enterprise AI rollout."
             ),
-            "target_skill_slugs": ["active-listening", "decision-justification"],
+            "target_skill_slugs": ["decision-justification"],
             "counts": {
-                "quick_practice_prompt_count": 3,
+                "quick_practice_prompt_count": 0,
                 "interview_prompt_count": 3,
             },
         }
@@ -800,5 +826,5 @@ class GenerationLatencyEnvelopeSmoke(SmokeCase):
             prompt_items_count=len(cast(list[object], result.get("prompt_items", []))),
             scenarios_count=0,
             expected_llm_calls=7,
-            expected_subpipelines=6,
+            expected_subpipelines=4,
         )

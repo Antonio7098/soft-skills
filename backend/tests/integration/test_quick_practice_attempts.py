@@ -89,7 +89,7 @@ async def _seed_quick_practice_prompt(client) -> tuple[dict[str, object], dict[s
                 "A client asks for an impossible delivery date. Respond with empathy and a realistic next step."
             ),
             "difficulty": "intermediate",
-            "target_skill_slugs": ["active-listening", "expectation-setting"],
+            "target_skill_slugs": [],
             "rubric_id": "quick_practice_reset_timeline@v1",
         },
     )

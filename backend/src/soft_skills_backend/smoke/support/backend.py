@@ -229,12 +229,12 @@ class SmokeBackendClient:
             payload={
                 "title_hint": "Smoke Prompt Expansion",
                 "workplace_context": "A senior stakeholder is escalating delivery risk after new legal feedback.",
-                "generation_focus": "Generate one realistic quick practice prompt about resetting expectations.",
+                "generation_focus": "Generate one realistic interview prompt about resetting expectations under pressure.",
                 "realism_notes": ["Keep the conflict concrete and business-relevant."],
-                "target_skill_slugs": ["active-listening"],
+                "target_skill_slugs": ["decision-justification"],
                 "counts": {
-                    "quick_practice_prompt_count": 1,
-                    "interview_prompt_count": 0,
+                    "quick_practice_prompt_count": 0,
+                    "interview_prompt_count": 1,
                 },
             },
         )

@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import logging
+import sys
 from collections.abc import Sequence
 from contextlib import redirect_stderr, redirect_stdout
 
+from soft_skills_backend.shared.errors import AppError
 from soft_skills_backend.smoke import build_default_runner
 
 
@@ -36,6 +39,19 @@ def main(argv: Sequence[str] | None = None) -> None:
         logging.disable(logging.CRITICAL)
         with redirect_stdout(buffer), redirect_stderr(buffer):
             result = runner.run(args.smoke)
+    except AppError as exc:
+        logging.disable(previous_disable)
+        debug_payload = {
+            "error": {
+                "code": exc.code,
+                "category": exc.category,
+                "message": exc.message,
+                "status_code": exc.status_code,
+                "details": exc.details,
+            }
+        }
+        print(json.dumps(debug_payload, default=str), file=sys.stderr)
+        raise
     finally:
         logging.disable(previous_disable)
     print(result.model_dump_json())
