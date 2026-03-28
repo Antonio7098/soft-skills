@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import perf_counter
@@ -63,6 +64,10 @@ from soft_skills_backend.shared.ports.llm import LLMProvider
 from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
 MAX_TOOL_ITERATIONS = 6
+_GENERATION_REQUEST_PATTERN = re.compile(
+    r"\b(generate|create|draft|make|add|build)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(slots=True)
@@ -508,6 +513,9 @@ class AssistantWorkflowService:
         history: list[Any],
     ) -> _AssistantLoopResult:
         messages = [{"role": "system", "content": rendered_prompt.content}]
+        required_tool_name = _required_generation_tool_name(history)
+        corrective_prompt_sent = False
+        has_executed_tool = False
         for message in history:
             if message.role.value == "assistant":
                 messages.append({"role": "assistant", "content": message.content})
@@ -542,6 +550,25 @@ class AssistantWorkflowService:
                 raise exc.app_error from exc
             decision = cast(AssistantDecision, typed.parsed)
             if decision.final_response is not None:
+                if required_tool_name is not None and not has_executed_tool:
+                    if corrective_prompt_sent:
+                        raise validation_error(
+                            "Assistant ignored a required generation tool request",
+                            code="SS-VALIDATION-206",
+                            details={"required_tool_name": required_tool_name},
+                        )
+                    messages.append(
+                        {
+                            "role": "system",
+                            "content": (
+                                "The latest user request explicitly requires content generation. "
+                                f"You must call the `{required_tool_name}` tool next and must not "
+                                "return final_response until the tool result is available."
+                            ),
+                        }
+                    )
+                    corrective_prompt_sent = True
+                    continue
                 return _AssistantLoopResult(
                     cancelled=False,
                     reason=None,
@@ -577,6 +604,7 @@ class AssistantWorkflowService:
                 ),
                 tool_requests=decision.tool_calls,
             )
+            has_executed_tool = has_executed_tool or bool(tool_results)
             if active.cancel_reason is not None:
                 return _AssistantLoopResult(cancelled=True, reason=active.cancel_reason)
             for tool_result in tool_results:
@@ -855,6 +883,26 @@ def _chunk_text(text: str, *, chunk_size: int = 80) -> list[str]:
     if current:
         chunks.append(current)
     return chunks
+
+def _required_generation_tool_name(history: list[Any]) -> str | None:
+    latest_user_message = next(
+        (
+            str(message.content)
+            for message in reversed(history)
+            if getattr(getattr(message, "role", None), "value", None) == "user"
+        ),
+        "",
+    )
+    if not latest_user_message or _GENERATION_REQUEST_PATTERN.search(latest_user_message) is None:
+        return None
+    lowered = latest_user_message.lower()
+    if "generate_prompt_items" in lowered:
+        return "generate_prompt_items"
+    if "generate_collection" in lowered:
+        return "generate_collection"
+    if "prompt item" in lowered or "prompt-item" in lowered:
+        return "generate_prompt_items"
+    return "generate_collection"
 
 
 def _utcnow() -> datetime:

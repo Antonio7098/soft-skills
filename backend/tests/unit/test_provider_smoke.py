@@ -27,7 +27,7 @@ def test_provider_smoke_accepts_openrouter_api_key() -> None:
         _env_file=None,
         provider_api_key=None,
         OPENROUTER_API_KEY="test-openrouter-key",
-        LLM_MARKING_MODEL="openrouter/test-model",
+        llm_marking_per_skill_model="openrouter/test-model",
     )
     resolved = resolve_llm_provider_config(settings)
 

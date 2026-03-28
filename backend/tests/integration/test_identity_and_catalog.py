@@ -128,7 +128,7 @@ async def test_identity_bootstrap_and_private_draft_authoring(app, client, test_
             "title": "Reset expectations",
             "prompt_text": "A client asks for an impossible deadline. Respond.",
             "difficulty": "intermediate",
-            "target_skill_slugs": ["active-listening"],
+            "target_skill_slugs": [],
             "rubric_id": "quick_practice_text@v1",
         },
     )
@@ -319,7 +319,7 @@ async def test_catalog_supports_updates_save_reuse_and_verified_discovery(
             "title": "Initial prompt",
             "prompt_text": "A client pushes for speed over realism. Respond.",
             "difficulty": "intermediate",
-            "target_skill_slugs": ["active-listening"],
+            "target_skill_slugs": [],
             "rubric_id": "quick_practice_text@v1",
         },
     )
@@ -389,7 +389,7 @@ async def test_catalog_supports_updates_save_reuse_and_verified_discovery(
             "title": "Updated prompt",
             "prompt_text": "A sponsor pushes for speed over quality. Respond with empathy and a boundary.",
             "difficulty": "advanced",
-            "target_skill_slugs": ["active-listening", "expectation-setting"],
+            "target_skill_slugs": [],
             "rubric_id": "quick_practice_text@v1",
         },
     )
@@ -525,7 +525,7 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
                         "title_hint": "Generated prompt",
                         "generation_brief": "A sponsor wants an impossible timeline. The learner must reset expectations while preserving trust.",
                         "difficulty": "intermediate",
-                        "target_skill_slugs": ["active-listening", "expectation-setting"],
+                        "target_skill_slugs": [],
                         "rubric_id": "quick_practice_text@v1",
                     }
                 ],
@@ -544,7 +544,7 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
                 "title": "Generated prompt",
                 "prompt_text": "A sponsor wants an impossible timeline. Respond.",
                 "difficulty": "intermediate",
-                "target_skill_slugs": ["active-listening", "expectation-setting"],
+                "target_skill_slugs": [],
                 "rubric_id": "quick_practice_text@v1",
                 "generated_rubric": {
                     "title": "Generated prompt rubric",
@@ -750,7 +750,7 @@ async def test_catalog_generates_prompt_items_for_existing_collections(
             "title": "Existing reset expectations prompt",
             "prompt_text": "A client asks for an unrealistic deadline. Respond with empathy and a boundary.",
             "difficulty": "advanced",
-            "target_skill_slugs": ["active-listening"],
+            "target_skill_slugs": [],
             "rubric_id": "quick_practice_text@v1",
         },
     )
@@ -768,7 +768,7 @@ async def test_catalog_generates_prompt_items_for_existing_collections(
                         "title_hint": "Escalation reset",
                         "generation_brief": "A sponsor escalates a timeline conflict and the learner must reset expectations while staying collaborative.",
                         "difficulty": "advanced",
-                        "target_skill_slugs": ["active-listening"],
+                        "target_skill_slugs": [],
                         "rubric_id": "quick_practice_text@v1",
                     }
                 ],
@@ -778,7 +778,7 @@ async def test_catalog_generates_prompt_items_for_existing_collections(
                 "title": "Escalation reset",
                 "prompt_text": "A sponsor escalates a timeline conflict. Respond with empathy, clarity, and a credible next step.",
                 "difficulty": "advanced",
-                "target_skill_slugs": ["active-listening"],
+                "target_skill_slugs": [],
                 "rubric_id": "quick_practice_text@v1",
                 "generated_rubric": {
                     "title": "Escalation reset rubric",

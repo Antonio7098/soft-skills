@@ -18,11 +18,17 @@ def test_settings_reject_zero_event_queue_size() -> None:
 
 def test_settings_support_openrouter_aliases(monkeypatch) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter-key")
-    monkeypatch.setenv("LLM_MARKING_MODEL", "openrouter/test-model")
-    monkeypatch.setenv("LLM_MARKING_MODEL_BACKUP", "qwen/qwen3.5-9b")
+    monkeypatch.setenv(
+        "SOFT_SKILLS_LLM_MARKING_PER_SKILL_MODEL",
+        "openrouter/test-model",
+    )
+    monkeypatch.setenv(
+        "SOFT_SKILLS_LLM_DEFAULT_BACKUP_MODEL",
+        "qwen/qwen3.5-9b",
+    )
 
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
     assert settings.openrouter_api_key == "test-openrouter-key"
-    assert settings.llm_marking_model == "openrouter/test-model"
-    assert settings.llm_marking_model_backup == "qwen/qwen3.5-9b"
+    assert settings.llm_marking_per_skill_model == "openrouter/test-model"
+    assert settings.llm_default_backup_model == "qwen/qwen3.5-9b"

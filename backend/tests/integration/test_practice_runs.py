@@ -111,7 +111,7 @@ async def _seed_quick_practice_prompt(client, learner_id: str) -> dict[str, obje
                 "A client asks for an impossible delivery date. Respond with empathy and a realistic next step."
             ),
             "difficulty": "intermediate",
-            "target_skill_slugs": ["active-listening", "expectation-setting"],
+            "target_skill_slugs": [],
             "rubric_id": "quick_practice_reset_timeline@v1",
         },
     )
@@ -208,6 +208,10 @@ class FakeSuccessMarker:
         call_context,
     ) -> AssessmentTransformPayload:
         del learner_payload, call_context
+        is_quick_practice = prompt_payload.prompt.practice_type.value == "quick_practice"
+        skill_slugs = list(prompt_payload.prompt.target_skill_slugs)
+        if is_quick_practice and not skill_slugs:
+            skill_slugs = ["active-listening", "expectation-setting"]
         return AssessmentTransformPayload(
             draft=AssessmentDraft.model_validate(
                 {
@@ -215,21 +219,15 @@ class FakeSuccessMarker:
                     "rubric_version": prompt_payload.prompt.rubric_version,
                     "provider": "openai",
                     "model_slug": "gpt-4.1-mini",
-                    "overall_score": (
-                        2 if prompt_payload.prompt.practice_type.value == "quick_practice" else 4
-                    ),
+                    "overall_score": (2 if is_quick_practice else 4),
                     "rationale": "The response addressed the prompt with a credible next step.",
                     "skill_scores": [
                         {
                             "skill_slug": slug,
-                            "score": (
-                                2
-                                if prompt_payload.prompt.practice_type.value == "quick_practice"
-                                else 4
-                            ),
+                            "score": (2 if is_quick_practice else 4),
                             "rationale": f"The response demonstrated {slug}.",
                         }
-                        for slug in prompt_payload.prompt.target_skill_slugs
+                        for slug in skill_slugs
                     ],
                     "evidence": [
                         {
@@ -237,7 +235,7 @@ class FakeSuccessMarker:
                             "quote": prompt_payload.response_text,
                             "explanation": f"The response text provided direct evidence for {slug}.",
                         }
-                        for slug in prompt_payload.prompt.target_skill_slugs
+                        for slug in skill_slugs
                     ],
                     "strengths": ["Stayed grounded in the prompt and stakeholder context."],
                     "weaknesses": ["Could have added one clearer follow-up checkpoint."],

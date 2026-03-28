@@ -62,18 +62,18 @@ class FakeSuccessMarker:
                     "rubric_version": prompt_payload.prompt.rubric_version,
                     "provider": "openai",
                     "model_slug": "gpt-4.1-mini",
-                    "overall_score": 4,
+                    "overall_score": 2,
                     "rationale": "The response balanced empathy with a realistic commitment.",
                     "skill_scores": [
                         {
                             "skill_slug": "active-listening",
-                            "score": 4,
+                            "score": 2,
                             "rationale": "It acknowledged the client concern directly.",
                         },
                         {
                             "skill_slug": "expectation-setting",
-                            "score": 3,
-                            "rationale": "It set a next step but could tighten the boundary.",
+                            "score": 2,
+                            "rationale": "It set a realistic next step and boundary.",
                         },
                     ],
                     "evidence": [
@@ -132,7 +132,7 @@ async def _seed_public_collection(client, org_id: str, admin_id: str | None = No
             "content_format_mix": ["quick_practice_prompt"],
             "target_skill_slugs": ["active-listening", "expectation-setting"],
             "target_competency_slugs": ["stakeholder-management"],
-            "rubric_ids": ["quick_practice_text@v1"],
+            "rubric_ids": ["quick_practice_reset_timeline@v1"],
             "organisation_id": org_id,
         },
     )
@@ -151,10 +151,11 @@ async def _seed_public_collection(client, org_id: str, admin_id: str | None = No
             "title": "Reset expectations",
             "prompt_text": "A client asks for an impossible timeline. Respond.",
             "difficulty": "intermediate",
-            "target_skill_slugs": ["active-listening", "expectation-setting"],
-            "rubric_id": "quick_practice_text@v1",
+            "target_skill_slugs": [],
+            "rubric_id": "quick_practice_reset_timeline@v1",
         },
     )
+    assert prompt_response.status_code == 200, prompt_response.json()
     publish_response = await client.patch(
         f"/api/collections/{collection_id}/lifecycle",
         headers={"X-User-ID": learner["id"], "X-Organisation-ID": org_id},
@@ -174,7 +175,7 @@ async def _seed_assessed_attempt(app, client, org_id: str, admin_id: str | None 
         headers={"X-User-ID": learner["id"]},
         json={"prompt_item_id": prompt["id"]},
     )
-    assert start_response.status_code == 200
+    assert start_response.status_code == 200, start_response.json()
     attempt_id = start_response.json()["data"]["attempt_id"]
     submit_response = await client.post(
         f"/api/attempts/{attempt_id}/submit",
@@ -186,7 +187,7 @@ async def _seed_assessed_attempt(app, client, org_id: str, admin_id: str | None 
             )
         },
     )
-    assert submit_response.status_code == 200
+    assert submit_response.status_code == 200, submit_response.json()
     return learner, collection, prompt, submit_response.json()["data"]
 
 
@@ -320,7 +321,6 @@ async def test_admin_analytics_and_audit_are_redacted_and_admin_only(
         app, client, org_id, admin_id=admin["id"]
     )
     attempt_id = attempt["id"]
-
     own_attempt_response = await client.get(
         f"/api/attempts/{attempt_id}",
         headers={"X-User-ID": learner["id"]},

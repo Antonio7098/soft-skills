@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Annotated
 from enum import StrEnum
 from functools import lru_cache
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class LLMTaskKind(StrEnum):
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     environment: str = "local"
     api_prefix: str = "/api"
-    cors_allowed_origins: tuple[str, ...] = ("*",)
+    cors_allowed_origins: Annotated[tuple[str, ...], NoDecode] = ("*",)
     database_url: str = "sqlite+pysqlite:///./softskills.db"
     log_level: str = "INFO"
     stageflow_event_queue_size: int = Field(default=1000, ge=1)
