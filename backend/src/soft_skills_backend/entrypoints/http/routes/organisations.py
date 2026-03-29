@@ -12,6 +12,16 @@ from soft_skills_backend.entrypoints.http.dependencies import (
 )
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
 from soft_skills_backend.modules.catalog import CollectionListFilters, CollectionView
+from soft_skills_backend.modules.catalog.contracts.prompt_item_commands import (
+    PromptItemCreateCommand,
+    PromptItemUpdateCommand,
+)
+from soft_skills_backend.modules.catalog.contracts.prompt_item_views import PromptItemView
+from soft_skills_backend.modules.catalog.contracts.scenario_commands import (
+    ScenarioCreateCommand,
+    ScenarioUpdateCommand,
+)
+from soft_skills_backend.modules.catalog.contracts.scenario_views import ScenarioView
 from soft_skills_backend.modules.organisations import (
     AddMemberCommand,
     CreateOrganisationCommand,
@@ -423,5 +433,177 @@ async def delete_org_rubric(
         workflow_id=correlation.workflow_id,
         organisation_id=organisation_id,
         rubric_id=rubric_id,
+    )
+    return ok_response(request, None)
+
+
+@router.post("/{organisation_id}/prompt-items", response_model=ApiEnvelope[PromptItemView])
+async def create_org_prompt_item(
+    request: Request,
+    organisation_id: str,
+    command: PromptItemCreateCommand,
+) -> ApiEnvelope[PromptItemView]:
+    actor = await require_org_admin_actor(request)
+    service = get_organisation_service(request)
+    correlation = _correlation_from_request(request)
+    payload = service.create_org_prompt_item(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        organisation_id=organisation_id,
+        command=command,
+    )
+    return ok_response(request, payload)
+
+
+@router.get("/{organisation_id}/prompt-items", response_model=ApiEnvelope[list[PromptItemView]])
+async def list_org_prompt_items(
+    request: Request,
+    organisation_id: str,
+) -> ApiEnvelope[list[PromptItemView]]:
+    actor = await require_org_admin_actor(request)
+    service = get_organisation_service(request)
+    return ok_response(request, service.list_org_prompt_items(actor, organisation_id))
+
+
+@router.get(
+    "/{organisation_id}/prompt-items/{prompt_item_id}", response_model=ApiEnvelope[PromptItemView]
+)
+async def get_org_prompt_item(
+    request: Request,
+    organisation_id: str,
+    prompt_item_id: str,
+) -> ApiEnvelope[PromptItemView]:
+    actor = await require_org_admin_actor(request)
+    service = get_organisation_service(request)
+    return ok_response(request, service.get_org_prompt_item(actor, organisation_id, prompt_item_id))
+
+
+@router.patch(
+    "/{organisation_id}/prompt-items/{prompt_item_id}", response_model=ApiEnvelope[PromptItemView]
+)
+async def update_org_prompt_item(
+    request: Request,
+    organisation_id: str,
+    prompt_item_id: str,
+    command: PromptItemUpdateCommand,
+) -> ApiEnvelope[PromptItemView]:
+    actor = await require_org_admin_actor(request)
+    service = get_organisation_service(request)
+    correlation = _correlation_from_request(request)
+    payload = service.update_org_prompt_item(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        organisation_id=organisation_id,
+        prompt_item_id=prompt_item_id,
+        command=command,
+    )
+    return ok_response(request, payload)
+
+
+@router.delete("/{organisation_id}/prompt-items/{prompt_item_id}")
+async def delete_org_prompt_item(
+    request: Request,
+    organisation_id: str,
+    prompt_item_id: str,
+) -> ApiEnvelope[None]:
+    actor = await require_org_admin_actor(request)
+    service = get_organisation_service(request)
+    correlation = _correlation_from_request(request)
+    service.delete_org_prompt_item(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        organisation_id=organisation_id,
+        prompt_item_id=prompt_item_id,
+    )
+    return ok_response(request, None)
+
+
+@router.post("/{organisation_id}/scenarios", response_model=ApiEnvelope[ScenarioView])
+async def create_org_scenario(
+    request: Request,
+    organisation_id: str,
+    command: ScenarioCreateCommand,
+) -> ApiEnvelope[ScenarioView]:
+    actor = await require_org_admin_actor(request)
+    service = get_organisation_service(request)
+    correlation = _correlation_from_request(request)
+    payload = service.create_org_scenario(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        organisation_id=organisation_id,
+        command=command,
+    )
+    return ok_response(request, payload)
+
+
+@router.get("/{organisation_id}/scenarios", response_model=ApiEnvelope[list[ScenarioView]])
+async def list_org_scenarios(
+    request: Request,
+    organisation_id: str,
+) -> ApiEnvelope[list[ScenarioView]]:
+    actor = await require_org_admin_actor(request)
+    service = get_organisation_service(request)
+    return ok_response(request, service.list_org_scenarios(actor, organisation_id))
+
+
+@router.get("/{organisation_id}/scenarios/{scenario_id}", response_model=ApiEnvelope[ScenarioView])
+async def get_org_scenario(
+    request: Request,
+    organisation_id: str,
+    scenario_id: str,
+) -> ApiEnvelope[ScenarioView]:
+    actor = await require_org_admin_actor(request)
+    service = get_organisation_service(request)
+    return ok_response(request, service.get_org_scenario(actor, organisation_id, scenario_id))
+
+
+@router.patch(
+    "/{organisation_id}/scenarios/{scenario_id}", response_model=ApiEnvelope[ScenarioView]
+)
+async def update_org_scenario(
+    request: Request,
+    organisation_id: str,
+    scenario_id: str,
+    command: ScenarioUpdateCommand,
+) -> ApiEnvelope[ScenarioView]:
+    actor = await require_org_admin_actor(request)
+    service = get_organisation_service(request)
+    correlation = _correlation_from_request(request)
+    payload = service.update_org_scenario(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        organisation_id=organisation_id,
+        scenario_id=scenario_id,
+        command=command,
+    )
+    return ok_response(request, payload)
+
+
+@router.delete("/{organisation_id}/scenarios/{scenario_id}")
+async def delete_org_scenario(
+    request: Request,
+    organisation_id: str,
+    scenario_id: str,
+) -> ApiEnvelope[None]:
+    actor = await require_org_admin_actor(request)
+    service = get_organisation_service(request)
+    correlation = _correlation_from_request(request)
+    service.delete_org_scenario(
+        actor,
+        request_id=correlation.request_id,
+        trace_id=correlation.trace_id,
+        workflow_id=correlation.workflow_id,
+        organisation_id=organisation_id,
+        scenario_id=scenario_id,
     )
     return ok_response(request, None)

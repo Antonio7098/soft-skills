@@ -1,7 +1,7 @@
 """Add organisation_id to prompt_items, scenarios, skills, competencies, rubrics.
 
 Revision ID: 20260329_0019
-Revises: 20260328_0018
+Revises: 20260328_0018_user_management
 Create Date: 2026-03-29 00:00:00.000000
 
 """
@@ -12,83 +12,41 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "20260329_0019"
-down_revision = "20260328_0018"
+down_revision = "20260328_0018_user_management"
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "prompt_items",
-        sa.Column("organisation_id", sa.String(length=32), nullable=True, index=True),
-    )
-    op.create_foreign_key(
-        "fk_prompt_items_organisation",
-        "prompt_items",
-        "organisations",
-        ["organisation_id"],
-        ["id"],
-    )
+    with op.batch_alter_table("prompt_items") as batch_op:
+        batch_op.alter_column("collection_id", existing_type=sa.String(length=32), nullable=True)
+        batch_op.add_column(sa.Column("organisation_id", sa.String(length=32), nullable=True))
+        batch_op.create_index("ix_prompt_items_organisation_id", ["organisation_id"])
 
-    op.add_column(
-        "scenarios",
-        sa.Column("organisation_id", sa.String(length=32), nullable=True, index=True),
-    )
-    op.create_foreign_key(
-        "fk_scenarios_organisation",
-        "scenarios",
-        "organisations",
-        ["organisation_id"],
-        ["id"],
-    )
+    with op.batch_alter_table("scenarios") as batch_op:
+        batch_op.alter_column("collection_id", existing_type=sa.String(length=32), nullable=True)
+        batch_op.add_column(sa.Column("organisation_id", sa.String(length=32), nullable=True))
+        batch_op.create_index("ix_scenarios_organisation_id", ["organisation_id"])
 
-    op.add_column(
-        "skills",
-        sa.Column("organisation_id", sa.String(length=32), nullable=True, index=True),
-    )
-    op.create_foreign_key(
-        "fk_skills_organisation",
-        "skills",
-        "organisations",
-        ["organisation_id"],
-        ["id"],
-    )
-    op.drop_constraint("skills_name_key", "skills", type_="unique")
-    op.create_unique_constraint(
-        "uq_skill_org_slug",
-        "skills",
-        ["slug", "organisation_id"],
-    )
+    with op.batch_alter_table("skills") as batch_op:
+        batch_op.add_column(sa.Column("organisation_id", sa.String(length=32), nullable=True))
+        batch_op.create_index("ix_skills_organisation_id", ["organisation_id"])
+        batch_op.create_unique_constraint(
+            "uq_skill_org_slug",
+            ["slug", "organisation_id"],
+        )
 
-    op.add_column(
-        "competencies",
-        sa.Column("organisation_id", sa.String(length=32), nullable=True, index=True),
-    )
-    op.create_foreign_key(
-        "fk_competencies_organisation",
-        "competencies",
-        "organisations",
-        ["organisation_id"],
-        ["id"],
-    )
-    op.drop_constraint("competencies_name_key", "competencies", type_="unique")
-    op.create_unique_constraint(
-        "uq_competency_org_slug",
-        "competencies",
-        ["slug", "organisation_id"],
-    )
+    with op.batch_alter_table("competencies") as batch_op:
+        batch_op.add_column(sa.Column("organisation_id", sa.String(length=32), nullable=True))
+        batch_op.create_index("ix_competencies_organisation_id", ["organisation_id"])
+        batch_op.create_unique_constraint(
+            "uq_competency_org_slug",
+            ["slug", "organisation_id"],
+        )
 
-    op.add_column(
-        "rubrics",
-        sa.Column("organisation_id", sa.String(length=32), nullable=True, index=True),
-    )
-    op.create_foreign_key(
-        "fk_rubrics_organisation",
-        "rubrics",
-        "organisations",
-        ["organisation_id"],
-        ["id"],
-    )
+    with op.batch_alter_table("rubrics") as batch_op:
+        batch_op.add_column(sa.Column("organisation_id", sa.String(length=32), nullable=True))
+        batch_op.create_index("ix_rubrics_organisation_id", ["organisation_id"])
 
     op.create_table(
         "org_skill_maps",
@@ -109,21 +67,26 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("org_skill_maps")
 
-    op.drop_constraint("fk_rubrics_organisation", "rubrics", type_="foreignkey")
-    op.drop_column("rubrics", "organisation_id")
+    with op.batch_alter_table("rubrics") as batch_op:
+        batch_op.drop_index("ix_rubrics_organisation_id")
+        batch_op.drop_column("organisation_id")
 
-    op.drop_constraint("uq_competency_org_slug", "competencies", type_="unique")
-    op.create_unique_constraint("competencies_name_key", "competencies", ["name"])
-    op.drop_constraint("fk_competencies_organisation", "competencies", type_="foreignkey")
-    op.drop_column("competencies", "organisation_id")
+    with op.batch_alter_table("competencies") as batch_op:
+        batch_op.drop_constraint("uq_competency_org_slug", type_="unique")
+        batch_op.drop_index("ix_competencies_organisation_id")
+        batch_op.drop_column("organisation_id")
 
-    op.drop_constraint("fk_skills_organisation", "skills", type_="unique")
-    op.create_unique_constraint("skills_name_key", "skills", ["name"])
-    op.drop_constraint("fk_skills_organisation", "skills", type_="foreignkey")
-    op.drop_column("skills", "organisation_id")
+    with op.batch_alter_table("skills") as batch_op:
+        batch_op.drop_constraint("uq_skill_org_slug", type_="unique")
+        batch_op.drop_index("ix_skills_organisation_id")
+        batch_op.drop_column("organisation_id")
 
-    op.drop_constraint("fk_scenarios_organisation", "scenarios", type_="foreignkey")
-    op.drop_column("scenarios", "organisation_id")
+    with op.batch_alter_table("scenarios") as batch_op:
+        batch_op.drop_index("ix_scenarios_organisation_id")
+        batch_op.drop_column("organisation_id")
+        batch_op.alter_column("collection_id", existing_type=sa.String(length=32), nullable=False)
 
-    op.drop_constraint("fk_prompt_items_organisation", "prompt_items", type_="foreignkey")
-    op.drop_column("prompt_items", "organisation_id")
+    with op.batch_alter_table("prompt_items") as batch_op:
+        batch_op.drop_index("ix_prompt_items_organisation_id")
+        batch_op.drop_column("organisation_id")
+        batch_op.alter_column("collection_id", existing_type=sa.String(length=32), nullable=False)

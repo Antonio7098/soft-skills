@@ -41,8 +41,18 @@ class ScenarioCreateCommand(BaseModel):
     organisation_id: str | None = None
 
 
-class ScenarioUpdateCommand(ScenarioCreateCommand):
-    pass
+class ScenarioUpdateCommand(BaseModel):
+    title: str | None = None
+    business_context: str | None = None
+    learner_objective: str | None = None
+    constraints: list[str] | None = None
+    stakeholder_tensions: list[str] | None = None
+    target_skill_slugs: list[str] | None = None
+    rubric_id: str | None = None
+    mock_company: MockCompanyInput | None = None
+    mock_people: list[MockPersonInput] | None = None
+    supporting_artifacts: list[ScenarioSupportingArtifactInput] | None = None
+    organisation_id: str | None = None
 
 
 class ScenarioSupportingArtifactView(BaseModel):
@@ -94,8 +104,14 @@ class PromptItemCreateCommand(BaseModel):
     organisation_id: str | None = None
 
 
-class PromptItemUpdateCommand(PromptItemCreateCommand):
-    pass
+class PromptItemUpdateCommand(BaseModel):
+    prompt_type: str | None = None
+    title: str | None = None
+    prompt_text: str | None = None
+    difficulty: str | None = None
+    target_skill_slugs: list[str] | None = None
+    rubric_id: str | None = None
+    organisation_id: str | None = None
 
 
 class PromptItemView(BaseModel):

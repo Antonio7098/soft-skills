@@ -166,34 +166,39 @@ def validate_prompt_command(
     collection: CollectionRecord | None,
     command: PromptItemCreateCommand | PromptItemUpdateCommand,
 ) -> None:
-    validate_difficulty(command.difficulty)
-    if command.prompt_type not in ALLOWED_PROMPT_TYPES:
-        raise validation_error(
-            "Unsupported prompt type",
-            code="SS-VALIDATION-005",
-            details={"prompt_type": command.prompt_type},
-        )
-    is_quick_practice = command.prompt_type == "quick_practice_prompt"
-    require_existing_skills(session, command.target_skill_slugs, command.organisation_id)
-    require_existing_rubrics(session, [command.rubric_id], command.organisation_id)
-    rubric = session.get(RubricRecord, command.rubric_id)
-    if rubric is None:
-        raise validation_error("Rubric was not found", details={"rubric_id": command.rubric_id})
-    expected_content_type = ALLOWED_PROMPT_TYPES[command.prompt_type]
-    if rubric.content_type != expected_content_type:
-        raise validation_error(
-            "Prompt type and rubric content type do not match",
-            code="SS-VALIDATION-006",
-            details={"prompt_type": command.prompt_type, "rubric_id": command.rubric_id},
-        )
-    if collection is not None:
-        if not is_quick_practice and not set(command.target_skill_slugs).issubset(
-            set(collection.target_skill_slugs)
-        ):
+    is_update = isinstance(command, PromptItemUpdateCommand)
+    if command.difficulty is not None:
+        validate_difficulty(command.difficulty)
+    if command.prompt_type is not None:
+        if command.prompt_type not in ALLOWED_PROMPT_TYPES:
             raise validation_error(
-                "Prompt item skills must be a subset of the collection skills",
-                code="SS-VALIDATION-007",
+                "Unsupported prompt type",
+                code="SS-VALIDATION-005",
+                details={"prompt_type": command.prompt_type},
             )
+    if command.target_skill_slugs is not None:
+        require_existing_skills(session, command.target_skill_slugs, command.organisation_id)
+    if command.rubric_id is not None:
+        require_existing_rubrics(session, [command.rubric_id], command.organisation_id)
+        rubric = session.get(RubricRecord, command.rubric_id)
+        if rubric is None:
+            raise validation_error("Rubric was not found", details={"rubric_id": command.rubric_id})
+        if command.prompt_type is not None:
+            expected_content_type = ALLOWED_PROMPT_TYPES[command.prompt_type]
+            if rubric.content_type != expected_content_type:
+                raise validation_error(
+                    "Prompt type and rubric content type do not match",
+                    code="SS-VALIDATION-006",
+                    details={"prompt_type": command.prompt_type, "rubric_id": command.rubric_id},
+                )
+    if collection is not None and command.prompt_type is not None and not is_update:
+        is_quick_practice = command.prompt_type == "quick_practice_prompt"
+        if not is_quick_practice and command.target_skill_slugs is not None:
+            if not set(command.target_skill_slugs).issubset(set(collection.target_skill_slugs)):
+                raise validation_error(
+                    "Prompt item skills must be a subset of the collection skills",
+                    code="SS-VALIDATION-007",
+                )
         if command.prompt_type not in collection.content_format_mix:
             raise validation_error(
                 "Prompt item type must be enabled on the collection",
@@ -204,33 +209,42 @@ def validate_prompt_command(
 
 def validate_scenario_command(
     session: Session,
-    collection: CollectionRecord,
+    collection: CollectionRecord | None,
     command: ScenarioCreateCommand | ScenarioUpdateCommand,
 ) -> None:
-    require_existing_skills(session, command.target_skill_slugs)
-    require_existing_rubrics(session, [command.rubric_id])
-    rubric = session.get(RubricRecord, command.rubric_id)
-    if rubric is None:
-        raise validation_error("Rubric was not found", details={"rubric_id": command.rubric_id})
-    if rubric.content_type != ALLOWED_SCENARIO_CONTENT_TYPE:
-        raise validation_error(
-            "Scenario rubric must target scenario steps",
-            code="SS-VALIDATION-008",
-            details={"rubric_id": command.rubric_id},
-        )
-    if not set(command.target_skill_slugs).issubset(set(collection.target_skill_slugs)):
-        raise validation_error(
-            "Scenario skills must be a subset of the collection skills",
-            code="SS-VALIDATION-009",
-        )
-    if ALLOWED_SCENARIO_CONTENT_TYPE not in collection.content_format_mix:
-        raise validation_error(
-            "Scenario content must be enabled on the collection",
-            code="SS-VALIDATION-038",
-            details={"collection_id": collection.id},
-        )
-    validate_supporting_artifacts(cast(list[object], command.supporting_artifacts))
-    validate_mock_world(command)
+    is_update = isinstance(command, ScenarioUpdateCommand)
+    if command.target_skill_slugs is not None:
+        require_existing_skills(session, command.target_skill_slugs, command.organisation_id)
+    if command.rubric_id is not None:
+        require_existing_rubrics(session, [command.rubric_id], command.organisation_id)
+        rubric = session.get(RubricRecord, command.rubric_id)
+        if rubric is None:
+            raise validation_error("Rubric was not found", details={"rubric_id": command.rubric_id})
+        if rubric.content_type != ALLOWED_SCENARIO_CONTENT_TYPE:
+            raise validation_error(
+                "Scenario rubric must target scenario steps",
+                code="SS-VALIDATION-008",
+                details={"rubric_id": command.rubric_id},
+            )
+    if collection is not None and not is_update:
+        if command.target_skill_slugs is not None:
+            if not set(command.target_skill_slugs).issubset(set(collection.target_skill_slugs)):
+                raise validation_error(
+                    "Scenario skills must be a subset of the collection skills",
+                    code="SS-VALIDATION-009",
+                )
+        if ALLOWED_SCENARIO_CONTENT_TYPE not in collection.content_format_mix:
+            raise validation_error(
+                "Scenario content must be enabled on the collection",
+                code="SS-VALIDATION-038",
+                details={"collection_id": collection.id},
+            )
+    if command.supporting_artifacts is not None:
+        validate_supporting_artifacts(cast(list[object], command.supporting_artifacts))
+    if not is_update or (
+        is_update and (command.mock_company is not None or command.mock_people is not None)
+    ):
+        validate_mock_world(command)
 
 
 def validate_generation_request(

@@ -9,10 +9,13 @@ from soft_skills_backend.platform.db.models import (
     OrganisationMembershipRecord,
     OrganisationRecord,
     OrganisationSkillMapRecord,
+    PromptItemRecord,
     RubricRecord,
+    ScenarioRecord,
     SkillRecord,
 )
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
+from soft_skills_backend.shared.errors import domain_error
 
 
 class OrganisationRepository:
@@ -113,6 +116,21 @@ class OrganisationRepository:
     def create_skill(self, skill: SkillRecord) -> SkillRecord:
         """Persist a new org-specific skill."""
         with self._session_factory() as session:
+            existing = (
+                session.query(SkillRecord)
+                .filter(
+                    SkillRecord.organisation_id == skill.organisation_id,
+                    SkillRecord.slug == skill.slug,
+                )
+                .first()
+            )
+            if existing is not None:
+                raise domain_error(
+                    "Skill already exists",
+                    code="SS-ORG-001",
+                    status_code=409,
+                    details={"slug": skill.slug, "organisation_id": skill.organisation_id},
+                )
             session.add(skill)
             session.commit()
             session.refresh(skill)
@@ -160,6 +178,24 @@ class OrganisationRepository:
     def create_competency(self, competency: CompetencyRecord) -> CompetencyRecord:
         """Persist a new org-specific competency."""
         with self._session_factory() as session:
+            existing = (
+                session.query(CompetencyRecord)
+                .filter(
+                    CompetencyRecord.organisation_id == competency.organisation_id,
+                    CompetencyRecord.slug == competency.slug,
+                )
+                .first()
+            )
+            if existing is not None:
+                raise domain_error(
+                    "Competency already exists",
+                    code="SS-ORG-002",
+                    status_code=409,
+                    details={
+                        "slug": competency.slug,
+                        "organisation_id": competency.organisation_id,
+                    },
+                )
             session.add(competency)
             session.commit()
             session.refresh(competency)
@@ -253,6 +289,24 @@ class OrganisationRepository:
     def create_rubric(self, rubric: RubricRecord) -> RubricRecord:
         """Persist a new org-specific rubric."""
         with self._session_factory() as session:
+            existing = (
+                session.query(RubricRecord)
+                .filter(
+                    RubricRecord.organisation_id == rubric.organisation_id,
+                    RubricRecord.rubric_id == rubric.rubric_id,
+                )
+                .first()
+            )
+            if existing is not None:
+                raise domain_error(
+                    "Rubric already exists",
+                    code="SS-ORG-003",
+                    status_code=409,
+                    details={
+                        "rubric_id": rubric.rubric_id,
+                        "organisation_id": rubric.organisation_id,
+                    },
+                )
             session.add(rubric)
             session.commit()
             session.refresh(rubric)
@@ -294,5 +348,99 @@ class OrganisationRepository:
             session.query(RubricRecord).filter(
                 RubricRecord.organisation_id == organisation_id,
                 RubricRecord.rubric_id == rubric_id,
+            ).delete()
+            session.commit()
+
+    def create_prompt_item(self, prompt_item: PromptItemRecord) -> PromptItemRecord:
+        """Persist a new org-specific prompt item."""
+        with self._session_factory() as session:
+            session.add(prompt_item)
+            session.commit()
+            session.refresh(prompt_item)
+            return prompt_item
+
+    def get_prompt_item(self, organisation_id: str, prompt_item_id: str) -> PromptItemRecord | None:
+        """Fetch an org-specific prompt item by id."""
+        with self._session_factory() as session:
+            return (
+                session.query(PromptItemRecord)
+                .filter(
+                    PromptItemRecord.organisation_id == organisation_id,
+                    PromptItemRecord.id == prompt_item_id,
+                )
+                .first()
+            )
+
+    def list_prompt_items(self, organisation_id: str) -> list[PromptItemRecord]:
+        """List all prompt items for an organisation."""
+        with self._session_factory() as session:
+            return (
+                session.query(PromptItemRecord)
+                .filter(PromptItemRecord.organisation_id == organisation_id)
+                .order_by(PromptItemRecord.created_at.desc())
+                .all()
+            )
+
+    def update_prompt_item(self, prompt_item: PromptItemRecord) -> PromptItemRecord:
+        """Update an org-specific prompt item."""
+        with self._session_factory() as session:
+            session.add(prompt_item)
+            session.commit()
+            session.refresh(prompt_item)
+            return prompt_item
+
+    def delete_prompt_item(self, organisation_id: str, prompt_item_id: str) -> None:
+        """Delete an org-specific prompt item."""
+        with self._session_factory() as session:
+            session.query(PromptItemRecord).filter(
+                PromptItemRecord.organisation_id == organisation_id,
+                PromptItemRecord.id == prompt_item_id,
+            ).delete()
+            session.commit()
+
+    def create_scenario(self, scenario: ScenarioRecord) -> ScenarioRecord:
+        """Persist a new org-specific scenario."""
+        with self._session_factory() as session:
+            session.add(scenario)
+            session.commit()
+            session.refresh(scenario)
+            return scenario
+
+    def get_scenario(self, organisation_id: str, scenario_id: str) -> ScenarioRecord | None:
+        """Fetch an org-specific scenario by id."""
+        with self._session_factory() as session:
+            return (
+                session.query(ScenarioRecord)
+                .filter(
+                    ScenarioRecord.organisation_id == organisation_id,
+                    ScenarioRecord.id == scenario_id,
+                )
+                .first()
+            )
+
+    def list_scenarios(self, organisation_id: str) -> list[ScenarioRecord]:
+        """List all scenarios for an organisation."""
+        with self._session_factory() as session:
+            return (
+                session.query(ScenarioRecord)
+                .filter(ScenarioRecord.organisation_id == organisation_id)
+                .order_by(ScenarioRecord.created_at.desc())
+                .all()
+            )
+
+    def update_scenario(self, scenario: ScenarioRecord) -> ScenarioRecord:
+        """Update an org-specific scenario."""
+        with self._session_factory() as session:
+            session.add(scenario)
+            session.commit()
+            session.refresh(scenario)
+            return scenario
+
+    def delete_scenario(self, organisation_id: str, scenario_id: str) -> None:
+        """Delete an org-specific scenario."""
+        with self._session_factory() as session:
+            session.query(ScenarioRecord).filter(
+                ScenarioRecord.organisation_id == organisation_id,
+                ScenarioRecord.id == scenario_id,
             ).delete()
             session.commit()
