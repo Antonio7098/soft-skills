@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -293,13 +293,15 @@ class AdminAnalyticsRepository:
                 ],
             )
             snapshot_payloads = [record.snapshot_payload for record in latest_snapshots.values()]
-            thirty_days_ago = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-            thirty_days_ago = thirty_days_ago.replace(
-                day=thirty_days_ago.day - 30 if thirty_days_ago.day > 30 else 1
-            )
+            thirty_days_ago = datetime.utcnow().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ) - timedelta(days=30)
             active_learner_ids: set[str] = set()
             for session_record in sessions:
-                if session_record.created_at >= thirty_days_ago:
+                created_at = session_record.created_at
+                if created_at.tzinfo is not None:
+                    created_at = created_at.replace(tzinfo=None)
+                if created_at >= thirty_days_ago:
                     active_learner_ids.add(session_record.user_id)
             target_role_counts: dict[str, int] = {}
             for learner_id in learner_ids:

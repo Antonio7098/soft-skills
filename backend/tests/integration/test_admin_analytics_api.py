@@ -45,6 +45,33 @@ async def _create_org_and_make_admin(
     return user, org
 
 
+ALL_SKILL_SLUGS = [
+    "active-listening",
+    "concise-explanation",
+    "conflict-handling",
+    "decision-justification",
+    "empathy",
+    "executive-summary",
+    "expectation-setting",
+    "negotiation",
+    "prioritization-under-pressure",
+    "structured-communication",
+]
+
+RUBRIC_SKILL_RATIONALES = {
+    "active-listening": "It acknowledged the client concern directly.",
+    "concise-explanation": "The explanation was clear and to the point.",
+    "conflict-handling": "It addressed the conflict professionally.",
+    "decision-justification": "The decision was well-reasoned and justified.",
+    "empathy": "The response showed genuine understanding of the client's perspective.",
+    "executive-summary": "The key points were summarized effectively.",
+    "expectation-setting": "It set a next step but could tighten the boundary.",
+    "negotiation": "It proposed a reasonable path forward.",
+    "prioritization-under-pressure": "It appropriately prioritized the most urgent items.",
+    "structured-communication": "The response was well-organized and structured.",
+}
+
+
 class FakeSuccessMarker:
     provider_name = "openai"
     model_slug = "gpt-4.1-mini"
@@ -56,39 +83,37 @@ class FakeSuccessMarker:
             AssessmentTransformPayload,
         )
 
+        rubric_version = prompt_payload.prompt.rubric_version
+        skill_scores = []
+        evidence = []
+        learner_response = "I hear why the date matters to you. The earliest realistic date is next Friday, and I can confirm scope with the team by tomorrow."
+        for slug in ALL_SKILL_SLUGS:
+            skill_scores.append(
+                {
+                    "skill_slug": slug,
+                    "score": 3,
+                    "rationale": RUBRIC_SKILL_RATIONALES.get(slug, "Assessed positively."),
+                }
+            )
+            evidence.append(
+                {
+                    "skill_slug": slug,
+                    "quote": learner_response,
+                    "explanation": RUBRIC_SKILL_RATIONALES.get(slug, "Good response."),
+                }
+            )
+
         return AssessmentTransformPayload(
             draft=AssessmentDraft.model_validate(
                 {
                     "prompt_version": "assessment.quick-practice.v1",
-                    "rubric_version": prompt_payload.prompt.rubric_version,
+                    "rubric_version": rubric_version,
                     "provider": "openai",
                     "model_slug": "gpt-4.1-mini",
                     "overall_score": 4,
                     "rationale": "The response balanced empathy with a realistic commitment.",
-                    "skill_scores": [
-                        {
-                            "skill_slug": "active-listening",
-                            "score": 4,
-                            "rationale": "It acknowledged the client concern directly.",
-                        },
-                        {
-                            "skill_slug": "expectation-setting",
-                            "score": 3,
-                            "rationale": "It set a next step but could tighten the boundary.",
-                        },
-                    ],
-                    "evidence": [
-                        {
-                            "skill_slug": "active-listening",
-                            "quote": "I hear why the date matters to you",
-                            "explanation": "The learner acknowledged the stakeholder concern.",
-                        },
-                        {
-                            "skill_slug": "expectation-setting",
-                            "quote": "The earliest realistic date is next Friday",
-                            "explanation": "The learner set a realistic boundary.",
-                        },
-                    ],
+                    "skill_scores": skill_scores,
+                    "evidence": evidence,
                     "strengths": ["Acknowledged the client concern before resetting expectations."],
                     "weaknesses": ["Could have named a firmer checkpoint and owner."],
                     "next_actions": ["Practice tighter expectation-setting under pressure."],

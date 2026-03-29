@@ -11,11 +11,12 @@ from soft_skills_backend.smoke.support.backend import SmokeBackendClient
 from soft_skills_backend.smoke.support.environment import (
     SmokeApplicationSessionFactory,
 )
+from soft_skills_backend.smoke.support.fixtures import PracticeFixtureSeeder
 from soft_skills_backend.smoke.support.models import SmokeActors
 
 from .contracts import AdminTelemetrySmokeResult
 
-SMOKE_TIMEOUT_SECONDS = 120.0
+SMOKE_TIMEOUT_SECONDS = 180.0
 
 
 class AdminTelemetrySmoke(SmokeCase):
@@ -86,6 +87,23 @@ class AdminTelemetrySmoke(SmokeCase):
             organisation_id=org_id,
             new_member_id=actors.learner_id,
             role="member",
+        )
+
+        await backend.bootstrap_canon(actors.admin_id)
+        fixtures = await PracticeFixtureSeeder(backend).seed(actors.learner_id)
+
+        session = await backend.start_quick_practice_session(
+            user_id=actors.learner_id,
+            prompt_item_id=fixtures.quick_prompt_id,
+        )
+        attempt_id = str(session["attempt_id"])
+        await backend.submit_attempt(
+            user_id=actors.learner_id,
+            attempt_id=attempt_id,
+            response_text=(
+                "I hear why the date matters to you. The earliest realistic date is next Friday, "
+                "and I can confirm any scope tradeoffs with the team by tomorrow afternoon."
+            ),
         )
 
         overview_result = await backend.admin_get_telemetry_overview(
