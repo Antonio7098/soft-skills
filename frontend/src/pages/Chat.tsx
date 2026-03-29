@@ -1,5 +1,5 @@
-import { ChatPage as ChatPageComponent } from '@/features/chat';
+import { ChatPage } from '@/features/chat';
 
 export function Chat() {
-  return <ChatPageComponent />;
+  return <ChatPage />;
 }

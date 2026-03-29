@@ -62,6 +62,14 @@ import type {
   ProviderUsageView,
   SkillClusterView,
   SkillAverageView,
+  AssistantSessionView,
+  AssistantTurnView,
+  AssistantMessageView,
+  AssistantToolCallView,
+  CreateAssistantSessionCommand,
+  CreateAssistantTurnCommand,
+  CancelAssistantTurnCommand,
+  AssistantStreamCallbacks,
 } from './types';
 import {
   SEED_SKILLS,
@@ -72,6 +80,10 @@ import {
   SEED_CURRENT_USER,
   SEED_ATTEMPT_HISTORY,
   SEED_COMPETENCY_PROGRESS,
+  SEED_ASSISTANT_SESSIONS,
+  SEED_TURNS,
+  SEED_MESSAGES,
+  SEED_TOOL_CALLS,
 } from './mock-data';
 
 // ---------------------------------------------------------------------------
@@ -598,6 +610,208 @@ let _adminUsers = [...SEED_ADMIN_USERS];
 let _learnerRelationships = new Map<string, AdminLearnerRelationshipView>();
 let _rubricsAdmin = [...SEED_RUBRICS_ADMIN];
 let _workflowEvents = [...SEED_WORKFLOW_EVENTS];
+
+// Helper function to simulate tool flow based on keywords in chat messages
+async function simulateToolFlow(
+  sessionId: string,
+  turnId: string,
+  message: string,
+  userMessage: AssistantMessageView,
+  isGenerate: boolean,
+  isPractice: boolean,
+): Promise<void> {
+  const session = SEED_ASSISTANT_SESSIONS.find(s => s.id === sessionId);
+  if (!session) return;
+
+  const turnIndex = SEED_TURNS.findIndex(t => t.id === turnId);
+  if (turnIndex === -1) return;
+
+  let toolCall: AssistantToolCallView;
+  let assistantContent: string;
+
+  if (isGenerate) {
+    // --- GENERATION FLOW ---
+    toolCall = {
+      id: `tc-${uid()}`,
+      turn_id: turnId,
+      tool_name: 'generate_collection',
+      status: 'running',
+      args: { prompt: message, difficulty: 'intermediate' },
+      result: null,
+      error_code: null,
+      error_message: null,
+      child_run_id: null,
+      started_at: new Date().toISOString(),
+      completed_at: null,
+    };
+
+    // Simulate generation progress
+    await delay(500);
+    
+    // Update with blueprint
+    toolCall = {
+      ...toolCall,
+      result: {
+        blueprint: {
+          title: 'Generated: ' + message.slice(0, 30),
+          summary: 'AI-generated practice content based on your request.',
+          prompt_items_count: 3,
+          scenarios_count: 1,
+          model_slug: 'gpt-4',
+        },
+        progress_percent: 40,
+        current_stage: 'blueprint_transform',
+      },
+    };
+
+    await delay(800);
+
+    // Update with prompt items
+    toolCall = {
+      ...toolCall,
+      result: {
+        ...toolCall.result,
+        prompt_items: [
+          { title: 'Quick Practice: Communication Skills', prompt_type: 'quick_practice_prompt', difficulty: 'intermediate' },
+          { title: 'Interview: Leadership Scenario', prompt_type: 'interview_prompt', difficulty: 'advanced' },
+          { title: 'Practice: Active Listening', prompt_type: 'quick_practice_prompt', difficulty: 'introductory' },
+        ],
+        progress_percent: 70,
+        current_stage: 'prompt_items_work',
+      },
+    };
+
+    await delay(800);
+
+    // Complete
+    toolCall = {
+      ...toolCall,
+      status: 'completed',
+      result: {
+        ...toolCall.result,
+        collection_id: `col-${uid()}`,
+        progress_percent: 100,
+        current_stage: 'completed',
+      },
+      completed_at: new Date().toISOString(),
+      child_run_id: `run-${uid()}`,
+    };
+
+    assistantContent = `I've generated a new collection based on your request: "${message}". The collection includes 3 practice prompts and 1 scenario covering communication, leadership, and active listening skills. You can find it in your Collections page!`;
+
+  } else if (isPractice) {
+    // --- PRACTICE FLOW ---
+    toolCall = {
+      id: `tc-${uid()}`,
+      turn_id: turnId,
+      tool_name: 'start_collection_practice',
+      status: 'running',
+      args: { collection_id: SEED_COLLECTIONS[0]?.id },
+      result: null,
+      error_code: null,
+      error_message: null,
+      child_run_id: null,
+      started_at: new Date().toISOString(),
+      completed_at: null,
+    };
+
+    await delay(600);
+
+    // Update with practice session info
+    toolCall = {
+      ...toolCall,
+      status: 'completed',
+      result: {
+        practice: {
+          session_id: `practice-${uid()}`,
+          collection_title: SEED_COLLECTIONS[0]?.title ?? 'Practice Collection',
+          session_type: 'quick_practice',
+          status: 'responding',
+          current_step: 1,
+          total_steps: 3,
+          current_prompt_title: 'Tell me about a time you handled conflict',
+        },
+      },
+      completed_at: new Date().toISOString(),
+      child_run_id: `run-${uid()}`,
+    };
+
+    assistantContent = `I've started a practice session for you from the "${SEED_COLLECTIONS[0]?.title ?? 'Collection'}" collection. You're on step 1 of 3. The current prompt is: "Tell me about a time you handled conflict". Take your time and respond when ready!`;
+
+  } else {
+    // --- NORMAL FLOW (list_collections) ---
+    toolCall = {
+      id: `tc-${uid()}`,
+      turn_id: turnId,
+      tool_name: 'list_collections',
+      status: 'running',
+      args: {},
+      result: null,
+      error_code: null,
+      error_message: null,
+      child_run_id: null,
+      started_at: new Date().toISOString(),
+      completed_at: null,
+    };
+
+    await delay(400);
+
+    // Complete with collection list
+    toolCall = {
+      ...toolCall,
+      status: 'completed',
+      result: {
+        collections: SEED_COLLECTIONS.slice(0, 3).map(c => ({
+          id: c.id,
+          title: c.title,
+          item_count: c.prompt_items.length + c.scenarios.length,
+        })),
+      },
+      completed_at: new Date().toISOString(),
+      child_run_id: `run-${uid()}`,
+    };
+
+    assistantContent = `I found ${SEED_COLLECTIONS.length} collections in your library. Based on your message "${message}", I'd recommend checking out "${SEED_COLLECTIONS[0]?.title}". Let me know if you'd like to practice with any of these!`;
+  }
+
+  // Update turn with completed tool call
+  const assistantMessage: AssistantMessageView = {
+    id: `msg-${uid()}`,
+    turn_id: turnId,
+    role: 'assistant',
+    content: assistantContent,
+    metadata: {},
+    created_at: new Date().toISOString(),
+  };
+
+  const baseTurn = SEED_TURNS[turnIndex];
+  if (!baseTurn) {
+    return;
+  }
+
+  const completedTurn: AssistantTurnView = {
+    ...baseTurn,
+    status: 'completed',
+    assistant_message_id: assistantMessage.id,
+    completed_at: new Date().toISOString(),
+    messages: [...baseTurn.messages, assistantMessage],
+    tool_calls: [toolCall],
+  };
+  SEED_TURNS[turnIndex] = completedTurn;
+
+  // Update session
+  const updatedSession: AssistantSessionView = {
+    ...session,
+    messages: [...session.messages, userMessage, assistantMessage],
+    turns: [...session.turns, completedTurn],
+    updated_at: new Date().toISOString(),
+  };
+
+  const sessionIndex = SEED_ASSISTANT_SESSIONS.findIndex(s => s.id === sessionId);
+  if (sessionIndex !== -1) {
+    SEED_ASSISTANT_SESSIONS[sessionIndex] = updatedSession;
+  }
+}
 
 export const mockDataProvider: DataProvider = {
   // --- Auth / Identity -----------------------------------------------------
@@ -2402,6 +2616,208 @@ export const mockDataProvider: DataProvider = {
       provider_calls: [
         { call_id: `call-${uid()}`, provider: 'openrouter', model_slug: 'gpt-4o-mini', operation: 'chat.complete', latency_ms: 850, success: true, error_code: null, trace_id: `trace-${uid()}` },
       ],
+    };
+  },
+
+  // --- Assistant ------------------------------------------------------------
+  async createAssistantSession(cmd?: CreateAssistantSessionCommand): Promise<AssistantSessionView> {
+    await delay(200);
+    const newSession: AssistantSessionView = {
+      id: `session-${uid()}`,
+      user_id: SEED_CURRENT_USER.id,
+      title: cmd?.title || 'New Chat Session',
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      turns: [],
+      messages: [],
+    };
+    SEED_ASSISTANT_SESSIONS.unshift(newSession);
+    return newSession;
+  },
+
+  async listAssistantSessions(): Promise<AssistantSessionView[]> {
+    await delay(150);
+    return SEED_ASSISTANT_SESSIONS.filter(session => session.user_id === SEED_CURRENT_USER.id);
+  },
+
+  async getAssistantSession(sessionId: string): Promise<AssistantSessionView> {
+    await delay(100);
+    const session = SEED_ASSISTANT_SESSIONS.find(s => s.id === sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+    return session;
+  },
+
+  async createAssistantTurn(sessionId: string, cmd: CreateAssistantTurnCommand): Promise<AssistantTurnView> {
+    await delay(300);
+    
+    const session = SEED_ASSISTANT_SESSIONS.find(s => s.id === sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+
+    const userMessage: AssistantMessageView = {
+      id: `msg-${uid()}`,
+      turn_id: `turn-${uid()}`,
+      role: 'user',
+      content: cmd.message,
+      metadata: {},
+      created_at: new Date().toISOString(),
+    };
+
+    const turnId = `turn-${uid()}`;
+    const streamToken = `st-${uid()}`;
+
+    // Determine which tool to call based on message content
+    const messageLower = cmd.message.toLowerCase();
+    const isGenerate = messageLower.includes('generate');
+    const isPractice = messageLower.includes('practice');
+
+    const newTurn: AssistantTurnView = {
+      id: turnId,
+      session_id: sessionId,
+      workflow_id: `wf-${uid()}`,
+      request_id: `req-${uid()}`,
+      trace_id: `trace-${uid()}`,
+      pipeline_run_id: `pr-${uid()}`,
+      status: 'running',
+      stream_token: streamToken,
+      last_error_code: null,
+      cancel_reason: null,
+      created_at: new Date().toISOString(),
+      started_at: new Date().toISOString(),
+      completed_at: null,
+      cancelled_at: null,
+      user_message_id: userMessage.id,
+      assistant_message_id: null,
+      messages: [userMessage],
+      tool_calls: [],
+    };
+
+    // Store turn for later retrieval
+    SEED_TURNS.push(newTurn);
+
+    // Start the async tool flow
+    simulateToolFlow(sessionId, turnId, cmd.message, userMessage, isGenerate, isPractice);
+
+    return newTurn;
+  },
+
+  async getAssistantTurn(turnId: string): Promise<AssistantTurnView> {
+    await delay(100);
+    const turn = SEED_TURNS.find(t => t.id === turnId);
+    if (!turn) {
+      throw new Error(`Turn ${turnId} not found`);
+    }
+    return turn;
+  },
+
+  async cancelAssistantTurn(turnId: string, cmd?: CancelAssistantTurnCommand): Promise<AssistantTurnView> {
+    await delay(200);
+    const turnIndex = SEED_TURNS.findIndex(t => t.id === turnId);
+    if (turnIndex === -1) {
+      throw new Error(`Turn ${turnId} not found`);
+    }
+    
+    const turn = SEED_TURNS[turnIndex];
+    if (!turn) {
+      throw new Error(`Turn ${turnId} not found`);
+    }
+    
+    if (turn.status === 'running') {
+      const cancelledTurn: AssistantTurnView = {
+        id: turn.id,
+        session_id: turn.session_id,
+        workflow_id: turn.workflow_id,
+        request_id: turn.request_id,
+        trace_id: turn.trace_id,
+        pipeline_run_id: turn.pipeline_run_id,
+        status: 'cancelled',
+        stream_token: turn.stream_token,
+        last_error_code: turn.last_error_code,
+        cancel_reason: cmd?.reason || 'user_requested',
+        created_at: turn.created_at,
+        started_at: turn.started_at,
+        completed_at: new Date().toISOString(),
+        cancelled_at: new Date().toISOString(),
+        user_message_id: turn.user_message_id,
+        assistant_message_id: turn.assistant_message_id,
+        messages: turn.messages,
+        tool_calls: turn.tool_calls,
+      };
+      SEED_TURNS[turnIndex] = cancelledTurn;
+      return cancelledTurn;
+    }
+    
+    return turn;
+  },
+
+  streamAssistantTurn(streamToken: string, callbacks: AssistantStreamCallbacks): () => void {
+    const turn = SEED_TURNS.find((item) => item.stream_token === streamToken);
+    if (!turn) {
+      callbacks.onError?.(`Stream ${streamToken} not found`);
+      callbacks.onClose?.();
+      return () => {};
+    }
+
+    const message = turn.messages.find((item) => item.role === 'user')?.content.toLowerCase() ?? '';
+    const isGenerate = message.includes('generate');
+    const isPractice = message.includes('practice');
+
+    const runningTool: AssistantToolCallView = {
+      id: `tc-${uid()}`,
+      turn_id: turn.id,
+      tool_name: isGenerate
+        ? 'generate_collection'
+        : isPractice
+          ? 'start_collection_practice'
+          : 'list_collections',
+      status: 'running',
+      args: isGenerate
+        ? { prompt: message, difficulty: 'intermediate' }
+        : isPractice
+          ? { collection_id: SEED_COLLECTIONS[0]?.id }
+          : {},
+      result: null,
+      error_code: null,
+      error_message: null,
+      child_run_id: null,
+      started_at: new Date().toISOString(),
+      completed_at: null,
+    };
+
+    callbacks.onToolStarted?.(runningTool);
+
+    const completionDelay = isGenerate ? 2300 : isPractice ? 800 : 600;
+    const timeoutId = setTimeout(() => {
+      const latestTurn = SEED_TURNS.find((item) => item.stream_token === streamToken);
+      if (!latestTurn) {
+        callbacks.onError?.(`Completed turn for stream ${streamToken} not found`);
+        callbacks.onClose?.();
+        return;
+      }
+
+      const completedTool = latestTurn.tool_calls[0] ?? {
+        ...runningTool,
+        status: 'completed' as const,
+        completed_at: new Date().toISOString(),
+      };
+
+      if (completedTool.status === 'failed') {
+        callbacks.onToolFailed?.(completedTool);
+      } else {
+        callbacks.onToolCompleted?.(completedTool);
+      }
+
+      callbacks.onTurnCompleted?.(latestTurn);
+      callbacks.onClose?.();
+    }, completionDelay);
+
+    return () => {
+      clearTimeout(timeoutId);
+      callbacks.onClose?.();
     };
   },
 };

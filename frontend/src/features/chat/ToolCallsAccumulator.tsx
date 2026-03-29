@@ -1,54 +1,71 @@
-import { useState } from 'react';
-import { cn } from '@/lib/cn';
-import { ToolCallItem, type ToolCall } from './ToolCallItem';
-import { Badge } from '@/design-system/primitives/Badge';
-import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
-import { Button } from '@/design-system/primitives/Button';
+import { Wrench, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import type { AssistantToolCallView } from '@/data/types';
+import { classifyTool } from '@/hooks/useAssistantStream';
+import { ToolCallItem } from './ToolCallItem';
+import { CompactGenerationTool } from './CompactGenerationTool';
+import { CompactPracticeTool } from './CompactPracticeTool';
 
 interface ToolCallsAccumulatorProps {
-  readonly toolCalls: ToolCall[];
-  readonly className?: string;
+  readonly toolCalls: AssistantToolCallView[];
 }
 
-export function ToolCallsAccumulator({ toolCalls, className }: ToolCallsAccumulatorProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
+export function ToolCallsAccumulator({ toolCalls }: ToolCallsAccumulatorProps) {
   if (toolCalls.length === 0) return null;
 
-  const runningCount = toolCalls.filter((tc) => tc.status === 'running').length;
-  const successCount = toolCalls.filter((tc) => tc.status === 'success').length;
-  const errorCount = toolCalls.filter((tc) => tc.status === 'error').length;
+  const running = toolCalls.filter((tc) => tc.status === 'running').length;
+  const succeeded = toolCalls.filter((tc) => tc.status === 'completed').length;
+  const failed = toolCalls.filter((tc) => tc.status === 'failed').length;
+  const total = toolCalls.length;
 
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="self-start -ml-2 text-content-secondary hover:text-content-primary"
-        icon={runningCount > 0 ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : undefined}
-        iconPosition="left"
-      >
-        <span className="flex items-center gap-2">
-          Tool Calls
-          <Badge variant="accent" size="sm">{toolCalls.length}</Badge>
-          {successCount > 0 && <Badge variant="success" size="sm">{successCount}</Badge>}
-          {errorCount > 0 && <Badge variant="error" size="sm">{errorCount}</Badge>}
-          {isExpanded ? (
-            <ChevronUp className="w-3.5 h-3.5 ml-1" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5 ml-1" />
-          )}
+    <div className="max-w-[85%] mr-auto">
+      {/* Summary header */}
+      <div className="flex items-center gap-2 mb-2 px-1">
+        <Wrench className="w-3.5 h-3.5 text-content-tertiary" />
+        <span className="text-body-xs font-medium text-content-tertiary">
+          {running > 0
+            ? `Running ${running} of ${total} tool${total !== 1 ? 's' : ''}...`
+            : `${total} tool${total !== 1 ? 's' : ''} executed`}
         </span>
-      </Button>
-
-      {isExpanded && (
-        <div className="flex flex-col gap-2 pl-2 border-l-2 border-line">
-          {toolCalls.map((toolCall) => (
-            <ToolCallItem key={toolCall.id} toolCall={toolCall} />
-          ))}
+        <div className="flex items-center gap-1 ml-auto">
+          {succeeded > 0 && (
+            <span className="flex items-center gap-0.5 text-body-xs text-status-success">
+              <CheckCircle2 className="w-3 h-3" /> {succeeded}
+            </span>
+          )}
+          {failed > 0 && (
+            <span className="flex items-center gap-0.5 text-body-xs text-status-error">
+              <XCircle className="w-3 h-3" /> {failed}
+            </span>
+          )}
+          {running > 0 && (
+            <span className="flex items-center gap-0.5 text-body-xs text-accent">
+              <Loader2 className="w-3 h-3 animate-spin" /> {running}
+            </span>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* Tool call list */}
+      <div className="flex flex-col gap-2">
+        {toolCalls.map((tc) => {
+          const type = classifyTool(tc.tool_name);
+
+          // Route to specialized component for expanded content
+          const expandedContent =
+            type === 'generation' ? <CompactGenerationTool toolCall={tc} /> :
+            type === 'practice' ? <CompactPracticeTool toolCall={tc} /> :
+            undefined;
+
+          return (
+            <ToolCallItem
+              key={tc.id}
+              toolCall={tc}
+              expandedContent={expandedContent}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }

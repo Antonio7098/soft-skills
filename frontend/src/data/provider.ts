@@ -53,6 +53,12 @@ import type {
   WorkflowEventView,
   PaginatedWorkflowEventsView,
   AttemptAuditView,
+  AssistantSessionView,
+  AssistantTurnView,
+  CreateAssistantSessionCommand,
+  CreateAssistantTurnCommand,
+  CancelAssistantTurnCommand,
+  AssistantStreamCallbacks,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -274,4 +280,13 @@ export interface DataProvider {
   ): Promise<WorkflowEventView>;
   deleteWorkflowEvent(eventId: string): Promise<{ status: string }>;
   getAttemptAudit(attemptId: string): Promise<AttemptAuditView>;
+
+  // --- Assistant ------------------------------------------------------------
+  createAssistantSession(cmd?: CreateAssistantSessionCommand): Promise<AssistantSessionView>;
+  listAssistantSessions(): Promise<AssistantSessionView[]>;
+  getAssistantSession(sessionId: string): Promise<AssistantSessionView>;
+  createAssistantTurn(sessionId: string, cmd: CreateAssistantTurnCommand): Promise<AssistantTurnView>;
+  getAssistantTurn(turnId: string): Promise<AssistantTurnView>;
+  cancelAssistantTurn(turnId: string, cmd?: CancelAssistantTurnCommand): Promise<AssistantTurnView>;
+  streamAssistantTurn(streamToken: string, callbacks: AssistantStreamCallbacks): () => void;
 }

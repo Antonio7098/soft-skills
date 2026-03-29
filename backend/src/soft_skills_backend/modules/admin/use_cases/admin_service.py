@@ -52,6 +52,9 @@ from soft_skills_backend.modules.admin.contracts.views import (
     StageDefinitionView,
     StageExecutionEventView,
     StageMetricsView,
+    TelemetryOverviewView,
+    TelemetryTraceListView,
+    TelemetryTraceView,
     UserActivityView,
     UserAttemptSummaryView,
     UserLoginEventView,
@@ -1056,3 +1059,75 @@ class AdminService:
             cancel_count=cancel_count,
             stage_metrics=stage_metrics_views,
         )
+
+    def get_telemetry_overview(
+        self,
+        actor: Actor,
+        organisation_id: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> TelemetryOverviewView:
+        resolved_org = organisation_id or actor.organisation_id
+        if resolved_org is None:
+            raise domain_error(
+                "Organisation ID is required for telemetry",
+                code="SS-ADMIN-050",
+                status_code=400,
+            )
+        return self._analytics.get_telemetry_overview(
+            organisation_id=resolved_org,
+            from_date=from_date,
+            to_date=to_date,
+        )
+
+    def list_telemetry_traces(
+        self,
+        actor: Actor,
+        organisation_id: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> TelemetryTraceListView:
+        resolved_org = organisation_id or actor.organisation_id
+        if resolved_org is None:
+            raise domain_error(
+                "Organisation ID is required for telemetry",
+                code="SS-ADMIN-051",
+                status_code=400,
+            )
+        return self._analytics.list_telemetry_traces(
+            organisation_id=resolved_org,
+            from_date=from_date,
+            to_date=to_date,
+            offset=offset,
+            limit=limit,
+        )
+
+    def get_telemetry_trace(
+        self,
+        actor: Actor,
+        trace_id: str,
+    ) -> TelemetryTraceView | None:
+        resolved_org = actor.organisation_id
+        if resolved_org is None:
+            raise domain_error(
+                "Organisation ID is required for telemetry",
+                code="SS-ADMIN-052",
+                status_code=400,
+            )
+        trace = self._analytics.get_telemetry_trace(trace_id)
+        if trace is None:
+            return None
+        if trace.organisation_id and trace.organisation_id != resolved_org:
+            trace_ids = self._analytics._organisation_trace_ids(
+                self._session_factory().__call__(), resolved_org
+            )
+            if trace_id not in trace_ids:
+                raise domain_error(
+                    "Trace not found",
+                    code="SS-ADMIN-053",
+                    status_code=404,
+                    details={"trace_id": trace_id},
+                )
+        return trace

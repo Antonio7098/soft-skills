@@ -15,6 +15,13 @@ from soft_skills_backend.modules.admin.contracts.views import (
     ProviderUsageView,
     SkillAverageView,
     SkillClusterView,
+    TelemetryErrorBreakdownView,
+    TelemetryLatencyBucketView,
+    TelemetryOverviewView,
+    TelemetryPipelineHealthView,
+    TelemetryProviderMetricView,
+    TelemetryTraceListView,
+    TelemetryTraceView,
     UsageSummaryView,
     UsageTrendPointView,
 )
@@ -603,3 +610,468 @@ class AdminAnalyticsRepository:
             assessed_at=None if attempt.assessed_at is None else attempt.assessed_at.isoformat(),
             created_at=attempt.created_at.isoformat(),
         )
+
+    def get_telemetry_overview(
+        self,
+        organisation_id: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> TelemetryOverviewView:
+        from soft_skills_backend.modules.admin.contracts.views import (
+            TelemetryErrorBreakdownView,
+            TelemetryLatencyBucketView,
+            TelemetryOverviewView,
+            TelemetryPipelineHealthView,
+            TelemetryProviderMetricView,
+        )
+
+        with self._session_factory() as session:
+            base_filter = self._build_date_filter(
+                WorkflowEventRecord.occurred_at, from_date, to_date
+            )
+            provider_filter = self._build_date_filter(
+                ProviderCallRecord.created_at, from_date, to_date
+            )
+            pipeline_filter = self._build_date_filter(
+                PipelineRunRecord.started_at, from_date, to_date
+            )
+
+            provider_calls = session.query(ProviderCallRecord).filter(provider_filter).all()
+            pipeline_runs = session.query(PipelineRunRecord).filter(pipeline_filter).all()
+            workflow_events = session.query(WorkflowEventRecord).filter(base_filter).all()
+
+            if organisation_id:
+                trace_ids = self._organisation_trace_ids(session, organisation_id)
+                provider_calls = [
+                    c for c in provider_calls if c.trace_id and c.trace_id in trace_ids
+                ]
+                pipeline_runs = [p for p in pipeline_runs if p.trace_id and p.trace_id in trace_ids]
+                workflow_events = [
+                    e
+                    for e in workflow_events
+                    if e.organisation_id == organisation_id
+                    or (e.trace_id and e.trace_id in trace_ids)
+                ]
+
+            total_provider_calls = len(provider_calls)
+            total_pipeline_runs = len(pipeline_runs)
+            total_workflow_events = len(workflow_events)
+
+            success_calls = [c for c in provider_calls if c.success]
+            success_pipeline = [p for p in pipeline_runs if p.status == "completed"]
+
+            provider_call_success_rate = (
+                round(len(success_calls) / total_provider_calls * 100, 2)
+                if total_provider_calls > 0
+                else None
+            )
+            pipeline_success_rate = (
+                round(len(success_pipeline) / total_pipeline_runs * 100, 2)
+                if total_pipeline_runs > 0
+                else None
+            )
+
+            all_latencies = [c.latency_ms for c in provider_calls if c.latency_ms is not None]
+            avg_provider_latency = (
+                round(sum(all_latencies) / len(all_latencies), 2) if all_latencies else None
+            )
+
+            total_errors = len([e for e in workflow_events if e.error_code])
+            error_rate = (
+                round(total_errors / total_workflow_events * 100, 2)
+                if total_workflow_events > 0
+                else None
+            )
+
+            provider_metrics = self._build_provider_metrics(provider_calls)
+            pipeline_health = self._build_pipeline_health(pipeline_runs)
+            error_breakdown = self._build_error_breakdown(workflow_events)
+            latency_distribution = self._build_latency_distribution(provider_calls)
+
+            return TelemetryOverviewView(
+                organisation_id=organisation_id,
+                from_date=from_date.isoformat() if from_date else None,
+                to_date=to_date.isoformat() if to_date else None,
+                total_provider_calls=total_provider_calls,
+                provider_call_success_rate=provider_call_success_rate,
+                avg_provider_latency_ms=avg_provider_latency,
+                total_pipeline_runs=total_pipeline_runs,
+                pipeline_success_rate=pipeline_success_rate,
+                total_workflow_events=total_workflow_events,
+                total_errors=total_errors,
+                error_rate=error_rate,
+                provider_metrics=provider_metrics,
+                pipeline_health=pipeline_health,
+                error_breakdown=error_breakdown,
+                latency_distribution=latency_distribution,
+            )
+
+    def list_telemetry_traces(
+        self,
+        organisation_id: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> TelemetryTraceListView:
+        from soft_skills_backend.modules.admin.contracts.views import (
+            TelemetryTraceListItemView,
+            TelemetryTraceListView,
+        )
+
+        with self._session_factory() as session:
+            if organisation_id:
+                trace_ids = self._organisation_trace_ids(session, organisation_id)
+                events_query = session.query(WorkflowEventRecord).filter(
+                    WorkflowEventRecord.trace_id.in_(trace_ids)
+                )
+            else:
+                events_query = session.query(WorkflowEventRecord)
+
+            if from_date:
+                events_query = events_query.filter(WorkflowEventRecord.occurred_at >= from_date)
+            if to_date:
+                events_query = events_query.filter(WorkflowEventRecord.occurred_at <= to_date)
+
+            total = events_query.count()
+            events = (
+                events_query.order_by(WorkflowEventRecord.occurred_at.desc())
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+
+            trace_ids_set = {e.trace_id for e in events if e.trace_id}
+            pipeline_runs = (
+                session.query(PipelineRunRecord)
+                .filter(PipelineRunRecord.trace_id.in_(trace_ids_set))
+                .all()
+            )
+            provider_calls = (
+                session.query(ProviderCallRecord)
+                .filter(ProviderCallRecord.trace_id.in_(trace_ids_set))
+                .all()
+            )
+
+            pipeline_by_trace = {p.trace_id: p for p in pipeline_runs if p.trace_id}
+            trace_spans: dict[str, int] = {tid: 0 for tid in trace_ids_set}
+            for pc in provider_calls:
+                if pc.trace_id:
+                    trace_spans[pc.trace_id] = trace_spans.get(pc.trace_id, 0) + 1
+
+            traces: list[TelemetryTraceListItemView] = []
+            for event in events:
+                if not event.trace_id:
+                    continue
+                pipeline_run = pipeline_by_trace.get(event.trace_id)
+                duration = None
+                if pipeline_run and pipeline_run.started_at and pipeline_run.finished_at:
+                    duration = int(
+                        (pipeline_run.finished_at - pipeline_run.started_at).total_seconds() * 1000
+                    )
+
+                traces.append(
+                    TelemetryTraceListItemView(
+                        trace_id=event.trace_id,
+                        organisation_id=event.organisation_id,
+                        operation_name=pipeline_run.pipeline_name if pipeline_run else None,
+                        service_name=None,
+                        duration_ms=duration,
+                        started_at=pipeline_run.started_at.isoformat()
+                        if pipeline_run and pipeline_run.started_at
+                        else None,
+                        error_count=1 if event.error_code else 0,
+                        span_count=trace_spans.get(event.trace_id, 0),
+                    )
+                )
+
+            unique_traces = {t.trace_id: t for t in traces}.values()
+            trace_list = sorted(unique_traces, key=lambda x: x.started_at or "", reverse=True)
+
+            return TelemetryTraceListView(
+                traces=list(trace_list)[offset : offset + limit],
+                total=len(trace_list),
+                offset=offset,
+                limit=limit,
+            )
+
+    def get_telemetry_trace(self, trace_id: str) -> TelemetryTraceView | None:
+        from soft_skills_backend.modules.admin.contracts.views import (
+            TelemetryTraceSpanView,
+            TelemetryTraceView,
+        )
+
+        with self._session_factory() as session:
+            pipeline_runs = (
+                session.query(PipelineRunRecord)
+                .filter(PipelineRunRecord.trace_id == trace_id)
+                .all()
+            )
+            provider_calls = (
+                session.query(ProviderCallRecord)
+                .filter(ProviderCallRecord.trace_id == trace_id)
+                .all()
+            )
+            workflow_events = (
+                session.query(WorkflowEventRecord)
+                .filter(WorkflowEventRecord.trace_id == trace_id)
+                .all()
+            )
+
+            if not pipeline_runs and not provider_calls and not workflow_events:
+                return None
+
+            spans: list[TelemetryTraceSpanView] = []
+            error_count = 0
+            started_at: datetime | None = None
+            completed_at: datetime | None = None
+
+            for pr in pipeline_runs:
+                if pr.started_at:
+                    started_at = (
+                        pr.started_at if started_at is None else min(started_at, pr.started_at)
+                    )
+                if pr.finished_at:
+                    completed_at = (
+                        pr.finished_at
+                        if completed_at is None
+                        else max(completed_at, pr.finished_at)
+                    )
+                if pr.error:
+                    error_count += 1
+                spans.append(
+                    TelemetryTraceSpanView(
+                        span_id=pr.pipeline_run_id,
+                        operation_name=f"pipeline.{pr.pipeline_name}",
+                        service_name="stageflow",
+                        start_time=pr.started_at.isoformat() if pr.started_at else None,
+                        end_time=pr.finished_at.isoformat() if pr.finished_at else None,
+                        duration_ms=int((pr.finished_at - pr.started_at).total_seconds() * 1000)
+                        if pr.started_at and pr.finished_at
+                        else None,
+                        status_code=pr.status,
+                        error=pr.error,
+                    )
+                )
+
+            for pc in provider_calls:
+                if pc.created_at:
+                    started_at = (
+                        pc.created_at if started_at is None else min(started_at, pc.created_at)
+                    )
+                if not pc.success and pc.error:
+                    error_count += 1
+                spans.append(
+                    TelemetryTraceSpanView(
+                        span_id=pc.call_id,
+                        operation_name=f"provider.{pc.operation}",
+                        service_name=pc.provider,
+                        start_time=pc.created_at.isoformat() if pc.created_at else None,
+                        duration_ms=pc.latency_ms,
+                        status_code="ok" if pc.success else "error",
+                        error=pc.error if not pc.success else None,
+                    )
+                )
+
+            for we in workflow_events:
+                if we.occurred_at:
+                    started_at = (
+                        we.occurred_at if started_at is None else min(started_at, we.occurred_at)
+                    )
+                if we.error_code:
+                    error_count += 1
+
+            total_duration_ms = None
+            if started_at and completed_at:
+                total_duration_ms = int((completed_at - started_at).total_seconds() * 1000)
+
+            workflow_event = workflow_events[0] if workflow_events else None
+
+            return TelemetryTraceView(
+                trace_id=trace_id,
+                organisation_id=workflow_event.organisation_id if workflow_event else None,
+                spans=spans,
+                total_duration_ms=total_duration_ms,
+                started_at=started_at.isoformat() if started_at else None,
+                completed_at=completed_at.isoformat() if completed_at else None,
+                error_count=error_count,
+                span_count=len(spans),
+            )
+
+    def _build_provider_metrics(
+        self, provider_calls: list[ProviderCallRecord]
+    ) -> list[TelemetryProviderMetricView]:
+        from soft_skills_backend.modules.admin.contracts.views import TelemetryProviderMetricView
+
+        by_provider_model: dict[tuple[str, str | None, str], list[ProviderCallRecord]] = {}
+        for pc in provider_calls:
+            key = (pc.provider, pc.model_id, pc.operation)
+            by_provider_model.setdefault(key, []).append(pc)
+
+        metrics: list[TelemetryProviderMetricView] = []
+        for (provider, model_id, operation), records in by_provider_model.items():
+            latencies = [r.latency_ms for r in records if r.latency_ms is not None]
+            sorted_latencies = sorted(latencies) if latencies else []
+            p50_idx = len(sorted_latencies) // 2
+            p95_idx = int(len(sorted_latencies) * 0.95)
+            p99_idx = int(len(sorted_latencies) * 0.99)
+
+            success_count = sum(1 for r in records if r.success)
+            metrics.append(
+                TelemetryProviderMetricView(
+                    provider=provider,
+                    model_slug=model_id,
+                    operation=operation,
+                    call_count=len(records),
+                    success_count=success_count,
+                    failure_count=len(records) - success_count,
+                    success_rate=round(success_count / len(records) * 100, 2) if records else None,
+                    avg_latency_ms=round(sum(latencies) / len(latencies), 2) if latencies else None,
+                    p50_latency_ms=sorted_latencies[p50_idx] if sorted_latencies else None,
+                    p95_latency_ms=sorted_latencies[p95_idx] if sorted_latencies else None,
+                    p99_latency_ms=sorted_latencies[p99_idx] if sorted_latencies else None,
+                    total_tokens=sum(
+                        r.metrics.get("prompt_tokens", 0) + r.metrics.get("completion_tokens", 0)
+                        for r in records
+                    ),
+                )
+            )
+        return metrics
+
+    def _build_pipeline_health(
+        self, pipeline_runs: list[PipelineRunRecord]
+    ) -> list[TelemetryPipelineHealthView]:
+        from soft_skills_backend.modules.admin.contracts.views import TelemetryPipelineHealthView
+
+        by_pipeline: dict[str, list[PipelineRunRecord]] = {}
+        for pr in pipeline_runs:
+            by_pipeline.setdefault(pr.pipeline_name, []).append(pr)
+
+        health: list[TelemetryPipelineHealthView] = []
+        for pipeline_name, records in by_pipeline.items():
+            success_count = sum(1 for r in records if r.status == "completed")
+            durations = [
+                int((r.finished_at - r.started_at).total_seconds() * 1000)
+                for r in records
+                if r.started_at and r.finished_at
+            ]
+            last_run = max((r.started_at for r in records if r.started_at), default=None)
+
+            health.append(
+                TelemetryPipelineHealthView(
+                    pipeline_name=pipeline_name,
+                    total_runs=len(records),
+                    success_count=success_count,
+                    failure_count=len(records) - success_count,
+                    cancel_count=sum(1 for r in records if r.status == "cancelled"),
+                    success_rate=round(success_count / len(records) * 100, 2) if records else None,
+                    avg_duration_ms=round(sum(durations) / len(durations), 2)
+                    if durations
+                    else None,
+                    error_rate=round((len(records) - success_count) / len(records) * 100, 2)
+                    if records
+                    else None,
+                    last_run_at=last_run.isoformat() if last_run else None,
+                )
+            )
+        return health
+
+    def _build_error_breakdown(
+        self, workflow_events: list[WorkflowEventRecord]
+    ) -> list[TelemetryErrorBreakdownView]:
+        from soft_skills_backend.modules.admin.contracts.views import TelemetryErrorBreakdownView
+
+        error_events = [e for e in workflow_events if e.error_code or e.payload.get("error")]
+        if not error_events:
+            return []
+
+        by_code: dict[str, list[WorkflowEventRecord]] = {}
+        for e in error_events:
+            code = e.error_code or e.payload.get("error_type", "unknown") or "unknown"
+            by_code.setdefault(code, []).append(e)
+
+        total = len(error_events)
+        breakdown: list[TelemetryErrorBreakdownView] = []
+        for code, events in by_code.items():
+            examples = [
+                str(e.payload.get("error", e.payload.get("root_cause", "")))[:100]
+                for e in events[:3]
+            ]
+            breakdown.append(
+                TelemetryErrorBreakdownView(
+                    error_code=code,
+                    error_type=events[0].payload.get("error_type", code) if events else code,
+                    count=len(events),
+                    percentage=round(len(events) / total * 100, 2) if total else 0.0,
+                    examples=examples,
+                )
+            )
+        return sorted(breakdown, key=lambda x: x.count, reverse=True)
+
+    def _build_latency_distribution(
+        self, provider_calls: list[ProviderCallRecord]
+    ) -> list[TelemetryLatencyBucketView]:
+        from soft_skills_backend.modules.admin.contracts.views import TelemetryLatencyBucketView
+
+        buckets = [50, 100, 200, 500, 1000, 2000, 5000, 10000]
+        latencies = sorted([c.latency_ms for c in provider_calls if c.latency_ms is not None])
+        if not latencies:
+            return []
+
+        total = len(latencies)
+        distribution: list[TelemetryLatencyBucketView] = []
+        bucket_idx = 0
+
+        for latency in latencies:
+            while bucket_idx < len(buckets) - 1 and latency > buckets[bucket_idx]:
+                bucket_idx += 1
+            bucket_val = buckets[bucket_idx] if bucket_idx < len(buckets) else buckets[-1] * 2
+            distribution.append(
+                TelemetryLatencyBucketView(bucket_ms=bucket_val, count=1, percentage=0.0)
+            )
+
+        bucket_counts: dict[int, int] = {}
+        for d in distribution:
+            bucket_counts[d.bucket_ms] = bucket_counts.get(d.bucket_ms, 0) + 1
+
+        return [
+            TelemetryLatencyBucketView(
+                bucket_ms=ms,
+                count=count,
+                percentage=round(count / total * 100, 2),
+            )
+            for ms, count in sorted(bucket_counts.items())
+        ]
+
+    def _build_date_filter(
+        self, column: Any, from_date: datetime | None, to_date: datetime | None
+    ) -> Any:
+        from sqlalchemy import and_
+
+        filters = []
+        if from_date:
+            filters.append(column >= from_date)
+        if to_date:
+            filters.append(column <= to_date)
+        return and_(*filters) if filters else True
+
+    def _organisation_trace_ids(self, session: Session, organisation_id: str) -> set[str]:
+        learner_ids = [
+            m.user_id
+            for m in session.query(OrganisationMembershipRecord)
+            .filter(OrganisationMembershipRecord.organisation_id == organisation_id)
+            .all()
+        ]
+
+        traces: set[str] = set()
+        for record in session.query(PipelineRunRecord).all():
+            if record.user_id and record.user_id in learner_ids and record.trace_id:
+                traces.add(record.trace_id)
+            if record.trace_id:
+                traces.add(record.trace_id)
+
+        for record in session.query(ProviderCallRecord).all():
+            if record.trace_id:
+                traces.add(record.trace_id)
+
+        return traces

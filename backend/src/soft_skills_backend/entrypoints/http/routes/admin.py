@@ -49,6 +49,9 @@ from soft_skills_backend.modules.admin import (
     PublishPromptCommand,
     RubricCriterionUpdateCommand,
     RubricView,
+    TelemetryOverviewView,
+    TelemetryTraceListView,
+    TelemetryTraceView,
     UpdatePromptCommand,
     UpdateRubricCommand,
     UserActivityView,
@@ -692,5 +695,69 @@ async def get_pipeline_metrics(
             code="SS-ORCHESTRATION-007",
             status_code=404,
             details={"pipeline_name": pipeline_name},
+        )
+    return ok_response(request, result)
+
+
+@router.get("/telemetry/overview", response_model=ApiEnvelope[TelemetryOverviewView])
+async def get_telemetry_overview(
+    request: Request,
+    organisation_id: str | None = Query(default=None),
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
+) -> ApiEnvelope[TelemetryOverviewView]:
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(
+        request,
+        service.get_telemetry_overview(
+            actor,
+            organisation_id=organisation_id,
+            from_date=from_date,
+            to_date=to_date,
+        ),
+    )
+
+
+@router.get("/telemetry/traces", response_model=ApiEnvelope[TelemetryTraceListView])
+async def list_telemetry_traces(
+    request: Request,
+    organisation_id: str | None = Query(default=None),
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> ApiEnvelope[TelemetryTraceListView]:
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(
+        request,
+        service.list_telemetry_traces(
+            actor,
+            organisation_id=organisation_id,
+            from_date=from_date,
+            to_date=to_date,
+            offset=offset,
+            limit=limit,
+        ),
+    )
+
+
+@router.get("/telemetry/traces/{trace_id}", response_model=ApiEnvelope[TelemetryTraceView | None])
+async def get_telemetry_trace(
+    request: Request,
+    trace_id: str,
+) -> ApiEnvelope[TelemetryTraceView | None]:
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    result = service.get_telemetry_trace(actor, trace_id)
+    if result is None:
+        from soft_skills_backend.shared.errors import domain_error
+
+        raise domain_error(
+            "Trace not found",
+            code="SS-ADMIN-053",
+            status_code=404,
+            details={"trace_id": trace_id},
         )
     return ok_response(request, result)

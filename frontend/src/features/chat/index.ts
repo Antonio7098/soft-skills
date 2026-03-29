@@ -1,7 +1,8 @@
-export { UserMessageBubble } from './UserMessageBubble';
-export { AssistantResponse } from './AssistantResponse';
+export { ChatPage } from './ChatPage';
+export { ChatInput } from './ChatInput';
+export { MessageBubble } from './MessageBubble';
 export { ToolCallItem } from './ToolCallItem';
 export { ToolCallsAccumulator } from './ToolCallsAccumulator';
-export { ChatInput } from './ChatInput';
-export type { ToolCall } from './ToolCallItem';
-export { ChatPage } from './ChatPage';
+export { CompactGenerationTool } from './CompactGenerationTool';
+export { CompactPracticeTool } from './CompactPracticeTool';
+export { SessionSidebar } from './SessionSidebar';

@@ -41,6 +41,12 @@ import type {
   WorkflowEventView,
   PaginatedWorkflowEventsView,
   AttemptAuditView,
+  AssistantSessionView,
+  AssistantTurnView,
+  CreateAssistantSessionCommand,
+  CreateAssistantTurnCommand,
+  CancelAssistantTurnCommand,
+  AssistantStreamCallbacks,
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
@@ -366,4 +372,90 @@ export const apiDataProvider: DataProvider = {
   deleteWorkflowEvent: (eventId) =>
     request<{ status: string }>(`/events/${encodeURIComponent(eventId)}`, { method: 'DELETE' }),
   getAttemptAudit: (attemptId) => request<AttemptAuditView>(`/admin/attempts/${attemptId}/audit`),
+
+  // --- Assistant ------------------------------------------------------------
+  createAssistantSession: (cmd) =>
+    request<AssistantSessionView>('/assistant/sessions', {
+      method: 'POST',
+      body: JSON.stringify(cmd || {}),
+    }),
+
+  listAssistantSessions: () =>
+    request<AssistantSessionView[]>('/assistant/sessions'),
+
+  getAssistantSession: (sessionId) =>
+    request<AssistantSessionView>(`/assistant/sessions/${encodeURIComponent(sessionId)}`),
+
+  createAssistantTurn: (sessionId, cmd) =>
+    request<AssistantTurnView>(`/assistant/sessions/${encodeURIComponent(sessionId)}/turns`, {
+      method: 'POST',
+      body: JSON.stringify(cmd),
+    }),
+
+  getAssistantTurn: (turnId) =>
+    request<AssistantTurnView>(`/assistant/turns/${encodeURIComponent(turnId)}`),
+
+  cancelAssistantTurn: (turnId, cmd) =>
+    request<AssistantTurnView>(`/assistant/turns/${encodeURIComponent(turnId)}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify(cmd || { reason: 'user_requested' }),
+    }),
+
+  streamAssistantTurn: (streamToken, callbacks) => {
+    const wsUrl = `${API_BASE.replace('http', 'ws')}/assistant/streams/${encodeURIComponent(streamToken)}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('Assistant stream connected');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'tool.started' && callbacks.onToolStarted) {
+          callbacks.onToolStarted(data.payload);
+        } else if (data.type === 'tool.completed' && callbacks.onToolCompleted) {
+          callbacks.onToolCompleted(data.payload);
+        } else if (data.type === 'tool.failed' && callbacks.onToolFailed) {
+          callbacks.onToolFailed(data.payload);
+        } else if (data.type === 'turn.completed' && callbacks.onTurnCompleted) {
+          callbacks.onTurnCompleted(data.payload);
+        }
+      } catch (error) {
+        console.error('Error parsing assistant stream message:', error);
+        if (callbacks.onError) {
+          callbacks.onError('Failed to parse stream message');
+        }
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('Assistant stream error:', error);
+      if (callbacks.onError) {
+        callbacks.onError('WebSocket connection error');
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('Assistant stream closed');
+      if (callbacks.onClose) {
+        callbacks.onClose();
+      }
+    };
+
+    // Handle control messages (like cancellation)
+    const sendControlMessage = (type: string, reason?: string) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type, reason }));
+      }
+    };
+
+    // Return cleanup function
+    return () => {
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
+    };
+  },
 };

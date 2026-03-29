@@ -20,6 +20,7 @@ import { QuickPracticeSession } from './pages/session/QuickPracticeSession';
 import { InterviewSession } from './pages/session/InterviewSession';
 import { ScenarioSession } from './pages/session/ScenarioSession';
 import { PracticeRunSession } from './pages/session/PracticeRunSession';
+import { Chat } from './pages/Chat';
 import './index.css';
 
 const router = createBrowserRouter([
@@ -38,6 +39,8 @@ const router = createBrowserRouter([
       { path: 'settings', element: <Settings /> },
       { path: 'assessment/:attemptId', element: <Assessment /> },
       { path: 'history', element: <History /> },
+      { path: 'chat', element: <Chat /> },
+      { path: 'chat/:sessionId', element: <Chat /> },
     ],
   },
   {

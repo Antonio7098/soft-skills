@@ -20,7 +20,17 @@ async function isApiReachable(): Promise<boolean> {
       method: 'GET',
       signal: AbortSignal.timeout(3000),
     });
-    return res.ok;
+    if (!res.ok) {
+      return false;
+    }
+
+    const contentType = res.headers.get('content-type') ?? '';
+    if (!contentType.includes('application/json')) {
+      return false;
+    }
+
+    const payload = await res.json() as { status?: string; ok?: boolean };
+    return payload.status === 'ok' || payload.ok === true;
   } catch {
     return false;
   }
@@ -42,8 +52,8 @@ class SwitchingDataProvider implements DataProvider {
 
     try {
       return await apiFn();
-    } catch (err) {
-      console.warn('[SwitchingProvider] API call failed, falling back to mock:', err);
+    } catch {
+      this._useApi = false;
       return mockFn();
     }
   }
@@ -227,6 +237,82 @@ class SwitchingDataProvider implements DataProvider {
       () => apiDataProvider.getAttemptHistory(userId),
       () => mockDataProvider.getAttemptHistory(userId),
     );
+  }
+
+  // --- Assistant ------------------------------------------------------------
+  createAssistantSession(cmd) {
+    return this.withFallback(
+      () => apiDataProvider.createAssistantSession(cmd),
+      () => mockDataProvider.createAssistantSession(cmd),
+    );
+  }
+
+  listAssistantSessions() {
+    return this.withFallback(
+      () => apiDataProvider.listAssistantSessions(),
+      () => mockDataProvider.listAssistantSessions(),
+    );
+  }
+
+  getAssistantSession(sessionId) {
+    return this.withFallback(
+      () => apiDataProvider.getAssistantSession(sessionId),
+      () => mockDataProvider.getAssistantSession(sessionId),
+    );
+  }
+
+  createAssistantTurn(sessionId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.createAssistantTurn(sessionId, cmd),
+      () => mockDataProvider.createAssistantTurn(sessionId, cmd),
+    );
+  }
+
+  getAssistantTurn(turnId) {
+    return this.withFallback(
+      () => apiDataProvider.getAssistantTurn(turnId),
+      () => mockDataProvider.getAssistantTurn(turnId),
+    );
+  }
+
+  cancelAssistantTurn(turnId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.cancelAssistantTurn(turnId, cmd),
+      () => mockDataProvider.cancelAssistantTurn(turnId, cmd),
+    );
+  }
+
+  streamAssistantTurn(streamToken, callbacks) {
+    if (!this._useApi) {
+      return mockDataProvider.streamAssistantTurn(streamToken, callbacks);
+    }
+
+    let mockCleanup: (() => void) | null = null;
+    let hasFallenBack = false;
+
+    const apiCleanup = apiDataProvider.streamAssistantTurn(streamToken, {
+      ...callbacks,
+      onError: (error) => {
+        if (hasFallenBack) {
+          callbacks.onError?.(error);
+          return;
+        }
+
+        hasFallenBack = true;
+        this._useApi = false;
+
+        try {
+          mockCleanup = mockDataProvider.streamAssistantTurn(streamToken, callbacks);
+        } catch {
+          callbacks.onError?.(error);
+        }
+      },
+    });
+
+    return () => {
+      apiCleanup();
+      mockCleanup?.();
+    };
   }
 }
 

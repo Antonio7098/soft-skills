@@ -630,6 +630,144 @@ All endpoints are prefixed with `/api/admin` and return `ApiEnvelope<T>` (Pydant
 
 ---
 
+### A10. Telemetry & Monitoring
+
+| Method | Path | Purpose | Query Params | Response Shape |
+|--------|------|---------|--------------|----------------|
+| `GET` | `/admin/telemetry/overview` | Aggregated telemetry dashboard | `organisation_id` (optional, defaults to actor's org), `from_date` (datetime, optional), `to_date` (datetime, optional) | `TelemetryOverviewView` |
+| `GET` | `/admin/telemetry/traces` | List distributed traces | `organisation_id`, `from_date`, `to_date`, `offset` (default 0), `limit` (default 50, max 200) | `TelemetryTraceListView` |
+| `GET` | `/admin/telemetry/traces/{trace_id}` | Get specific trace detail | — | `TelemetryTraceView` |
+
+**`TelemetryOverviewView`** shape:
+```json
+{
+  "organisation_id": "string | null",
+  "from_date": "string | null",
+  "to_date": "string | null",
+  "total_provider_calls": "int",
+  "provider_call_success_rate": "float | null",
+  "avg_provider_latency_ms": "float | null",
+  "total_pipeline_runs": "int",
+  "pipeline_success_rate": "float | null",
+  "total_workflow_events": "int",
+  "total_errors": "int",
+  "error_rate": "float | null",
+  "provider_metrics": ["TelemetryProviderMetricView"],
+  "pipeline_health": ["TelemetryPipelineHealthView"],
+  "error_breakdown": ["TelemetryErrorBreakdownView"],
+  "latency_distribution": ["TelemetryLatencyBucketView"]
+}
+```
+
+**`TelemetryProviderMetricView`** shape:
+```json
+{
+  "provider": "string",
+  "model_slug": "string | null",
+  "operation": "string",
+  "call_count": "int",
+  "success_count": "int",
+  "failure_count": "int",
+  "success_rate": "float | null",
+  "avg_latency_ms": "float | null",
+  "p50_latency_ms": "float | null",
+  "p95_latency_ms": "float | null",
+  "p99_latency_ms": "float | null",
+  "total_tokens": "int"
+}
+```
+
+**`TelemetryPipelineHealthView`** shape:
+```json
+{
+  "pipeline_name": "string",
+  "total_runs": "int",
+  "success_count": "int",
+  "failure_count": "int",
+  "cancel_count": "int",
+  "success_rate": "float | null",
+  "avg_duration_ms": "float | null",
+  "error_rate": "float | null",
+  "last_run_at": "string | null"
+}
+```
+
+**`TelemetryErrorBreakdownView`** shape:
+```json
+{
+  "error_code": "string | null",
+  "error_type": "string",
+  "count": "int",
+  "percentage": "float",
+  "examples": ["string"]
+}
+```
+
+**`TelemetryLatencyBucketView`** shape:
+```json
+{
+  "bucket_ms": "int",
+  "count": "int",
+  "percentage": "float"
+}
+```
+
+**`TelemetryTraceListView`** shape:
+```json
+{
+  "traces": ["TelemetryTraceListItemView"],
+  "total": "int",
+  "offset": "int",
+  "limit": "int"
+}
+```
+
+**`TelemetryTraceListItemView`** shape:
+```json
+{
+  "trace_id": "string",
+  "organisation_id": "string | null",
+  "operation_name": "string | null",
+  "service_name": "string | null",
+  "duration_ms": "int | null",
+  "started_at": "string | null",
+  "error_count": "int",
+  "span_count": "int"
+}
+```
+
+**`TelemetryTraceView`** shape:
+```json
+{
+  "trace_id": "string",
+  "organisation_id": "string | null",
+  "spans": ["TelemetryTraceSpanView"],
+  "total_duration_ms": "int | null",
+  "started_at": "string | null",
+  "completed_at": "string | null",
+  "error_count": "int",
+  "span_count": "int"
+}
+```
+
+**`TelemetryTraceSpanView`** shape:
+```json
+{
+  "span_id": "string | null",
+  "parent_span_id": "string | null",
+  "operation_name": "string",
+  "service_name": "string | null",
+  "start_time": "string | null",
+  "end_time": "string | null",
+  "duration_ms": "int | null",
+  "status_code": "string | null",
+  "error": "string | null",
+  "attributes": "dict"
+}
+```
+
+---
+
 ## B. Admin Dashboard Pages & Layout Proposal
 
 ### B1. Overall Layout
@@ -651,6 +789,7 @@ All endpoints are prefixed with `/api/admin` and return `ApiEnvelope<T>` (Pydant
 │  Pipelines   │                                              │
 │  Rubrics     │                                              │
 │  Audit Logs  │                                              │
+│  Telemetry   │                                              │
 │              │                                              │
 └──────────────┴──────────────────────────────────────────────┘
 ```
@@ -959,6 +1098,40 @@ All endpoints are prefixed with `/api/admin` and return `ApiEnvelope<T>` (Pydant
 - Search events by trace_id → trace execution path through system
 - Search events by error_code → all failures of a type
 - Inspect failed attempt → full artifact lineage
+
+---
+
+#### B2.11 Telemetry & Monitoring Page (`/admin/telemetry`)
+
+**Purpose:** Monitor system health, trace distributed requests, and analyze provider/pipeline performance for the organisation.
+
+**Sub-pages / tabs:**
+
+**Overview tab** (default):
+- `GET /admin/telemetry/overview`
+- **KPI Cards row**: Total Provider Calls, Call Success Rate %, Avg Latency (ms), Total Pipeline Runs, Pipeline Success Rate %, Total Errors, Error Rate %
+- **Provider Metrics table**: provider, model_slug, operation, call_count, success_rate, avg_latency_ms, p50/p95/p99 latency, total_tokens
+- **Pipeline Health table**: pipeline_name, total_runs, success_rate, avg_duration_ms, error_rate, last_run_at
+- **Error Breakdown chart**: horizontal bar chart of error_code vs count
+- **Latency Distribution chart**: histogram of latency buckets
+
+**Traces tab:**
+- `GET /admin/telemetry/traces`
+- **Filters**: from_date, to_date, trace_id search
+- **Trace list table**: columns: Trace ID, Operation, Duration (ms), Started At, Errors, Spans
+- Click row → trace detail
+
+**Trace Detail (`/admin/telemetry/traces/{trace_id}`):**
+- `GET /admin/telemetry/traces/{trace_id}`
+- **Trace timeline**: waterfall chart of spans
+- **Span details**: operation_name, service_name, duration_ms, status_code, error
+- **Attributes viewer**: key-value pairs of span attributes
+
+**Key workflows:**
+- Monitor provider health → view success_rate and latency percentiles
+- Identify failing pipelines → sort pipeline health by error_rate desc
+- Drill into a specific trace → click trace row to see full waterfall
+- Date range filtering → all queries re-fetch with new date bounds
 
 ---
 

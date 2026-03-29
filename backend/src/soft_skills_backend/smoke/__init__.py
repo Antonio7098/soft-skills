@@ -32,7 +32,7 @@ from .suites.content_generation import (
 from .suites.eval_dashboard_smoke import EvalDashboardSmoke
 from .suites.evaluation_smoke import EvaluationSmoke
 from .suites.full_user_journey import FullUserJourneySmoke
-from .suites.generation_streaming import GenerationStreamingSmoke
+from .suites.generation_streaming import GenerationCancellationSmoke, GenerationStreamingSmoke
 from .suites.organisation_smoke import OrganisationSmoke
 from .suites.pipeline_visualization import PipelineVisualizationSmoke
 from .suites.practice_run_lifecycle import PracticeRunLifecycleSmoke
@@ -57,6 +57,7 @@ def build_default_registry() -> SmokeRegistry:
             ChatPromptItemGenerationSmoke(),
             GenerationLatencyEnvelopeSmoke(),
             GenerationStreamingSmoke(),
+            GenerationCancellationSmoke(),
             AuthFlowsSmoke(),
             EvaluationSmoke(),
             EvalDashboardSmoke(),

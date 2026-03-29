@@ -559,3 +559,159 @@ class BulkOperationResultView(BaseModel):
     success_count: int
     failure_count: int
     failed_user_ids: list[str] = Field(default_factory=list)
+
+
+class TelemetryProviderMetricView(BaseModel):
+    """Provider call metrics for one provider/model combo."""
+
+    provider: str
+    model_slug: str | None = None
+    operation: str
+    call_count: int = 0
+    success_count: int = 0
+    failure_count: int = 0
+    success_rate: float | None = None
+    avg_latency_ms: float | None = None
+    p50_latency_ms: float | None = None
+    p95_latency_ms: float | None = None
+    p99_latency_ms: float | None = None
+    total_tokens: int = 0
+
+
+class TelemetryPipelineHealthView(BaseModel):
+    """Pipeline health summary."""
+
+    pipeline_name: str
+    total_runs: int = 0
+    success_count: int = 0
+    failure_count: int = 0
+    cancel_count: int = 0
+    success_rate: float | None = None
+    avg_duration_ms: float | None = None
+    error_rate: float | None = None
+    last_run_at: str | None = None
+
+
+class TelemetryErrorBreakdownView(BaseModel):
+    """Error category breakdown."""
+
+    error_code: str | None = None
+    error_type: str
+    count: int = 0
+    percentage: float = 0.0
+    examples: list[str] = Field(default_factory=list)
+
+
+class TelemetryLatencyBucketView(BaseModel):
+    """Latency histogram bucket."""
+
+    bucket_ms: int
+    count: int = 0
+    percentage: float = 0.0
+
+
+class TelemetryOverviewView(BaseModel):
+    """Aggregated telemetry dashboard overview."""
+
+    organisation_id: str | None = None
+    from_date: str | None = None
+    to_date: str | None = None
+    total_provider_calls: int = 0
+    provider_call_success_rate: float | None = None
+    avg_provider_latency_ms: float | None = None
+    total_pipeline_runs: int = 0
+    pipeline_success_rate: float | None = None
+    total_workflow_events: int = 0
+    total_errors: int = 0
+    error_rate: float | None = None
+    provider_metrics: list[TelemetryProviderMetricView] = Field(default_factory=list)
+    pipeline_health: list[TelemetryPipelineHealthView] = Field(default_factory=list)
+    error_breakdown: list[TelemetryErrorBreakdownView] = Field(default_factory=list)
+    latency_distribution: list[TelemetryLatencyBucketView] = Field(default_factory=list)
+
+
+class TelemetryTraceSpanView(BaseModel):
+    """One span in a distributed trace."""
+
+    span_id: str | None = None
+    parent_span_id: str | None = None
+    operation_name: str
+    service_name: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    duration_ms: int | None = None
+    status_code: str | None = None
+    error: str | None = None
+    attributes: dict[str, object] = Field(default_factory=dict)
+
+
+class TelemetryTraceView(BaseModel):
+    """Full distributed trace view."""
+
+    trace_id: str
+    organisation_id: str | None = None
+    spans: list[TelemetryTraceSpanView] = Field(default_factory=list)
+    total_duration_ms: int | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    error_count: int = 0
+    span_count: int = 0
+
+
+class TelemetryTraceListItemView(BaseModel):
+    """Summary of one trace for list views."""
+
+    trace_id: str
+    organisation_id: str | None = None
+    operation_name: str | None = None
+    service_name: str | None = None
+    duration_ms: int | None = None
+    started_at: str | None = None
+    error_count: int = 0
+    span_count: int = 0
+
+
+class TelemetryTraceListView(BaseModel):
+    """Paginated list of traces."""
+
+    traces: list[TelemetryTraceListItemView]
+    total: int
+    offset: int
+    limit: int
+
+
+class TelemetryEventSummaryView(BaseModel):
+    """Event summary for telemetry."""
+
+    event_id: str
+    event_type: str
+    trace_id: str | None = None
+    request_id: str | None = None
+    workflow_id: str | None = None
+    error_code: str | None = None
+    occurred_at: str | None = None
+
+
+class TelemetryServiceMapNodeView(BaseModel):
+    """One node in a service map."""
+
+    service_name: str
+    call_count: int = 0
+    error_count: int = 0
+    avg_duration_ms: float | None = None
+
+
+class TelemetryServiceMapEdgeView(BaseModel):
+    """One edge in a service map."""
+
+    source_service: str
+    target_service: str
+    call_count: int = 0
+    error_count: int = 0
+
+
+class TelemetryServiceMapView(BaseModel):
+    """Service dependency map."""
+
+    nodes: list[TelemetryServiceMapNodeView] = Field(default_factory=list)
+    edges: list[TelemetryServiceMapEdgeView] = Field(default_factory=list)
