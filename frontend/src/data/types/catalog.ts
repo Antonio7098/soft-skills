@@ -31,6 +31,7 @@ export interface PromptItemView {
   readonly lifecycle_state: LifecycleState;
   readonly target_skill_slugs: string[];
   readonly rubric_id: string;
+  readonly organisation_id?: string;
 }
 
 export interface ScenarioView {
@@ -45,6 +46,7 @@ export interface ScenarioView {
   readonly rubric_id: string;
   readonly mock_company: MockCompanyView | null;
   readonly mock_people: MockPersonView[];
+  readonly organisation_id?: string;
 }
 
 export interface CollectionView {

@@ -36,6 +36,11 @@ Stageflow workflows in SoftSkills.
 - **Recommendations:** Suggested improvement
 -->
 
+**First-Class Cooperative Cancellation Hooks** (2026-03-29)
+- **Reference File:** `backend/src/soft_skills_backend/modules/catalog/workflows/generation/collection_pipeline.py`
+- **Description:** Real-provider generation cancellation only became reliable once SoftSkills added three application-level behaviors around Stageflow: storing the live task handle, wiring the active `PipelineContext` back onto the execution record, and inserting a brief cooperative cancellation checkpoint before expensive worker fan-out. The underlying issue was not just application code; Stageflow currently leaves too much of "cancel before the next costly await" to ad hoc local patterns.
+- **Recommendations:** Stageflow should expose a first-class cooperative cancellation helper at stage level, for example `ctx.raise_if_cancelled()` and `await ctx.cancellation_checkpoint(...)`, so long-running stages can cheaply yield control without local sleep-based windows. A built-in "before stage work starts" hook would also let applications publish deterministic progress/start events before entering expensive provider calls.
+
 ## Observations
 
 <!-- Format:
@@ -111,3 +116,8 @@ Stageflow workflows in SoftSkills.
 - **Reference File:** `backend/src/soft_skills_backend/modules/admin/domain/prompt_registry.py`
 - **Description:** Moving from static in-code prompt libraries to a DB-backed registry introduced a lifecycle dependency that Stageflow itself does not solve: prompts must exist before the render stage runs. In SoftSkills, integration tests construct the app container before migrations, so eager seeding at container build time was not safe and lazy idempotent seeding became the pragmatic bridge.
 - **Recommendations:** When stage execution depends on external configuration state, pair the stage with an explicit bootstrap contract. If bootstrap cannot be guaranteed at app startup, make initialization idempotent and tie it to the first safe post-migration use site.
+
+**Cancellation Needs Stage-Start Observability, Not Just Completion Progress** (2026-03-29)
+- **Reference File:** `backend/src/soft_skills_backend/modules/catalog/workflows/generation/service.py`
+- **Description:** SoftSkills originally emitted generation progress through an application callback that scheduled broker publication later on the event loop. For live cancellation, that was too weak: by the time the UI saw `prompt_items_work`, the expensive work could already be underway or even completed. The local fix now publishes progress immediately and adds a cooperative pre-work cancellation checkpoint, but the broader lesson is that stage-completion-oriented progress is a poor control surface for cancellation.
+- **Recommendations:** Stageflow observability would be stronger with explicit stage-start events and ordering guarantees that are suitable for live control loops, not just post-hoc reporting. Cancellation-sensitive applications should not have to approximate this with local realtime brokers and manually timed checkpoints.

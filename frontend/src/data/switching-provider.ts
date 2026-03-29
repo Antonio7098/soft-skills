@@ -716,6 +716,186 @@ class SwitchingDataProvider implements DataProvider {
       () => mockDataProvider.getTelemetryTrace(traceId),
     );
   }
+
+  // --- Admin: Org-scoped Skills ---------------------------------------------
+  listOrgSkills(orgId) {
+    return this.withFallback(
+      () => apiDataProvider.listOrgSkills(orgId),
+      () => mockDataProvider.listOrgSkills(orgId),
+    );
+  }
+
+  getOrgSkill(orgId, skillId) {
+    return this.withFallback(
+      () => apiDataProvider.getOrgSkill(orgId, skillId),
+      () => mockDataProvider.getOrgSkill(orgId, skillId),
+    );
+  }
+
+  createOrgSkill(orgId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.createOrgSkill(orgId, cmd),
+      () => mockDataProvider.createOrgSkill(orgId, cmd),
+    );
+  }
+
+  updateOrgSkill(orgId, skillId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.updateOrgSkill(orgId, skillId, cmd),
+      () => mockDataProvider.updateOrgSkill(orgId, skillId, cmd),
+    );
+  }
+
+  deleteOrgSkill(orgId, skillId) {
+    return this.withFallback(
+      () => apiDataProvider.deleteOrgSkill(orgId, skillId),
+      () => mockDataProvider.deleteOrgSkill(orgId, skillId),
+    );
+  }
+
+  // --- Admin: Org-scoped Competencies ---------------------------------------
+  listOrgCompetencies(orgId) {
+    return this.withFallback(
+      () => apiDataProvider.listOrgCompetencies(orgId),
+      () => mockDataProvider.listOrgCompetencies(orgId),
+    );
+  }
+
+  getOrgCompetency(orgId, competencyId) {
+    return this.withFallback(
+      () => apiDataProvider.getOrgCompetency(orgId, competencyId),
+      () => mockDataProvider.getOrgCompetency(orgId, competencyId),
+    );
+  }
+
+  createOrgCompetency(orgId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.createOrgCompetency(orgId, cmd),
+      () => mockDataProvider.createOrgCompetency(orgId, cmd),
+    );
+  }
+
+  updateOrgCompetency(orgId, competencyId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.updateOrgCompetency(orgId, competencyId, cmd),
+      () => mockDataProvider.updateOrgCompetency(orgId, competencyId, cmd),
+    );
+  }
+
+  deleteOrgCompetency(orgId, competencyId) {
+    return this.withFallback(
+      () => apiDataProvider.deleteOrgCompetency(orgId, competencyId),
+      () => mockDataProvider.deleteOrgCompetency(orgId, competencyId),
+    );
+  }
+
+  // --- Admin: Org-scoped Rubrics --------------------------------------------
+  listOrgRubrics(orgId) {
+    return this.withFallback(
+      () => apiDataProvider.listOrgRubrics(orgId),
+      () => mockDataProvider.listOrgRubrics(orgId),
+    );
+  }
+
+  getOrgRubric(orgId, rubricId) {
+    return this.withFallback(
+      () => apiDataProvider.getOrgRubric(orgId, rubricId),
+      () => mockDataProvider.getOrgRubric(orgId, rubricId),
+    );
+  }
+
+  createOrgRubric(orgId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.createOrgRubric(orgId, cmd),
+      () => mockDataProvider.createOrgRubric(orgId, cmd),
+    );
+  }
+
+  updateOrgRubric(orgId, rubricId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.updateOrgRubric(orgId, rubricId, cmd),
+      () => mockDataProvider.updateOrgRubric(orgId, rubricId, cmd),
+    );
+  }
+
+  deleteOrgRubric(orgId, rubricId) {
+    return this.withFallback(
+      () => apiDataProvider.deleteOrgRubric(orgId, rubricId),
+      () => mockDataProvider.deleteOrgRubric(orgId, rubricId),
+    );
+  }
+
+  // --- Admin: Org-scoped Prompt Items ---------------------------------------
+  listOrgPromptItems(orgId) {
+    return this.withFallback(
+      () => apiDataProvider.listOrgPromptItems(orgId),
+      () => mockDataProvider.listOrgPromptItems(orgId),
+    );
+  }
+
+  getOrgPromptItem(orgId, promptItemId) {
+    return this.withFallback(
+      () => apiDataProvider.getOrgPromptItem(orgId, promptItemId),
+      () => mockDataProvider.getOrgPromptItem(orgId, promptItemId),
+    );
+  }
+
+  createOrgPromptItem(orgId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.createOrgPromptItem(orgId, cmd),
+      () => mockDataProvider.createOrgPromptItem(orgId, cmd),
+    );
+  }
+
+  updateOrgPromptItem(orgId, promptItemId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.updateOrgPromptItem(orgId, promptItemId, cmd),
+      () => mockDataProvider.updateOrgPromptItem(orgId, promptItemId, cmd),
+    );
+  }
+
+  deleteOrgPromptItem(orgId, promptItemId) {
+    return this.withFallback(
+      () => apiDataProvider.deleteOrgPromptItem(orgId, promptItemId),
+      () => mockDataProvider.deleteOrgPromptItem(orgId, promptItemId),
+    );
+  }
+
+  // --- Admin: Org-scoped Scenarios ------------------------------------------
+  listOrgScenarios(orgId) {
+    return this.withFallback(
+      () => apiDataProvider.listOrgScenarios(orgId),
+      () => mockDataProvider.listOrgScenarios(orgId),
+    );
+  }
+
+  getOrgScenario(orgId, scenarioId) {
+    return this.withFallback(
+      () => apiDataProvider.getOrgScenario(orgId, scenarioId),
+      () => mockDataProvider.getOrgScenario(orgId, scenarioId),
+    );
+  }
+
+  createOrgScenario(orgId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.createOrgScenario(orgId, cmd),
+      () => mockDataProvider.createOrgScenario(orgId, cmd),
+    );
+  }
+
+  updateOrgScenario(orgId, scenarioId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.updateOrgScenario(orgId, scenarioId, cmd),
+      () => mockDataProvider.updateOrgScenario(orgId, scenarioId, cmd),
+    );
+  }
+
+  deleteOrgScenario(orgId, scenarioId) {
+    return this.withFallback(
+      () => apiDataProvider.deleteOrgScenario(orgId, scenarioId),
+      () => mockDataProvider.deleteOrgScenario(orgId, scenarioId),
+    );
+  }
 }
 
 export const switchingDataProvider = new SwitchingDataProvider();

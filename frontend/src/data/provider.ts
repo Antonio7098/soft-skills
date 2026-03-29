@@ -62,6 +62,11 @@ import type {
   CreateAssistantTurnCommand,
   CancelAssistantTurnCommand,
   AssistantStreamCallbacks,
+  OrgSkillView,
+  OrgCompetencyView,
+  OrgRubricView,
+  PromptItemView,
+  ScenarioView,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -265,6 +270,49 @@ export interface DataProvider {
     rubricId: string,
     criterionRef: string,
   ): Promise<RubricView>;
+
+  // --- Admin: Org-scoped Skills ------------------------------------------------
+  listOrgSkills(orgId: string): Promise<OrgSkillView[]>;
+  getOrgSkill(orgId: string, skillSlug: string): Promise<OrgSkillView>;
+  createOrgSkill(orgId: string, cmd: { slug: string; name: string; description: string }): Promise<OrgSkillView>;
+  updateOrgSkill(orgId: string, skillSlug: string, cmd: { name?: string; description?: string }): Promise<OrgSkillView>;
+  deleteOrgSkill(orgId: string, skillSlug: string): Promise<{ status: string }>;
+
+  // --- Admin: Org-scoped Competencies -----------------------------------------
+  listOrgCompetencies(orgId: string): Promise<OrgCompetencyView[]>;
+  getOrgCompetency(orgId: string, competencySlug: string): Promise<OrgCompetencyView>;
+  createOrgCompetency(orgId: string, cmd: { slug: string; name: string; description: string; skill_slugs?: string[] }): Promise<OrgCompetencyView>;
+  updateOrgCompetency(orgId: string, competencySlug: string, cmd: { name?: string; description?: string; skill_slugs?: string[] }): Promise<OrgCompetencyView>;
+  deleteOrgCompetency(orgId: string, competencySlug: string): Promise<{ status: string }>;
+
+  // --- Admin: Org-scoped Rubrics ----------------------------------------------
+  listOrgRubrics(orgId: string): Promise<OrgRubricView[]>;
+  getOrgRubric(orgId: string, rubricId: string): Promise<OrgRubricView>;
+  createOrgRubric(orgId: string, cmd: {
+    rubric_id: string;
+    family: string;
+    version: string;
+    content_type: string;
+    schema_version: string;
+    name: string;
+    criteria?: string[];
+  }): Promise<OrgRubricView>;
+  updateOrgRubric(orgId: string, rubricId: string, cmd: { name?: string; criteria?: string[] }): Promise<OrgRubricView>;
+  deleteOrgRubric(orgId: string, rubricId: string): Promise<{ status: string }>;
+
+  // --- Admin: Org-scoped Prompt Items -----------------------------------------
+  listOrgPromptItems(orgId: string): Promise<PromptItemView[]>;
+  getOrgPromptItem(orgId: string, promptItemId: string): Promise<PromptItemView>;
+  createOrgPromptItem(orgId: string, cmd: PromptItemCreateCommand): Promise<PromptItemView>;
+  updateOrgPromptItem(orgId: string, promptItemId: string, cmd: Partial<PromptItemCreateCommand>): Promise<PromptItemView>;
+  deleteOrgPromptItem(orgId: string, promptItemId: string): Promise<{ status: string }>;
+
+  // --- Admin: Org-scoped Scenarios -------------------------------------------
+  listOrgScenarios(orgId: string): Promise<ScenarioView[]>;
+  getOrgScenario(orgId: string, scenarioId: string): Promise<ScenarioView>;
+  createOrgScenario(orgId: string, cmd: ScenarioCreateCommand): Promise<ScenarioView>;
+  updateOrgScenario(orgId: string, scenarioId: string, cmd: Partial<ScenarioCreateCommand>): Promise<ScenarioView>;
+  deleteOrgScenario(orgId: string, scenarioId: string): Promise<{ status: string }>;
 
   // --- Admin: Audit & Events -------------------------------------------------
   listWorkflowEvents(params?: {

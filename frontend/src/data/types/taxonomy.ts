@@ -39,6 +39,32 @@ export interface RubricCriterionView {
   readonly levels: Record<string, RubricLevel>;
 }
 
+export interface OrgSkillView {
+  readonly slug: string;
+  readonly name: string;
+  readonly description: string;
+  readonly organisation_id: string;
+}
+
+export interface OrgCompetencyView {
+  readonly slug: string;
+  readonly name: string;
+  readonly description: string;
+  readonly skill_slugs: string[];
+  readonly organisation_id: string;
+}
+
+export interface OrgRubricView {
+  readonly rubric_id: string;
+  readonly family: string;
+  readonly version: string;
+  readonly content_type: string;
+  readonly schema_version: string;
+  readonly name: string;
+  readonly criteria: string[];
+  readonly organisation_id: string;
+}
+
 export interface TaxonomySnapshot {
   readonly skills: SkillView[];
   readonly competencies: CompetencyView[];

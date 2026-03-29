@@ -10,4 +10,9 @@ export {
   AdminRubrics,
   AdminAudit,
   AdminTelemetry,
+  AdminOrgSkills,
+  AdminOrgCompetencies,
+  AdminOrgRubrics,
+  AdminOrgPromptItems,
+  AdminOrgScenarios,
 } from './pages';

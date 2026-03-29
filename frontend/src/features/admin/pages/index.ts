@@ -8,3 +8,8 @@ export { AdminPipelines } from './AdminPipelines';
 export { AdminRubrics } from './AdminRubrics';
 export { AdminAudit } from './AdminAudit';
 export { AdminTelemetry } from './AdminTelemetry';
+export { AdminOrgSkills } from './AdminOrgSkills';
+export { AdminOrgCompetencies } from './AdminOrgCompetencies';
+export { AdminOrgRubrics } from './AdminOrgRubrics';
+export { AdminOrgPromptItems } from './AdminOrgPromptItems';
+export { AdminOrgScenarios } from './AdminOrgScenarios';

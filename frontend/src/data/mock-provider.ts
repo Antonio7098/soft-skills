@@ -74,6 +74,9 @@ import type {
   TelemetryTraceListView,
   TelemetryTraceListItemView,
   TelemetryTraceDetailView,
+  OrgSkillView,
+  OrgCompetencyView,
+  OrgRubricView,
 } from './types';
 import {
   SEED_SKILLS,
@@ -612,6 +615,51 @@ let _adminUsers = [...SEED_ADMIN_USERS];
 let _learnerRelationships = new Map<string, AdminLearnerRelationshipView>();
 let _rubricsAdmin = [...SEED_RUBRICS_ADMIN];
 let _workflowEvents = [...SEED_WORKFLOW_EVENTS];
+
+const SEED_ORG_SKILLS: OrgSkillView[] = [
+  { slug: 'effective-communication', name: 'Effective Communication', description: 'Conveys ideas clearly and persuasively in verbal and written form', organisation_id: 'org-001' },
+  { slug: 'team-collaboration', name: 'Team Collaboration', description: 'Works effectively with others to achieve shared goals', organisation_id: 'org-001' },
+  { slug: 'problem-solving', name: 'Problem Solving', description: 'Identifies issues and develops practical solutions', organisation_id: 'org-001' },
+  { slug: 'leadership', name: 'Leadership', description: 'Guides and motivates others toward achieving objectives', organisation_id: 'org-001' },
+  { slug: 'adaptability', name: 'Adaptability', description: 'Adjusts approach and mindset to changing circumstances', organisation_id: 'org-001' },
+  { slug: 'time-management', name: 'Time Management', description: 'Prioritizes tasks and manages time efficiently', organisation_id: 'org-001' },
+  { slug: 'critical-thinking', name: 'Critical Thinking', description: 'Analyzes information to form well-reasoned judgments', organisation_id: 'org-001' },
+  { slug: 'conflict-resolution', name: 'Conflict Resolution', description: 'Mediates disputes and finds mutually acceptable solutions', organisation_id: 'org-001' },
+];
+
+const SEED_ORG_COMPETENCIES: OrgCompetencyView[] = [
+  { slug: 'communication-expertise', name: 'Communication Expertise', description: 'Mastery of effective communication across various contexts', skill_slugs: ['effective-communication', 'active-listening'], organisation_id: 'org-001' },
+  { slug: 'teamwork-excellence', name: 'Teamwork Excellence', description: 'Demonstrates exceptional collaboration and team synergy', skill_slugs: ['team-collaboration', 'conflict-resolution'], organisation_id: 'org-001' },
+  { slug: 'analytical-prowess', name: 'Analytical Prowess', description: 'Strong analytical and critical thinking capabilities', skill_slugs: ['problem-solving', 'critical-thinking'], organisation_id: 'org-001' },
+  { slug: 'leadership-ability', name: 'Leadership Ability', description: 'Capable of guiding teams and making decisions', skill_slugs: ['leadership', 'effective-communication'], organisation_id: 'org-001' },
+  { slug: 'agile-adaptation', name: 'Agile Adaptation', description: 'Thrives in changing environments with flexibility', skill_slugs: ['adaptability', 'time-management'], organisation_id: 'org-001' },
+];
+
+const SEED_ORG_RUBRICS: OrgRubricView[] = [
+  { rubric_id: 'org-rubric-001', family: 'org_communication', version: 'v1', content_type: 'interview', schema_version: '1.0', name: 'Org Communication Rubric', criteria: ['clarity', 'relevance', 'engagement'], organisation_id: 'org-001' },
+  { rubric_id: 'org-rubric-002', family: 'org_leadership', version: 'v1', content_type: 'scenario', schema_version: '1.0', name: 'Org Leadership Rubric', criteria: ['decision-making', 'delegation', 'accountability'], organisation_id: 'org-001' },
+  { rubric_id: 'org-rubric-003', family: 'org_problem_solving', version: 'v1', content_type: 'quick_practice', schema_version: '1.0', name: 'Org Problem Solving Rubric', criteria: ['analysis', 'creativity', 'implementation'], organisation_id: 'org-001' },
+];
+
+const SEED_ORG_PROMPT_ITEMS: PromptItemView[] = [
+  { id: 'org-prompt-001', prompt_type: 'interview_prompt', title: 'Team Conflict Scenario', prompt_text: 'Describe how you would handle a conflict within your team', difficulty: 'intermediate', lifecycle_state: 'published_private', target_skill_slugs: ['conflict-resolution', 'communication'], rubric_id: 'org-rubric-001', organisation_id: 'org-001' },
+  { id: 'org-prompt-002', prompt_type: 'quick_practice_prompt', title: 'Project Kickoff Briefing', prompt_text: 'Lead a project kickoff meeting with stakeholders', difficulty: 'advanced', lifecycle_state: 'published_private', target_skill_slugs: ['leadership', 'communication'], rubric_id: 'org-rubric-001', organisation_id: 'org-001' },
+  { id: 'org-prompt-003', prompt_type: 'interview_prompt', title: 'Performance Review Delivery', prompt_text: 'Deliver constructive feedback during a performance review', difficulty: 'advanced', lifecycle_state: 'published_private', target_skill_slugs: ['communication', 'leadership'], rubric_id: 'org-rubric-002', organisation_id: 'org-001' },
+  { id: 'org-prompt-004', prompt_type: 'quick_practice_prompt', title: 'Stakeholder Update', prompt_text: 'Present a project status update to executive stakeholders', difficulty: 'intermediate', lifecycle_state: 'draft', target_skill_slugs: ['communication'], rubric_id: 'org-rubric-001', organisation_id: 'org-001' },
+];
+
+const SEED_ORG_SCENARIOS: ScenarioView[] = [
+  { id: 'org-scenario-001', title: 'Budget Presentation', business_context: 'Present a budget proposal to senior leadership', learner_objective: 'Develop executive presence and financial communication skills', constraints: ['Time limit of 15 minutes', 'Must address all stakeholder concerns'], stakeholder_tensions: ['Cost vs. quality', 'Short-term vs. long-term priorities'], lifecycle_state: 'published_private', target_skill_slugs: ['communication', 'leadership'], rubric_id: 'org-rubric-002', mock_company: null, mock_people: [], organisation_id: 'org-001' },
+  { id: 'org-scenario-002', title: 'New Hire Onboarding', business_context: 'Onboard a new team member with company processes', learner_objective: 'Master onboarding best practices and team integration', constraints: ['Must complete within 30 minutes', 'Cover all mandatory topics'], stakeholder_tensions: ['Thoroughness vs. efficiency', 'Standard process vs. personalized approach'], lifecycle_state: 'published_private', target_skill_slugs: ['leadership', 'communication'], rubric_id: 'org-rubric-002', mock_company: null, mock_people: [], organisation_id: 'org-001' },
+  { id: 'org-scenario-003', title: 'Crisis Communication', business_context: 'Handle internal communication during a company crisis', learner_objective: 'Practice crisis communication and stakeholder management', constraints: ['Must address employee concerns within 24 hours', 'All communications must be approved by legal'], stakeholder_tensions: ['Transparency vs. legal risk', 'Employee concerns vs. business continuity'], lifecycle_state: 'published_private', target_skill_slugs: ['communication', 'problem-solving'], rubric_id: 'org-rubric-003', mock_company: null, mock_people: [], organisation_id: 'org-001' },
+  { id: 'org-scenario-004', title: 'Cross-functional Collaboration', business_context: 'Coordinate a project across multiple departments', learner_objective: 'Improve cross-departmental collaboration skills', constraints: ['Limited budget', 'Tight timeline'], stakeholder_tensions: ['Different departmental priorities', 'Resource allocation conflicts'], lifecycle_state: 'draft', target_skill_slugs: ['team-collaboration', 'problem-solving'], rubric_id: 'org-rubric-003', mock_company: null, mock_people: [], organisation_id: 'org-001' },
+];
+
+let _orgSkills = [...SEED_ORG_SKILLS];
+let _orgCompetencies = [...SEED_ORG_COMPETENCIES];
+let _orgRubrics = [...SEED_ORG_RUBRICS];
+let _orgPromptItems = [...SEED_ORG_PROMPT_ITEMS];
+let _orgScenarios = [...SEED_ORG_SCENARIOS];
 
 // Helper function to simulate tool flow based on keywords in chat messages
 async function simulateToolFlow(
@@ -2917,5 +2965,241 @@ export const mockDataProvider: DataProvider = {
       },
       error: null,
     };
+  },
+
+  // --- Admin: Org-scoped Skills ---------------------------------------------
+  async listOrgSkills(orgId: string): Promise<OrgSkillView[]> {
+    await delay(200);
+    return _orgSkills.filter((s) => s.organisation_id === orgId);
+  },
+
+  async getOrgSkill(orgId: string, skillSlug: string): Promise<OrgSkillView> {
+    await delay(200);
+    const skill = _orgSkills.find((s) => s.organisation_id === orgId && s.slug === skillSlug);
+    if (!skill) throw new Error(`Skill ${skillSlug} not found`);
+    return skill;
+  },
+
+  async createOrgSkill(orgId: string, cmd: { skill_id: string; name: string; description?: string; taxonomy_codes?: string[] }): Promise<OrgSkillView> {
+    await delay(300);
+    const skill: OrgSkillView = {
+      slug: cmd.skill_id,
+      name: cmd.name,
+      description: cmd.description ?? '',
+      organisation_id: orgId,
+    };
+    _orgSkills.push(skill);
+    return skill;
+  },
+
+  async updateOrgSkill(orgId: string, skillSlug: string, cmd: { name?: string; description?: string }): Promise<OrgSkillView> {
+    await delay(200);
+    const idx = _orgSkills.findIndex((s) => s.organisation_id === orgId && s.slug === skillSlug);
+    if (idx === -1) throw new Error(`Skill ${skillSlug} not found`);
+    const updated: OrgSkillView = {
+      ..._orgSkills[idx]!,
+      name: cmd.name ?? _orgSkills[idx]!.name,
+      description: cmd.description ?? _orgSkills[idx]!.description,
+    };
+    _orgSkills[idx] = updated;
+    return updated;
+  },
+
+  async deleteOrgSkill(orgId: string, skillSlug: string): Promise<{ status: string }> {
+    await delay(200);
+    _orgSkills = _orgSkills.filter((s) => !(s.organisation_id === orgId && s.slug === skillSlug));
+    return { status: 'deleted' };
+  },
+
+  // --- Admin: Org-scoped Competencies ---------------------------------------
+  async listOrgCompetencies(orgId: string): Promise<OrgCompetencyView[]> {
+    await delay(200);
+    return _orgCompetencies.filter((c) => c.organisation_id === orgId);
+  },
+
+  async getOrgCompetency(orgId: string, competencySlug: string): Promise<OrgCompetencyView> {
+    await delay(200);
+    const competency = _orgCompetencies.find((c) => c.organisation_id === orgId && c.slug === competencySlug);
+    if (!competency) throw new Error(`Competency ${competencySlug} not found`);
+    return competency;
+  },
+
+  async createOrgCompetency(orgId: string, cmd: { competency_id: string; name: string; description?: string; skill_ids?: string[] }): Promise<OrgCompetencyView> {
+    await delay(300);
+    const competency: OrgCompetencyView = {
+      slug: cmd.competency_id,
+      name: cmd.name,
+      description: cmd.description ?? '',
+      skill_slugs: cmd.skill_ids ?? [],
+      organisation_id: orgId,
+    };
+    _orgCompetencies.push(competency);
+    return competency;
+  },
+
+  async updateOrgCompetency(orgId: string, competencySlug: string, cmd: { name?: string; description?: string }): Promise<OrgCompetencyView> {
+    await delay(200);
+    const idx = _orgCompetencies.findIndex((c) => c.organisation_id === orgId && c.slug === competencySlug);
+    if (idx === -1) throw new Error(`Competency ${competencySlug} not found`);
+    const updated: OrgCompetencyView = {
+      ..._orgCompetencies[idx]!,
+      name: cmd.name ?? _orgCompetencies[idx]!.name,
+      description: cmd.description ?? _orgCompetencies[idx]!.description,
+    };
+    _orgCompetencies[idx] = updated;
+    return updated;
+  },
+
+  async deleteOrgCompetency(orgId: string, competencySlug: string): Promise<{ status: string }> {
+    await delay(200);
+    _orgCompetencies = _orgCompetencies.filter((c) => !(c.organisation_id === orgId && c.slug === competencySlug));
+    return { status: 'deleted' };
+  },
+
+  // --- Admin: Org-scoped Rubrics --------------------------------------------
+  async listOrgRubrics(orgId: string): Promise<OrgRubricView[]> {
+    await delay(200);
+    return _orgRubrics.filter((r) => r.organisation_id === orgId);
+  },
+
+  async getOrgRubric(orgId: string, rubricId: string): Promise<OrgRubricView> {
+    await delay(200);
+    const rubric = _orgRubrics.find((r) => r.organisation_id === orgId && r.rubric_id === rubricId);
+    if (!rubric) throw new Error(`Rubric ${rubricId} not found`);
+    return rubric;
+  },
+
+  async createOrgRubric(orgId: string, cmd: { rubric_id: string; name: string; description?: string }): Promise<OrgRubricView> {
+    await delay(300);
+    const rubric: OrgRubricView = {
+      rubric_id: cmd.rubric_id,
+      family: cmd.rubric_id,
+      version: 'v1',
+      content_type: 'custom',
+      schema_version: '1.0',
+      name: cmd.name,
+      description: cmd.description ?? '',
+      criteria: [],
+      organisation_id: orgId,
+    };
+    _orgRubrics.push(rubric);
+    return rubric;
+  },
+
+  async updateOrgRubric(orgId: string, rubricId: string, cmd: { name?: string; description?: string }): Promise<OrgRubricView> {
+    await delay(200);
+    const idx = _orgRubrics.findIndex((r) => r.organisation_id === orgId && r.rubric_id === rubricId);
+    if (idx === -1) throw new Error(`Rubric ${rubricId} not found`);
+    const updated: OrgRubricView = {
+      ..._orgRubrics[idx]!,
+      name: cmd.name ?? _orgRubrics[idx]!.name,
+      description: cmd.description ?? _orgRubrics[idx]!.description,
+    };
+    _orgRubrics[idx] = updated;
+    return updated;
+  },
+
+  async deleteOrgRubric(orgId: string, rubricId: string): Promise<{ status: string }> {
+    await delay(200);
+    _orgRubrics = _orgRubrics.filter((r) => !(r.organisation_id === orgId && r.rubric_id === rubricId));
+    return { status: 'deleted' };
+  },
+
+  // --- Admin: Org-scoped Prompt Items ---------------------------------------
+  async listOrgPromptItems(orgId: string): Promise<PromptItemView[]> {
+    await delay(200);
+    return _orgPromptItems.filter((p) => p.organisation_id === orgId);
+  },
+
+  async getOrgPromptItem(orgId: string, promptItemId: string): Promise<PromptItemView> {
+    await delay(200);
+    const item = _orgPromptItems.find((p) => p.organisation_id === orgId && p.id === promptItemId);
+    if (!item) throw new Error(`Prompt item ${promptItemId} not found`);
+    return item;
+  },
+
+  async createOrgPromptItem(orgId: string, cmd: { id: string; title: string; prompt_text?: string }): Promise<PromptItemView> {
+    await delay(300);
+    const item: PromptItemView = {
+      id: cmd.id,
+      prompt_type: 'quick_practice_prompt',
+      title: cmd.title,
+      prompt_text: cmd.prompt_text ?? '',
+      difficulty: 'intermediate',
+      lifecycle_state: 'draft',
+      target_skill_slugs: [],
+      rubric_id: '',
+      organisation_id: orgId,
+    };
+    _orgPromptItems.push(item);
+    return item;
+  },
+
+  async updateOrgPromptItem(orgId: string, promptItemId: string, cmd: { title?: string; prompt_text?: string }): Promise<PromptItemView> {
+    await delay(200);
+    const idx = _orgPromptItems.findIndex((p) => p.organisation_id === orgId && p.id === promptItemId);
+    if (idx === -1) throw new Error(`Prompt item ${promptItemId} not found`);
+    const updated: PromptItemView = {
+      ..._orgPromptItems[idx]!,
+      title: cmd.title ?? _orgPromptItems[idx]!.title,
+      prompt_text: cmd.prompt_text ?? _orgPromptItems[idx]!.prompt_text,
+    };
+    _orgPromptItems[idx] = updated;
+    return updated;
+  },
+
+  async deleteOrgPromptItem(orgId: string, promptItemId: string): Promise<{ status: string }> {
+    await delay(200);
+    _orgPromptItems = _orgPromptItems.filter((p) => !(p.organisation_id === orgId && p.id === promptItemId));
+    return { status: 'deleted' };
+  },
+
+  // --- Admin: Org-scoped Scenarios ------------------------------------------
+  async listOrgScenarios(orgId: string): Promise<ScenarioView[]> {
+    await delay(200);
+    return _orgScenarios.filter((s) => s.organisation_id === orgId);
+  },
+
+  async getOrgScenario(orgId: string, scenarioId: string): Promise<ScenarioView> {
+    await delay(200);
+    const scenario = _orgScenarios.find((s) => s.organisation_id === orgId && s.scenario_id === scenarioId);
+    if (!scenario) throw new Error(`Scenario ${scenarioId} not found`);
+    return scenario;
+  },
+
+  async createOrgScenario(orgId: string, cmd: { scenario_id: string; name: string; description?: string }): Promise<ScenarioView> {
+    await delay(300);
+    const scenario: ScenarioView = {
+      scenario_id: cmd.scenario_id,
+      name: cmd.name,
+      description: cmd.description ?? '',
+      version: 1,
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      organisation_id: orgId,
+    };
+    _orgScenarios.push(scenario);
+    return scenario;
+  },
+
+  async updateOrgScenario(orgId: string, scenarioId: string, cmd: { name?: string; description?: string }): Promise<ScenarioView> {
+    await delay(200);
+    const idx = _orgScenarios.findIndex((s) => s.organisation_id === orgId && s.scenario_id === scenarioId);
+    if (idx === -1) throw new Error(`Scenario ${scenarioId} not found`);
+    const updated: ScenarioView = {
+      ..._orgScenarios[idx]!,
+      name: cmd.name ?? _orgScenarios[idx]!.name,
+      description: cmd.description ?? _orgScenarios[idx]!.description,
+      updated_at: new Date().toISOString(),
+    };
+    _orgScenarios[idx] = updated;
+    return updated;
+  },
+
+  async deleteOrgScenario(orgId: string, scenarioId: string): Promise<{ status: string }> {
+    await delay(200);
+    _orgScenarios = _orgScenarios.filter((s) => !(s.organisation_id === orgId && s.scenario_id === scenarioId));
+    return { status: 'deleted' };
   },
 };

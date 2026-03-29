@@ -33,6 +33,11 @@ import {
   AdminRubrics,
   AdminAudit,
   AdminTelemetry,
+  AdminOrgSkills,
+  AdminOrgCompetencies,
+  AdminOrgRubrics,
+  AdminOrgPromptItems,
+  AdminOrgScenarios,
 } from './features/admin';
 import './index.css';
 
@@ -80,6 +85,11 @@ const router = createBrowserRouter([
       { path: 'rubrics', element: <AdminRubrics /> },
       { path: 'audit', element: <AdminAudit /> },
       { path: 'telemetry', element: <AdminTelemetry /> },
+      { path: 'orgs/:organisationId/skills', element: <AdminOrgSkills /> },
+      { path: 'orgs/:organisationId/competencies', element: <AdminOrgCompetencies /> },
+      { path: 'orgs/:organisationId/rubrics', element: <AdminOrgRubrics /> },
+      { path: 'orgs/:organisationId/prompt-items', element: <AdminOrgPromptItems /> },
+      { path: 'orgs/:organisationId/scenarios', element: <AdminOrgScenarios /> },
     ],
   },
 ]);

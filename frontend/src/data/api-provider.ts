@@ -50,6 +50,13 @@ import type {
   CreateAssistantTurnCommand,
   CancelAssistantTurnCommand,
   AssistantStreamCallbacks,
+  OrgSkillView,
+  OrgCompetencyView,
+  OrgRubricView,
+  PromptItemView,
+  ScenarioView,
+  PromptItemCreateCommand,
+  ScenarioCreateCommand,
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
@@ -355,6 +362,66 @@ export const apiDataProvider: DataProvider = {
     request<RubricView>(`/admin/rubrics/${encodeURIComponent(rubricId)}/criteria/${encodeURIComponent(criterionRef)}`, {
       method: 'DELETE',
     }),
+
+  // --- Admin: Org-scoped Skills ------------------------------------------------
+  listOrgSkills: (orgId) =>
+    request<OrgSkillView[]>(`/organisations/${encodeURIComponent(orgId)}/skills`),
+  getOrgSkill: (orgId, skillSlug) =>
+    request<OrgSkillView>(`/organisations/${encodeURIComponent(orgId)}/skills/${encodeURIComponent(skillSlug)}`),
+  createOrgSkill: (orgId, cmd) =>
+    request<OrgSkillView>(`/organisations/${encodeURIComponent(orgId)}/skills`, { method: 'POST', body: JSON.stringify(cmd) }),
+  updateOrgSkill: (orgId, skillSlug, cmd) =>
+    request<OrgSkillView>(`/organisations/${encodeURIComponent(orgId)}/skills/${encodeURIComponent(skillSlug)}`, { method: 'PATCH', body: JSON.stringify(cmd) }),
+  deleteOrgSkill: (orgId, skillSlug) =>
+    request<{ status: string }>(`/organisations/${encodeURIComponent(orgId)}/skills/${encodeURIComponent(skillSlug)}`, { method: 'DELETE' }),
+
+  // --- Admin: Org-scoped Competencies -----------------------------------------
+  listOrgCompetencies: (orgId) =>
+    request<OrgCompetencyView[]>(`/organisations/${encodeURIComponent(orgId)}/competencies`),
+  getOrgCompetency: (orgId, competencySlug) =>
+    request<OrgCompetencyView>(`/organisations/${encodeURIComponent(orgId)}/competencies/${encodeURIComponent(competencySlug)}`),
+  createOrgCompetency: (orgId, cmd) =>
+    request<OrgCompetencyView>(`/organisations/${encodeURIComponent(orgId)}/competencies`, { method: 'POST', body: JSON.stringify(cmd) }),
+  updateOrgCompetency: (orgId, competencySlug, cmd) =>
+    request<OrgCompetencyView>(`/organisations/${encodeURIComponent(orgId)}/competencies/${encodeURIComponent(competencySlug)}`, { method: 'PATCH', body: JSON.stringify(cmd) }),
+  deleteOrgCompetency: (orgId, competencySlug) =>
+    request<{ status: string }>(`/organisations/${encodeURIComponent(orgId)}/competencies/${encodeURIComponent(competencySlug)}`, { method: 'DELETE' }),
+
+  // --- Admin: Org-scoped Rubrics ----------------------------------------------
+  listOrgRubrics: (orgId) =>
+    request<OrgRubricView[]>(`/organisations/${encodeURIComponent(orgId)}/rubrics`),
+  getOrgRubric: (orgId, rubricId) =>
+    request<OrgRubricView>(`/organisations/${encodeURIComponent(orgId)}/rubrics/${encodeURIComponent(rubricId)}`),
+  createOrgRubric: (orgId, cmd) =>
+    request<OrgRubricView>(`/organisations/${encodeURIComponent(orgId)}/rubrics`, { method: 'POST', body: JSON.stringify(cmd) }),
+  updateOrgRubric: (orgId, rubricId, cmd) =>
+    request<OrgRubricView>(`/organisations/${encodeURIComponent(orgId)}/rubrics/${encodeURIComponent(rubricId)}`, { method: 'PATCH', body: JSON.stringify(cmd) }),
+  deleteOrgRubric: (orgId, rubricId) =>
+    request<{ status: string }>(`/organisations/${encodeURIComponent(orgId)}/rubrics/${encodeURIComponent(rubricId)}`, { method: 'DELETE' }),
+
+  // --- Admin: Org-scoped Prompt Items -----------------------------------------
+  listOrgPromptItems: (orgId) =>
+    request<PromptItemView[]>(`/organisations/${encodeURIComponent(orgId)}/prompt-items`),
+  getOrgPromptItem: (orgId, promptItemId) =>
+    request<PromptItemView>(`/organisations/${encodeURIComponent(orgId)}/prompt-items/${encodeURIComponent(promptItemId)}`),
+  createOrgPromptItem: (orgId, cmd) =>
+    request<PromptItemView>(`/organisations/${encodeURIComponent(orgId)}/prompt-items`, { method: 'POST', body: JSON.stringify(cmd) }),
+  updateOrgPromptItem: (orgId, promptItemId, cmd) =>
+    request<PromptItemView>(`/organisations/${encodeURIComponent(orgId)}/prompt-items/${encodeURIComponent(promptItemId)}`, { method: 'PATCH', body: JSON.stringify(cmd) }),
+  deleteOrgPromptItem: (orgId, promptItemId) =>
+    request<{ status: string }>(`/organisations/${encodeURIComponent(orgId)}/prompt-items/${encodeURIComponent(promptItemId)}`, { method: 'DELETE' }),
+
+  // --- Admin: Org-scoped Scenarios -------------------------------------------
+  listOrgScenarios: (orgId) =>
+    request<ScenarioView[]>(`/organisations/${encodeURIComponent(orgId)}/scenarios`),
+  getOrgScenario: (orgId, scenarioId) =>
+    request<ScenarioView>(`/organisations/${encodeURIComponent(orgId)}/scenarios/${encodeURIComponent(scenarioId)}`),
+  createOrgScenario: (orgId, cmd) =>
+    request<ScenarioView>(`/organisations/${encodeURIComponent(orgId)}/scenarios`, { method: 'POST', body: JSON.stringify(cmd) }),
+  updateOrgScenario: (orgId, scenarioId, cmd) =>
+    request<ScenarioView>(`/organisations/${encodeURIComponent(orgId)}/scenarios/${encodeURIComponent(scenarioId)}`, { method: 'PATCH', body: JSON.stringify(cmd) }),
+  deleteOrgScenario: (orgId, scenarioId) =>
+    request<{ status: string }>(`/organisations/${encodeURIComponent(orgId)}/scenarios/${encodeURIComponent(scenarioId)}`, { method: 'DELETE' }),
 
   // --- Admin: Audit & Events -------------------------------------------------
   listWorkflowEvents: (params) => {

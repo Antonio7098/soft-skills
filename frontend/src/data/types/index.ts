@@ -20,6 +20,9 @@ export {
   type RubricLevel,
   type RubricCriterionView,
   type TaxonomySnapshot,
+  type OrgSkillView,
+  type OrgCompetencyView,
+  type OrgRubricView,
 } from './taxonomy';
 
 export {

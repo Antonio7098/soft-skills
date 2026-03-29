@@ -14,6 +14,11 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ArrowLeft,
+  Building2,
+  Lightbulb,
+  Target,
+  FileBarChart,
+  Map,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -74,6 +79,16 @@ const NAV_SECTIONS = [
       { path: '/admin/rubrics', label: 'Rubrics', icon: Scale },
       { path: '/admin/audit', label: 'Audit Logs', icon: ScrollText },
       { path: '/admin/telemetry', label: 'Telemetry', icon: Activity },
+    ],
+  },
+  {
+    title: 'Organisations',
+    items: [
+      { path: '/admin/orgs/:organisationId/skills', label: 'Skills', icon: Lightbulb },
+      { path: '/admin/orgs/:organisationId/competencies', label: 'Competencies', icon: Target },
+      { path: '/admin/orgs/:organisationId/rubrics', label: 'Org Rubrics', icon: Scale },
+      { path: '/admin/orgs/:organisationId/prompt-items', label: 'Prompt Items', icon: FileText },
+      { path: '/admin/orgs/:organisationId/scenarios', label: 'Scenarios', icon: Map },
     ],
   },
 ];
