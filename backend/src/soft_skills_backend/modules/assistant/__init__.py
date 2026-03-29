@@ -3,6 +3,7 @@
 from soft_skills_backend.modules.assistant.contracts.commands import (
     AssistantCorrelation,
     CancelAssistantTurnCommand,
+    DecideAssistantApprovalCommand,
     CreateAssistantSessionCommand,
     CreateAssistantTurnCommand,
 )
@@ -11,6 +12,7 @@ from soft_skills_backend.modules.assistant.contracts.stream import (
     AssistantStreamEvent,
 )
 from soft_skills_backend.modules.assistant.contracts.views import (
+    AssistantApprovalView,
     AssistantMessageView,
     AssistantSessionView,
     AssistantToolCallView,
@@ -20,6 +22,7 @@ from soft_skills_backend.modules.assistant.use_cases.assistant_service import As
 
 __all__ = [
     "AssistantCorrelation",
+    "AssistantApprovalView",
     "AssistantMessageView",
     "AssistantService",
     "AssistantSessionView",
@@ -28,6 +31,7 @@ __all__ = [
     "AssistantToolCallView",
     "AssistantTurnView",
     "CancelAssistantTurnCommand",
+    "DecideAssistantApprovalCommand",
     "CreateAssistantSessionCommand",
     "CreateAssistantTurnCommand",
 ]

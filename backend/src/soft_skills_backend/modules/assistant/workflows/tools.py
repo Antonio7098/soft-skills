@@ -10,8 +10,13 @@ from pydantic import ValidationError
 from stageflow.api import Pipeline, StageKind, stage
 from stageflow.core import StageContext
 
+from soft_skills_backend.config import Settings
+from soft_skills_backend.modules.assistant.domain.models import AssistantApprovalStatus
 from soft_skills_backend.modules.assistant.infra.realtime import AssistantRealtimeBroker
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
+from soft_skills_backend.modules.assistant.workflows.approval_service import (
+    AssistantApprovalService,
+)
 from soft_skills_backend.modules.assistant.workflows.practice_facilitation import (
     AssistantPracticeCoordinator,
     StartCollectionPracticeToolArgs,
@@ -63,16 +68,21 @@ class AssistantToolExecutor:
         self,
         *,
         repository: AssistantRepository,
+        approvals: AssistantApprovalService,
         broker: AssistantRealtimeBroker,
         catalog_service: CatalogService,
         practice_service: PracticeService,
         stageflow_support: StageflowPipelineSupport,
+        settings: Settings,
     ) -> None:
         self._repository = repository
+        self._approvals = approvals
         self._broker = broker
         self._catalog = catalog_service
         self._practice = practice_service
         self._stageflow = stageflow_support
+        self._approval_timeout_seconds = settings.tool_approval_timeout_seconds
+        self._auto_allow_tools = frozenset(settings.tool_approval_auto_allow)
         self._practice_tools = AssistantPracticeCoordinator(
             repository=repository,
             catalog_service=catalog_service,
@@ -103,26 +113,27 @@ class AssistantToolExecutor:
         execution: ToolExecutionContext,
         tool_request: AssistantToolRequest,
     ) -> ToolPromptResult:
+        requires_approval = self._requires_approval(tool_request.tool_name)
         tool_call = self._repository.create_tool_call(
             turn_id=execution.turn_id,
             tool_name=tool_request.tool_name,
             args_payload=tool_request.arguments,
-        )
-        await self._broker.publish(
-            execution.stream_token,
-            self._repository.create_stream_event(
-                turn_id=execution.turn_id,
-                event_type="tool.started",
-                payload={
-                    "tool_call_id": tool_call.id,
-                    "call_id": tool_request.call_id,
-                    "tool_name": tool_request.tool_name,
-                    "arguments": tool_request.arguments,
-                },
-                emitted_at=tool_call.started_at,
-            ),
+            waiting_for_approval=requires_approval,
         )
         try:
+            if requires_approval:
+                await self._await_human_approval(
+                    execution=execution,
+                    tool_request=tool_request,
+                    tool_call_id=tool_call.id,
+                )
+                tool_call = self._repository.mark_tool_call_running(tool_call_id=tool_call.id)
+            await self._publish_tool_started(
+                execution=execution,
+                tool_request=tool_request,
+                tool_call_id=tool_call.id,
+                emitted_at=tool_call.started_at,
+            )
             result_payload, child_run_id = await self._dispatch_tool(
                 stage_ctx=stage_ctx,
                 execution=execution,
@@ -202,6 +213,89 @@ class AssistantToolExecutor:
                 error=app_error,
             )
             raise app_error from exc
+
+    def _requires_approval(self, tool_name: str) -> bool:
+        return tool_name not in self._auto_allow_tools
+
+    async def _await_human_approval(
+        self,
+        *,
+        execution: ToolExecutionContext,
+        tool_request: AssistantToolRequest,
+        tool_call_id: str,
+    ) -> None:
+        approval = await self._approvals.request_tool_approval(
+            tool_call_id=tool_call_id,
+            approval_message=_approval_message(tool_request),
+            payload_summary={
+                "arguments": tool_request.arguments,
+                "call_id": tool_request.call_id,
+            },
+            timeout_seconds=self._approval_timeout_seconds,
+        )
+        await self._broker.publish(
+            execution.stream_token,
+            self._repository.create_stream_event(
+                turn_id=execution.turn_id,
+                event_type="approval.requested",
+                payload={
+                    "approval_request_id": approval.id,
+                    "tool_call_id": tool_call_id,
+                    "call_id": tool_request.call_id,
+                    "tool_name": tool_request.tool_name,
+                    "approval_message": approval.approval_message,
+                    "payload_summary": approval.payload_summary,
+                    "status": approval.status.value,
+                    "expires_at": (
+                        None if approval.expires_at is None else approval.expires_at.isoformat()
+                    ),
+                },
+                emitted_at=approval.requested_at,
+            ),
+        )
+        decision = await self._approvals.await_decision(
+            request_id=approval.id,
+            timeout_seconds=self._approval_timeout_seconds,
+        )
+        decided = self._repository.get_approval_for_system(approval.id)
+        await self._broker.publish(
+            execution.stream_token,
+            self._repository.create_stream_event(
+                turn_id=execution.turn_id,
+                event_type="approval.decided",
+                payload={
+                    "approval_request_id": decided.id,
+                    "tool_call_id": tool_call_id,
+                    "call_id": tool_request.call_id,
+                    "tool_name": tool_request.tool_name,
+                    "decision": decided.status.value,
+                    "reason": decided.decision_reason,
+                    "decided_by_user_id": decided.decided_by_user_id,
+                },
+                emitted_at=decided.decided_at or stage_now(),
+            ),
+        )
+        if decision.granted:
+            return
+        if decided.status is AssistantApprovalStatus.EXPIRED:
+            raise orchestration_error(
+                "Assistant tool approval timed out",
+                code="SS-ORCHESTRATION-202",
+                status_code=408,
+                details={
+                    "tool_name": tool_request.tool_name,
+                    "approval_request_id": decided.id,
+                },
+            )
+        raise orchestration_error(
+            "Assistant tool approval was denied",
+            code="SS-ORCHESTRATION-203",
+            status_code=409,
+            details={
+                "tool_name": tool_request.tool_name,
+                "approval_request_id": decided.id,
+            },
+        )
 
     async def _dispatch_tool(
         self,
@@ -325,7 +419,7 @@ class AssistantToolExecutor:
         if not result.success or result.data is None:
             raise orchestration_error(
                 "Assistant generation subpipeline failed",
-                code="SS-ORCHESTRATION-202",
+                code="SS-ORCHESTRATION-204",
                 details={"child_run_id": str(result.child_run_id), "error": result.error},
             )
         return {"generation": result.data["payload"]}, str(result.child_run_id)
@@ -374,10 +468,33 @@ class AssistantToolExecutor:
         if not result.success or result.data is None:
             raise orchestration_error(
                 "Assistant generation subpipeline failed",
-                code="SS-ORCHESTRATION-202",
+                code="SS-ORCHESTRATION-204",
                 details={"child_run_id": str(result.child_run_id), "error": result.error},
             )
         return {"generation": result.data["payload"]}, str(result.child_run_id)
+
+    async def _publish_tool_started(
+        self,
+        *,
+        execution: ToolExecutionContext,
+        tool_request: AssistantToolRequest,
+        tool_call_id: str,
+        emitted_at: Any,
+    ) -> None:
+        await self._broker.publish(
+            execution.stream_token,
+            self._repository.create_stream_event(
+                turn_id=execution.turn_id,
+                event_type="tool.started",
+                payload={
+                    "tool_call_id": tool_call_id,
+                    "call_id": tool_request.call_id,
+                    "tool_name": tool_request.tool_name,
+                    "arguments": tool_request.arguments,
+                },
+                emitted_at=emitted_at,
+            ),
+        )
 
     async def _publish_tool_failure(
         self,
@@ -438,3 +555,24 @@ def stage_now():
     from datetime import UTC, datetime
 
     return datetime.now(UTC)
+
+
+def _approval_message(tool_request: AssistantToolRequest) -> str:
+    if tool_request.tool_name == "generate_collection":
+        title = tool_request.arguments.get("title")
+        return f"Approve generate_collection for '{title}'?" if isinstance(title, str) else "Approve generate_collection?"
+    if tool_request.tool_name == "generate_prompt_items":
+        collection_id = tool_request.arguments.get("collection_id")
+        return (
+            f"Approve generate_prompt_items for collection {collection_id}?"
+            if isinstance(collection_id, str)
+            else "Approve generate_prompt_items?"
+        )
+    if tool_request.tool_name == "start_collection_practice":
+        collection_id = tool_request.arguments.get("collection_id")
+        return (
+            f"Approve start_collection_practice for collection {collection_id}?"
+            if isinstance(collection_id, str)
+            else "Approve start_collection_practice?"
+        )
+    return f"Approve {tool_request.tool_name}?"

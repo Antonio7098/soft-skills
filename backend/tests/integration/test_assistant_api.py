@@ -20,6 +20,7 @@ from soft_skills_backend.modules.practice.workflows.assessment import (
 from soft_skills_backend.platform.db.models import (
     AssistantMessageRecord,
     AssistantSessionRecord,
+    AssistantApprovalRequestRecord,
     AssistantToolCallRecord,
     AssistantTurnRecord,
     AssessmentRecord,
@@ -208,6 +209,29 @@ async def _wait_for_turn_status(
             ) from errors[-1]
         if loop.time() >= deadline:
             raise AssertionError(f"Timed out waiting for turn {turn_id} to reach {expected_status}")
+        await asyncio.sleep(0.05)
+
+
+async def _wait_for_pending_approval(
+    client: Any,
+    *,
+    user_id: str,
+    timeout_seconds: float = 5.0,
+) -> dict[str, object]:
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout_seconds
+    while True:
+        response = await client.get(
+            "/api/assistant/approvals",
+            headers={"X-User-ID": user_id},
+            params={"status": "pending"},
+        )
+        assert response.status_code == 200
+        approvals = response.json()["data"]
+        if approvals:
+            return approvals[0]
+        if loop.time() >= deadline:
+            raise AssertionError("Timed out waiting for a pending assistant approval")
         await asyncio.sleep(0.05)
 
 
@@ -518,7 +542,6 @@ async def test_assistant_facilitates_multi_turn_practice_run(
     assert "Practice complete." in session_view["messages"][5]["content"]
 
     practice_run_id = session_view["turns"][0]["tool_calls"][0]["result"]["practice"]["practice_run_id"]
-
     with container.session_factory() as session:
         assistant_session = session.get(AssistantSessionRecord, session_id)
         run_record = session.get(PracticeRunRecord, practice_run_id)
@@ -550,6 +573,177 @@ async def test_assistant_facilitates_multi_turn_practice_run(
     assert "practice.attempt_submitted.v1" in workflow_event_types
     assert "assessment.validated.v1" in workflow_event_types
 
+
+@pytest.mark.asyncio
+async def test_assistant_turn_waits_for_human_approval_before_mutating_tool_executes(
+    app: Any, client: Any, test_settings: Any
+) -> None:
+    _migrate(test_settings)
+    container = app.state.container
+    container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
+        payloads=[
+            {
+                "tool_calls": [
+                    {
+                        "call_id": "call-start",
+                        "tool_name": "start_collection_practice",
+                        "arguments": {"collection_id": "__COLLECTION_ID__", "item_limit": 1},
+                    }
+                ],
+                "final_response": None,
+            },
+            {
+                "tool_calls": [],
+                "final_response": "Practice started after approval.",
+            },
+        ]
+    )
+    container.practice_service._assessment_marker = _AssistantPracticeMarker()
+    learner = await _bootstrap_admin_and_learner(
+        client,
+        learner_email="assistant-approval@example.com",
+    )
+    collection = await _seed_quick_practice_collection(client, str(learner["id"]))
+    provider_payloads = container.assistant_service._workflows._llm_provider._payloads  # type: ignore[attr-defined]
+    provider_payloads[0]["tool_calls"][0]["arguments"]["collection_id"] = collection["id"]  # type: ignore[index]
+
+    session_response = await client.post(
+        "/api/assistant/sessions",
+        headers={"X-User-ID": learner["id"]},
+        json={"title": "Approval Coach"},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["data"]["id"]
+
+    turn_response = await client.post(
+        f"/api/assistant/sessions/{session_id}/turns",
+        headers={"X-User-ID": learner["id"]},
+        json={"message": f"Start one approved practice item from collection {collection['id']}."},
+    )
+    assert turn_response.status_code == 200
+    turn = turn_response.json()["data"]
+
+    approval = await _wait_for_pending_approval(client, user_id=str(learner["id"]))
+    assert approval["tool_name"] == "start_collection_practice"
+
+    before_decision_events = container.assistant_service.list_stream_events(turn["stream_token"])
+    before_event_types = [event.type for event in before_decision_events]
+    assert "approval.requested" in before_event_types
+    assert "tool.started" not in before_event_types
+
+    approve_response = await client.post(
+        f"/api/assistant/approvals/{approval['id']}",
+        headers={"X-User-ID": learner["id"]},
+        json={"decision": "approved", "reason": "continue"},
+    )
+    assert approve_response.status_code == 200
+    assert approve_response.json()["data"]["status"] == "approved"
+
+    completed_turn = await _wait_for_turn_status(
+        container,
+        turn_id=turn["id"],
+        expected_status="completed",
+    )
+    assert completed_turn.status == "completed"
+
+    after_events = container.assistant_service.list_stream_events(turn["stream_token"])
+    after_event_types = [event.type for event in after_events]
+    assert after_event_types.index("approval.requested") < after_event_types.index("approval.decided")
+    assert after_event_types.index("approval.decided") < after_event_types.index("tool.started")
+    assert "tool.completed" in after_event_types
+    assert "turn.completed" in after_event_types
+
+    session_view_response = await client.get(
+        f"/api/assistant/sessions/{session_id}",
+        headers={"X-User-ID": learner["id"]},
+    )
+    assert session_view_response.status_code == 200
+    tool_call = session_view_response.json()["data"]["turns"][0]["tool_calls"][0]
+    assert tool_call["status"] == "completed"
+    assert tool_call["current_approval"]["status"] == "approved"
+
+    with container.session_factory() as session:
+        approval_record = session.query(AssistantApprovalRequestRecord).one()
+        tool_call_record = session.query(AssistantToolCallRecord).one()
+        assert approval_record.status == "approved"
+        assert tool_call_record.status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_assistant_turn_fails_when_human_denies_required_tool_approval(
+    app: Any, client: Any, test_settings: Any
+) -> None:
+    _migrate(test_settings)
+    container = app.state.container
+    container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
+        payloads=[
+            {
+                "tool_calls": [
+                    {
+                        "call_id": "call-start",
+                        "tool_name": "start_collection_practice",
+                        "arguments": {"collection_id": "__COLLECTION_ID__", "item_limit": 1},
+                    }
+                ],
+                "final_response": None,
+            }
+        ]
+    )
+    learner = await _bootstrap_admin_and_learner(
+        client,
+        learner_email="assistant-approval-denied@example.com",
+    )
+    collection = await _seed_quick_practice_collection(client, str(learner["id"]))
+    provider_payloads = container.assistant_service._workflows._llm_provider._payloads  # type: ignore[attr-defined]
+    provider_payloads[0]["tool_calls"][0]["arguments"]["collection_id"] = collection["id"]  # type: ignore[index]
+
+    session_response = await client.post(
+        "/api/assistant/sessions",
+        headers={"X-User-ID": learner["id"]},
+        json={"title": "Approval Denial"},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["data"]["id"]
+
+    turn_response = await client.post(
+        f"/api/assistant/sessions/{session_id}/turns",
+        headers={"X-User-ID": learner["id"]},
+        json={"message": f"Start one practice item from collection {collection['id']}."},
+    )
+    assert turn_response.status_code == 200
+    turn = turn_response.json()["data"]
+
+    approval = await _wait_for_pending_approval(client, user_id=str(learner["id"]))
+    deny_response = await client.post(
+        f"/api/assistant/approvals/{approval['id']}",
+        headers={"X-User-ID": learner["id"]},
+        json={"decision": "denied", "reason": "not now"},
+    )
+    assert deny_response.status_code == 200
+
+    failed_turn = await _wait_for_turn_status(
+        container,
+        turn_id=turn["id"],
+        expected_status="failed",
+    )
+    assert failed_turn.last_error_code == "SS-ORCHESTRATION-203"
+
+    events = container.assistant_service.list_stream_events(turn["stream_token"])
+    event_types = [event.type for event in events]
+    assert "approval.requested" in event_types
+    assert "approval.decided" in event_types
+    assert "tool.failed" in event_types
+    assert "tool.started" not in event_types
+
+    with container.session_factory() as session:
+        approval_record = session.query(AssistantApprovalRequestRecord).one()
+        tool_call_record = session.query(AssistantToolCallRecord).one()
+        turn_record = session.get(AssistantTurnRecord, turn["id"])
+        assert approval_record.status == "denied"
+        assert tool_call_record.status == "failed"
+        assert tool_call_record.error_code == "SS-ORCHESTRATION-203"
+        assert turn_record is not None
+        assert turn_record.status == "failed"
 
 @pytest.mark.asyncio
 @pytest.mark.skip(reason="Known integration harness hang while teardown is being stabilized")

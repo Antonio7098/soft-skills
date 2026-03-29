@@ -710,6 +710,27 @@ class AssistantToolCallRecord(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class AssistantApprovalRequestRecord(Base):
+    """Durable assistant human-approval request lifecycle."""
+
+    __tablename__ = "assistant_approval_requests"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(32), index=True)
+    turn_id: Mapped[str] = mapped_column(String(32), index=True)
+    tool_call_id: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    tool_name: Mapped[str] = mapped_column(String(128), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    approval_message: Mapped[str] = mapped_column(Text)
+    payload_summary: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    decision_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_by_user_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class AssistantStreamEventRecord(Base):
     """Durable ordered assistant stream event."""
 

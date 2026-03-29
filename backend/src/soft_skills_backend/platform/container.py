@@ -18,6 +18,9 @@ from soft_skills_backend.modules.admin.infra.prompt_repository import PromptRepo
 from soft_skills_backend.modules.assistant import AssistantService
 from soft_skills_backend.modules.assistant.infra.realtime import AssistantRealtimeBroker
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
+from soft_skills_backend.modules.assistant.workflows.approval_service import (
+    AssistantApprovalService,
+)
 from soft_skills_backend.modules.assistant.workflows.service import AssistantWorkflowService
 from soft_skills_backend.modules.catalog import CatalogService
 from soft_skills_backend.modules.catalog.infra.realtime import GenerationRealtimeBroker
@@ -202,11 +205,13 @@ def build_container(settings: Settings) -> AppContainer:
         session_factory=session_factory,
         workflow_events=workflow_events,
     )
+    assistant_approval_service = AssistantApprovalService(repository=assistant_repository)
     assistant_service = AssistantService(
         repository=assistant_repository,
         workflows=AssistantWorkflowService(
             llm_provider=llm_provider,
             repository=assistant_repository,
+            approvals=assistant_approval_service,
             broker=assistant_broker,
             catalog_service=catalog_service,
             practice_service=practice_service,
@@ -215,6 +220,7 @@ def build_container(settings: Settings) -> AppContainer:
             prompt_registry=prompt_registry,
             settings=settings,
         ),
+        approvals=assistant_approval_service,
         background_tasks=background_tasks,
     )
     health_service = HealthService(

@@ -25,9 +25,18 @@ class AssistantMessageRole(StrEnum):
 
 
 class AssistantToolCallStatus(StrEnum):
+    PENDING_APPROVAL = "pending_approval"
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class AssistantApprovalStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    DENIED = "denied"
+    EXPIRED = "expired"
     CANCELLED = "cancelled"
 
 

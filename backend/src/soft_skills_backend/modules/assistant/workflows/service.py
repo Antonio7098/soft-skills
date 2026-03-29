@@ -37,6 +37,9 @@ from soft_skills_backend.modules.assistant.infra.repository import AssistantRepo
 from soft_skills_backend.modules.assistant.workflows.practice_facilitation import (
     AssistantPracticeState,
 )
+from soft_skills_backend.modules.assistant.workflows.approval_service import (
+    AssistantApprovalService,
+)
 from soft_skills_backend.modules.assistant.workflows.prompting import (
     ASSISTANT_FINAL_RESPONSE_PROMPT_NAME,
     ASSISTANT_FINAL_RESPONSE_PROMPT_VERSION,
@@ -102,6 +105,7 @@ class AssistantWorkflowService:
         *,
         llm_provider: LLMProvider,
         repository: AssistantRepository,
+        approvals: AssistantApprovalService,
         broker: AssistantRealtimeBroker,
         catalog_service: CatalogService,
         practice_service: PracticeService,
@@ -128,10 +132,12 @@ class AssistantWorkflowService:
         )
         self._tools = AssistantToolExecutor(
             repository=repository,
+            approvals=approvals,
             broker=broker,
             catalog_service=catalog_service,
             practice_service=practice_service,
             stageflow_support=self._stageflow,
+            settings=settings,
         )
 
     async def run_turn(self, execution: AssistantTurnExecutionInput) -> None:

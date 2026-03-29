@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from soft_skills_backend.modules.assistant.domain.models import (
+    AssistantApprovalStatus,
     AssistantMessageRole,
     AssistantSessionStatus,
     AssistantToolCallStatus,
@@ -24,6 +25,22 @@ class AssistantMessageView(BaseModel):
     created_at: datetime
 
 
+class AssistantApprovalView(BaseModel):
+    id: str
+    session_id: str
+    turn_id: str
+    tool_call_id: str
+    tool_name: str
+    status: AssistantApprovalStatus
+    approval_message: str
+    payload_summary: dict[str, Any] = Field(default_factory=dict)
+    decision_reason: str | None = None
+    decided_by_user_id: str | None = None
+    requested_at: datetime
+    expires_at: datetime | None = None
+    decided_at: datetime | None = None
+
+
 class AssistantToolCallView(BaseModel):
     id: str
     turn_id: str
@@ -36,6 +53,7 @@ class AssistantToolCallView(BaseModel):
     child_run_id: str | None = None
     started_at: datetime
     completed_at: datetime | None = None
+    current_approval: AssistantApprovalView | None = None
 
 
 class AssistantTurnView(BaseModel):

@@ -17,6 +17,7 @@ from .suites.assessment_marking import (
     ScenarioMarkingSmoke,
 )
 from .suites.assistant_runtime import (
+    AssistantApprovalWorkflowSmoke,
     AssistantGenerationRuntimeSmoke,
     AssistantPracticeRuntimeSmoke,
     AssistantReadRuntimeSmoke,
@@ -48,6 +49,7 @@ def build_default_registry() -> SmokeRegistry:
     return SmokeRegistry(
         [
             ProviderBaselineSmoke(),
+            AssistantApprovalWorkflowSmoke(),
             AssistantReadRuntimeSmoke(),
             AssistantGenerationRuntimeSmoke(),
             AssistantPracticeRuntimeSmoke(),

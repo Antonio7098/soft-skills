@@ -11,6 +11,11 @@ def test_settings_parse_cors_csv() -> None:
     assert settings.cors_allowed_origins == ("https://a.example", "https://b.example")
 
 
+def test_settings_parse_tool_approval_auto_allow_csv() -> None:
+    settings = Settings(tool_approval_auto_allow="list_collections, get_collection")  # type: ignore[arg-type]
+    assert settings.tool_approval_auto_allow == ("list_collections", "get_collection")
+
+
 def test_settings_reject_zero_event_queue_size() -> None:
     with pytest.raises(ValidationError):
         Settings(stageflow_event_queue_size=0)

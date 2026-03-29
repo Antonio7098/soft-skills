@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -10,12 +10,14 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.modules.assistant.contracts.stream import AssistantStreamEvent
 from soft_skills_backend.modules.assistant.contracts.views import (
+    AssistantApprovalView,
     AssistantMessageView,
     AssistantSessionView,
     AssistantToolCallView,
     AssistantTurnView,
 )
 from soft_skills_backend.modules.assistant.domain.models import (
+    AssistantApprovalStatus,
     AssistantMessageRole,
     AssistantSessionStatus,
     AssistantToolCallStatus,
@@ -26,6 +28,7 @@ from soft_skills_backend.modules.identity.models import LearnerProfileView
 from soft_skills_backend.platform.db.models import (
     AssessmentRecord,
     AssistantMessageRecord,
+    AssistantApprovalRequestRecord,
     AssistantSessionRecord,
     AssistantStreamEventRecord,
     AssistantToolCallRecord,
@@ -438,6 +441,7 @@ class AssistantRepository:
         turn_id: str,
         tool_name: str,
         args_payload: dict[str, Any],
+        waiting_for_approval: bool = False,
     ) -> AssistantToolCallView:
         now = datetime.now(UTC)
         with self._session_factory() as session:
@@ -448,7 +452,11 @@ class AssistantRepository:
                 turn_id=turn_id,
                 user_id=turn.user_id,
                 tool_name=tool_name,
-                status=AssistantToolCallStatus.RUNNING.value,
+                status=(
+                    AssistantToolCallStatus.PENDING_APPROVAL.value
+                    if waiting_for_approval
+                    else AssistantToolCallStatus.RUNNING.value
+                ),
                 args_payload=args_payload,
                 result_payload=None,
                 error_code=None,
@@ -459,6 +467,13 @@ class AssistantRepository:
             )
             turn.tool_call_count += 1
             session.add(record)
+            session.commit()
+            return self._build_tool_call_view(record)
+
+    def mark_tool_call_running(self, *, tool_call_id: str) -> AssistantToolCallView:
+        with self._session_factory() as session:
+            record = self._load_tool_call(session, tool_call_id)
+            record.status = AssistantToolCallStatus.RUNNING.value
             session.commit()
             return self._build_tool_call_view(record)
 
@@ -545,6 +560,137 @@ class AssistantRepository:
                 payload=dict(record.payload),
             )
 
+    def create_approval_request(
+        self,
+        *,
+        tool_call_id: str,
+        approval_message: str,
+        payload_summary: dict[str, Any],
+        timeout_seconds: float,
+    ) -> AssistantApprovalView:
+        now = datetime.now(UTC)
+        expires_at = now if timeout_seconds <= 0 else now + timedelta(seconds=timeout_seconds)
+        with self._session_factory() as session:
+            tool_call = self._load_tool_call(session, tool_call_id)
+            record = AssistantApprovalRequestRecord(
+                id=uuid4().hex,
+                session_id=tool_call.session_id,
+                turn_id=tool_call.turn_id,
+                tool_call_id=tool_call.id,
+                user_id=tool_call.user_id,
+                tool_name=tool_call.tool_name,
+                status=AssistantApprovalStatus.PENDING.value,
+                approval_message=approval_message,
+                payload_summary=payload_summary,
+                decision_reason=None,
+                decided_by_user_id=None,
+                requested_at=now,
+                expires_at=expires_at,
+                decided_at=None,
+            )
+            session.add(record)
+            session.commit()
+            session.refresh(record)
+        self._record_event(
+            event_type="assistant.approval.requested.v1",
+            request_id=None,
+            trace_id=None,
+            workflow_id=record.turn_id,
+            payload={
+                "approval_request_id": record.id,
+                "turn_id": record.turn_id,
+                "tool_call_id": record.tool_call_id,
+                "tool_name": record.tool_name,
+                "status": record.status,
+            },
+        )
+        return self._build_approval_view(record)
+
+    def get_approval(self, actor: Actor, request_id: str) -> AssistantApprovalView:
+        with self._session_factory() as session:
+            record = self._load_owned_approval(session, actor, request_id)
+            return self._build_approval_view(record)
+
+    def get_approval_for_system(self, request_id: str) -> AssistantApprovalView:
+        with self._session_factory() as session:
+            record = self._load_approval(session, request_id)
+            return self._build_approval_view(record)
+
+    def list_approvals(
+        self,
+        *,
+        actor: Actor,
+        status: AssistantApprovalStatus | None = None,
+        session_id: str | None = None,
+        turn_id: str | None = None,
+    ) -> list[AssistantApprovalView]:
+        with self._session_factory() as session:
+            query = session.query(AssistantApprovalRequestRecord).filter(
+                AssistantApprovalRequestRecord.user_id == actor.user_id
+            )
+            if status is not None:
+                query = query.filter(AssistantApprovalRequestRecord.status == status.value)
+            if session_id is not None:
+                query = query.filter(AssistantApprovalRequestRecord.session_id == session_id)
+            if turn_id is not None:
+                query = query.filter(AssistantApprovalRequestRecord.turn_id == turn_id)
+            records = (
+                query.order_by(
+                    AssistantApprovalRequestRecord.requested_at.desc(),
+                    AssistantApprovalRequestRecord.id.desc(),
+                )
+                .all()
+            )
+            return [self._build_approval_view(record) for record in records]
+
+    def resolve_approval_request(
+        self,
+        *,
+        actor: Actor | None,
+        request_id: str,
+        status: AssistantApprovalStatus,
+        reason: str | None,
+    ) -> AssistantApprovalView:
+        now = datetime.now(UTC)
+        with self._session_factory() as session:
+            record = self._load_approval(session, request_id)
+            if actor is not None and record.user_id != actor.user_id:
+                raise auth_error(
+                    "Assistant approval request is not visible to this actor",
+                    code="SS-AUTH-203",
+                    status_code=403,
+                    details={"approval_request_id": request_id},
+                )
+            if AssistantApprovalStatus(record.status) is not AssistantApprovalStatus.PENDING:
+                raise domain_error(
+                    "Assistant approval request is no longer pending",
+                    code="SS-DOMAIN-206",
+                    status_code=409,
+                    details={"approval_request_id": request_id, "status": record.status},
+                )
+            record.status = status.value
+            record.decision_reason = reason
+            record.decided_by_user_id = None if actor is None else actor.user_id
+            record.decided_at = now
+            session.commit()
+            session.refresh(record)
+        self._record_event(
+            event_type="assistant.approval.decided.v1",
+            request_id=None,
+            trace_id=None,
+            workflow_id=record.turn_id,
+            payload={
+                "approval_request_id": record.id,
+                "turn_id": record.turn_id,
+                "tool_call_id": record.tool_call_id,
+                "tool_name": record.tool_name,
+                "status": record.status,
+                "decided_by_user_id": record.decided_by_user_id,
+                "reason": reason,
+            },
+        )
+        return self._build_approval_view(record)
+
     def _load_owned_session(
         self,
         session: Session,
@@ -601,6 +747,32 @@ class AssistantRepository:
             )
         return record
 
+    def _load_approval(
+        self, session: Session, request_id: str
+    ) -> AssistantApprovalRequestRecord:
+        record = session.get(AssistantApprovalRequestRecord, request_id)
+        if record is None:
+            raise domain_error(
+                "Assistant approval request was not found",
+                code="SS-DOMAIN-207",
+                status_code=404,
+                details={"approval_request_id": request_id},
+            )
+        return record
+
+    def _load_owned_approval(
+        self, session: Session, actor: Actor, request_id: str
+    ) -> AssistantApprovalRequestRecord:
+        record = self._load_approval(session, request_id)
+        if record.user_id != actor.user_id:
+            raise auth_error(
+                "Assistant approval request is not visible to this actor",
+                code="SS-AUTH-203",
+                status_code=403,
+                details={"approval_request_id": request_id},
+            )
+        return record
+
     def _build_session_view(
         self, session: Session, record: AssistantSessionRecord
     ) -> AssistantSessionView:
@@ -640,6 +812,15 @@ class AssistantRepository:
             .order_by(AssistantToolCallRecord.started_at.asc())
             .all()
         )
+        approval_records = (
+            session.query(AssistantApprovalRequestRecord)
+            .filter(AssistantApprovalRequestRecord.turn_id == record.id)
+            .order_by(AssistantApprovalRequestRecord.requested_at.asc())
+            .all()
+        )
+        latest_approval_by_tool_call_id = {
+            approval.tool_call_id: approval for approval in approval_records
+        }
         return AssistantTurnView(
             id=record.id,
             session_id=record.session_id,
@@ -658,7 +839,13 @@ class AssistantRepository:
             user_message_id=record.user_message_id,
             assistant_message_id=record.assistant_message_id,
             messages=[self._build_message_view(message) for message in messages],
-            tool_calls=[self._build_tool_call_view(tool_call) for tool_call in tool_calls],
+            tool_calls=[
+                self._build_tool_call_view(
+                    tool_call,
+                    approval=latest_approval_by_tool_call_id.get(tool_call.id),
+                )
+                for tool_call in tool_calls
+            ],
         )
 
     def _build_message_view(self, record: AssistantMessageRecord) -> AssistantMessageView:
@@ -671,7 +858,12 @@ class AssistantRepository:
             created_at=record.created_at,
         )
 
-    def _build_tool_call_view(self, record: AssistantToolCallRecord) -> AssistantToolCallView:
+    def _build_tool_call_view(
+        self,
+        record: AssistantToolCallRecord,
+        *,
+        approval: AssistantApprovalRequestRecord | None = None,
+    ) -> AssistantToolCallView:
         return AssistantToolCallView(
             id=record.id,
             turn_id=record.turn_id,
@@ -684,6 +876,28 @@ class AssistantRepository:
             child_run_id=record.child_run_id,
             started_at=record.started_at,
             completed_at=record.completed_at,
+            current_approval=(
+                None if approval is None else self._build_approval_view(approval)
+            ),
+        )
+
+    def _build_approval_view(
+        self, record: AssistantApprovalRequestRecord
+    ) -> AssistantApprovalView:
+        return AssistantApprovalView(
+            id=record.id,
+            session_id=record.session_id,
+            turn_id=record.turn_id,
+            tool_call_id=record.tool_call_id,
+            tool_name=record.tool_name,
+            status=AssistantApprovalStatus(record.status),
+            approval_message=record.approval_message,
+            payload_summary=dict(record.payload_summary),
+            decision_reason=record.decision_reason,
+            decided_by_user_id=record.decided_by_user_id,
+            requested_at=record.requested_at,
+            expires_at=record.expires_at,
+            decided_at=record.decided_at,
         )
 
     def _record_event(

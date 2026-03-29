@@ -1,6 +1,7 @@
 """Assistant runtime smoke suites."""
 
 from .smoke import (
+    AssistantApprovalWorkflowSmoke,
     AssistantGenerationRuntimeSmoke,
     AssistantPracticeRuntimeSmoke,
     AssistantReadRuntimeSmoke,
@@ -8,6 +9,7 @@ from .smoke import (
 )
 
 __all__ = [
+    "AssistantApprovalWorkflowSmoke",
     "AssistantGenerationRuntimeSmoke",
     "AssistantPracticeRuntimeSmoke",
     "AssistantReadRuntimeSmoke",

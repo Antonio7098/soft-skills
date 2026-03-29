@@ -444,6 +444,40 @@ class SmokeBackendClient:
         self.require_ok(response, "list assistant messages")
         return cast(list[JsonObject], response.json()["data"])
 
+    async def list_assistant_approvals(
+        self,
+        *,
+        user_id: str,
+        status: str | None = None,
+    ) -> list[JsonObject]:
+        params = {} if status is None else {"status": status}
+        response = await self._client.get(
+            "/api/assistant/approvals",
+            headers={"X-User-ID": user_id},
+            params=params,
+        )
+        self.require_ok(response, "list assistant approvals")
+        return cast(list[JsonObject], response.json()["data"])
+
+    async def decide_assistant_approval(
+        self,
+        *,
+        user_id: str,
+        request_id: str,
+        decision: str,
+        reason: str | None = None,
+    ) -> JsonObject:
+        payload: JsonObject = {"decision": decision}
+        if reason is not None:
+            payload["reason"] = reason
+        response = await self._client.post(
+            f"/api/assistant/approvals/{request_id}",
+            headers={"X-User-ID": user_id},
+            json=payload,
+        )
+        self.require_ok(response, "decide assistant approval")
+        return self.data(response)
+
     async def wait_for_assistant_turn(
         self,
         *,

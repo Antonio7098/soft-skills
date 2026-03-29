@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from soft_skills_backend.entrypoints.http.dependencies import get_assistant_service, require_actor
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
 from soft_skills_backend.modules.assistant import (
+    AssistantApprovalView,
     AssistantCorrelation,
     AssistantMessageView,
     AssistantService,
@@ -16,9 +17,11 @@ from soft_skills_backend.modules.assistant import (
     AssistantStreamControlMessage,
     AssistantTurnView,
     CancelAssistantTurnCommand,
+    DecideAssistantApprovalCommand,
     CreateAssistantSessionCommand,
     CreateAssistantTurnCommand,
 )
+from soft_skills_backend.modules.assistant.domain.models import AssistantApprovalStatus
 from soft_skills_backend.shared.errors import AppError
 
 router = APIRouter()
@@ -98,6 +101,38 @@ async def get_turn(request: Request, turn_id: str) -> ApiEnvelope[AssistantTurnV
     actor = await require_actor(request)
     service = get_assistant_service(request)
     return ok_response(request, service.get_turn(actor, turn_id))
+
+
+@router.get("/approvals", response_model=ApiEnvelope[list[AssistantApprovalView]])
+async def list_approvals(
+    request: Request,
+    status: AssistantApprovalStatus | None = None,
+    session_id: str | None = None,
+    turn_id: str | None = None,
+) -> ApiEnvelope[list[AssistantApprovalView]]:
+    actor = await require_actor(request)
+    service = get_assistant_service(request)
+    return ok_response(
+        request,
+        service.list_approvals(
+            actor,
+            status=status,
+            session_id=session_id,
+            turn_id=turn_id,
+        ),
+    )
+
+
+@router.post("/approvals/{request_id}", response_model=ApiEnvelope[AssistantApprovalView])
+async def decide_approval(
+    request: Request,
+    request_id: str,
+    command: DecideAssistantApprovalCommand,
+) -> ApiEnvelope[AssistantApprovalView]:
+    actor = await require_actor(request)
+    service = get_assistant_service(request)
+    payload = await service.decide_approval(actor, request_id, command)
+    return ok_response(request, payload)
 
 
 @router.websocket("/streams/{stream_token}")

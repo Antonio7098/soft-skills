@@ -49,6 +49,19 @@ class Settings(BaseSettings):
         validation_alias="OPENROUTER_BASE_URL",
     )
     smoke_timeout_seconds: float = Field(default=10.0, gt=0)
+    tool_approval_timeout_seconds: float = Field(default=60.0, gt=0, le=300.0)
+    tool_approval_auto_allow: Annotated[tuple[str, ...], NoDecode] = (
+        "list_collections",
+        "get_collection",
+        "list_recent_attempts",
+        "get_attempt",
+        "start_collection_practice",
+        "get_active_practice",
+        "submit_active_practice_response",
+        "end_active_practice",
+        "generate_collection",
+        "generate_prompt_items",
+    )
     provider_max_retries: int = Field(default=2, ge=0, le=5)
     provider_retry_backoff_seconds: float = Field(default=0.25, gt=0, le=10.0)
     assessment_validation_retries: int = Field(default=1, ge=0, le=3)
@@ -91,6 +104,15 @@ class Settings(BaseSettings):
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
     def _normalize_cors_allowed_origins(
+        cls, value: str | tuple[str, ...] | list[str]
+    ) -> tuple[str, ...]:
+        if isinstance(value, str):
+            return tuple(part.strip() for part in value.split(",") if part.strip())
+        return tuple(value)
+
+    @field_validator("tool_approval_auto_allow", mode="before")
+    @classmethod
+    def _normalize_tool_approval_auto_allow(
         cls, value: str | tuple[str, ...] | list[str]
     ) -> tuple[str, ...]:
         if isinstance(value, str):

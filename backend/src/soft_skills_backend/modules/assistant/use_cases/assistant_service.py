@@ -8,16 +8,22 @@ from uuid import uuid4
 from soft_skills_backend.modules.assistant.contracts.commands import (
     AssistantCorrelation,
     CancelAssistantTurnCommand,
+    DecideAssistantApprovalCommand,
     CreateAssistantSessionCommand,
     CreateAssistantTurnCommand,
 )
 from soft_skills_backend.modules.assistant.contracts.stream import AssistantStreamEvent
 from soft_skills_backend.modules.assistant.contracts.views import (
+    AssistantApprovalView,
     AssistantMessageView,
     AssistantSessionView,
     AssistantTurnView,
 )
+from soft_skills_backend.modules.assistant.domain.models import AssistantApprovalStatus
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
+from soft_skills_backend.modules.assistant.workflows.approval_service import (
+    AssistantApprovalService,
+)
 from soft_skills_backend.modules.assistant.workflows.service import (
     AssistantTurnExecutionInput,
     AssistantWorkflowService,
@@ -34,10 +40,12 @@ class AssistantService:
         *,
         repository: AssistantRepository,
         workflows: AssistantWorkflowService,
+        approvals: AssistantApprovalService,
         background_tasks: BackgroundTaskRunner | None = None,
     ) -> None:
         self._repository = repository
         self._workflows = workflows
+        self._approvals = approvals
         self._background_tasks = background_tasks
 
     def create_session(
@@ -77,6 +85,21 @@ class AssistantService:
         return self._repository.list_stream_events(
             stream_token=stream_token,
             after_sequence=after_sequence,
+        )
+
+    def list_approvals(
+        self,
+        actor: Actor,
+        *,
+        status: AssistantApprovalStatus | None = None,
+        session_id: str | None = None,
+        turn_id: str | None = None,
+    ) -> list[AssistantApprovalView]:
+        return self._repository.list_approvals(
+            actor=actor,
+            status=status,
+            session_id=session_id,
+            turn_id=turn_id,
         )
 
     def create_turn(
@@ -130,3 +153,16 @@ class AssistantService:
     ) -> AssistantTurnView:
         turn = self._repository.get_turn_by_stream_token(stream_token)
         return await self._workflows.request_cancel(turn=turn, reason=command.reason)
+
+    async def decide_approval(
+        self,
+        actor: Actor,
+        request_id: str,
+        command: DecideAssistantApprovalCommand,
+    ) -> AssistantApprovalView:
+        return await self._approvals.record_decision(
+            actor=actor,
+            request_id=request_id,
+            granted=command.decision == "approved",
+            reason=command.reason,
+        )
