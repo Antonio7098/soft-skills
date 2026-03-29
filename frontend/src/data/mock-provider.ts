@@ -82,9 +82,7 @@ import {
   SEED_COMPETENCY_PROGRESS,
   SEED_ASSISTANT_SESSIONS,
   SEED_TURNS,
-  SEED_MESSAGES,
-  SEED_TOOL_CALLS,
-} from './mock-data';
+} from './mock';
 
 // ---------------------------------------------------------------------------
 // MockDataProvider — all data comes from in-memory seed arrays.
