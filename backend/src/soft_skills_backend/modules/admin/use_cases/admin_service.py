@@ -1067,6 +1067,8 @@ class AdminService:
         from_date: datetime | None = None,
         to_date: datetime | None = None,
     ) -> TelemetryOverviewView:
+        from soft_skills_backend.shared.errors import domain_error
+
         resolved_org = organisation_id or actor.organisation_id
         if resolved_org is None:
             raise domain_error(
@@ -1089,6 +1091,8 @@ class AdminService:
         offset: int = 0,
         limit: int = 50,
     ) -> TelemetryTraceListView:
+        from soft_skills_backend.shared.errors import domain_error
+
         resolved_org = organisation_id or actor.organisation_id
         if resolved_org is None:
             raise domain_error(
@@ -1109,6 +1113,8 @@ class AdminService:
         actor: Actor,
         trace_id: str,
     ) -> TelemetryTraceView | None:
+        from soft_skills_backend.shared.errors import domain_error
+
         resolved_org = actor.organisation_id
         if resolved_org is None:
             raise domain_error(

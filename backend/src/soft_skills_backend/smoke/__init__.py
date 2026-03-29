@@ -8,6 +8,7 @@ from .contracts import SmokeContext, SmokeDefinition, SmokeExecutionResult
 from .registry import SmokeRegistry
 from .runner import SmokeRunner
 from .suites.admin_analytics_smoke import AdminAnalyticsSmoke
+from .suites.admin_telemetry_smoke import AdminTelemetrySmoke
 from .suites.admin_user_management_smoke import AdminUserManagementSmoke
 from .suites.assessment_marking import (
     InterviewMarkingSmoke,
@@ -70,6 +71,7 @@ def build_default_registry() -> SmokeRegistry:
             OrganisationSmoke(),
             AdminUserManagementSmoke(),
             AdminAnalyticsSmoke(),
+            AdminTelemetrySmoke(),
             PipelineVisualizationSmoke(),
             TelemetrySmoke(),
             FullUserJourneySmoke(),

@@ -1,16 +1,15 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Sparkles, AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useAssistantChat } from '@/hooks/useAssistantStream';
 import { Button } from '@/design-system/primitives/Button';
 import { MessageBubble } from './MessageBubble';
 import { ToolCallsAccumulator } from './ToolCallsAccumulator';
 import { ChatInput } from './ChatInput';
-import { SessionSidebar } from './SessionSidebar';
-import { cn } from '@/lib/cn';
+import { SessionModal } from './SessionSidebar';
 
 // ---------------------------------------------------------------------------
-// Streaming indicator — animated dots that show the assistant is thinking
+// Streaming indicator — minimal animated dots
 // ---------------------------------------------------------------------------
 
 function StreamingIndicator() {
@@ -20,26 +19,24 @@ function StreamingIndicator() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15, ease: 'easeOut' }}
-      className="flex items-center gap-3 max-w-[85%] mr-auto"
+      className="flex items-center gap-1.5 py-2"
     >
-      <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center ring-2 ring-accent/20 shrink-0">
-        <Bot className="w-4 h-4 text-accent" />
-      </div>
-      <div className="flex items-center gap-1.5 px-4 py-3 rounded-2xl rounded-bl-md bg-surface-elevated border border-line shadow-card">
-        {[0, 1, 2].map((i) => (
-          <motion.div
-            key={i}
-            animate={{ opacity: [0.35, 0.8, 0.35] }}
-            transition={{
-              duration: 1,
-              repeat: Infinity,
-              delay: i * 0.2,
-              ease: 'easeInOut',
-            }}
-            className="w-2 h-2 rounded-full bg-accent"
-          />
-        ))}
-      </div>
+      <p className="text-body-xs font-semibold uppercase tracking-wider text-content-tertiary mr-2">
+        Assistant
+      </p>
+      {[0, 1, 2].map((i) => (
+        <motion.div
+          key={i}
+          animate={{ opacity: [0.3, 0.8, 0.3] }}
+          transition={{
+            duration: 1,
+            repeat: Infinity,
+            delay: i * 0.2,
+            ease: 'easeInOut',
+          }}
+          className="w-1.5 h-1.5 rounded-full bg-content-tertiary"
+        />
+      ))}
     </motion.div>
   );
 }
@@ -97,35 +94,16 @@ function WelcomeScreen({ onStart }: { onStart: () => void }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="flex-1 flex flex-col items-center justify-center px-6 py-12"
     >
-      {/* Animated logo */}
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 }}
-        className="relative mb-8"
-      >
-        <div className="w-20 h-20 rounded-2xl bg-accent/10 flex items-center justify-center">
-          <Bot className="w-10 h-10 text-accent" />
-        </div>
-        <motion.div
-          animate={{ rotate: [0, 360] }}
-          transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-          className="absolute -top-1 -right-1"
-        >
-          <Sparkles className="w-5 h-5 text-accent" />
-        </motion.div>
-      </motion.div>
-
       <h1 className="font-display text-display-lg text-content-primary mb-2">
-        SoftSkills Assistant
+        What can I help with?
       </h1>
       <p className="text-body-md text-content-secondary text-center max-w-md mb-10">
-        I can help you practice, generate content, review your progress, and more. What would you like to do?
+        Practice, generate content, review your progress, and more.
       </p>
 
       {/* Suggestion chips */}
@@ -133,17 +111,11 @@ function WelcomeScreen({ onStart }: { onStart: () => void }) {
         {suggestions.map((suggestion, i) => (
           <motion.button
             key={suggestion}
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 + i * 0.08, type: 'spring', stiffness: 400, damping: 30 }}
+            transition={{ delay: 0.1 + i * 0.06, duration: 0.3, ease: 'easeOut' }}
             onClick={onStart}
-            className={cn(
-              'text-left px-4 py-3 rounded-xl border border-line',
-              'bg-surface-elevated/50 hover:bg-surface-elevated hover:border-accent/30',
-              'hover:shadow-card transition-all duration-200',
-              'text-body-sm text-content-secondary hover:text-content-primary',
-              'active:scale-[0.98]',
-            )}
+            className="text-left px-4 py-3 rounded-lg border border-line bg-surface-elevated/50 hover:bg-surface-elevated hover:border-accent/30 transition-all duration-200 text-body-sm text-content-secondary hover:text-content-primary active:scale-[0.98]"
           >
             {suggestion}
           </motion.button>
@@ -303,10 +275,32 @@ export function ChatPage() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] -m-8 -mt-8">
-      {/* Session sidebar */}
-      <div className="w-72 shrink-0 hidden lg:block">
-        <SessionSidebar
+    <div className="flex flex-col h-[calc(100vh-4rem)] -m-8 -mt-8 bg-surface-primary">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-line">
+        <div className="flex items-center gap-3">
+          {hasSession ? (
+            <p className="text-body-sm font-semibold text-content-primary truncate">
+              {state.session?.title ?? 'Chat Session'}
+            </p>
+          ) : (
+            <p className="text-body-sm font-medium text-content-secondary">New Chat</p>
+          )}
+          {isStreaming && (
+            <div className="flex items-center gap-1">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                  className="w-1.5 h-1.5 rounded-full bg-accent"
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <SessionModal
           sessions={state.sessions}
           activeSessionId={state.session?.id ?? null}
           onSelectSession={handleSelectSession}
@@ -315,117 +309,81 @@ export function ChatPage() {
         />
       </div>
 
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-surface-primary">
-        {/* Chat header */}
-        {hasSession && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-3 px-6 py-3 border-b border-line bg-surface-primary/80 backdrop-blur-sm"
-          >
-            <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-              <Bot className="w-4 h-4 text-accent" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-body-sm font-semibold text-content-primary truncate">
-                {state.session?.title ?? 'Chat Session'}
-              </p>
-              <p className="text-body-xs text-content-tertiary">
-                {isStreaming ? 'Thinking...' : 'Online'}
-              </p>
-            </div>
-            {isStreaming && (
-              <div className="flex items-center gap-1">
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                    className="w-1.5 h-1.5 rounded-full bg-accent"
-                  />
-                ))}
-              </div>
-            )}
-          </motion.div>
+      {/* Messages area */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleMessagesScroll}
+        className="flex-1 overflow-y-auto"
+      >
+        {!hasSession && !hasMessages ? (
+          <WelcomeScreen onStart={handleNewSession} />
+        ) : (
+          <div className="flex flex-col gap-6 px-6 py-6 max-w-3xl mx-auto w-full">
+            {renderedTurns.map((turn) => {
+              const userMessage = turn.messages.find((msg) => msg.role === 'user');
+              const assistantMessage = turn.messages.find((msg) => msg.role === 'assistant');
+              const turnToolCalls = turn.id === state.activeTurn?.id
+                ? state.activeToolCalls.length > 0
+                  ? state.activeToolCalls
+                  : turn.tool_calls
+                : turn.tool_calls;
+
+              return (
+                <div
+                  key={turn.id}
+                  className="flex flex-col gap-5"
+                >
+                  {userMessage && (
+                    <MessageBubble
+                      role={userMessage.role}
+                      content={userMessage.content}
+                      timestamp={userMessage.created_at}
+                    />
+                  )}
+
+                  {turnToolCalls.length > 0 && (
+                    <ToolCallsAccumulator toolCalls={turnToolCalls} />
+                  )}
+
+                  {assistantMessage && (
+                    <MessageBubble
+                      role={assistantMessage.role}
+                      content={assistantMessage.content}
+                      timestamp={assistantMessage.created_at}
+                    />
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Streaming indicator */}
+            <AnimatePresence>
+              {isStreaming && (!state.activeTurn || state.activeToolCalls.length === 0) && (
+                <StreamingIndicator />
+              )}
+            </AnimatePresence>
+
+          </div>
         )}
+      </div>
 
-        {/* Messages area */}
-        <div
-          ref={scrollContainerRef}
-          onScroll={handleMessagesScroll}
-          className="flex-1 overflow-y-auto"
-        >
-          {!hasSession && !hasMessages ? (
-            <WelcomeScreen onStart={handleNewSession} />
-          ) : (
-            <div className="flex flex-col gap-4 px-6 py-6 max-w-3xl mx-auto w-full">
-              {renderedTurns.map((turn) => {
-                const userMessage = turn.messages.find((msg) => msg.role === 'user');
-                const assistantMessage = turn.messages.find((msg) => msg.role === 'assistant');
-                const turnToolCalls = turn.id === state.activeTurn?.id
-                  ? state.activeToolCalls.length > 0
-                    ? state.activeToolCalls
-                    : turn.tool_calls
-                  : turn.tool_calls;
-
-                return (
-                  <div
-                    key={turn.id}
-                    className="flex flex-col gap-4"
-                  >
-                    {userMessage && (
-                      <MessageBubble
-                        role={userMessage.role}
-                        content={userMessage.content}
-                        timestamp={userMessage.created_at}
-                      />
-                    )}
-
-                    {turnToolCalls.length > 0 && (
-                      <ToolCallsAccumulator toolCalls={turnToolCalls} />
-                    )}
-
-                    {assistantMessage && (
-                      <MessageBubble
-                        role={assistantMessage.role}
-                        content={assistantMessage.content}
-                        timestamp={assistantMessage.created_at}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Streaming indicator */}
-              <AnimatePresence>
-                {isStreaming && (!state.activeTurn || state.activeToolCalls.length === 0) && (
-                  <StreamingIndicator />
-                )}
-              </AnimatePresence>
-
-            </div>
-          )}
-        </div>
-
-        {/* Error banner */}
-        <AnimatePresence>
-          {state.error && (
-            <ErrorBanner
-              message={state.error}
-              onDismiss={clearError}
-            />
-          )}
-        </AnimatePresence>
-
-        {/* Input area */}
-        <div className="px-6 pb-4 pt-2 max-w-3xl mx-auto w-full">
-          <ChatInput
-            onSend={handleSend}
-            onCancel={cancelTurn}
-            isStreaming={isStreaming}
+      {/* Error banner */}
+      <AnimatePresence>
+        {state.error && (
+          <ErrorBanner
+            message={state.error}
+            onDismiss={clearError}
           />
-        </div>
+        )}
+      </AnimatePresence>
+
+      {/* Input area */}
+      <div className="px-6 pb-4 pt-2 max-w-3xl mx-auto w-full">
+        <ChatInput
+          onSend={handleSend}
+          onCancel={cancelTurn}
+          isStreaming={isStreaming}
+        />
       </div>
     </div>
   );

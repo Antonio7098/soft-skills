@@ -883,6 +883,64 @@ class SmokeBackendClient:
         self.require_ok(response, "admin export analytics")
         return {"status": "exported", "format": format}
 
+    async def admin_get_telemetry_overview(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> JsonObject:
+        params: dict[str, str] = {}
+        if from_date:
+            params["from_date"] = from_date
+        if to_date:
+            params["to_date"] = to_date
+        response = await self._client.get(
+            "/api/admin/telemetry/overview",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            params=params,
+        )
+        self.require_ok(response, "admin get telemetry overview")
+        return self.data(response)
+
+    async def admin_list_telemetry_traces(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        offset: int = 0,
+        limit: int = 50,
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> JsonObject:
+        params: dict[str, str | int] = {"offset": offset, "limit": limit}
+        if from_date:
+            params["from_date"] = from_date
+        if to_date:
+            params["to_date"] = to_date
+        response = await self._client.get(
+            "/api/admin/telemetry/traces",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+            params=params,
+        )
+        self.require_ok(response, "admin list telemetry traces")
+        return self.data(response)
+
+    async def admin_get_telemetry_trace(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        trace_id: str,
+    ) -> JsonObject:
+        response = await self._client.get(
+            f"/api/admin/telemetry/traces/{trace_id}",
+            headers={"X-User-ID": user_id, "X-Organisation-ID": organisation_id},
+        )
+        self.require_ok(response, f"admin get telemetry trace {trace_id}")
+        return self.data(response)
+
     @staticmethod
     def data(response: httpx.Response) -> JsonObject:
         return cast(JsonObject, response.json()["data"])

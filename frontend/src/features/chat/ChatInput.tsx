@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback, type KeyboardEvent } from 'react';
-import { Send, Square } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 interface ChatInputProps {
@@ -56,9 +55,9 @@ export function ChatInput({
     <div className="relative">
       <div
         className={cn(
-          'flex items-end gap-2 rounded-2xl border bg-surface-elevated px-4 py-3',
-          'shadow-card transition-all duration-200',
-          'focus-within:border-accent/40 focus-within:shadow-elevated',
+          'flex items-center gap-3 rounded-xl border bg-surface-elevated px-4 py-2.5',
+          'transition-all duration-200',
+          'focus-within:border-accent/40 focus-within:ring-1 focus-within:ring-accent/20',
           disabled ? 'opacity-60 pointer-events-none' : 'border-line',
         )}
       >
@@ -75,7 +74,7 @@ export function ChatInput({
             'flex-1 resize-none bg-transparent text-body-md text-content-primary',
             'placeholder:text-content-tertiary',
             'focus:outline-none',
-            'min-h-[24px] max-h-[200px]',
+            'min-h-[24px] max-h-[200px] leading-[24px]',
           )}
         />
 
@@ -83,21 +82,16 @@ export function ChatInput({
           onClick={isStreaming ? onCancel : handleSend}
           disabled={actionDisabled}
           className={cn(
-            'shrink-0 w-9 h-9 rounded-xl flex items-center justify-center',
+            'shrink-0 px-4 py-1.5 rounded-lg text-body-sm font-medium',
             'transition-colors duration-150',
             isStreaming
-              ? 'bg-status-error/10 text-status-error hover:bg-status-error/20'
+              ? 'text-status-error hover:bg-status-error/10'
               : canSend
-                ? 'bg-accent text-surface-primary hover:bg-accent-hover shadow-sm'
-                : 'bg-surface-secondary text-content-tertiary',
+                ? 'bg-accent text-surface-primary hover:bg-accent-hover'
+                : 'text-content-tertiary',
           )}
-          aria-label={isStreaming ? 'Cancel generation' : 'Send message'}
         >
-          {isStreaming ? (
-            <Square className="w-4 h-4 fill-current" />
-          ) : (
-            <Send className="w-4 h-4" />
-          )}
+          {isStreaming ? 'Stop' : 'Send'}
         </button>
       </div>
 

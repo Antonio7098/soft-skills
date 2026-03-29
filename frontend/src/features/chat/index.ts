@@ -5,4 +5,4 @@ export { ToolCallItem } from './ToolCallItem';
 export { ToolCallsAccumulator } from './ToolCallsAccumulator';
 export { CompactGenerationTool } from './CompactGenerationTool';
 export { CompactPracticeTool } from './CompactPracticeTool';
-export { SessionSidebar } from './SessionSidebar';
+export { SessionModal } from './SessionSidebar';
