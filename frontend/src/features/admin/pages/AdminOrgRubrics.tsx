@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Plus, Edit, Trash2, X, Check, Search, Scale } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Check, Scale } from 'lucide-react';
+import { useAdminScope } from '@/auth';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
 import { Badge } from '@/design-system/primitives/Badge';
@@ -11,7 +11,7 @@ import { AdminPageShell, MetricCard, SearchInput } from '../components';
 import type { OrgRubricView } from '@/data/types';
 
 export function AdminOrgRubrics() {
-  const { organisationId } = useParams<{ organisationId: string }>();
+  const { organisationId } = useAdminScope();
   const dataProvider = useData();
   const [rubrics, setRubrics] = useState<OrgRubricView[]>([]);
   const [selectedRubric, setSelectedRubric] = useState<OrgRubricView | null>(null);
@@ -158,8 +158,9 @@ export function AdminOrgRubrics() {
             ))}
             {filteredRubrics.length === 0 && (
               <EmptyState
+                icon={<Scale className="w-5 h-5" />}
                 title="No rubrics found"
-                message={search ? 'Try adjusting your search' : 'Create your first rubric to get started'}
+                description={search ? 'Try adjusting your search' : 'Create your first rubric to get started'}
               />
             )}
           </div>

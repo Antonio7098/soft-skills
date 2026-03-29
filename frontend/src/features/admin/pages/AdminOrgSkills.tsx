@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Plus, Edit, Trash2, X, Check, Search, Star } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Check, Star } from 'lucide-react';
+import { useAdminScope } from '@/auth';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
-import { Badge } from '@/design-system/primitives/Badge';
 import { LoadingState } from '@/design-system/patterns/LoadingState';
 import { EmptyState } from '@/design-system/patterns/EmptyState';
 import { useData } from '@/data';
@@ -11,7 +10,7 @@ import { AdminPageShell, MetricCard, SearchInput } from '../components';
 import type { OrgSkillView } from '@/data/types';
 
 export function AdminOrgSkills() {
-  const { organisationId } = useParams<{ organisationId: string }>();
+  const { organisationId } = useAdminScope();
   const dataProvider = useData();
   const [skills, setSkills] = useState<OrgSkillView[]>([]);
   const [selectedSkill, setSelectedSkill] = useState<OrgSkillView | null>(null);
@@ -22,10 +21,12 @@ export function AdminOrgSkills() {
   const [actionLoading, setActionLoading] = useState(false);
   const [newSkill, setNewSkill] = useState({ slug: '', name: '', description: '' });
 
+  const orgId = organisationId;
+
   const refreshSkills = () => {
-    if (!organisationId) return;
+    if (!orgId) return;
     setLoading(true);
-    dataProvider.listOrgSkills(organisationId)
+    dataProvider.listOrgSkills(orgId)
       .then(setSkills)
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -33,13 +34,13 @@ export function AdminOrgSkills() {
 
   useEffect(() => {
     refreshSkills();
-  }, [dataProvider, organisationId]);
+  }, [dataProvider, orgId]);
 
   const handleCreateSkill = async () => {
-    if (!newSkill.slug || !newSkill.name || !organisationId) return;
+    if (!newSkill.slug || !newSkill.name) return;
     setActionLoading(true);
     try {
-      await dataProvider.createOrgSkill(organisationId, {
+      await dataProvider.createOrgSkill(orgId!, {
         slug: newSkill.slug.toLowerCase().replace(/\s+/g, '-'),
         name: newSkill.name,
         description: newSkill.description,
@@ -55,10 +56,10 @@ export function AdminOrgSkills() {
   };
 
   const handleUpdateSkill = async () => {
-    if (!selectedSkill || !organisationId) return;
+    if (!selectedSkill) return;
     setActionLoading(true);
     try {
-      await dataProvider.updateOrgSkill(organisationId, selectedSkill.slug, {
+      await dataProvider.updateOrgSkill(orgId!, selectedSkill.slug, {
         name: selectedSkill.name,
         description: selectedSkill.description,
       });
@@ -72,10 +73,10 @@ export function AdminOrgSkills() {
   };
 
   const handleDeleteSkill = async (slug: string) => {
-    if (!organisationId) return;
+    if (!orgId) return;
     if (!confirm('Are you sure you want to delete this skill?')) return;
     try {
-      await dataProvider.deleteOrgSkill(organisationId, slug);
+      await dataProvider.deleteOrgSkill(orgId, slug);
       if (selectedSkill?.slug === slug) setSelectedSkill(null);
       refreshSkills();
     } catch (error) {
@@ -87,7 +88,7 @@ export function AdminOrgSkills() {
     search ? s.name.toLowerCase().includes(search.toLowerCase()) || s.slug.toLowerCase().includes(search.toLowerCase()) : true
   );
 
-  if (loading || !organisationId) {
+  if (loading || !orgId) {
     return (
       <AdminPageShell title="Org Skills" subtitle="Manage organization-specific skills">
         <LoadingState message="Loading skills..." />
@@ -146,8 +147,9 @@ export function AdminOrgSkills() {
             ))}
             {filteredSkills.length === 0 && (
               <EmptyState
+                icon={<Star className="w-5 h-5" />}
                 title="No skills found"
-                message={search ? 'Try adjusting your search' : 'Create your first skill to get started'}
+                description={search ? 'Try adjusting your search' : 'Create your first skill to get started'}
               />
             )}
           </div>

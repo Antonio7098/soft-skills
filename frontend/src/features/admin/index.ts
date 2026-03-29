@@ -15,4 +15,5 @@ export {
   AdminOrgRubrics,
   AdminOrgPromptItems,
   AdminOrgScenarios,
+  AdminRouteAliasRedirect,
 } from './pages';

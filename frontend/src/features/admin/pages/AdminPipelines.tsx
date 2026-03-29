@@ -4,7 +4,6 @@ import {
   Play,
   CheckCircle,
   XCircle,
-  Clock,
   ChevronRight,
   X,
   BarChart3,
@@ -253,10 +252,10 @@ export function AdminPipelines() {
                           <span className="text-body-sm text-content-primary">{stage.stage_name}</span>
                           <div className="flex items-center gap-4">
                             <span className="text-body-xs text-content-tertiary">
-                              Avg: {(stage.avg_duration_ms / 1000).toFixed(2)}s
+                              Avg: {((stage.avg_duration_ms ?? 0) / 1000).toFixed(2)}s
                             </span>
                             <span className="text-body-xs text-status-success">
-                              {(stage.success_rate * 100).toFixed(0)}% success
+                              {((stage.success_count / stage.invocation_count) * 100).toFixed(0)}% success
                             </span>
                           </div>
                         </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Plus, Edit, Trash2, X, Check, Search, Users } from 'lucide-react';
+import { Plus, Trash2, X, Check, Users } from 'lucide-react';
+import { useAdminScope } from '@/auth';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
 import { Badge } from '@/design-system/primitives/Badge';
@@ -11,7 +11,7 @@ import { AdminPageShell, MetricCard, SearchInput } from '../components';
 import type { ScenarioView } from '@/data/types';
 
 export function AdminOrgScenarios() {
-  const { organisationId } = useParams<{ organisationId: string }>();
+  const { organisationId } = useAdminScope();
   const dataProvider = useData();
   const [scenarios, setScenarios] = useState<ScenarioView[]>([]);
   const [selectedScenario, setSelectedScenario] = useState<ScenarioView | null>(null);
@@ -148,8 +148,9 @@ export function AdminOrgScenarios() {
             ))}
             {filteredScenarios.length === 0 && (
               <EmptyState
+                icon={<Users className="w-5 h-5" />}
                 title="No scenarios found"
-                message={search ? 'Try adjusting your search' : 'Create your first scenario to get started'}
+                description={search ? 'Try adjusting your search' : 'Create your first scenario to get started'}
               />
             )}
           </div>

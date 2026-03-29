@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Plus, Edit, Trash2, X, Check, Search, FileText } from 'lucide-react';
+import { Plus, Trash2, X, Check, FileText } from 'lucide-react';
+import { useAdminScope } from '@/auth';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
 import { Badge } from '@/design-system/primitives/Badge';
@@ -12,7 +12,7 @@ import type { PromptItemView } from '@/data/types';
 import type { Difficulty } from '@/data/types/shared';
 
 export function AdminOrgPromptItems() {
-  const { organisationId } = useParams<{ organisationId: string }>();
+  const { organisationId } = useAdminScope();
   const dataProvider = useData();
   const [promptItems, setPromptItems] = useState<PromptItemView[]>([]);
   const [selectedItem, setSelectedItem] = useState<PromptItemView | null>(null);
@@ -23,7 +23,7 @@ export function AdminOrgPromptItems() {
   const [newItem, setNewItem] = useState({
     title: '',
     prompt_text: '',
-    prompt_type: 'quick_practice' as const,
+    prompt_type: 'quick_practice_prompt' as const,
     difficulty: 'intermediate' as Difficulty,
     rubric_id: '',
     target_skill_slugs: '',
@@ -58,7 +58,7 @@ export function AdminOrgPromptItems() {
       setNewItem({
         title: '',
         prompt_text: '',
-        prompt_type: 'quick_practice',
+        prompt_type: 'quick_practice_prompt',
         difficulty: 'intermediate',
         rubric_id: '',
         target_skill_slugs: '',
@@ -150,8 +150,9 @@ export function AdminOrgPromptItems() {
             ))}
             {filteredItems.length === 0 && (
               <EmptyState
+                icon={<FileText className="w-5 h-5" />}
                 title="No prompt items found"
-                message={search ? 'Try adjusting your search' : 'Create your first prompt item to get started'}
+                description={search ? 'Try adjusting your search' : 'Create your first prompt item to get started'}
               />
             )}
           </div>

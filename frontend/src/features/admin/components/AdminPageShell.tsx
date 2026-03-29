@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
+import { Building2 } from 'lucide-react';
+import { useAdminScope } from '@/auth';
 import { cn } from '@/lib/cn';
 
 interface AdminPageShellProps {
@@ -8,6 +10,7 @@ interface AdminPageShellProps {
   readonly actions?: ReactNode;
   readonly children: ReactNode;
   readonly className?: string;
+  readonly showScope?: boolean;
 }
 
 const pageVariants = {
@@ -24,7 +27,9 @@ const childVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] } },
 };
 
-export function AdminPageShell({ title, subtitle, actions, children, className }: AdminPageShellProps) {
+export function AdminPageShell({ title, subtitle, actions, children, className, showScope = true }: AdminPageShellProps) {
+  const { activeOrganisation } = useAdminScope();
+
   return (
     <motion.div
       variants={pageVariants}
@@ -37,6 +42,14 @@ export function AdminPageShell({ title, subtitle, actions, children, className }
           <h1 className="font-display text-display-md text-content-primary">{title}</h1>
           {subtitle && (
             <p className="text-body-sm text-content-secondary max-w-2xl">{subtitle}</p>
+          )}
+          {showScope && activeOrganisation && (
+            <div className="flex items-center gap-2 text-body-xs text-content-tertiary">
+              <Building2 className="w-3.5 h-3.5" />
+              <span>
+                Scoped to {activeOrganisation.organisation_name}
+              </span>
+            </div>
           )}
         </div>
         {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}

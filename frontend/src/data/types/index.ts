@@ -7,6 +7,11 @@ export type * from './admin';
 export type * from './assistant';
 
 export {
+  type AuthSessionView,
+  type AuthProfileView,
+  type OrganisationMembershipView,
+  type OrganisationRole,
+  type PlatformRole,
   type LearnerProfileView,
   type UserView,
   type RegisterUserCommand,

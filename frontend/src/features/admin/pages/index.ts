@@ -13,3 +13,4 @@ export { AdminOrgCompetencies } from './AdminOrgCompetencies';
 export { AdminOrgRubrics } from './AdminOrgRubrics';
 export { AdminOrgPromptItems } from './AdminOrgPromptItems';
 export { AdminOrgScenarios } from './AdminOrgScenarios';
+export { AdminRouteAliasRedirect } from './AdminRouteAliasRedirect';

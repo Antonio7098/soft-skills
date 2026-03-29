@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthSession } from '@/auth';
 import { Award, Clock, Star, Target } from 'lucide-react';
 import { PageShell } from '@/design-system/patterns/PageShell';
 import { StatCard } from '@/design-system/patterns/StatCard';
@@ -15,18 +16,16 @@ import type { AttemptHistoryItem, CompetencyProgressView } from '@/data';
 export function Dashboard() {
   const navigate = useNavigate();
   const data = useData();
-  const [user, setUser] = useState<{ display_name: string } | null>(null);
+  const { session } = useAuthSession();
   const [history, setHistory] = useState<AttemptHistoryItem[]>([]);
   const [competencies, setCompetencies] = useState<CompetencyProgressView[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
-      data.getMe(),
       data.getAttemptHistory('current'),
       data.getCompetencyProgress('current'),
-    ]).then(([u, h, c]) => {
-      setUser(u);
+    ]).then(([h, c]) => {
       setHistory(h);
       setCompetencies(c);
       setLoading(false);
@@ -46,7 +45,7 @@ export function Dashboard() {
 
   return (
     <PageShell
-      title={`Welcome back, ${user?.display_name ?? 'Learner'}`}
+      title={`Welcome back, ${session?.actor?.display_name ?? 'Learner'}`}
       subtitle={`You've completed ${history.length} attempts. Keep building your skills.`}
       actions={
         <Button variant="primary" icon={<Target className="w-4 h-4" />} onClick={() => navigate('/practice')}>

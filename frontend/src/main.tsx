@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { AuthSessionProvider, AdminGuard, UserAppGuard } from './auth';
 import { DataProviderProvider } from './data';
 import { MainLayout } from './components/layout/MainLayout';
 import { SessionLayout } from './components/layout/SessionLayout';
@@ -38,13 +39,14 @@ import {
   AdminOrgRubrics,
   AdminOrgPromptItems,
   AdminOrgScenarios,
+  AdminRouteAliasRedirect,
 } from './features/admin';
 import './index.css';
 
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <MainLayout />,
+    element: <UserAppGuard><MainLayout /></UserAppGuard>,
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'practice', element: <Practice /> },
@@ -63,7 +65,7 @@ const router = createBrowserRouter([
   },
   {
     path: '/session',
-    element: <SessionLayout />,
+    element: <UserAppGuard><SessionLayout /></UserAppGuard>,
     children: [
       { path: 'quick/:promptId', element: <QuickPracticeSession /> },
       { path: 'interview/:promptId', element: <InterviewSession /> },
@@ -73,7 +75,7 @@ const router = createBrowserRouter([
   },
   {
     path: '/admin',
-    element: <AdminLayout />,
+    element: <AdminGuard><AdminLayout /></AdminGuard>,
     children: [
       { index: true, element: <AdminOverview /> },
       { path: 'users', element: <AdminUsers /> },
@@ -85,11 +87,16 @@ const router = createBrowserRouter([
       { path: 'rubrics', element: <AdminRubrics /> },
       { path: 'audit', element: <AdminAudit /> },
       { path: 'telemetry', element: <AdminTelemetry /> },
-      { path: 'orgs/:organisationId/skills', element: <AdminOrgSkills /> },
-      { path: 'orgs/:organisationId/competencies', element: <AdminOrgCompetencies /> },
-      { path: 'orgs/:organisationId/rubrics', element: <AdminOrgRubrics /> },
-      { path: 'orgs/:organisationId/prompt-items', element: <AdminOrgPromptItems /> },
-      { path: 'orgs/:organisationId/scenarios', element: <AdminOrgScenarios /> },
+      { path: 'skills', element: <AdminOrgSkills /> },
+      { path: 'competencies', element: <AdminOrgCompetencies /> },
+      { path: 'org-rubrics', element: <AdminOrgRubrics /> },
+      { path: 'prompt-items', element: <AdminOrgPromptItems /> },
+      { path: 'scenarios', element: <AdminOrgScenarios /> },
+      { path: 'orgs/:organisationId/skills', element: <AdminRouteAliasRedirect to="/admin/skills" /> },
+      { path: 'orgs/:organisationId/competencies', element: <AdminRouteAliasRedirect to="/admin/competencies" /> },
+      { path: 'orgs/:organisationId/rubrics', element: <AdminRouteAliasRedirect to="/admin/org-rubrics" /> },
+      { path: 'orgs/:organisationId/prompt-items', element: <AdminRouteAliasRedirect to="/admin/prompt-items" /> },
+      { path: 'orgs/:organisationId/scenarios', element: <AdminRouteAliasRedirect to="/admin/scenarios" /> },
     ],
   },
 ]);
@@ -100,7 +107,9 @@ if (root) {
     <StrictMode>
       <ThemeProvider>
         <DataProviderProvider>
-          <RouterProvider router={router} />
+          <AuthSessionProvider>
+            <RouterProvider router={router} />
+          </AuthSessionProvider>
         </DataProviderProvider>
       </ThemeProvider>
     </StrictMode>,

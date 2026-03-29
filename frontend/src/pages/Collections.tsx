@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthSession } from '@/auth';
 import { Globe, Building2, Bookmark, Clock, Star, BookOpen } from 'lucide-react';
 import { PageShell } from '@/design-system/patterns/PageShell';
 import { Card } from '@/design-system/primitives/Card';
@@ -175,16 +176,12 @@ function SectionHeader({ title, action }: SectionHeaderProps) {
 export function Collections() {
   const navigate = useNavigate();
   const data = useData();
+  const { session } = useAuthSession();
   const [collections, setCollections] = useState<CollectionView[]>([]);
-  const [user, setUser] = useState<{ id: string; display_name: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      data.getMe(),
-      data.listCollections({ include_private: true }),
-    ]).then(([u, c]) => {
-      setUser(u);
+    data.listCollections({ include_private: true }).then((c) => {
       setCollections(c);
       setLoading(false);
     });
@@ -192,7 +189,7 @@ export function Collections() {
 
   const globalCollections = useMemo(() => collections.filter((c) => c.discovery_tier === 'global_public'), [collections]);
   const orgCollections = useMemo(() => collections.filter((c) => c.discovery_tier === 'org_public'), [collections]);
-  const myCollections = useMemo(() => collections.filter((c) => c.author_user_id === user?.id), [collections, user]);
+  const myCollections = useMemo(() => collections.filter((c) => c.author_user_id === session?.actor?.id), [collections, session]);
   const savedCollections = useMemo(() => collections.filter((c) => c.saved_by_actor), [collections]);
   const featuredCollection = useMemo(() => myCollections.find((c) => c.featured) ?? globalCollections.find((c) => c.verification_state === 'verified'), [myCollections, globalCollections]);
 

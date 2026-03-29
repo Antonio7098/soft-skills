@@ -31,6 +31,7 @@ contracts, or sequencing change.
 19. [Sprint 13f: Prompt Library API](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13f-prompt-library-api.md)
 20. [Sprint 13g: User Management API](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13g-user-management-api.md)
 21. [Sprint 13h: User Cohort Analytics](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13h-user-cohort-analytics.md)
+22. [Sprint 14: Admin Super Agent](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-14-admin-super-agent.md)
 
 ## Active Sprint
 

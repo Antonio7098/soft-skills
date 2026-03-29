@@ -1,6 +1,7 @@
 import type { DataProvider } from './provider';
 import type {
   UserView,
+  AuthSessionView,
   TaxonomySnapshot,
   CollectionView,
   CollectionListFilters,
@@ -46,25 +47,56 @@ import type {
   TelemetryTraceView,
   AssistantSessionView,
   AssistantTurnView,
-  CreateAssistantSessionCommand,
-  CreateAssistantTurnCommand,
-  CancelAssistantTurnCommand,
-  AssistantStreamCallbacks,
   OrgSkillView,
   OrgCompetencyView,
   OrgRubricView,
   PromptItemView,
   ScenarioView,
-  PromptItemCreateCommand,
-  ScenarioCreateCommand,
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+const USER_ID_STORAGE_KEY = 'ss_user_id';
+const ACTIVE_ORG_STORAGE_KEY = 'ss_active_organisation_id';
+
+export class ApiRequestError extends Error {
+  readonly status: number | null;
+  readonly isNetworkError: boolean;
+
+  constructor(message: string, opts?: { status?: number | null; isNetworkError?: boolean }) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = opts?.status ?? null;
+    this.isNetworkError = opts?.isNetworkError ?? false;
+  }
+}
 
 function getAuthHeaders(): Record<string, string> {
-  const userId = sessionStorage.getItem('ss_user_id');
-  if (!userId) return {};
-  return { 'X-User-ID': userId };
+  const headers: Record<string, string> = {};
+  const userId = sessionStorage.getItem(USER_ID_STORAGE_KEY);
+  if (userId) {
+    headers['X-User-ID'] = userId;
+  }
+  const activeOrganisationId = getStoredActiveOrganisation();
+  if (activeOrganisationId) {
+    headers['X-Organisation-ID'] = activeOrganisationId;
+  }
+  return headers;
+}
+
+function getStoredActiveOrganisation(): string | null {
+  return sessionStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
+}
+
+export function getStoredActiveOrganisationId(): string | null {
+  return getStoredActiveOrganisation();
+}
+
+function setStoredActiveOrganisationId(organisationId: string | null): void {
+  if (organisationId) {
+    sessionStorage.setItem(ACTIVE_ORG_STORAGE_KEY, organisationId);
+    return;
+  }
+  sessionStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -74,14 +106,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init?.headers,
   };
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Network request failed';
+    throw new ApiRequestError(message, { isNetworkError: true });
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body?.error?.message ?? `API error ${res.status}`);
+    throw new ApiRequestError(body?.error?.message ?? `API error ${res.status}`, { status: res.status });
   }
 
   const envelope = await res.json();
@@ -89,19 +127,60 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export function setUserId(userId: string): void {
-  sessionStorage.setItem('ss_user_id', userId);
+  sessionStorage.setItem(USER_ID_STORAGE_KEY, userId);
 }
 
 export function clearUserId(): void {
-  sessionStorage.removeItem('ss_user_id');
+  sessionStorage.removeItem(USER_ID_STORAGE_KEY);
 }
 
 export function getUserId(): string | null {
-  return sessionStorage.getItem('ss_user_id');
+  return sessionStorage.getItem(USER_ID_STORAGE_KEY);
+}
+
+function deriveSessionFromUser(user: UserView): AuthSessionView {
+  const activeOrganisationId = getStoredActiveOrganisation();
+  const platformRole = user.role === 'superadmin'
+    ? 'superadmin'
+    : user.role === 'admin'
+      ? 'admin'
+      : 'learner';
+  const orgMemberships: AuthSessionView['org_memberships'] = activeOrganisationId
+    ? [{
+        organisation_id: activeOrganisationId,
+        organisation_name: activeOrganisationId,
+        role: platformRole === 'learner' ? 'member' : 'org_admin',
+        permissions: platformRole === 'learner'
+          ? ['collections:read', 'practice:run']
+          : ['admin:access', 'org:read', 'org:write', 'collections:read', 'practice:run'],
+      }]
+    : [];
+  const capabilities: AuthSessionView['capabilities'] = platformRole === 'learner'
+    ? ['app:access']
+    : ['app:access', 'admin:access'];
+
+  return {
+    status: 'authenticated',
+    actor: user,
+    platform_role: platformRole,
+    org_memberships: orgMemberships,
+    active_organisation_id: activeOrganisationId,
+    capabilities,
+    data_mode: 'api',
+  };
 }
 
 export const apiDataProvider: DataProvider = {
   // --- Auth / Identity -----------------------------------------------------
+  getAuthSession: async () => deriveSessionFromUser(await request<UserView>('/users/me')),
+  setActiveOrganisation: async (organisationId) => {
+    setStoredActiveOrganisationId(organisationId);
+    return deriveSessionFromUser(await request<UserView>('/users/me'));
+  },
+  listAuthProfiles: async () => [],
+  switchAuthProfile: async (_profileId) => {
+    throw new ApiRequestError('Auth profile switching is only available in mock mode');
+  },
   register: (cmd) => {
     const result = request<UserView>('/auth/register', { method: 'POST', body: JSON.stringify(cmd) });
     result.then((user) => setUserId(user.id)).catch(() => {});
@@ -534,14 +613,6 @@ export const apiDataProvider: DataProvider = {
         callbacks.onClose();
       }
     };
-
-    // Handle control messages (like cancellation)
-    const sendControlMessage = (type: string, reason?: string) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type, reason }));
-      }
-    };
-
     // Return cleanup function
     return () => {
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {

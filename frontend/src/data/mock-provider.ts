@@ -1,6 +1,9 @@
 import type { DataProvider } from './provider';
 import type {
   UserView,
+  AuthSessionView,
+  AuthProfileView,
+  OrganisationMembershipView,
   TaxonomySnapshot,
   CollectionView,
   CollectionListFilters,
@@ -18,6 +21,7 @@ import type {
   InterviewSessionView,
   ScenarioSessionView,
   PracticeRunView,
+  PracticeRunItemSummary,
   PracticeSessionView,
   StartPracticeRunCommand,
   StructuredCollectionGenerationCommand,
@@ -25,6 +29,8 @@ import type {
   CollectionGenerationView,
   PromptItemView,
   ScenarioView,
+  MockCompanyView,
+  MockPersonView,
   PerSkillAssessment,
   EvidenceItem,
   AdminUserView,
@@ -55,6 +61,8 @@ import type {
   PipelineMetricsView,
   RubricView,
   RubricCriterionInput,
+  RubricCriterionAdminView,
+  RubricAdminView,
   WorkflowEventView,
   PaginatedWorkflowEventsView,
   AttemptAuditView,
@@ -73,7 +81,7 @@ import type {
   TelemetryOverviewView,
   TelemetryTraceListView,
   TelemetryTraceListItemView,
-  TelemetryTraceDetailView,
+  TelemetryTraceView,
   OrgSkillView,
   OrgCompetencyView,
   OrgRubricView,
@@ -195,6 +203,8 @@ const _practiceRuns = new Map<string, PracticeRunView>();
 const _practiceSessions = new Map<string, PracticeSessionView>();
 const _saves = new Map<string, Set<string>>();
 const _ratings = new Map<string, Map<string, number>>();
+const MOCK_PROFILE_STORAGE_KEY = 'ss_mock_auth_profile_id';
+const MOCK_ACTIVE_ORG_STORAGE_KEY = 'ss_mock_active_organisation_id';
 
 function delay(ms = 300): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -208,6 +218,168 @@ function isoDate(daysAgo = 0): string {
   const d = new Date();
   d.setDate(d.getDate() - daysAgo);
   return d.toISOString();
+}
+
+const DEFAULT_MEMBER_PERMISSIONS = ['collections:read', 'practice:run'];
+const DEFAULT_ORG_ADMIN_PERMISSIONS = ['collections:read', 'practice:run', 'admin:access', 'org:read', 'org:write'];
+
+function createMembership(
+  organisation_id: string,
+  organisation_name: string,
+  role: 'member' | 'org_admin',
+  permissions = role === 'org_admin' ? DEFAULT_ORG_ADMIN_PERMISSIONS : DEFAULT_MEMBER_PERMISSIONS,
+): OrganisationMembershipView {
+  return { organisation_id, organisation_name, role, permissions };
+}
+
+const MOCK_AUTH_PROFILES: AuthProfileView[] = [
+  {
+    id: 'learner-alex',
+    label: 'Alex Chen',
+    description: 'Learner in Acme Sales',
+    session: {
+      status: 'authenticated',
+      actor: { ...SEED_CURRENT_USER },
+      platform_role: 'learner',
+      org_memberships: [createMembership('org-001', 'Acme Sales', 'member')],
+      active_organisation_id: 'org-001',
+      capabilities: ['app:access'],
+      data_mode: 'mock',
+    },
+  },
+  {
+    id: 'org-admin-alex',
+    label: 'Alex Chen (Org Admin)',
+    description: 'Org admin for Acme Sales',
+    session: {
+      status: 'authenticated',
+      actor: { ...SEED_CURRENT_USER, role: 'admin' },
+      platform_role: 'admin',
+      org_memberships: [createMembership('org-001', 'Acme Sales', 'org_admin')],
+      active_organisation_id: 'org-001',
+      capabilities: ['app:access', 'admin:access'],
+      data_mode: 'mock',
+    },
+  },
+  {
+    id: 'superadmin-henry',
+    label: 'Henry Patel',
+    description: 'Platform admin across multiple organisations',
+    session: {
+      status: 'authenticated',
+      actor: {
+        id: 'user-900',
+        email: 'henry.patel@acme.com',
+        display_name: 'Henry Patel',
+        role: 'superadmin',
+        auth_provider: 'google',
+        created_at: '2026-01-05T10:00:00Z',
+        profile: {
+          target_role: 'Platform Admin',
+          goals: ['Audit org content', 'Manage platform configuration'],
+          practice_preferences: {},
+        },
+      },
+      platform_role: 'superadmin',
+      org_memberships: [
+        createMembership('org-001', 'Acme Sales', 'org_admin'),
+        createMembership('org-002', 'Acme Support', 'org_admin'),
+      ],
+      active_organisation_id: 'org-001',
+      capabilities: ['app:access', 'admin:access', 'platform:superadmin'],
+      data_mode: 'mock',
+    },
+  },
+];
+
+function getStoredProfileId(): string {
+  return sessionStorage.getItem(MOCK_PROFILE_STORAGE_KEY) ?? 'org-admin-alex';
+}
+
+function setStoredProfileId(profileId: string): void {
+  sessionStorage.setItem(MOCK_PROFILE_STORAGE_KEY, profileId);
+}
+
+function getStoredActiveOrgId(): string | null {
+  return sessionStorage.getItem(MOCK_ACTIVE_ORG_STORAGE_KEY);
+}
+
+function setStoredActiveOrgId(orgId: string | null): void {
+  if (orgId) {
+    sessionStorage.setItem(MOCK_ACTIVE_ORG_STORAGE_KEY, orgId);
+    return;
+  }
+  sessionStorage.removeItem(MOCK_ACTIVE_ORG_STORAGE_KEY);
+}
+
+function getProfileDefinition(profileId = getStoredProfileId()): AuthProfileView {
+  return MOCK_AUTH_PROFILES.find((profile) => profile.id === profileId) ?? MOCK_AUTH_PROFILES[1]!;
+}
+
+function materializeSession(profileId = getStoredProfileId()): AuthSessionView {
+  const profile = getProfileDefinition(profileId);
+  const storedOrgId = getStoredActiveOrgId();
+  const availableOrgIds = new Set(profile.session.org_memberships.map((membership) => membership.organisation_id));
+  const activeOrgId = storedOrgId && availableOrgIds.has(storedOrgId)
+    ? storedOrgId
+    : profile.session.active_organisation_id;
+
+  return {
+    ...profile.session,
+    actor: profile.session.actor ? { ...profile.session.actor } : null,
+    org_memberships: profile.session.org_memberships.map((membership) => ({ ...membership })),
+    active_organisation_id: activeOrgId,
+    capabilities: [...profile.session.capabilities],
+  };
+}
+
+function syncMockUserFromSession(): AuthSessionView {
+  const session = materializeSession();
+  _user = session.actor ? { ...session.actor } : { ...SEED_CURRENT_USER };
+  return session;
+}
+
+function hasCapability(session: AuthSessionView, capability: string): boolean {
+  return session.capabilities.includes(capability);
+}
+
+function getMembership(session: AuthSessionView, organisationId: string): OrganisationMembershipView | undefined {
+  return session.org_memberships.find((membership) => membership.organisation_id === organisationId);
+}
+
+function requireAuthenticatedSession(): AuthSessionView {
+  const session = syncMockUserFromSession();
+  if (session.status !== 'authenticated' || !session.actor) {
+    throw new Error('Authentication required');
+  }
+  return session;
+}
+
+function requireAdminSession(): AuthSessionView {
+  const session = requireAuthenticatedSession();
+  if (!hasCapability(session, 'admin:access')) {
+    throw new Error('Admin access required');
+  }
+  return session;
+}
+
+function requireOrgAccess(orgId: string, permission: 'org:read' | 'org:write' = 'org:read'): AuthSessionView {
+  const session = requireAdminSession();
+  if (session.platform_role === 'superadmin') {
+    return session;
+  }
+  const membership = getMembership(session, orgId);
+  if (!membership || !membership.permissions.includes(permission)) {
+    throw new Error(`Not authorized for organisation ${orgId}`);
+  }
+  return session;
+}
+
+function getScopedAdminOrganisationId(session: AuthSessionView): string | null {
+  if (session.platform_role === 'superadmin') {
+    return session.active_organisation_id;
+  }
+  return session.active_organisation_id ?? session.org_memberships[0]?.organisation_id ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -530,6 +702,9 @@ const SEED_PIPELINE_METRICS: Record<string, PipelineMetricsView> = {
     success_count: 1198,
     failure_count: 34,
     cancel_count: 15,
+    success_rate: 1198 / 1247,
+    avg_duration_ms: 920.5,
+    p95_duration_ms: 1250,
     stage_metrics: [
       { stage_name: 'input_guard', invocation_count: 1247, success_count: 1247, failure_count: 0, skip_count: 0, cancel_count: 15, retry_count: 0, avg_duration_ms: 12.4, p50_duration_ms: 11, p95_duration_ms: 18, p99_duration_ms: 25 },
       { stage_name: 'history_enrich', invocation_count: 1232, success_count: 1230, failure_count: 2, skip_count: 0, cancel_count: 15, retry_count: 5, avg_duration_ms: 89.2, p50_duration_ms: 85, p95_duration_ms: 120, p99_duration_ms: 180 },
@@ -545,6 +720,9 @@ const SEED_PIPELINE_METRICS: Record<string, PipelineMetricsView> = {
     success_count: 812,
     failure_count: 28,
     cancel_count: 16,
+    success_rate: 812 / 856,
+    avg_duration_ms: 1850.0,
+    p95_duration_ms: 2400,
     stage_metrics: [
       { stage_name: 'submission_guard', invocation_count: 856, success_count: 856, failure_count: 0, skip_count: 0, cancel_count: 16, retry_count: 0, avg_duration_ms: 8.2, p50_duration_ms: 8, p95_duration_ms: 12, p99_duration_ms: 18 },
       { stage_name: 'prompt_retrieval', invocation_count: 840, success_count: 840, failure_count: 0, skip_count: 0, cancel_count: 16, retry_count: 0, avg_duration_ms: 45.6, p50_duration_ms: 42, p95_duration_ms: 68, p99_duration_ms: 95 },
@@ -558,7 +736,7 @@ const SEED_PIPELINE_METRICS: Record<string, PipelineMetricsView> = {
   },
 };
 
-const SEED_RUBRICS_ADMIN: RubricView[] = [
+const SEED_RUBRICS_ADMIN: RubricAdminView[] = [
   {
     rubric_id: 'quick_practice_text@v1',
     family: 'quick_practice_text',
@@ -613,7 +791,7 @@ const SEED_WORKFLOW_EVENTS: WorkflowEventView[] = [
 
 let _adminUsers = [...SEED_ADMIN_USERS];
 let _learnerRelationships = new Map<string, AdminLearnerRelationshipView>();
-let _rubricsAdmin = [...SEED_RUBRICS_ADMIN];
+let _rubricsAdmin: RubricAdminView[] = [...SEED_RUBRICS_ADMIN];
 let _workflowEvents = [...SEED_WORKFLOW_EVENTS];
 
 const SEED_ORG_SKILLS: OrgSkillView[] = [
@@ -865,6 +1043,45 @@ async function simulateToolFlow(
 
 export const mockDataProvider: DataProvider = {
   // --- Auth / Identity -----------------------------------------------------
+  async getAuthSession(): Promise<AuthSessionView> {
+    await delay(100);
+    return syncMockUserFromSession();
+  },
+
+  async setActiveOrganisation(organisationId: string | null): Promise<AuthSessionView> {
+    await delay(80);
+    const session = requireAuthenticatedSession();
+    if (organisationId === null) {
+      setStoredActiveOrgId(null);
+      return syncMockUserFromSession();
+    }
+    if (session.platform_role !== 'superadmin' && !getMembership(session, organisationId)) {
+      throw new Error(`Organisation ${organisationId} is not available for this actor`);
+    }
+    setStoredActiveOrgId(organisationId);
+    return syncMockUserFromSession();
+  },
+
+  async listAuthProfiles(): Promise<AuthProfileView[]> {
+    await delay(60);
+    return MOCK_AUTH_PROFILES.map((profile) => ({
+      ...profile,
+      session: {
+        ...profile.session,
+        actor: profile.session.actor ? { ...profile.session.actor } : null,
+        org_memberships: profile.session.org_memberships.map((membership) => ({ ...membership })),
+        capabilities: [...profile.session.capabilities],
+      },
+    }));
+  },
+
+  async switchAuthProfile(profileId: string): Promise<AuthSessionView> {
+    await delay(80);
+    const profile = getProfileDefinition(profileId);
+    setStoredProfileId(profile.id);
+    setStoredActiveOrgId(profile.session.active_organisation_id);
+    return syncMockUserFromSession();
+  },
 
   async register(cmd: RegisterUserCommand): Promise<UserView> {
     await delay();
@@ -887,6 +1104,7 @@ export const mockDataProvider: DataProvider = {
 
   async getMe(): Promise<UserView> {
     await delay(150);
+    syncMockUserFromSession();
     return _user;
   },
 
@@ -1732,7 +1950,12 @@ export const mockDataProvider: DataProvider = {
     is_active?: boolean;
   }): Promise<AdminUserListView> {
     await delay(200);
+    const session = requireAdminSession();
     let filtered = [..._adminUsers];
+    const scopedOrganisationId = getScopedAdminOrganisationId(session);
+    if (scopedOrganisationId) {
+      filtered = filtered.filter((user) => user.organisation_id === scopedOrganisationId);
+    }
     if (params?.search) {
       const q = params.search.toLowerCase();
       filtered = filtered.filter(
@@ -1758,11 +1981,20 @@ export const mockDataProvider: DataProvider = {
 
   async getAdminUser(userId: string): Promise<AdminUserView | null> {
     await delay(150);
-    return _adminUsers.find((u) => u.user_id === userId) ?? null;
+    const session = requireAdminSession();
+    const user = _adminUsers.find((u) => u.user_id === userId) ?? null;
+    if (!user) return null;
+    const scopedOrganisationId = getScopedAdminOrganisationId(session);
+    if (scopedOrganisationId && user.organisation_id !== scopedOrganisationId) {
+      throw new Error(`User ${userId} is outside the active organisation scope`);
+    }
+    return user;
   },
 
   async updateAdminUserRole(userId: string, role: string): Promise<AdminUserView> {
     await delay(200);
+    const existingUser = await this.getAdminUser(userId);
+    if (!existingUser) throw new Error(`User ${userId} not found`);
     const idx = _adminUsers.findIndex((u) => u.user_id === userId);
     if (idx === -1) throw new Error(`User ${userId} not found`);
     _adminUsers = _adminUsers.map((u, i) =>
@@ -1773,6 +2005,8 @@ export const mockDataProvider: DataProvider = {
 
   async updateAdminUserStatus(userId: string, isActive: boolean): Promise<AdminUserView> {
     await delay(200);
+    const existingUser = await this.getAdminUser(userId);
+    if (!existingUser) throw new Error(`User ${userId} not found`);
     const idx = _adminUsers.findIndex((u) => u.user_id === userId);
     if (idx === -1) throw new Error(`User ${userId} not found`);
     _adminUsers = _adminUsers.map((u, i) =>
@@ -1783,13 +2017,18 @@ export const mockDataProvider: DataProvider = {
 
   async createAdminUser(cmd: { email: string; role: string }): Promise<AdminUserView> {
     await delay(300);
+    const session = requireAdminSession();
+    const organisationId = getScopedAdminOrganisationId(session);
+    if (!organisationId) {
+      throw new Error('No active organisation selected');
+    }
     const newUser: AdminUserView = {
       user_id: `usr-${uid()}`,
       email: cmd.email,
       display_name: cmd.email.split('@')[0]!,
       auth_provider: 'google',
       is_active: true,
-      organisation_id: 'org-001',
+      organisation_id: organisationId,
       organisation_role: cmd.role,
       created_at: new Date().toISOString(),
     };
@@ -1830,7 +2069,7 @@ export const mockDataProvider: DataProvider = {
 
   async getUserActivity(userId: string): Promise<UserActivityView> {
     await delay(250);
-    const user = _adminUsers.find((u) => u.user_id === userId);
+    const user = await this.getAdminUser(userId);
     if (!user) throw new Error(`User ${userId} not found`);
     return {
       user_id: user.user_id,
@@ -2340,14 +2579,9 @@ export const mockDataProvider: DataProvider = {
     const verB = versions.find((v) => v.version === cmd.version_b);
     return {
       name: cmd.name,
-      version_a: cmd.version_a,
-      version_b: cmd.version_b,
-      template_a: verA?.template ?? 'Template A not found',
-      template_b: verB?.template ?? 'Template B not found',
-      variables_schema_a: verA?.variables_schema ?? {},
-      variables_schema_b: verB?.variables_schema ?? {},
-      metrics_a: verA ? await this.getPromptAnalytics(cmd.name, cmd.version_a) : null,
-      metrics_b: verB ? await this.getPromptAnalytics(cmd.name, cmd.version_b) : null,
+      version_a: verA ?? { id: 0, name: cmd.name, version: cmd.version_a, prompt_type: 'quick_practice_prompt', template: 'Template not found', variables_schema: {}, output_schema: null, status: 'archived', parent_version_id: null, created_at: '', updated_at: '' },
+      version_b: verB ?? { id: 0, name: cmd.name, version: cmd.version_b, prompt_type: 'quick_practice_prompt', template: 'Template not found', variables_schema: {}, output_schema: null, status: 'archived', parent_version_id: null, created_at: '', updated_at: '' },
+      diff_summary: verA && verB ? `Comparing v${verA.version} to v${verB.version}` : null,
     };
   },
 
@@ -2400,12 +2634,19 @@ export const mockDataProvider: DataProvider = {
     await delay(250);
     const metrics = SEED_PIPELINE_METRICS[pipelineName];
     if (!metrics) {
+      const totalRuns = Math.floor(Math.random() * 500) + 100;
+      const successCount = Math.floor(Math.random() * 450) + 90;
+      const failureCount = Math.floor(Math.random() * 20) + 5;
+      const cancelCount = Math.floor(Math.random() * 10) + 2;
       return {
         pipeline_name: pipelineName,
-        total_runs: Math.floor(Math.random() * 500) + 100,
-        success_count: Math.floor(Math.random() * 450) + 90,
-        failure_count: Math.floor(Math.random() * 20) + 5,
-        cancel_count: Math.floor(Math.random() * 10) + 2,
+        total_runs: totalRuns,
+        success_count: successCount,
+        failure_count: failureCount,
+        cancel_count: cancelCount,
+        success_rate: successCount / totalRuns,
+        avg_duration_ms: 500,
+        p95_duration_ms: 1200,
         stage_metrics: [
           { stage_name: 'stage_1', invocation_count: 100, success_count: 98, failure_count: 2, skip_count: 0, cancel_count: 2, retry_count: 5, avg_duration_ms: 120.5, p50_duration_ms: 115, p95_duration_ms: 180, p99_duration_ms: 250 },
         ],
@@ -2445,18 +2686,8 @@ export const mockDataProvider: DataProvider = {
       content_type: cmd.content_type,
       schema_version: cmd.schema_version,
       name: cmd.name,
-      criteria: (cmd.criteria ?? []).map((c) => ({
-        criterion_ref: c.criterion_ref,
-        skill_slug: c.skill_slug,
-        title: c.title,
-        description: c.description,
-        weight: c.weight,
-        required: c.required,
-        position: c.position,
-        levels: c.levels,
-      })),
     };
-    _rubricsAdmin.push(rubric);
+    _rubricsAdmin.push(rubric as RubricAdminView);
     return rubric;
   },
 
@@ -2473,7 +2704,7 @@ export const mockDataProvider: DataProvider = {
       version: cmd.version ?? _rubricsAdmin[idx]!.version,
       name: cmd.name ?? _rubricsAdmin[idx]!.name,
     };
-    _rubricsAdmin[idx] = updated;
+    _rubricsAdmin[idx] = updated as RubricAdminView;
     return updated;
   },
 
@@ -2490,21 +2721,20 @@ export const mockDataProvider: DataProvider = {
     await delay(250);
     const idx = _rubricsAdmin.findIndex((r) => r.rubric_id === rubricId);
     if (idx === -1) throw new Error(`Rubric ${rubricId} not found`);
-    const updated: RubricView = {
-      ..._rubricsAdmin[idx]!,
-      criteria: [
-        ..._rubricsAdmin[idx]!.criteria,
-        {
-          criterion_ref: criterion.criterion_ref,
-          skill_slug: criterion.skill_slug,
-          title: criterion.title,
-          description: criterion.description,
-          weight: criterion.weight,
-          required: criterion.required,
-          position: criterion.position,
-          levels: criterion.levels,
-        },
-      ],
+    const newCriterion: RubricCriterionAdminView = {
+      criterion_ref: criterion.criterion_ref,
+      skill_slug: criterion.skill_slug,
+      title: criterion.title,
+      description: criterion.description,
+      weight: criterion.weight,
+      required: criterion.required,
+      position: criterion.position,
+      levels: criterion.levels,
+    };
+    const existing = _rubricsAdmin[idx]!;
+    const updated: RubricAdminView = {
+      ...existing,
+      criteria: [...(existing.criteria ?? []), newCriterion],
     };
     _rubricsAdmin[idx] = updated;
     return updated;
@@ -2518,12 +2748,13 @@ export const mockDataProvider: DataProvider = {
     await delay(250);
     const idx = _rubricsAdmin.findIndex((r) => r.rubric_id === rubricId);
     if (idx === -1) throw new Error(`Rubric ${rubricId} not found`);
-    const criteriaIdx = _rubricsAdmin[idx]!.criteria.findIndex((c) => c.criterion_ref === criterionRef);
+    const existing = _rubricsAdmin[idx]!;
+    const criteriaIdx = existing.criteria?.findIndex((c) => c.criterion_ref === criterionRef) ?? -1;
     if (criteriaIdx === -1) throw new Error(`Criterion ${criterionRef} not found`);
-    const updatedCriteria = _rubricsAdmin[idx]!.criteria.map((c, i) =>
+    const updatedCriteria = (existing.criteria ?? []).map((c, i) =>
       i === criteriaIdx ? { ...c, ...criterion } : c,
     );
-    const updated: RubricView = { ..._rubricsAdmin[idx]!, criteria: updatedCriteria };
+    const updated: RubricAdminView = { ...existing, criteria: updatedCriteria };
     _rubricsAdmin[idx] = updated;
     return updated;
   },
@@ -2532,9 +2763,10 @@ export const mockDataProvider: DataProvider = {
     await delay(250);
     const idx = _rubricsAdmin.findIndex((r) => r.rubric_id === rubricId);
     if (idx === -1) throw new Error(`Rubric ${rubricId} not found`);
-    const updated: RubricView = {
-      ..._rubricsAdmin[idx]!,
-      criteria: _rubricsAdmin[idx]!.criteria.filter((c) => c.criterion_ref !== criterionRef),
+    const existing = _rubricsAdmin[idx]!;
+    const updated: RubricAdminView = {
+      ...existing,
+      criteria: (existing.criteria ?? []).filter((c) => c.criterion_ref !== criterionRef),
     };
     _rubricsAdmin[idx] = updated;
     return updated;
@@ -2880,36 +3112,43 @@ export const mockDataProvider: DataProvider = {
   }): Promise<TelemetryOverviewView> {
     await delay(300);
     return {
+      organisation_id: null,
+      from_date: null,
+      to_date: null,
       total_provider_calls: 15420,
       provider_call_success_rate: 0.967,
       avg_provider_latency_ms: 342,
+      total_pipeline_runs: 11160,
+      pipeline_success_rate: 0.94,
+      total_workflow_events: 45230,
       total_errors: 512,
+      error_rate: 0.011,
       latency_distribution: [
-        { bucket_ms: 100, count: 2100 },
-        { bucket_ms: 200, count: 4500 },
-        { bucket_ms: 300, count: 3800 },
-        { bucket_ms: 500, count: 2400 },
-        { bucket_ms: 1000, count: 1800 },
-        { bucket_ms: 2000, count: 620 },
-        { bucket_ms: 5000, count: 200 },
+        { bucket_ms: 100, count: 2100, percentage: 13.6 },
+        { bucket_ms: 200, count: 4500, percentage: 29.2 },
+        { bucket_ms: 300, count: 3800, percentage: 24.6 },
+        { bucket_ms: 500, count: 2400, percentage: 15.6 },
+        { bucket_ms: 1000, count: 1800, percentage: 11.7 },
+        { bucket_ms: 2000, count: 620, percentage: 4.0 },
+        { bucket_ms: 5000, count: 200, percentage: 1.3 },
       ],
       pipeline_health: [
-        { pipeline_name: 'assessment-pipeline', success_rate: 0.95, avg_duration_ms: 1200, run_count: 3420 },
-        { pipeline_name: 'generation-pipeline', success_rate: 0.92, avg_duration_ms: 2800, run_count: 1250 },
-        { pipeline_name: 'feedback-pipeline', success_rate: 0.98, avg_duration_ms: 800, run_count: 5100 },
-        { pipeline_name: 'interview-pipeline', success_rate: 0.89, avg_duration_ms: 3500, run_count: 890 },
+        { pipeline_name: 'assessment-pipeline', total_runs: 3420, success_count: 3249, failure_count: 137, cancel_count: 34, success_rate: 0.95, avg_duration_ms: 1200, error_rate: 0.04, last_run_at: isoDate(0) },
+        { pipeline_name: 'generation-pipeline', total_runs: 1250, success_count: 1150, failure_count: 75, cancel_count: 25, success_rate: 0.92, avg_duration_ms: 2800, error_rate: 0.06, last_run_at: isoDate(1) },
+        { pipeline_name: 'feedback-pipeline', total_runs: 5100, success_count: 4998, failure_count: 71, cancel_count: 31, success_rate: 0.98, avg_duration_ms: 800, error_rate: 0.014, last_run_at: isoDate(0) },
+        { pipeline_name: 'interview-pipeline', total_runs: 890, success_count: 792, failure_count: 74, cancel_count: 24, success_rate: 0.89, avg_duration_ms: 3500, error_rate: 0.083, last_run_at: isoDate(2) },
       ],
       provider_metrics: [
-        { provider: 'openai', operation: 'chat.completion', call_count: 8500, success_rate: 0.97, avg_latency_ms: 380, p95_latency_ms: 850 },
-        { provider: 'openai', operation: 'embedding', call_count: 3200, success_rate: 0.99, avg_latency_ms: 120, p95_latency_ms: 250 },
-        { provider: 'anthropic', operation: 'chat.completion', call_count: 2800, success_rate: 0.96, avg_latency_ms: 420, p95_latency_ms: 920 },
-        { provider: 'google', operation: 'chat.completion', call_count: 920, success_rate: 0.94, avg_latency_ms: 510, p95_latency_ms: 1100 },
+        { provider: 'openai', model_slug: 'gpt-4o-mini', operation: 'chat.completion', call_count: 8500, success_count: 8245, failure_count: 255, success_rate: 0.97, avg_latency_ms: 380, p50_latency_ms: 350, p95_latency_ms: 850, p99_latency_ms: 1200, total_tokens: 45600000 },
+        { provider: 'openai', model_slug: 'text-embedding-3-small', operation: 'embedding', call_count: 3200, success_count: 3168, failure_count: 32, success_rate: 0.99, avg_latency_ms: 120, p50_latency_ms: 110, p95_latency_ms: 250, p99_latency_ms: 400, total_tokens: 8500000 },
+        { provider: 'anthropic', model_slug: 'claude-3-haiku', operation: 'chat.completion', call_count: 2800, success_count: 2688, failure_count: 112, success_rate: 0.96, avg_latency_ms: 420, p50_latency_ms: 390, p95_latency_ms: 920, p99_latency_ms: 1400, total_tokens: 28900000 },
+        { provider: 'google', model_slug: 'gemini-pro', operation: 'chat.completion', call_count: 920, success_count: 864, failure_count: 56, success_rate: 0.94, avg_latency_ms: 510, p50_latency_ms: 480, p95_latency_ms: 1100, p99_latency_ms: 1600, total_tokens: 12300000 },
       ],
       error_breakdown: [
-        { error_type: 'RateLimitError', error_code: 'RATE_LIMIT', count: 245, percentage: 47.8 },
-        { error_type: 'TimeoutError', error_code: 'TIMEOUT', count: 128, percentage: 25.0 },
-        { error_type: 'ValidationError', error_code: 'INVALID_INPUT', count: 89, percentage: 17.4 },
-        { error_type: 'ServerError', error_code: 'INTERNAL', count: 50, percentage: 9.8 },
+        { error_code: 'RATE_LIMIT', error_type: 'RateLimitError', count: 245, percentage: 47.8, examples: ['Rate limit exceeded for openai', 'Too many requests to anthropic'] },
+        { error_code: 'TIMEOUT', error_type: 'TimeoutError', count: 128, percentage: 25.0, examples: ['Request timed out after 30s', 'LLM response timeout'] },
+        { error_code: 'INVALID_INPUT', error_type: 'ValidationError', count: 89, percentage: 17.4, examples: ['Invalid prompt template', 'Missing required fields'] },
+        { error_code: 'INTERNAL', error_type: 'ServerError', count: 50, percentage: 9.8, examples: ['Internal server error', 'Database connection failed'] },
       ],
     };
   },
@@ -2924,16 +3163,16 @@ export const mockDataProvider: DataProvider = {
     await delay(250);
     const limit = params?.limit ?? 20;
     const traces: TelemetryTraceListItemView[] = [
-      { trace_id: 'trace-001-abc123', operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 1250, span_count: 8, error_count: 0, started_at: new Date(Date.now() - 60000).toISOString() },
-      { trace_id: 'trace-002-def456', operation_name: 'GenerateCollection', service_name: 'generation-service', duration_ms: 3420, span_count: 12, error_count: 0, started_at: new Date(Date.now() - 120000).toISOString() },
-      { trace_id: 'trace-003-ghi789', operation_name: 'ProcessFeedback', service_name: 'feedback-service', duration_ms: 890, span_count: 5, error_count: 0, started_at: new Date(Date.now() - 180000).toISOString() },
-      { trace_id: 'trace-004-jkl012', operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 2100, span_count: 8, error_count: 1, started_at: new Date(Date.now() - 240000).toISOString() },
-      { trace_id: 'trace-005-mno345', operation_name: 'RunInterview', service_name: 'interview-service', duration_ms: 4500, span_count: 15, error_count: 0, started_at: new Date(Date.now() - 300000).toISOString() },
-      { trace_id: 'trace-006-pqr678', operation_name: 'GeneratePrompts', service_name: 'generation-service', duration_ms: 2800, span_count: 10, error_count: 0, started_at: new Date(Date.now() - 360000).toISOString() },
-      { trace_id: 'trace-007-stu901', operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 1100, span_count: 7, error_count: 0, started_at: new Date(Date.now() - 420000).toISOString() },
-      { trace_id: 'trace-008-vwx234', operation_name: 'ProcessFeedback', service_name: 'feedback-service', duration_ms: 750, span_count: 4, error_count: 0, started_at: new Date(Date.now() - 480000).toISOString() },
-      { trace_id: 'trace-009-yza567', operation_name: 'GenerateCollection', service_name: 'generation-service', duration_ms: 5200, span_count: 14, error_count: 2, started_at: new Date(Date.now() - 540000).toISOString() },
-      { trace_id: 'trace-010-bcd890', operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 980, span_count: 6, error_count: 0, started_at: new Date(Date.now() - 600000).toISOString() },
+      { trace_id: 'trace-001-abc123', organisation_id: null, operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 1250, span_count: 8, error_count: 0, started_at: new Date(Date.now() - 60000).toISOString() },
+      { trace_id: 'trace-002-def456', organisation_id: null, operation_name: 'GenerateCollection', service_name: 'generation-service', duration_ms: 3420, span_count: 12, error_count: 0, started_at: new Date(Date.now() - 120000).toISOString() },
+      { trace_id: 'trace-003-ghi789', organisation_id: null, operation_name: 'ProcessFeedback', service_name: 'feedback-service', duration_ms: 890, span_count: 5, error_count: 0, started_at: new Date(Date.now() - 180000).toISOString() },
+      { trace_id: 'trace-004-jkl012', organisation_id: null, operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 2100, span_count: 8, error_count: 1, started_at: new Date(Date.now() - 240000).toISOString() },
+      { trace_id: 'trace-005-mno345', organisation_id: null, operation_name: 'RunInterview', service_name: 'interview-service', duration_ms: 4500, span_count: 15, error_count: 0, started_at: new Date(Date.now() - 300000).toISOString() },
+      { trace_id: 'trace-006-pqr678', organisation_id: null, operation_name: 'GeneratePrompts', service_name: 'generation-service', duration_ms: 2800, span_count: 10, error_count: 0, started_at: new Date(Date.now() - 360000).toISOString() },
+      { trace_id: 'trace-007-stu901', organisation_id: null, operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 1100, span_count: 7, error_count: 0, started_at: new Date(Date.now() - 420000).toISOString() },
+      { trace_id: 'trace-008-vwx234', organisation_id: null, operation_name: 'ProcessFeedback', service_name: 'feedback-service', duration_ms: 750, span_count: 4, error_count: 0, started_at: new Date(Date.now() - 480000).toISOString() },
+      { trace_id: 'trace-009-yza567', organisation_id: null, operation_name: 'GenerateCollection', service_name: 'generation-service', duration_ms: 5200, span_count: 14, error_count: 2, started_at: new Date(Date.now() - 540000).toISOString() },
+      { trace_id: 'trace-010-bcd890', organisation_id: null, operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 980, span_count: 6, error_count: 0, started_at: new Date(Date.now() - 600000).toISOString() },
     ];
     return {
       traces: traces.slice(0, limit),
@@ -2943,47 +3182,47 @@ export const mockDataProvider: DataProvider = {
     };
   },
 
-  async getTelemetryTrace(traceId: string): Promise<TelemetryTraceDetailView> {
+  async getTelemetryTrace(traceId: string): Promise<TelemetryTraceView> {
     await delay(200);
+    const startTime = new Date(Date.now() - 60000);
+    const endTime = new Date(Date.now() - 58750);
     return {
       trace_id: traceId,
-      operation_name: 'AssessAttempt',
-      service_name: 'assessment-service',
-      duration_ms: 1250,
-      started_at: new Date(Date.now() - 60000).toISOString(),
-      ended_at: new Date(Date.now() - 58750).toISOString(),
+      organisation_id: null,
       spans: [
-        { span_id: 'span-001', parent_span_id: null, operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 1250, started_at: new Date(Date.now() - 60000).toISOString(), status: 'ok', attributes: { attempt_id: 'att-123' } },
-        { span_id: 'span-002', parent_span_id: 'span-001', operation_name: 'LoadRubric', service_name: 'assessment-service', duration_ms: 50, started_at: new Date(Date.now() - 59950).toISOString(), status: 'ok', attributes: {} },
-        { span_id: 'span-003', parent_span_id: 'span-001', operation_name: 'CallLLM', service_name: 'llm-gateway', duration_ms: 980, started_at: new Date(Date.now() - 59900).toISOString(), status: 'ok', attributes: { provider: 'openai', model: 'gpt-4' } },
-        { span_id: 'span-004', parent_span_id: 'span-001', operation_name: 'SaveAssessment', service_name: 'assessment-service', duration_ms: 120, started_at: new Date(Date.now() - 58920).toISOString(), status: 'ok', attributes: {} },
+        { span_id: 'span-001', parent_span_id: null, operation_name: 'AssessAttempt', service_name: 'assessment-service', start_time: startTime.toISOString(), end_time: endTime.toISOString(), duration_ms: 1250, status_code: 'ok', error: null, attributes: { attempt_id: 'att-123' } },
+        { span_id: 'span-002', parent_span_id: 'span-001', operation_name: 'LoadRubric', service_name: 'assessment-service', start_time: new Date(Date.now() - 59950).toISOString(), end_time: new Date(Date.now() - 59900).toISOString(), duration_ms: 50, status_code: 'ok', error: null, attributes: {} },
+        { span_id: 'span-003', parent_span_id: 'span-001', operation_name: 'CallLLM', service_name: 'llm-gateway', start_time: new Date(Date.now() - 59900).toISOString(), end_time: new Date(Date.now() - 58920).toISOString(), duration_ms: 980, status_code: 'ok', error: null, attributes: { provider: 'openai', model: 'gpt-4' } },
+        { span_id: 'span-004', parent_span_id: 'span-001', operation_name: 'SaveAssessment', service_name: 'assessment-service', start_time: new Date(Date.now() - 58920).toISOString(), end_time: endTime.toISOString(), duration_ms: 120, status_code: 'ok', error: null, attributes: {} },
       ],
-      attributes: {
-        user_id: 'usr-abc123',
-        attempt_id: 'att-123',
-        collection_id: 'col-456',
-      },
-      error: null,
+      total_duration_ms: 1250,
+      started_at: startTime.toISOString(),
+      completed_at: endTime.toISOString(),
+      error_count: 0,
+      span_count: 4,
     };
   },
 
   // --- Admin: Org-scoped Skills ---------------------------------------------
   async listOrgSkills(orgId: string): Promise<OrgSkillView[]> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:read');
     return _orgSkills.filter((s) => s.organisation_id === orgId);
   },
 
   async getOrgSkill(orgId: string, skillSlug: string): Promise<OrgSkillView> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:read');
     const skill = _orgSkills.find((s) => s.organisation_id === orgId && s.slug === skillSlug);
     if (!skill) throw new Error(`Skill ${skillSlug} not found`);
     return skill;
   },
 
-  async createOrgSkill(orgId: string, cmd: { skill_id: string; name: string; description?: string; taxonomy_codes?: string[] }): Promise<OrgSkillView> {
+  async createOrgSkill(orgId: string, cmd: { slug: string; name: string; description: string }): Promise<OrgSkillView> {
     await delay(300);
+    requireOrgAccess(orgId, 'org:write');
     const skill: OrgSkillView = {
-      slug: cmd.skill_id,
+      slug: cmd.slug,
       name: cmd.name,
       description: cmd.description ?? '',
       organisation_id: orgId,
@@ -2994,6 +3233,7 @@ export const mockDataProvider: DataProvider = {
 
   async updateOrgSkill(orgId: string, skillSlug: string, cmd: { name?: string; description?: string }): Promise<OrgSkillView> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:write');
     const idx = _orgSkills.findIndex((s) => s.organisation_id === orgId && s.slug === skillSlug);
     if (idx === -1) throw new Error(`Skill ${skillSlug} not found`);
     const updated: OrgSkillView = {
@@ -3007,6 +3247,7 @@ export const mockDataProvider: DataProvider = {
 
   async deleteOrgSkill(orgId: string, skillSlug: string): Promise<{ status: string }> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:write');
     _orgSkills = _orgSkills.filter((s) => !(s.organisation_id === orgId && s.slug === skillSlug));
     return { status: 'deleted' };
   },
@@ -3014,37 +3255,42 @@ export const mockDataProvider: DataProvider = {
   // --- Admin: Org-scoped Competencies ---------------------------------------
   async listOrgCompetencies(orgId: string): Promise<OrgCompetencyView[]> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:read');
     return _orgCompetencies.filter((c) => c.organisation_id === orgId);
   },
 
   async getOrgCompetency(orgId: string, competencySlug: string): Promise<OrgCompetencyView> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:read');
     const competency = _orgCompetencies.find((c) => c.organisation_id === orgId && c.slug === competencySlug);
     if (!competency) throw new Error(`Competency ${competencySlug} not found`);
     return competency;
   },
 
-  async createOrgCompetency(orgId: string, cmd: { competency_id: string; name: string; description?: string; skill_ids?: string[] }): Promise<OrgCompetencyView> {
+  async createOrgCompetency(orgId: string, cmd: { slug: string; name: string; description: string; skill_slugs?: string[] }): Promise<OrgCompetencyView> {
     await delay(300);
+    requireOrgAccess(orgId, 'org:write');
     const competency: OrgCompetencyView = {
-      slug: cmd.competency_id,
+      slug: cmd.slug,
       name: cmd.name,
       description: cmd.description ?? '',
-      skill_slugs: cmd.skill_ids ?? [],
+      skill_slugs: cmd.skill_slugs ?? [],
       organisation_id: orgId,
     };
     _orgCompetencies.push(competency);
     return competency;
   },
 
-  async updateOrgCompetency(orgId: string, competencySlug: string, cmd: { name?: string; description?: string }): Promise<OrgCompetencyView> {
+  async updateOrgCompetency(orgId: string, competencySlug: string, cmd: { name?: string; description?: string; skill_slugs?: string[] }): Promise<OrgCompetencyView> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:write');
     const idx = _orgCompetencies.findIndex((c) => c.organisation_id === orgId && c.slug === competencySlug);
     if (idx === -1) throw new Error(`Competency ${competencySlug} not found`);
     const updated: OrgCompetencyView = {
       ..._orgCompetencies[idx]!,
       name: cmd.name ?? _orgCompetencies[idx]!.name,
       description: cmd.description ?? _orgCompetencies[idx]!.description,
+      skill_slugs: cmd.skill_slugs ?? _orgCompetencies[idx]!.skill_slugs,
     };
     _orgCompetencies[idx] = updated;
     return updated;
@@ -3052,6 +3298,7 @@ export const mockDataProvider: DataProvider = {
 
   async deleteOrgCompetency(orgId: string, competencySlug: string): Promise<{ status: string }> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:write');
     _orgCompetencies = _orgCompetencies.filter((c) => !(c.organisation_id === orgId && c.slug === competencySlug));
     return { status: 'deleted' };
   },
@@ -3059,41 +3306,52 @@ export const mockDataProvider: DataProvider = {
   // --- Admin: Org-scoped Rubrics --------------------------------------------
   async listOrgRubrics(orgId: string): Promise<OrgRubricView[]> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:read');
     return _orgRubrics.filter((r) => r.organisation_id === orgId);
   },
 
   async getOrgRubric(orgId: string, rubricId: string): Promise<OrgRubricView> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:read');
     const rubric = _orgRubrics.find((r) => r.organisation_id === orgId && r.rubric_id === rubricId);
     if (!rubric) throw new Error(`Rubric ${rubricId} not found`);
     return rubric;
   },
 
-  async createOrgRubric(orgId: string, cmd: { rubric_id: string; name: string; description?: string }): Promise<OrgRubricView> {
+  async createOrgRubric(orgId: string, cmd: {
+    rubric_id: string;
+    family: string;
+    version: string;
+    content_type: string;
+    schema_version: string;
+    name: string;
+    criteria?: string[];
+  }): Promise<OrgRubricView> {
     await delay(300);
+    requireOrgAccess(orgId, 'org:write');
     const rubric: OrgRubricView = {
       rubric_id: cmd.rubric_id,
-      family: cmd.rubric_id,
-      version: 'v1',
-      content_type: 'custom',
-      schema_version: '1.0',
+      family: cmd.family,
+      version: cmd.version,
+      content_type: cmd.content_type,
+      schema_version: cmd.schema_version,
       name: cmd.name,
-      description: cmd.description ?? '',
-      criteria: [],
+      criteria: cmd.criteria ?? [],
       organisation_id: orgId,
     };
     _orgRubrics.push(rubric);
     return rubric;
   },
 
-  async updateOrgRubric(orgId: string, rubricId: string, cmd: { name?: string; description?: string }): Promise<OrgRubricView> {
+  async updateOrgRubric(orgId: string, rubricId: string, cmd: { name?: string; criteria?: string[] }): Promise<OrgRubricView> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:write');
     const idx = _orgRubrics.findIndex((r) => r.organisation_id === orgId && r.rubric_id === rubricId);
     if (idx === -1) throw new Error(`Rubric ${rubricId} not found`);
     const updated: OrgRubricView = {
       ..._orgRubrics[idx]!,
       name: cmd.name ?? _orgRubrics[idx]!.name,
-      description: cmd.description ?? _orgRubrics[idx]!.description,
+      criteria: cmd.criteria ?? _orgRubrics[idx]!.criteria,
     };
     _orgRubrics[idx] = updated;
     return updated;
@@ -3101,6 +3359,7 @@ export const mockDataProvider: DataProvider = {
 
   async deleteOrgRubric(orgId: string, rubricId: string): Promise<{ status: string }> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:write');
     _orgRubrics = _orgRubrics.filter((r) => !(r.organisation_id === orgId && r.rubric_id === rubricId));
     return { status: 'deleted' };
   },
@@ -3108,41 +3367,48 @@ export const mockDataProvider: DataProvider = {
   // --- Admin: Org-scoped Prompt Items ---------------------------------------
   async listOrgPromptItems(orgId: string): Promise<PromptItemView[]> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:read');
     return _orgPromptItems.filter((p) => p.organisation_id === orgId);
   },
 
   async getOrgPromptItem(orgId: string, promptItemId: string): Promise<PromptItemView> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:read');
     const item = _orgPromptItems.find((p) => p.organisation_id === orgId && p.id === promptItemId);
     if (!item) throw new Error(`Prompt item ${promptItemId} not found`);
     return item;
   },
 
-  async createOrgPromptItem(orgId: string, cmd: { id: string; title: string; prompt_text?: string }): Promise<PromptItemView> {
+  async createOrgPromptItem(orgId: string, cmd: PromptItemCreateCommand): Promise<PromptItemView> {
     await delay(300);
+    requireOrgAccess(orgId, 'org:write');
     const item: PromptItemView = {
-      id: cmd.id,
-      prompt_type: 'quick_practice_prompt',
+      id: `org-prompt-${uid()}`,
+      prompt_type: cmd.prompt_type,
       title: cmd.title,
-      prompt_text: cmd.prompt_text ?? '',
-      difficulty: 'intermediate',
+      prompt_text: cmd.prompt_text,
+      difficulty: cmd.difficulty,
       lifecycle_state: 'draft',
-      target_skill_slugs: [],
-      rubric_id: '',
+      target_skill_slugs: cmd.target_skill_slugs,
+      rubric_id: cmd.rubric_id,
       organisation_id: orgId,
     };
     _orgPromptItems.push(item);
     return item;
   },
 
-  async updateOrgPromptItem(orgId: string, promptItemId: string, cmd: { title?: string; prompt_text?: string }): Promise<PromptItemView> {
+  async updateOrgPromptItem(orgId: string, promptItemId: string, cmd: Partial<PromptItemCreateCommand>): Promise<PromptItemView> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:write');
     const idx = _orgPromptItems.findIndex((p) => p.organisation_id === orgId && p.id === promptItemId);
     if (idx === -1) throw new Error(`Prompt item ${promptItemId} not found`);
     const updated: PromptItemView = {
       ..._orgPromptItems[idx]!,
       title: cmd.title ?? _orgPromptItems[idx]!.title,
       prompt_text: cmd.prompt_text ?? _orgPromptItems[idx]!.prompt_text,
+      difficulty: cmd.difficulty ?? _orgPromptItems[idx]!.difficulty,
+      target_skill_slugs: cmd.target_skill_slugs ?? _orgPromptItems[idx]!.target_skill_slugs,
+      rubric_id: cmd.rubric_id ?? _orgPromptItems[idx]!.rubric_id,
     };
     _orgPromptItems[idx] = updated;
     return updated;
@@ -3150,6 +3416,7 @@ export const mockDataProvider: DataProvider = {
 
   async deleteOrgPromptItem(orgId: string, promptItemId: string): Promise<{ status: string }> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:write');
     _orgPromptItems = _orgPromptItems.filter((p) => !(p.organisation_id === orgId && p.id === promptItemId));
     return { status: 'deleted' };
   },
@@ -3157,41 +3424,64 @@ export const mockDataProvider: DataProvider = {
   // --- Admin: Org-scoped Scenarios ------------------------------------------
   async listOrgScenarios(orgId: string): Promise<ScenarioView[]> {
     await delay(200);
+    requireOrgAccess(orgId, 'org:read');
     return _orgScenarios.filter((s) => s.organisation_id === orgId);
   },
 
   async getOrgScenario(orgId: string, scenarioId: string): Promise<ScenarioView> {
     await delay(200);
-    const scenario = _orgScenarios.find((s) => s.organisation_id === orgId && s.scenario_id === scenarioId);
+    requireOrgAccess(orgId, 'org:read');
+    const scenario = _orgScenarios.find((s) => s.organisation_id === orgId && s.id === scenarioId);
     if (!scenario) throw new Error(`Scenario ${scenarioId} not found`);
     return scenario;
   },
 
-  async createOrgScenario(orgId: string, cmd: { scenario_id: string; name: string; description?: string }): Promise<ScenarioView> {
+  async createOrgScenario(orgId: string, cmd: ScenarioCreateCommand): Promise<ScenarioView> {
     await delay(300);
+    requireOrgAccess(orgId, 'org:write');
+    const mockCompanyView: MockCompanyView | null = cmd.mock_company ? { ...cmd.mock_company, id: `company-${uid()}` } : null;
+    const mockPeopleViews: MockPersonView[] = (cmd.mock_people ?? []).map((p, i) => ({ ...p, id: `person-${uid()}-${i}`, goals: p.goals ?? [] }));
     const scenario: ScenarioView = {
-      scenario_id: cmd.scenario_id,
-      name: cmd.name,
-      description: cmd.description ?? '',
-      version: 1,
-      status: 'active',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      id: `org-scenario-${uid()}`,
+      title: cmd.title,
+      business_context: cmd.business_context,
+      learner_objective: cmd.learner_objective,
+      constraints: cmd.constraints ?? [],
+      stakeholder_tensions: cmd.stakeholder_tensions ?? [],
+      lifecycle_state: 'draft',
+      target_skill_slugs: cmd.target_skill_slugs,
+      rubric_id: cmd.rubric_id,
+      mock_company: mockCompanyView,
+      mock_people: mockPeopleViews,
       organisation_id: orgId,
     };
     _orgScenarios.push(scenario);
     return scenario;
   },
 
-  async updateOrgScenario(orgId: string, scenarioId: string, cmd: { name?: string; description?: string }): Promise<ScenarioView> {
+  async updateOrgScenario(orgId: string, scenarioId: string, cmd: Partial<ScenarioCreateCommand>): Promise<ScenarioView> {
     await delay(200);
-    const idx = _orgScenarios.findIndex((s) => s.organisation_id === orgId && s.scenario_id === scenarioId);
+    requireOrgAccess(orgId, 'org:write');
+    const idx = _orgScenarios.findIndex((s) => s.organisation_id === orgId && s.id === scenarioId);
     if (idx === -1) throw new Error(`Scenario ${scenarioId} not found`);
+    const existing = _orgScenarios[idx]!;
+    const mockCompanyView: MockCompanyView | null = cmd.mock_company !== undefined 
+      ? (cmd.mock_company ? { ...cmd.mock_company, id: existing.mock_company?.id ?? `company-${uid()}` } : null)
+      : existing.mock_company;
+    const mockPeopleViews: MockPersonView[] = cmd.mock_people !== undefined
+      ? cmd.mock_people.map((p, i) => ({ ...p, id: existing.mock_people[i]?.id ?? `person-${uid()}-${i}`, goals: p.goals ?? [] }))
+      : existing.mock_people;
     const updated: ScenarioView = {
-      ..._orgScenarios[idx]!,
-      name: cmd.name ?? _orgScenarios[idx]!.name,
-      description: cmd.description ?? _orgScenarios[idx]!.description,
-      updated_at: new Date().toISOString(),
+      ...existing,
+      title: cmd.title ?? existing.title,
+      business_context: cmd.business_context ?? existing.business_context,
+      learner_objective: cmd.learner_objective ?? existing.learner_objective,
+      constraints: cmd.constraints ?? existing.constraints,
+      stakeholder_tensions: cmd.stakeholder_tensions ?? existing.stakeholder_tensions,
+      target_skill_slugs: cmd.target_skill_slugs ?? existing.target_skill_slugs,
+      rubric_id: cmd.rubric_id ?? existing.rubric_id,
+      mock_company: mockCompanyView,
+      mock_people: mockPeopleViews,
     };
     _orgScenarios[idx] = updated;
     return updated;
@@ -3199,7 +3489,8 @@ export const mockDataProvider: DataProvider = {
 
   async deleteOrgScenario(orgId: string, scenarioId: string): Promise<{ status: string }> {
     await delay(200);
-    _orgScenarios = _orgScenarios.filter((s) => !(s.organisation_id === orgId && s.scenario_id === scenarioId));
+    requireOrgAccess(orgId, 'org:write');
+    _orgScenarios = _orgScenarios.filter((s) => !(s.organisation_id === orgId && s.id === scenarioId));
     return { status: 'deleted' };
   },
 };

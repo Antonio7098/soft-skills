@@ -36,9 +36,9 @@ export const SEED_COMPETENCIES: CompetencyView[] = [
 ];
 
 export const SEED_RUBRICS: RubricView[] = [
-  { rubric_id: 'quick_practice_text@v1', family: 'quick_practice_text', version: 'v1', content_type: 'quick_practice_prompt', schema_version: 'quick-practice-assessment-output.v1', name: 'Quick Practice (Text)', criteria: [] },
-  { rubric_id: 'scenario_text@v1', family: 'scenario_text', version: 'v1', content_type: 'scenario_step', schema_version: 'scenario-assessment-output.v1', name: 'Scenario (Text)', criteria: [] },
-  { rubric_id: 'interview_text@v1', family: 'interview_text', version: 'v1', content_type: 'interview_prompt', schema_version: 'interview-assessment-output.v1', name: 'Interview (Text)', criteria: [] },
+  { rubric_id: 'quick_practice_text@v1', family: 'quick_practice_text', version: 'v1', content_type: 'quick_practice_prompt', schema_version: 'quick-practice-assessment-output.v1', name: 'Quick Practice (Text)' },
+  { rubric_id: 'scenario_text@v1', family: 'scenario_text', version: 'v1', content_type: 'scenario_step', schema_version: 'scenario-assessment-output.v1', name: 'Scenario (Text)' },
+  { rubric_id: 'interview_text@v1', family: 'interview_text', version: 'v1', content_type: 'interview_prompt', schema_version: 'interview-assessment-output.v1', name: 'Interview (Text)' },
 ];
 
 export const SEED_RUBRIC_CRITERIA: RubricCriterionView[] = [

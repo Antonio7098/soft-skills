@@ -1,6 +1,7 @@
 import { Bell, Search } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { Avatar } from '@/design-system/primitives/Avatar';
+import { useAuthSession } from '@/auth';
 import { NAV_ROUTES } from '@/lib/nav-config';
 
 function getPageTitle(pathname: string): string {
@@ -11,6 +12,14 @@ function getPageTitle(pathname: string): string {
 export function TopBar() {
   const location = useLocation();
   const title = getPageTitle(location.pathname);
+  const {
+    session,
+    authProfiles,
+    isMockMode,
+    activeOrganisation,
+    setActiveOrganisation,
+    switchAuthProfile,
+  } = useAuthSession();
 
   return (
     <header className="h-16 border-b border-line bg-surface-primary/80 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between px-8 shrink-0">
@@ -33,10 +42,38 @@ export function TopBar() {
           <span className="absolute top-2 right-2.5 w-1.5 h-1.5 bg-status-error rounded-full ring-2 ring-surface-primary" />
         </button>
 
+        {isMockMode && authProfiles.length > 0 && (
+          <select
+            value={authProfiles.find((profile) => profile.session.actor?.id === session?.actor?.id && profile.session.platform_role === session?.platform_role)?.id ?? authProfiles[0]?.id}
+            onChange={(event) => void switchAuthProfile(event.target.value)}
+            className="h-9 rounded-full border border-line bg-surface-primary px-3 text-body-xs text-content-secondary focus:outline-none focus:ring-2 focus:ring-accent/20"
+            aria-label="Mock auth profile"
+          >
+            {authProfiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>{profile.label}</option>
+            ))}
+          </select>
+        )}
+
+        {session && session.org_memberships.length > 0 && (
+          <select
+            value={activeOrganisation?.organisation_id ?? session.active_organisation_id ?? ''}
+            onChange={(event) => void setActiveOrganisation(event.target.value || null)}
+            className="h-9 rounded-full border border-line bg-surface-primary px-3 text-body-xs text-content-secondary focus:outline-none focus:ring-2 focus:ring-accent/20"
+            aria-label="Active organisation"
+          >
+            {session.org_memberships.map((membership) => (
+              <option key={membership.organisation_id} value={membership.organisation_id}>
+                {membership.organisation_name}
+              </option>
+            ))}
+          </select>
+        )}
+
         <div className="w-px h-6 bg-line mx-1" />
 
         <button className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <Avatar fallback="Alex Chen" size="sm" />
+          <Avatar fallback={session?.actor?.display_name ?? 'User'} size="sm" />
         </button>
       </div>
     </header>

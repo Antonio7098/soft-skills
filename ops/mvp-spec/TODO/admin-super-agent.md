@@ -136,6 +136,8 @@ The SQL tool must be constrained aggressively.
 6. Redact or pseudonymize results before any LLM consumption
 7. Audit each executed query and response shape
 
+The model must never query raw production tables directly; it may query only pre-scoped, allowlisted views with enforced bounds and audited execution.
+
 ## Admin-Safe View Strategy
 
 The strongest design is not "run raw SQL and redact later." The strongest design is to expose only pre-scoped, pre-redacted views.

@@ -14,10 +14,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ArrowLeft,
-  Building2,
   Lightbulb,
   Target,
-  FileBarChart,
   Map,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -84,17 +82,18 @@ const NAV_SECTIONS = [
   {
     title: 'Organisations',
     items: [
-      { path: '/admin/orgs/:organisationId/skills', label: 'Skills', icon: Lightbulb },
-      { path: '/admin/orgs/:organisationId/competencies', label: 'Competencies', icon: Target },
-      { path: '/admin/orgs/:organisationId/rubrics', label: 'Org Rubrics', icon: Scale },
-      { path: '/admin/orgs/:organisationId/prompt-items', label: 'Prompt Items', icon: FileText },
-      { path: '/admin/orgs/:organisationId/scenarios', label: 'Scenarios', icon: Map },
+      { path: '/admin/skills', label: 'Skills', icon: Lightbulb },
+      { path: '/admin/competencies', label: 'Competencies', icon: Target },
+      { path: '/admin/org-rubrics', label: 'Org Rubrics', icon: Scale },
+      { path: '/admin/prompt-items', label: 'Prompt Items', icon: FileText },
+      { path: '/admin/scenarios', label: 'Scenarios', icon: Map },
     ],
   },
 ];
 
 export function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const sections = NAV_SECTIONS;
 
   return (
     <aside
@@ -140,7 +139,7 @@ export function AdminSidebar() {
       </div>
 
       <nav className={cn('flex-1 overflow-y-auto py-4', collapsed ? 'px-2' : 'px-3')}>
-        {NAV_SECTIONS.map((section, idx) => (
+        {sections.map((section, idx) => (
           <div key={section.title} className={cn(idx > 0 && 'mt-6')}>
             {!collapsed && (
               <span className="px-3 text-body-xs font-medium text-sidebar-text-muted uppercase tracking-wider">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Plus, Edit, Trash2, X, Check, Search, Target } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Check, Target } from 'lucide-react';
+import { useAdminScope } from '@/auth';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
 import { Badge } from '@/design-system/primitives/Badge';
@@ -11,7 +11,7 @@ import { AdminPageShell, MetricCard, SearchInput } from '../components';
 import type { OrgCompetencyView } from '@/data/types';
 
 export function AdminOrgCompetencies() {
-  const { organisationId } = useParams<{ organisationId: string }>();
+  const { organisationId } = useAdminScope();
   const dataProvider = useData();
   const [competencies, setCompetencies] = useState<OrgCompetencyView[]>([]);
   const [selectedCompetency, setSelectedCompetency] = useState<OrgCompetencyView | null>(null);
@@ -22,10 +22,12 @@ export function AdminOrgCompetencies() {
   const [actionLoading, setActionLoading] = useState(false);
   const [newCompetency, setNewCompetency] = useState({ slug: '', name: '', description: '', skill_slugs: '' });
 
+  const orgId = organisationId;
+
   const refreshCompetencies = () => {
-    if (!organisationId) return;
+    if (!orgId) return;
     setLoading(true);
-    dataProvider.listOrgCompetencies(organisationId)
+    dataProvider.listOrgCompetencies(orgId)
       .then(setCompetencies)
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -33,13 +35,13 @@ export function AdminOrgCompetencies() {
 
   useEffect(() => {
     refreshCompetencies();
-  }, [dataProvider, organisationId]);
+  }, [dataProvider, orgId]);
 
   const handleCreateCompetency = async () => {
-    if (!newCompetency.slug || !newCompetency.name || !organisationId) return;
+    if (!newCompetency.slug || !newCompetency.name) return;
     setActionLoading(true);
     try {
-      await dataProvider.createOrgCompetency(organisationId, {
+      await dataProvider.createOrgCompetency(orgId!, {
         slug: newCompetency.slug.toLowerCase().replace(/\s+/g, '-'),
         name: newCompetency.name,
         description: newCompetency.description,
@@ -56,10 +58,10 @@ export function AdminOrgCompetencies() {
   };
 
   const handleUpdateCompetency = async () => {
-    if (!selectedCompetency || !organisationId) return;
+    if (!selectedCompetency) return;
     setActionLoading(true);
     try {
-      await dataProvider.updateOrgCompetency(organisationId, selectedCompetency.slug, {
+      await dataProvider.updateOrgCompetency(orgId!, selectedCompetency.slug, {
         name: selectedCompetency.name,
         description: selectedCompetency.description,
         skill_slugs: selectedCompetency.skill_slugs,
@@ -89,7 +91,7 @@ export function AdminOrgCompetencies() {
     search ? c.name.toLowerCase().includes(search.toLowerCase()) || c.slug.toLowerCase().includes(search.toLowerCase()) : true
   );
 
-  if (loading || !organisationId) {
+  if (loading || !orgId) {
     return (
       <AdminPageShell title="Org Competencies" subtitle="Manage organization-specific competencies">
         <LoadingState message="Loading competencies..." />
@@ -148,8 +150,9 @@ export function AdminOrgCompetencies() {
             ))}
             {filteredCompetencies.length === 0 && (
               <EmptyState
+                icon={<Target className="w-5 h-5" />}
                 title="No competencies found"
-                message={search ? 'Try adjusting your search' : 'Create your first competency to get started'}
+                description={search ? 'Try adjusting your search' : 'Create your first competency to get started'}
               />
             )}
           </div>

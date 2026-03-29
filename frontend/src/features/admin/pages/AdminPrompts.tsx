@@ -54,7 +54,7 @@ export function AdminPrompts() {
         version: '1.0',
         prompt_type: newPrompt.prompt_type,
         template: newPrompt.template,
-        status: 'draft',
+        variables_schema: { type: 'object', properties: {} },
       });
       setShowCreateModal(false);
       setNewPrompt({ name: '', prompt_type: 'assessment', template: '' });

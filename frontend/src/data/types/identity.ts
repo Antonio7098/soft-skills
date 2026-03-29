@@ -4,6 +4,34 @@ export interface LearnerProfileView {
   readonly practice_preferences: Record<string, string>;
 }
 
+export type PlatformRole = 'anonymous' | 'learner' | 'admin' | 'superadmin';
+
+export type OrganisationRole = 'member' | 'org_admin';
+
+export interface OrganisationMembershipView {
+  readonly organisation_id: string;
+  readonly organisation_name: string;
+  readonly role: OrganisationRole;
+  readonly permissions: string[];
+}
+
+export interface AuthSessionView {
+  readonly status: 'anonymous' | 'authenticated';
+  readonly actor: UserView | null;
+  readonly platform_role: PlatformRole;
+  readonly org_memberships: OrganisationMembershipView[];
+  readonly active_organisation_id: string | null;
+  readonly capabilities: string[];
+  readonly data_mode: 'api' | 'mock';
+}
+
+export interface AuthProfileView {
+  readonly id: string;
+  readonly label: string;
+  readonly description: string;
+  readonly session: AuthSessionView;
+}
+
 export interface UserView {
   readonly id: string;
   readonly email: string;

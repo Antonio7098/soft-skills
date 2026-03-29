@@ -1,5 +1,7 @@
 import type {
   UserView,
+  AuthSessionView,
+  AuthProfileView,
   TaxonomySnapshot,
   CollectionView,
   CollectionListFilters,
@@ -76,6 +78,10 @@ import type {
 
 export interface DataProvider {
   // --- Auth / Identity -----------------------------------------------------
+  getAuthSession(): Promise<AuthSessionView>;
+  setActiveOrganisation(organisationId: string | null): Promise<AuthSessionView>;
+  listAuthProfiles(): Promise<AuthProfileView[]>;
+  switchAuthProfile(profileId: string): Promise<AuthSessionView>;
   register(cmd: RegisterUserCommand): Promise<UserView>;
   getMe(): Promise<UserView>;
   updateProfile(cmd: UpdateProfileCommand): Promise<UserView>;

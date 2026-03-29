@@ -269,6 +269,19 @@ Sprint 13 was too large and has been split into 9 focused sprints for better man
 **Status:** Not Started
 **Detail:** [ops/sprints/sprint-13h-user-cohort-analytics.md](ops/sprints/sprint-13h-user-cohort-analytics.md)
 
+### Sprint 14: Admin Super Agent
+**Status:** Not Started
+**Detail:** [ops/sprints/sprint-14-admin-super-agent.md](ops/sprints/sprint-14-admin-super-agent.md)
+
+**Key Outcomes:**
+- Read-only admin investigation agent exposed through `POST /admin-agent/chat`
+- Single constrained SQL read tool over admin-safe, org-scoped, PII-safe views
+- Schema registry/context for allowlisted views, columns, joins, and example patterns
+- SQL validation, row/time caps, audit events, and defensive output redaction
+- Approval-ready tool execution integration without introducing write actions
+
+**Exit Criteria:** Admins can investigate operational and analytics questions through a replayable, traceable, org-scoped agent without exposing raw tables or raw PII to the model.
+
 **Combined Exit Criteria:** The backend provides comprehensive event logging, observability infrastructure, and APIs sufficient for admin dashboard visibility.
 
 ---

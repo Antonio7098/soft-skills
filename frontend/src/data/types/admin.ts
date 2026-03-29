@@ -334,14 +334,9 @@ export interface PromptAnalyticsView {
 
 export interface PromptCompareView {
   readonly name: string;
-  readonly version_a: string;
-  readonly version_b: string;
-  readonly template_a: string;
-  readonly template_b: string;
-  readonly variables_schema_a: Record<string, unknown>;
-  readonly variables_schema_b: Record<string, unknown>;
-  readonly metrics_a: PromptAnalyticsView | null;
-  readonly metrics_b: PromptAnalyticsView | null;
+  readonly version_a: PromptVersionView;
+  readonly version_b: PromptVersionView;
+  readonly diff_summary: string | null;
 }
 
 export interface PipelineDefinitionView {
@@ -421,6 +416,9 @@ export interface PipelineMetricsView {
   readonly success_count: number;
   readonly failure_count: number;
   readonly cancel_count: number;
+  readonly success_rate: number;
+  readonly avg_duration_ms: number;
+  readonly p95_duration_ms: number;
   readonly stage_metrics: PipelineStageMetricsView[];
 }
 
