@@ -6,13 +6,15 @@ import {
   XCircle,
   Clock,
   ChevronRight,
+  X,
+  BarChart3,
 } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
 import { LoadingState } from '@/design-system/patterns/LoadingState';
 import { useData } from '@/data';
 import { AdminPageShell, MetricCard, DataTable, StatusBadge } from '../components';
-import type { PipelineDefinitionView, PipelineRunSummaryView } from '@/data/types';
+import type { PipelineDefinitionView, PipelineRunSummaryView, PipelineMetricsView } from '@/data/types';
 
 export function AdminPipelines() {
   const dataProvider = useData();
@@ -20,6 +22,9 @@ export function AdminPipelines() {
   const [selectedPipeline, setSelectedPipeline] = useState<string | null>(null);
   const [runs, setRuns] = useState<PipelineRunSummaryView[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showMetricsModal, setShowMetricsModal] = useState(false);
+  const [metrics, setMetrics] = useState<PipelineMetricsView | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -38,6 +43,20 @@ export function AdminPipelines() {
       setRuns([]);
     }
   }, [dataProvider, selectedPipeline]);
+
+  const handleViewMetrics = async () => {
+    if (!selectedPipeline) return;
+    setMetricsLoading(true);
+    setShowMetricsModal(true);
+    try {
+      const data = await dataProvider.getPipelineMetrics(selectedPipeline);
+      setMetrics(data);
+    } catch (error) {
+      console.error('Failed to load metrics:', error);
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
 
   const runColumns = [
     {
@@ -161,7 +180,7 @@ export function AdminPipelines() {
               {selectedPipeline ? `${selectedPipeline} Runs` : 'Select a Pipeline'}
             </h3>
             {selectedPipeline && (
-              <Button variant="secondary" size="sm" icon={<Clock className="w-4 h-4" />}>
+              <Button variant="secondary" size="sm" icon={<BarChart3 className="w-4 h-4" />} onClick={handleViewMetrics}>
                 View Metrics
               </Button>
             )}
@@ -182,6 +201,79 @@ export function AdminPipelines() {
           )}
         </Card>
       </div>
+
+      {/* Metrics Modal */}
+      {showMetricsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-display-xs text-content-primary">
+                {selectedPipeline} Metrics
+              </h3>
+              <button onClick={() => { setShowMetricsModal(false); setMetrics(null); }} className="p-1 rounded hover:bg-surface-secondary">
+                <X className="w-5 h-5 text-content-tertiary" />
+              </button>
+            </div>
+            {metricsLoading ? (
+              <div className="py-8">
+                <LoadingState message="Loading metrics..." />
+              </div>
+            ) : metrics ? (
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-3 rounded-lg bg-surface-secondary/50">
+                    <p className="text-body-xs text-content-tertiary">Total Runs</p>
+                    <p className="text-body-lg font-semibold text-content-primary">{metrics.total_runs}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-surface-secondary/50">
+                    <p className="text-body-xs text-content-tertiary">Success Rate</p>
+                    <p className="text-body-lg font-semibold text-status-success">
+                      {(metrics.success_rate * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-surface-secondary/50">
+                    <p className="text-body-xs text-content-tertiary">Avg Duration</p>
+                    <p className="text-body-lg font-semibold text-content-primary">
+                      {(metrics.avg_duration_ms / 1000).toFixed(2)}s
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-surface-secondary/50">
+                    <p className="text-body-xs text-content-tertiary">P95 Duration</p>
+                    <p className="text-body-lg font-semibold text-content-primary">
+                      {(metrics.p95_duration_ms / 1000).toFixed(2)}s
+                    </p>
+                  </div>
+                </div>
+                {metrics.stage_metrics && metrics.stage_metrics.length > 0 && (
+                  <div>
+                    <h4 className="text-body-sm font-medium text-content-secondary mb-2">Stage Breakdown</h4>
+                    <div className="flex flex-col gap-2">
+                      {metrics.stage_metrics.map((stage) => (
+                        <div key={stage.stage_name} className="flex items-center justify-between p-2 rounded-lg bg-surface-secondary/30">
+                          <span className="text-body-sm text-content-primary">{stage.stage_name}</span>
+                          <div className="flex items-center gap-4">
+                            <span className="text-body-xs text-content-tertiary">
+                              Avg: {(stage.avg_duration_ms / 1000).toFixed(2)}s
+                            </span>
+                            <span className="text-body-xs text-status-success">
+                              {(stage.success_rate * 100).toFixed(0)}% success
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-body-sm text-content-tertiary py-8 text-center">No metrics available</p>
+            )}
+            <div className="flex justify-end pt-2">
+              <Button variant="secondary" onClick={() => { setShowMetricsModal(false); setMetrics(null); }}>Close</Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </AdminPageShell>
   );
 }

@@ -20,8 +20,9 @@ export function AdminEvaluations() {
   const [runs, setRuns] = useState<EvaluationRunView[]>([]);
   const [dashboard, setDashboard] = useState<EvaluationDashboardView | null>(null);
   const [loading, setLoading] = useState(true);
+  const [runningEval, setRunningEval] = useState<string | null>(null);
 
-  useEffect(() => {
+  const refreshData = () => {
     setLoading(true);
     Promise.all([
       dataProvider.listEvalSuites(),
@@ -35,7 +36,23 @@ export function AdminEvaluations() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    refreshData();
   }, [dataProvider]);
+
+  const handleRunEvaluation = async (suiteId: string) => {
+    setRunningEval(suiteId);
+    try {
+      await dataProvider.triggerEvalRun({ suite_id: suiteId });
+      refreshData();
+    } catch (error) {
+      console.error('Failed to run evaluation:', error);
+    } finally {
+      setRunningEval(null);
+    }
+  };
 
   const runColumns = [
     {
@@ -109,7 +126,11 @@ export function AdminEvaluations() {
       title="Evaluations"
       subtitle="Monitor model performance, run evaluation suites, and track quality metrics"
       actions={
-        <Button icon={<Play className="w-4 h-4" />}>
+        <Button 
+          icon={<Play className="w-4 h-4" />} 
+          onClick={() => suites[0] && handleRunEvaluation(suites[0].suite_id)}
+          loading={runningEval !== null}
+        >
           Run Evaluation
         </Button>
       }
@@ -173,7 +194,13 @@ export function AdminEvaluations() {
                   </p>
                   <p className="text-body-xs text-content-tertiary">{suite.suite_type}</p>
                 </div>
-                <Button variant="ghost" size="sm" icon={<Play className="w-3.5 h-3.5" />}>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  icon={<Play className="w-3.5 h-3.5" />}
+                  onClick={() => handleRunEvaluation(suite.suite_id)}
+                  loading={runningEval === suite.suite_id}
+                >
                   Run
                 </Button>
               </div>

@@ -5,8 +5,10 @@ import {
   AlertTriangle,
   Clock,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
+import { Button } from '@/design-system/primitives/Button';
 import { Badge } from '@/design-system/primitives/Badge';
 import { LoadingState } from '@/design-system/patterns/LoadingState';
 import { useData } from '@/data';
@@ -28,6 +30,8 @@ export function AdminAudit() {
   const [eventTypeFilter, setEventTypeFilter] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 20;
+  const [selectedEvent, setSelectedEvent] = useState<WorkflowEventView | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -99,8 +103,13 @@ export function AdminAudit() {
       key: 'actions',
       header: '',
       width: '48px',
-      render: () => (
-        <ChevronRight className="w-4 h-4 text-content-tertiary" />
+      render: (event: WorkflowEventView) => (
+        <button 
+          onClick={() => { setSelectedEvent(event); setShowDetailModal(true); }}
+          className="p-1 rounded hover:bg-surface-secondary"
+        >
+          <ChevronRight className="w-4 h-4 text-content-tertiary" />
+        </button>
       ),
     },
   ];
@@ -179,6 +188,70 @@ export function AdminAudit() {
         totalPages={totalPages}
         onPageChange={setPage}
       />
+
+      {/* Event Detail Modal */}
+      {showDetailModal && selectedEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-lg flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-display-xs text-content-primary">Event Details</h3>
+              <button onClick={() => { setShowDetailModal(false); setSelectedEvent(null); }} className="p-1 rounded hover:bg-surface-secondary">
+                <X className="w-5 h-5 text-content-tertiary" />
+              </button>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${selectedEvent.error_code ? 'bg-status-error' : 'bg-status-success'}`} />
+                <span className="text-body-md font-semibold text-content-primary">{selectedEvent.event_type}</span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-surface-secondary/50">
+                  <p className="text-body-xs text-content-tertiary">Event ID</p>
+                  <p className="text-body-sm font-mono text-content-primary truncate">{selectedEvent.event_id}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-surface-secondary/50">
+                  <p className="text-body-xs text-content-tertiary">Occurred At</p>
+                  <p className="text-body-sm text-content-primary">{new Date(selectedEvent.occurred_at).toLocaleString()}</p>
+                </div>
+                {selectedEvent.trace_id && (
+                  <div className="p-3 rounded-lg bg-surface-secondary/50">
+                    <p className="text-body-xs text-content-tertiary">Trace ID</p>
+                    <p className="text-body-sm font-mono text-content-primary truncate">{selectedEvent.trace_id}</p>
+                  </div>
+                )}
+                {selectedEvent.workflow_id && (
+                  <div className="p-3 rounded-lg bg-surface-secondary/50">
+                    <p className="text-body-xs text-content-tertiary">Workflow ID</p>
+                    <p className="text-body-sm font-mono text-content-primary truncate">{selectedEvent.workflow_id}</p>
+                  </div>
+                )}
+              </div>
+
+              {selectedEvent.error_code && (
+                <div className="p-3 rounded-lg bg-status-error/5 border border-status-error/20">
+                  <p className="text-body-xs text-content-tertiary mb-1">Error</p>
+                  <p className="text-body-sm font-medium text-status-error">{selectedEvent.error_code}</p>
+                </div>
+              )}
+
+              {selectedEvent.payload && Object.keys(selectedEvent.payload).length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-body-sm font-medium text-content-secondary">Payload</p>
+                  <pre className="p-3 rounded-lg bg-surface-secondary/50 text-body-xs font-mono text-content-primary overflow-auto max-h-40">
+                    {JSON.stringify(selectedEvent.payload, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-line">
+              <Button variant="secondary" onClick={() => { setShowDetailModal(false); setSelectedEvent(null); }}>Close</Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </AdminPageShell>
   );
 }

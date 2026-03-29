@@ -4,7 +4,7 @@ import { cn } from '@/lib/cn';
 
 export interface Column<T> {
   readonly key: string;
-  readonly header: string;
+  readonly header: ReactNode;
   readonly width?: string;
   readonly render?: (item: T) => ReactNode;
 }

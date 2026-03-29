@@ -314,6 +314,408 @@ class SwitchingDataProvider implements DataProvider {
       mockCleanup?.();
     };
   }
+
+  // --- Admin: Users & User Management ----------------------------------------
+  listAdminUsers(params) {
+    return this.withFallback(
+      () => apiDataProvider.listAdminUsers(params),
+      () => mockDataProvider.listAdminUsers(params),
+    );
+  }
+
+  getAdminUser(userId) {
+    return this.withFallback(
+      () => apiDataProvider.getAdminUser(userId),
+      () => mockDataProvider.getAdminUser(userId),
+    );
+  }
+
+  updateAdminUserRole(userId, role) {
+    return this.withFallback(
+      () => apiDataProvider.updateAdminUserRole(userId, role),
+      () => mockDataProvider.updateAdminUserRole(userId, role),
+    );
+  }
+
+  updateAdminUserStatus(userId, isActive) {
+    return this.withFallback(
+      () => apiDataProvider.updateAdminUserStatus(userId, isActive),
+      () => mockDataProvider.updateAdminUserStatus(userId, isActive),
+    );
+  }
+
+  createAdminUser(cmd) {
+    return this.withFallback(
+      () => apiDataProvider.createAdminUser(cmd),
+      () => mockDataProvider.createAdminUser(cmd),
+    );
+  }
+
+  bulkAdminUserOperation(cmd) {
+    return this.withFallback(
+      () => apiDataProvider.bulkAdminUserOperation(cmd),
+      () => mockDataProvider.bulkAdminUserOperation(cmd),
+    );
+  }
+
+  getUserActivity(userId) {
+    return this.withFallback(
+      () => apiDataProvider.getUserActivity(userId),
+      () => mockDataProvider.getUserActivity(userId),
+    );
+  }
+
+  // --- Admin: Learners & Relationships --------------------------------------
+  getLearnerAnalytics(learnerId, params) {
+    return this.withFallback(
+      () => apiDataProvider.getLearnerAnalytics(learnerId, params),
+      () => mockDataProvider.getLearnerAnalytics(learnerId, params),
+    );
+  }
+
+  getLearnerRelationship(learnerId) {
+    return this.withFallback(
+      () => apiDataProvider.getLearnerRelationship(learnerId),
+      () => mockDataProvider.getLearnerRelationship(learnerId),
+    );
+  }
+
+  upsertLearnerRelationship(learnerId, relationshipType) {
+    return this.withFallback(
+      () => apiDataProvider.upsertLearnerRelationship(learnerId, relationshipType),
+      () => mockDataProvider.upsertLearnerRelationship(learnerId, relationshipType),
+    );
+  }
+
+  deleteLearnerRelationship(learnerId) {
+    return this.withFallback(
+      () => apiDataProvider.deleteLearnerRelationship(learnerId),
+      () => mockDataProvider.deleteLearnerRelationship(learnerId),
+    );
+  }
+
+  // --- Admin: Analytics Overview ---------------------------------------------
+  getAnalyticsOverview(params) {
+    return this.withFallback(
+      () => apiDataProvider.getAnalyticsOverview(params),
+      () => mockDataProvider.getAnalyticsOverview(params),
+    );
+  }
+
+  getCohortAnalytics(params) {
+    return this.withFallback(
+      () => apiDataProvider.getCohortAnalytics(params),
+      () => mockDataProvider.getCohortAnalytics(params),
+    );
+  }
+
+  getCohortsComparison(params) {
+    return this.withFallback(
+      () => apiDataProvider.getCohortsComparison(params),
+      () => mockDataProvider.getCohortsComparison(params),
+    );
+  }
+
+  // --- Admin: Collections & Verification -----------------------------------
+  getVerificationQueue() {
+    return this.withFallback(
+      () => apiDataProvider.getVerificationQueue(),
+      () => mockDataProvider.getVerificationQueue(),
+    );
+  }
+
+  getCollectionVerification(collectionId) {
+    return this.withFallback(
+      () => apiDataProvider.getCollectionVerification(collectionId),
+      () => mockDataProvider.getCollectionVerification(collectionId),
+    );
+  }
+
+  updateCollectionVerification(collectionId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.updateCollectionVerification(collectionId, cmd),
+      () => mockDataProvider.updateCollectionVerification(collectionId, cmd),
+    );
+  }
+
+  updateCollectionFeature(collectionId, featured) {
+    return this.withFallback(
+      () => apiDataProvider.updateCollectionFeature(collectionId, featured),
+      () => mockDataProvider.updateCollectionFeature(collectionId, featured),
+    );
+  }
+
+  // --- Admin: Evaluation Dashboard -------------------------------------------
+  listEvalSuites() {
+    return this.withFallback(
+      () => apiDataProvider.listEvalSuites(),
+      () => mockDataProvider.listEvalSuites(),
+    );
+  }
+
+  listEvalRuns(params) {
+    return this.withFallback(
+      () => apiDataProvider.listEvalRuns(params),
+      () => mockDataProvider.listEvalRuns(params),
+    );
+  }
+
+  getEvalRun(runId) {
+    return this.withFallback(
+      () => apiDataProvider.getEvalRun(runId),
+      () => mockDataProvider.getEvalRun(runId),
+    );
+  }
+
+  triggerEvalRun(cmd) {
+    return this.withFallback(
+      () => apiDataProvider.triggerEvalRun(cmd),
+      () => mockDataProvider.triggerEvalRun(cmd),
+    );
+  }
+
+  getEvalDashboard(params) {
+    return this.withFallback(
+      () => apiDataProvider.getEvalDashboard(params),
+      () => mockDataProvider.getEvalDashboard(params),
+    );
+  }
+
+  getEvalRunsComparison(params) {
+    return this.withFallback(
+      () => apiDataProvider.getEvalRunsComparison(params),
+      () => mockDataProvider.getEvalRunsComparison(params),
+    );
+  }
+
+  getEvalBenchmark(params) {
+    return this.withFallback(
+      () => apiDataProvider.getEvalBenchmark(params),
+      () => mockDataProvider.getEvalBenchmark(params),
+    );
+  }
+
+  getEvalCaseDetail(caseId) {
+    return this.withFallback(
+      () => apiDataProvider.getEvalCaseDetail(caseId),
+      () => mockDataProvider.getEvalCaseDetail(caseId),
+    );
+  }
+
+  // --- Admin: Prompts --------------------------------------------------------
+  listPrompts() {
+    return this.withFallback(
+      () => apiDataProvider.listPrompts(),
+      () => mockDataProvider.listPrompts(),
+    );
+  }
+
+  listPromptVersions(name) {
+    return this.withFallback(
+      () => apiDataProvider.listPromptVersions(name),
+      () => mockDataProvider.listPromptVersions(name),
+    );
+  }
+
+  getPromptVersion(name, version) {
+    return this.withFallback(
+      () => apiDataProvider.getPromptVersion(name, version),
+      () => mockDataProvider.getPromptVersion(name, version),
+    );
+  }
+
+  createPrompt(cmd) {
+    return this.withFallback(
+      () => apiDataProvider.createPrompt(cmd),
+      () => mockDataProvider.createPrompt(cmd),
+    );
+  }
+
+  updatePrompt(name, version, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.updatePrompt(name, version, cmd),
+      () => mockDataProvider.updatePrompt(name, version, cmd),
+    );
+  }
+
+  publishPrompt(name, version) {
+    return this.withFallback(
+      () => apiDataProvider.publishPrompt(name, version),
+      () => mockDataProvider.publishPrompt(name, version),
+    );
+  }
+
+  archivePrompt(name, version) {
+    return this.withFallback(
+      () => apiDataProvider.archivePrompt(name, version),
+      () => mockDataProvider.archivePrompt(name, version),
+    );
+  }
+
+  getPromptAnalytics(name, version) {
+    return this.withFallback(
+      () => apiDataProvider.getPromptAnalytics(name, version),
+      () => mockDataProvider.getPromptAnalytics(name, version),
+    );
+  }
+
+  comparePrompts(cmd) {
+    return this.withFallback(
+      () => apiDataProvider.comparePrompts(cmd),
+      () => mockDataProvider.comparePrompts(cmd),
+    );
+  }
+
+  // --- Admin: Pipelines ------------------------------------------------------
+  listPipelines() {
+    return this.withFallback(
+      () => apiDataProvider.listPipelines(),
+      () => mockDataProvider.listPipelines(),
+    );
+  }
+
+  getPipelineDAG(pipelineName) {
+    return this.withFallback(
+      () => apiDataProvider.getPipelineDAG(pipelineName),
+      () => mockDataProvider.getPipelineDAG(pipelineName),
+    );
+  }
+
+  listPipelineRuns(pipelineName, params) {
+    return this.withFallback(
+      () => apiDataProvider.listPipelineRuns(pipelineName, params),
+      () => mockDataProvider.listPipelineRuns(pipelineName, params),
+    );
+  }
+
+  getPipelineTrace(pipelineName, pipelineRunId) {
+    return this.withFallback(
+      () => apiDataProvider.getPipelineTrace(pipelineName, pipelineRunId),
+      () => mockDataProvider.getPipelineTrace(pipelineName, pipelineRunId),
+    );
+  }
+
+  getPipelineMetrics(pipelineName) {
+    return this.withFallback(
+      () => apiDataProvider.getPipelineMetrics(pipelineName),
+      () => mockDataProvider.getPipelineMetrics(pipelineName),
+    );
+  }
+
+  // --- Admin: Rubrics --------------------------------------------------------
+  listRubrics() {
+    return this.withFallback(
+      () => apiDataProvider.listRubrics(),
+      () => mockDataProvider.listRubrics(),
+    );
+  }
+
+  getRubric(rubricId) {
+    return this.withFallback(
+      () => apiDataProvider.getRubric(rubricId),
+      () => mockDataProvider.getRubric(rubricId),
+    );
+  }
+
+  createRubric(cmd) {
+    return this.withFallback(
+      () => apiDataProvider.createRubric(cmd),
+      () => mockDataProvider.createRubric(cmd),
+    );
+  }
+
+  updateRubric(rubricId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.updateRubric(rubricId, cmd),
+      () => mockDataProvider.updateRubric(rubricId, cmd),
+    );
+  }
+
+  deleteRubric(rubricId) {
+    return this.withFallback(
+      () => apiDataProvider.deleteRubric(rubricId),
+      () => mockDataProvider.deleteRubric(rubricId),
+    );
+  }
+
+  addRubricCriterion(rubricId, criterion) {
+    return this.withFallback(
+      () => apiDataProvider.addRubricCriterion(rubricId, criterion),
+      () => mockDataProvider.addRubricCriterion(rubricId, criterion),
+    );
+  }
+
+  updateRubricCriterion(rubricId, criterionRef, criterion) {
+    return this.withFallback(
+      () => apiDataProvider.updateRubricCriterion(rubricId, criterionRef, criterion),
+      () => mockDataProvider.updateRubricCriterion(rubricId, criterionRef, criterion),
+    );
+  }
+
+  deleteRubricCriterion(rubricId, criterionRef) {
+    return this.withFallback(
+      () => apiDataProvider.deleteRubricCriterion(rubricId, criterionRef),
+      () => mockDataProvider.deleteRubricCriterion(rubricId, criterionRef),
+    );
+  }
+
+  // --- Admin: Audit & Events -------------------------------------------------
+  listWorkflowEvents(params) {
+    return this.withFallback(
+      () => apiDataProvider.listWorkflowEvents(params),
+      () => mockDataProvider.listWorkflowEvents(params),
+    );
+  }
+
+  getWorkflowEvent(eventId) {
+    return this.withFallback(
+      () => apiDataProvider.getWorkflowEvent(eventId),
+      () => mockDataProvider.getWorkflowEvent(eventId),
+    );
+  }
+
+  updateWorkflowEvent(eventId, cmd) {
+    return this.withFallback(
+      () => apiDataProvider.updateWorkflowEvent(eventId, cmd),
+      () => mockDataProvider.updateWorkflowEvent(eventId, cmd),
+    );
+  }
+
+  deleteWorkflowEvent(eventId) {
+    return this.withFallback(
+      () => apiDataProvider.deleteWorkflowEvent(eventId),
+      () => mockDataProvider.deleteWorkflowEvent(eventId),
+    );
+  }
+
+  getAttemptAudit(attemptId) {
+    return this.withFallback(
+      () => apiDataProvider.getAttemptAudit(attemptId),
+      () => mockDataProvider.getAttemptAudit(attemptId),
+    );
+  }
+
+  // --- Admin: Telemetry & Monitoring -----------------------------------------
+  getTelemetryOverview(params) {
+    return this.withFallback(
+      () => apiDataProvider.getTelemetryOverview(params),
+      () => mockDataProvider.getTelemetryOverview(params),
+    );
+  }
+
+  listTelemetryTraces(params) {
+    return this.withFallback(
+      () => apiDataProvider.listTelemetryTraces(params),
+      () => mockDataProvider.listTelemetryTraces(params),
+    );
+  }
+
+  getTelemetryTrace(traceId) {
+    return this.withFallback(
+      () => apiDataProvider.getTelemetryTrace(traceId),
+      () => mockDataProvider.getTelemetryTrace(traceId),
+    );
+  }
 }
 
 export const switchingDataProvider = new SwitchingDataProvider();

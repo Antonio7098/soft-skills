@@ -70,6 +70,10 @@ import type {
   CreateAssistantTurnCommand,
   CancelAssistantTurnCommand,
   AssistantStreamCallbacks,
+  TelemetryOverviewView,
+  TelemetryTraceListView,
+  TelemetryTraceListItemView,
+  TelemetryTraceDetailView,
 } from './types';
 import {
   SEED_SKILLS,
@@ -2816,6 +2820,102 @@ export const mockDataProvider: DataProvider = {
     return () => {
       clearTimeout(timeoutId);
       callbacks.onClose?.();
+    };
+  },
+
+  // --- Admin: Telemetry & Monitoring -----------------------------------------
+
+  async getTelemetryOverview(_params?: {
+    organisation_id?: string;
+    from_date?: string;
+    to_date?: string;
+  }): Promise<TelemetryOverviewView> {
+    await delay(300);
+    return {
+      total_provider_calls: 15420,
+      provider_call_success_rate: 0.967,
+      avg_provider_latency_ms: 342,
+      total_errors: 512,
+      latency_distribution: [
+        { bucket_ms: 100, count: 2100 },
+        { bucket_ms: 200, count: 4500 },
+        { bucket_ms: 300, count: 3800 },
+        { bucket_ms: 500, count: 2400 },
+        { bucket_ms: 1000, count: 1800 },
+        { bucket_ms: 2000, count: 620 },
+        { bucket_ms: 5000, count: 200 },
+      ],
+      pipeline_health: [
+        { pipeline_name: 'assessment-pipeline', success_rate: 0.95, avg_duration_ms: 1200, run_count: 3420 },
+        { pipeline_name: 'generation-pipeline', success_rate: 0.92, avg_duration_ms: 2800, run_count: 1250 },
+        { pipeline_name: 'feedback-pipeline', success_rate: 0.98, avg_duration_ms: 800, run_count: 5100 },
+        { pipeline_name: 'interview-pipeline', success_rate: 0.89, avg_duration_ms: 3500, run_count: 890 },
+      ],
+      provider_metrics: [
+        { provider: 'openai', operation: 'chat.completion', call_count: 8500, success_rate: 0.97, avg_latency_ms: 380, p95_latency_ms: 850 },
+        { provider: 'openai', operation: 'embedding', call_count: 3200, success_rate: 0.99, avg_latency_ms: 120, p95_latency_ms: 250 },
+        { provider: 'anthropic', operation: 'chat.completion', call_count: 2800, success_rate: 0.96, avg_latency_ms: 420, p95_latency_ms: 920 },
+        { provider: 'google', operation: 'chat.completion', call_count: 920, success_rate: 0.94, avg_latency_ms: 510, p95_latency_ms: 1100 },
+      ],
+      error_breakdown: [
+        { error_type: 'RateLimitError', error_code: 'RATE_LIMIT', count: 245, percentage: 47.8 },
+        { error_type: 'TimeoutError', error_code: 'TIMEOUT', count: 128, percentage: 25.0 },
+        { error_type: 'ValidationError', error_code: 'INVALID_INPUT', count: 89, percentage: 17.4 },
+        { error_type: 'ServerError', error_code: 'INTERNAL', count: 50, percentage: 9.8 },
+      ],
+    };
+  },
+
+  async listTelemetryTraces(params?: {
+    organisation_id?: string;
+    from_date?: string;
+    to_date?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<TelemetryTraceListView> {
+    await delay(250);
+    const limit = params?.limit ?? 20;
+    const traces: TelemetryTraceListItemView[] = [
+      { trace_id: 'trace-001-abc123', operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 1250, span_count: 8, error_count: 0, started_at: new Date(Date.now() - 60000).toISOString() },
+      { trace_id: 'trace-002-def456', operation_name: 'GenerateCollection', service_name: 'generation-service', duration_ms: 3420, span_count: 12, error_count: 0, started_at: new Date(Date.now() - 120000).toISOString() },
+      { trace_id: 'trace-003-ghi789', operation_name: 'ProcessFeedback', service_name: 'feedback-service', duration_ms: 890, span_count: 5, error_count: 0, started_at: new Date(Date.now() - 180000).toISOString() },
+      { trace_id: 'trace-004-jkl012', operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 2100, span_count: 8, error_count: 1, started_at: new Date(Date.now() - 240000).toISOString() },
+      { trace_id: 'trace-005-mno345', operation_name: 'RunInterview', service_name: 'interview-service', duration_ms: 4500, span_count: 15, error_count: 0, started_at: new Date(Date.now() - 300000).toISOString() },
+      { trace_id: 'trace-006-pqr678', operation_name: 'GeneratePrompts', service_name: 'generation-service', duration_ms: 2800, span_count: 10, error_count: 0, started_at: new Date(Date.now() - 360000).toISOString() },
+      { trace_id: 'trace-007-stu901', operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 1100, span_count: 7, error_count: 0, started_at: new Date(Date.now() - 420000).toISOString() },
+      { trace_id: 'trace-008-vwx234', operation_name: 'ProcessFeedback', service_name: 'feedback-service', duration_ms: 750, span_count: 4, error_count: 0, started_at: new Date(Date.now() - 480000).toISOString() },
+      { trace_id: 'trace-009-yza567', operation_name: 'GenerateCollection', service_name: 'generation-service', duration_ms: 5200, span_count: 14, error_count: 2, started_at: new Date(Date.now() - 540000).toISOString() },
+      { trace_id: 'trace-010-bcd890', operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 980, span_count: 6, error_count: 0, started_at: new Date(Date.now() - 600000).toISOString() },
+    ];
+    return {
+      traces: traces.slice(0, limit),
+      total: 1250,
+      offset: params?.offset ?? 0,
+      limit,
+    };
+  },
+
+  async getTelemetryTrace(traceId: string): Promise<TelemetryTraceDetailView> {
+    await delay(200);
+    return {
+      trace_id: traceId,
+      operation_name: 'AssessAttempt',
+      service_name: 'assessment-service',
+      duration_ms: 1250,
+      started_at: new Date(Date.now() - 60000).toISOString(),
+      ended_at: new Date(Date.now() - 58750).toISOString(),
+      spans: [
+        { span_id: 'span-001', parent_span_id: null, operation_name: 'AssessAttempt', service_name: 'assessment-service', duration_ms: 1250, started_at: new Date(Date.now() - 60000).toISOString(), status: 'ok', attributes: { attempt_id: 'att-123' } },
+        { span_id: 'span-002', parent_span_id: 'span-001', operation_name: 'LoadRubric', service_name: 'assessment-service', duration_ms: 50, started_at: new Date(Date.now() - 59950).toISOString(), status: 'ok', attributes: {} },
+        { span_id: 'span-003', parent_span_id: 'span-001', operation_name: 'CallLLM', service_name: 'llm-gateway', duration_ms: 980, started_at: new Date(Date.now() - 59900).toISOString(), status: 'ok', attributes: { provider: 'openai', model: 'gpt-4' } },
+        { span_id: 'span-004', parent_span_id: 'span-001', operation_name: 'SaveAssessment', service_name: 'assessment-service', duration_ms: 120, started_at: new Date(Date.now() - 58920).toISOString(), status: 'ok', attributes: {} },
+      ],
+      attributes: {
+        user_id: 'usr-abc123',
+        attempt_id: 'att-123',
+        collection_id: 'col-456',
+      },
+      error: null,
     };
   },
 };

@@ -142,7 +142,10 @@ export function AdminLearners() {
             {overview?.cohort_breakdown?.slice(0, 6).map((cohortItem) => (
               <div 
                 key={cohortItem.cohort_key} 
-                className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-surface-secondary/50 transition-colors cursor-pointer"
+                onClick={() => setCohortFilter(cohortItem.cohort_key)}
+                className={`flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-surface-secondary/50 transition-colors cursor-pointer ${
+                  cohortFilter === cohortItem.cohort_key ? 'bg-accent/10 border border-accent/20' : ''
+                }`}
               >
                 <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center">
                   <GraduationCap className="w-3.5 h-3.5 text-accent" />

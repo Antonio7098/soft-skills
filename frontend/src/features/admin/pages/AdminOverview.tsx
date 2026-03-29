@@ -132,7 +132,11 @@ export function AdminOverview() {
           </div>
           <div className="flex flex-col gap-2">
             {overview?.top_weak_skills?.slice(0, 5).map((skill, idx) => (
-              <div key={skill.skill_slug} className="flex items-center gap-3 py-2">
+              <div 
+                key={skill.skill_slug} 
+                onClick={() => navigate(`/admin/learners?skill=${encodeURIComponent(skill.skill_slug)}`)}
+                className="flex items-center gap-3 py-2 px-2 -mx-2 rounded-lg cursor-pointer hover:bg-surface-secondary/50 transition-colors"
+              >
                 <span className="w-5 h-5 rounded-full bg-surface-secondary flex items-center justify-center text-body-xs font-medium text-content-secondary">
                   {idx + 1}
                 </span>
