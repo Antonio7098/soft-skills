@@ -75,15 +75,20 @@ class GenerationRealtimeBroker:
         if not subscribers:
             self._subscribers.pop(stream_token, None)
 
-    async def publish(self, stream_token: str, event: GenerationStreamEvent) -> None:
+    def publish_nowait(self, stream_token: str, event: GenerationStreamEvent) -> None:
         self._backlog[stream_token].append(event)
-        current_loop = asyncio.get_running_loop()
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
         for subscriber in list(self._subscribers.get(stream_token, {}).values()):
             if subscriber.loop is current_loop:
-                await subscriber.queue.put(event)
+                subscriber.queue.put_nowait(event)
                 continue
-            future = asyncio.run_coroutine_threadsafe(subscriber.queue.put(event), subscriber.loop)
-            await asyncio.wrap_future(future)
+            subscriber.loop.call_soon_threadsafe(subscriber.queue.put_nowait, event)
+
+    async def publish(self, stream_token: str, event: GenerationStreamEvent) -> None:
+        self.publish_nowait(stream_token, event)
 
     def register_execution(self, execution: GenerationExecution) -> None:
         self._executions[execution.generation_id] = execution

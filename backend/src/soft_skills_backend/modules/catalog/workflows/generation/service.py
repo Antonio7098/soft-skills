@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -121,13 +122,7 @@ class CatalogGenerationService:
             )
             sequence["value"] += 1
             if self._broker is not None:
-                import asyncio
-
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.create_task(self._broker.publish(execution.stream_token, event))
-                except RuntimeError:
-                    pass
+                self._broker.publish_nowait(execution.stream_token, event)
 
         return callback
 
@@ -297,6 +292,7 @@ class CatalogGenerationService:
         workflow_id: str | None,
         command: StructuredCollectionGenerationCommand,
     ) -> None:
+        execution.task = asyncio.current_task()
         started_event = GenerationStreamEvent(
             event_id=uuid4().hex,
             generation_id=execution.generation_id,
@@ -334,6 +330,7 @@ class CatalogGenerationService:
                 sanitize_text=self._sanitize_generation_text,
                 workplace_context_for_commands=self._collection_workplace_context,
                 progress_callback=progress_callback,
+                execution=execution,
             )
             complete_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
@@ -350,6 +347,19 @@ class CatalogGenerationService:
             )
             if self._broker is not None:
                 await self._broker.publish(execution.stream_token, complete_event)
+        except asyncio.CancelledError:
+            cancelled_event = GenerationStreamEvent(
+                event_id=uuid4().hex,
+                generation_id=execution.generation_id,
+                type="cancelled",
+                stage=GenerationStage.CANCELLED,
+                sequence_number=999,
+                emitted_at=datetime.now(UTC),
+                progress_percent=0.0,
+                payload={"reason": execution.cancel_reason or "user_requested"},
+            )
+            if self._broker is not None:
+                await self._broker.publish(execution.stream_token, cancelled_event)
         except Exception as exc:
             error_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
@@ -364,6 +374,7 @@ class CatalogGenerationService:
             if self._broker is not None:
                 await self._broker.publish(execution.stream_token, error_event)
         finally:
+            execution.task = None
             if self._broker is not None:
                 self._broker.remove_execution(execution.generation_id)
 
@@ -403,6 +414,7 @@ class CatalogGenerationService:
         workflow_id: str | None,
         command: ChatCollectionGenerationCommand,
     ) -> None:
+        execution.task = asyncio.current_task()
         started_event = GenerationStreamEvent(
             event_id=uuid4().hex,
             generation_id=execution.generation_id,
@@ -440,6 +452,7 @@ class CatalogGenerationService:
                 sanitize_text=self._sanitize_generation_text,
                 workplace_context_for_commands=self._collection_workplace_context,
                 progress_callback=progress_callback,
+                execution=execution,
             )
             complete_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
@@ -456,6 +469,19 @@ class CatalogGenerationService:
             )
             if self._broker is not None:
                 await self._broker.publish(execution.stream_token, complete_event)
+        except asyncio.CancelledError:
+            cancelled_event = GenerationStreamEvent(
+                event_id=uuid4().hex,
+                generation_id=execution.generation_id,
+                type="cancelled",
+                stage=GenerationStage.CANCELLED,
+                sequence_number=999,
+                emitted_at=datetime.now(UTC),
+                progress_percent=0.0,
+                payload={"reason": execution.cancel_reason or "user_requested"},
+            )
+            if self._broker is not None:
+                await self._broker.publish(execution.stream_token, cancelled_event)
         except Exception as exc:
             error_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
@@ -470,6 +496,7 @@ class CatalogGenerationService:
             if self._broker is not None:
                 await self._broker.publish(execution.stream_token, error_event)
         finally:
+            execution.task = None
             if self._broker is not None:
                 self._broker.remove_execution(execution.generation_id)
 

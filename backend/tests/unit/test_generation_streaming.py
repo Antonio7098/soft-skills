@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import pytest
 
@@ -16,6 +17,11 @@ from soft_skills_backend.modules.catalog.infra.realtime import (
     GenerationExecution,
     GenerationRealtimeBroker,
 )
+from soft_skills_backend.modules.catalog.workflows.generation import collection_pipeline
+from soft_skills_backend.modules.catalog.workflows.generation.collection_pipeline import (
+    generate_collection,
+)
+from soft_skills_backend.shared.auth import Actor
 
 
 class TestGenerationStage:
@@ -185,3 +191,184 @@ class TestGenerationRealtimeBroker:
         broker.remove_execution("gen-123")
 
         assert broker.get_execution("gen-123") is None
+
+
+class TestGenerationCancellationFlow:
+    @pytest.mark.asyncio()
+    async def test_cancelled_event_published_on_cancel(self) -> None:
+        broker = GenerationRealtimeBroker()
+        execution = GenerationExecution(
+            generation_id="gen-123",
+            mode="structured",
+            stream_token="gen_gen-123",
+        )
+        broker.register_execution(execution)
+        queue = broker.subscribe(execution.stream_token)
+
+        execution.request_cancel("user_requested")
+        assert execution.is_cancelled is True
+
+        cancelled_event = GenerationStreamEvent(
+            event_id="evt-cancel-1",
+            generation_id=execution.generation_id,
+            type="cancelled",
+            stage=GenerationStage.CANCELLED,
+            sequence_number=999,
+            emitted_at=datetime.now(UTC),
+            progress_percent=0.0,
+            payload={"reason": "user_requested"},
+        )
+        await broker.publish(execution.stream_token, cancelled_event)
+
+        received = await asyncio.wait_for(queue.get(), timeout=1.0)
+        assert received.type == "cancelled"
+        assert received.stage == GenerationStage.CANCELLED
+        assert received.payload == {"reason": "user_requested"}
+
+    def test_execution_cancellation_sets_is_cancelled_flag(self) -> None:
+        execution = GenerationExecution(
+            generation_id="gen-456",
+            mode="chat",
+            stream_token="gen_gen-456",
+        )
+        assert execution.is_cancelled is False
+        assert execution.cancel_reason is None
+
+        execution.request_cancel("timeout")
+        assert execution.is_cancelled is True
+        assert execution.cancel_reason == "timeout"
+
+    def test_execution_cancellation_multiple_calls(self) -> None:
+        execution = GenerationExecution(
+            generation_id="gen-789",
+            mode="structured",
+            stream_token="gen_gen-789",
+        )
+        execution.request_cancel("first")
+        assert execution.is_cancelled is True
+        assert execution.cancel_reason == "first"
+
+        execution.request_cancel("second")
+        assert execution.is_cancelled is True
+        assert execution.cancel_reason == "second"
+
+    @pytest.mark.asyncio()
+    async def test_run_structured_stream_stores_task_and_emits_cancelled_event(
+        self, app, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        service = app.state.container.catalog_service._generation
+        broker = app.state.container.generation_broker
+        actor = Actor(user_id="user-123", email="user@example.com")
+        execution = GenerationExecution(
+            generation_id="gen-123",
+            mode="structured",
+            stream_token="gen_gen-123",
+        )
+        broker.register_execution(execution)
+        queue = broker.subscribe(execution.stream_token)
+        started = asyncio.Event()
+
+        async def fake_generate_collection(**kwargs):
+            assert kwargs["execution"] is execution
+            assert execution.task is asyncio.current_task()
+            execution.pipeline_context = SimpleNamespace(mark_canceled=lambda: None)
+            started.set()
+            await asyncio.sleep(10.0)
+            raise AssertionError("generation task should have been cancelled")
+
+        monkeypatch.setattr(
+            "soft_skills_backend.modules.catalog.workflows.generation.service.generate_collection",
+            fake_generate_collection,
+        )
+
+        task = asyncio.create_task(
+            service.run_structured_draft_stream(
+                actor=actor,
+                execution=execution,
+                request_id="req-123",
+                trace_id="trace-123",
+                workflow_id="wf-123",
+                command=SimpleNamespace(),
+            )
+        )
+        try:
+            await asyncio.wait_for(started.wait(), timeout=1.0)
+            execution.request_cancel("unit_test_cancel")
+            assert execution.task is not None
+            execution.task.cancel()
+            await asyncio.wait_for(task, timeout=1.0)
+        finally:
+            if not task.done():
+                task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+        received = [await asyncio.wait_for(queue.get(), timeout=1.0) for _ in range(2)]
+        assert [event.type for event in received] == ["started", "cancelled"]
+        assert received[1].payload == {"reason": "unit_test_cancel"}
+        assert execution.task is None
+
+    @pytest.mark.asyncio()
+    async def test_generate_collection_links_pipeline_context_for_cancellation(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        actor = Actor(user_id="user-123", email="user@example.com")
+        execution = GenerationExecution(
+            generation_id="gen-ctx",
+            mode="structured",
+            stream_token="gen_ctx",
+            is_cancelled=True,
+            cancel_reason="unit_test_cancel",
+        )
+        captured: dict[str, object] = {}
+        expected_view = object()
+
+        class _DummyContext:
+            def __init__(self) -> None:
+                self.mark_canceled_calls = 0
+
+            def mark_canceled(self) -> None:
+                self.mark_canceled_calls += 1
+
+        async def fake_run_logged_pipeline(*args, **kwargs):
+            on_context_ready = kwargs["on_context_ready"]
+            ctx = _DummyContext()
+            captured["ctx"] = ctx
+            on_context_ready(ctx)
+            assert execution.pipeline_context is ctx
+            return object()
+
+        monkeypatch.setattr(collection_pipeline, "run_logged_pipeline", fake_run_logged_pipeline)
+        monkeypatch.setattr(collection_pipeline, "payload_from_results", lambda *args, **kwargs: expected_view)
+
+        result = await generate_collection(
+            actor=actor,
+            request_id="req-ctx",
+            trace_id="trace-ctx",
+            workflow_id="wf-ctx",
+            mode="structured",
+            structured_command=SimpleNamespace(
+                model_dump=lambda mode="json": {},
+                difficulty="intermediate",
+                target_audience="Audience",
+            ),
+            chat_command=None,
+            session_factory=SimpleNamespace(),
+            events=SimpleNamespace(record=lambda *args, **kwargs: None),
+            llm_provider=SimpleNamespace(provider_name="test-provider"),
+            prompt_security_policy=SimpleNamespace(),
+            stageflow=SimpleNamespace(),
+            prompt_registry=SimpleNamespace(),
+            config=SimpleNamespace(),
+            blueprint_output=SimpleNamespace(),
+            prompt_item_worker_output=SimpleNamespace(),
+            scenario_worker_output=SimpleNamespace(),
+            timeout_ms=1000,
+            sanitize_text=lambda text: text,
+            workplace_context_for_commands=lambda *_args: "context",
+            execution=execution,
+        )
+
+        assert result is expected_view
+        assert execution.pipeline_context is None
+        assert isinstance(captured["ctx"], _DummyContext)
+        assert captured["ctx"].mark_canceled_calls == 1

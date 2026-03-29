@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from typing import Any, cast
 from uuid import uuid4
@@ -43,6 +44,7 @@ from soft_skills_backend.modules.catalog.workflows.generation.validation import 
     validate_collection_blueprint,
     validate_generated_collection_draft,
 )
+from soft_skills_backend.modules.catalog.infra.realtime import GenerationExecution
 from soft_skills_backend.modules.catalog.workflows.generation.workers import (
     WorkerExecutionResult,
     run_prompt_item_workers,
@@ -92,11 +94,37 @@ async def generate_collection(
         [StructuredCollectionGenerationCommand | None, ChatCollectionGenerationCommand | None], str
     ],
     progress_callback: Callable[[str, float, dict[str, object]], None] | None = None,
+    execution: GenerationExecution | None = None,
 ) -> CollectionGenerationView:
     assert structured_command is not None or chat_command is not None
     command = structured_command or cast(ChatCollectionGenerationCommand, chat_command)
 
+    def _cancel_output() -> Any:
+        from stageflow.core import StageOutput
+
+        return StageOutput.cancel(
+            reason=(execution.cancel_reason if execution is not None else None) or "user_requested",
+            data={
+                "payload": {"status": "cancelled"},
+                "summary": {"status": "cancelled"},
+            },
+        )
+
+    async def _yield_for_cancel() -> Any | None:
+        if execution is None:
+            return None
+        if execution.is_cancelled:
+            return _cancel_output()
+        # Give the websocket control path a brief chance to deliver a real user cancel
+        # before starting the next expensive LLM fan-out stage.
+        await asyncio.sleep(0.15)
+        if execution.is_cancelled:
+            return _cancel_output()
+        return None
+
     async def input_guard(_ctx: StageContext) -> Any:
+        if execution is not None and execution.is_cancelled:
+            return _cancel_output()
         if progress_callback:
             progress_callback("input_guard", 5.0, {"difficulty": command.difficulty, "mode": mode})
         with session_factory() as session:
@@ -190,6 +218,9 @@ async def generate_collection(
     async def prompt_items_work(ctx: StageContext) -> Any:
         if progress_callback:
             progress_callback("prompt_items_work", 35.0, {})
+        cancel_output = await _yield_for_cancel()
+        if cancel_output is not None:
+            return cancel_output
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_guard"))
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
         prompt_item_results = await run_prompt_item_workers(
@@ -237,6 +268,9 @@ async def generate_collection(
     async def scenarios_work(ctx: StageContext) -> Any:
         if progress_callback:
             progress_callback("scenarios_work", 55.0, {})
+        cancel_output = await _yield_for_cancel()
+        if cancel_output is not None:
+            return cancel_output
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_guard"))
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
         scenario_results = await run_scenario_workers(
@@ -468,6 +502,13 @@ async def generate_collection(
         },
     )
     try:
+        def on_context_ready(pipeline_ctx: Any) -> None:
+            if execution is None:
+                return
+            execution.pipeline_context = pipeline_ctx
+            if execution.is_cancelled:
+                pipeline_ctx.mark_canceled()
+
         results = await run_logged_pipeline(
             stageflow,
             pipeline,
@@ -480,6 +521,7 @@ async def generate_collection(
             idempotency_key=f"catalog_{mode}_generation:{actor.user_id}:{request_id}",
             idempotency_params=command.model_dump(mode="json"),
             timeout_ms=timeout_ms,
+            on_context_ready=on_context_ready,
         )
         events.record(
             "catalog.generation.completed.v1",
@@ -500,3 +542,6 @@ async def generate_collection(
             payload={"mode": mode, "error": str(exc)},
         )
         raise
+    finally:
+        if execution is not None:
+            execution.pipeline_context = None
