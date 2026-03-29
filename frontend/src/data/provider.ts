@@ -53,6 +53,9 @@ import type {
   WorkflowEventView,
   PaginatedWorkflowEventsView,
   AttemptAuditView,
+  TelemetryOverviewView,
+  TelemetryTraceListView,
+  TelemetryTraceView,
   AssistantSessionView,
   AssistantTurnView,
   CreateAssistantSessionCommand,
@@ -280,6 +283,21 @@ export interface DataProvider {
   ): Promise<WorkflowEventView>;
   deleteWorkflowEvent(eventId: string): Promise<{ status: string }>;
   getAttemptAudit(attemptId: string): Promise<AttemptAuditView>;
+
+  // --- Admin: Telemetry & Monitoring -----------------------------------------
+  getTelemetryOverview(params?: {
+    organisation_id?: string;
+    from_date?: string;
+    to_date?: string;
+  }): Promise<TelemetryOverviewView>;
+  listTelemetryTraces(params?: {
+    organisation_id?: string;
+    from_date?: string;
+    to_date?: string;
+    offset?: number;
+    limit?: number;
+  }): Promise<TelemetryTraceListView>;
+  getTelemetryTrace(traceId: string): Promise<TelemetryTraceView | null>;
 
   // --- Assistant ------------------------------------------------------------
   createAssistantSession(cmd?: CreateAssistantSessionCommand): Promise<AssistantSessionView>;

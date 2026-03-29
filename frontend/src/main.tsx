@@ -21,6 +21,19 @@ import { InterviewSession } from './pages/session/InterviewSession';
 import { ScenarioSession } from './pages/session/ScenarioSession';
 import { PracticeRunSession } from './pages/session/PracticeRunSession';
 import { Chat } from './pages/Chat';
+import {
+  AdminLayout,
+  AdminOverview,
+  AdminUsers,
+  AdminLearners,
+  AdminCollections,
+  AdminEvaluations,
+  AdminPrompts,
+  AdminPipelines,
+  AdminRubrics,
+  AdminAudit,
+  AdminTelemetry,
+} from './features/admin';
 import './index.css';
 
 const router = createBrowserRouter([
@@ -51,6 +64,22 @@ const router = createBrowserRouter([
       { path: 'interview/:promptId', element: <InterviewSession /> },
       { path: 'scenario/:scenarioId', element: <ScenarioSession /> },
       { path: 'practice-run/:runId', element: <PracticeRunSession /> },
+    ],
+  },
+  {
+    path: '/admin',
+    element: <AdminLayout />,
+    children: [
+      { index: true, element: <AdminOverview /> },
+      { path: 'users', element: <AdminUsers /> },
+      { path: 'learners', element: <AdminLearners /> },
+      { path: 'collections', element: <AdminCollections /> },
+      { path: 'evaluations', element: <AdminEvaluations /> },
+      { path: 'prompts', element: <AdminPrompts /> },
+      { path: 'pipelines', element: <AdminPipelines /> },
+      { path: 'rubrics', element: <AdminRubrics /> },
+      { path: 'audit', element: <AdminAudit /> },
+      { path: 'telemetry', element: <AdminTelemetry /> },
     ],
   },
 ]);

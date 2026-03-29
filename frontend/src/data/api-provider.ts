@@ -41,6 +41,9 @@ import type {
   WorkflowEventView,
   PaginatedWorkflowEventsView,
   AttemptAuditView,
+  TelemetryOverviewView,
+  TelemetryTraceListView,
+  TelemetryTraceView,
   AssistantSessionView,
   AssistantTurnView,
   CreateAssistantSessionCommand,
@@ -372,6 +375,27 @@ export const apiDataProvider: DataProvider = {
   deleteWorkflowEvent: (eventId) =>
     request<{ status: string }>(`/events/${encodeURIComponent(eventId)}`, { method: 'DELETE' }),
   getAttemptAudit: (attemptId) => request<AttemptAuditView>(`/admin/attempts/${attemptId}/audit`),
+
+  // --- Admin: Telemetry & Monitoring -----------------------------------------
+  getTelemetryOverview: (params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.organisation_id) searchParams.set('organisation_id', params.organisation_id);
+    if (params?.from_date) searchParams.set('from_date', params.from_date);
+    if (params?.to_date) searchParams.set('to_date', params.to_date);
+    const qs = searchParams.toString();
+    return request<TelemetryOverviewView>(`/admin/telemetry/overview${qs ? `?${qs}` : ''}`);
+  },
+  listTelemetryTraces: (params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.organisation_id) searchParams.set('organisation_id', params.organisation_id);
+    if (params?.from_date) searchParams.set('from_date', params.from_date);
+    if (params?.to_date) searchParams.set('to_date', params.to_date);
+    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
+    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    const qs = searchParams.toString();
+    return request<TelemetryTraceListView>(`/admin/telemetry/traces${qs ? `?${qs}` : ''}`);
+  },
+  getTelemetryTrace: (traceId) => request<TelemetryTraceView | null>(`/admin/telemetry/traces/${encodeURIComponent(traceId)}`),
 
   // --- Assistant ------------------------------------------------------------
   createAssistantSession: (cmd) =>

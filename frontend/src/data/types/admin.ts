@@ -614,3 +614,104 @@ export interface GenerationProgressState {
   readonly collection: import('./catalog').CollectionView | null;
   readonly error: string | null;
 }
+
+export interface TelemetryProviderMetricView {
+  readonly provider: string;
+  readonly model_slug: string | null;
+  readonly operation: string;
+  readonly call_count: number;
+  readonly success_count: number;
+  readonly failure_count: number;
+  readonly success_rate: number | null;
+  readonly avg_latency_ms: number | null;
+  readonly p50_latency_ms: number | null;
+  readonly p95_latency_ms: number | null;
+  readonly p99_latency_ms: number | null;
+  readonly total_tokens: number;
+}
+
+export interface TelemetryPipelineHealthView {
+  readonly pipeline_name: string;
+  readonly total_runs: number;
+  readonly success_count: number;
+  readonly failure_count: number;
+  readonly cancel_count: number;
+  readonly success_rate: number | null;
+  readonly avg_duration_ms: number | null;
+  readonly error_rate: number | null;
+  readonly last_run_at: string | null;
+}
+
+export interface TelemetryErrorBreakdownView {
+  readonly error_code: string | null;
+  readonly error_type: string;
+  readonly count: number;
+  readonly percentage: number;
+  readonly examples: string[];
+}
+
+export interface TelemetryLatencyBucketView {
+  readonly bucket_ms: number;
+  readonly count: number;
+  readonly percentage: number;
+}
+
+export interface TelemetryOverviewView {
+  readonly organisation_id: string | null;
+  readonly from_date: string | null;
+  readonly to_date: string | null;
+  readonly total_provider_calls: number;
+  readonly provider_call_success_rate: number | null;
+  readonly avg_provider_latency_ms: number | null;
+  readonly total_pipeline_runs: number;
+  readonly pipeline_success_rate: number | null;
+  readonly total_workflow_events: number;
+  readonly total_errors: number;
+  readonly error_rate: number | null;
+  readonly provider_metrics: TelemetryProviderMetricView[];
+  readonly pipeline_health: TelemetryPipelineHealthView[];
+  readonly error_breakdown: TelemetryErrorBreakdownView[];
+  readonly latency_distribution: TelemetryLatencyBucketView[];
+}
+
+export interface TelemetryTraceSpanView {
+  readonly span_id: string | null;
+  readonly parent_span_id: string | null;
+  readonly operation_name: string;
+  readonly service_name: string | null;
+  readonly start_time: string | null;
+  readonly end_time: string | null;
+  readonly duration_ms: number | null;
+  readonly status_code: string | null;
+  readonly error: string | null;
+  readonly attributes: Record<string, unknown>;
+}
+
+export interface TelemetryTraceView {
+  readonly trace_id: string;
+  readonly organisation_id: string | null;
+  readonly spans: TelemetryTraceSpanView[];
+  readonly total_duration_ms: number | null;
+  readonly started_at: string | null;
+  readonly completed_at: string | null;
+  readonly error_count: number;
+  readonly span_count: number;
+}
+
+export interface TelemetryTraceListItemView {
+  readonly trace_id: string;
+  readonly organisation_id: string | null;
+  readonly operation_name: string | null;
+  readonly service_name: string | null;
+  readonly duration_ms: number | null;
+  readonly started_at: string | null;
+  readonly error_count: number;
+  readonly span_count: number;
+}
+
+export interface TelemetryTraceListView {
+  readonly traces: TelemetryTraceListItemView[];
+  readonly total: number;
+  readonly offset: number;
+  readonly limit: number;
+}

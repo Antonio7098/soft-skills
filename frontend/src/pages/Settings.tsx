@@ -1,8 +1,13 @@
+import { useNavigate } from 'react-router-dom';
+import { Shield } from 'lucide-react';
 import { PageShell } from '@/design-system/patterns/PageShell';
 import { Card } from '@/design-system/primitives/Card';
+import { Button } from '@/design-system/primitives/Button';
 import { ThemeSwitcher } from '@/components/navigation/ThemeSwitcher';
 
 export function Settings() {
+  const navigate = useNavigate();
+
   return (
     <PageShell
       title="Settings"
@@ -17,6 +22,32 @@ export function Settings() {
 
           <div className="p-4 rounded-xl bg-surface-secondary/50 border border-line">
             <ThemeSwitcher />
+          </div>
+        </Card>
+
+        <Card className="flex flex-col gap-6">
+          <div className="flex flex-col gap-1">
+            <h3 className="font-display text-display-xs text-content-primary">Administration</h3>
+            <p className="text-body-sm text-content-secondary">Access administrative tools and platform management.</p>
+          </div>
+
+          <div className="flex items-center justify-between p-4 rounded-xl bg-accent/5 border border-accent/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-accent" />
+              </div>
+              <div>
+                <p className="text-body-sm font-medium text-content-primary">Admin Dashboard</p>
+                <p className="text-body-xs text-content-tertiary">Manage users, content, and system settings</p>
+              </div>
+            </div>
+            <Button 
+              variant="primary" 
+              size="sm"
+              onClick={() => navigate('/admin')}
+            >
+              Go to Admin Dashboard
+            </Button>
           </div>
         </Card>
       </div>

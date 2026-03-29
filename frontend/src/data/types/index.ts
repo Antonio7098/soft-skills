@@ -126,6 +126,15 @@ export {
   type BlueprintInfo,
   type PromptItemDraft,
   type GenerationProgressState,
+  type TelemetryProviderMetricView,
+  type TelemetryPipelineHealthView,
+  type TelemetryErrorBreakdownView,
+  type TelemetryLatencyBucketView,
+  type TelemetryOverviewView,
+  type TelemetryTraceSpanView,
+  type TelemetryTraceView,
+  type TelemetryTraceListItemView,
+  type TelemetryTraceListView,
 } from './admin';
 
 export {
