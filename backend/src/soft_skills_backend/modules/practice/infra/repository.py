@@ -24,6 +24,7 @@ from soft_skills_backend.modules.practice.models import (
 )
 from soft_skills_backend.platform.db.models import AttemptRecord, PracticeRunRecord
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.workflows.stageflow import StageflowStageResult
 from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import AppError, auth_error, domain_error
@@ -33,7 +34,6 @@ from ..contracts.views import (
     build_practice_run_list_item,
     build_practice_run_view,
 )
-from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from .persistence import (
     mark_attempt_assessing,
     mark_attempt_failed,

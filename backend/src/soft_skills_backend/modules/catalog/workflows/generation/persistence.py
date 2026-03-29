@@ -23,7 +23,6 @@ from soft_skills_backend.modules.catalog.domain.models import (
     GenerationManifest,
     GenerationWorkerArtifact,
 )
-from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.modules.catalog.workflows.generation.workers import WorkerExecutionResult
 from soft_skills_backend.modules.practice.workflows.assessment import TypedLLMResult
 from soft_skills_backend.platform.db.models import (
@@ -37,6 +36,7 @@ from soft_skills_backend.platform.db.models import (
     ScenarioRecord,
     ScenarioSupportingArtifactRecord,
 )
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import domain_error
 

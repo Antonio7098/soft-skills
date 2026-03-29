@@ -33,6 +33,7 @@ from soft_skills_backend.platform.db.models import (
     PracticeRunRecord,
     PracticeSessionRecord,
 )
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.workflows.stageflow import (
     StageflowStageResult,
     metadata_value,
@@ -48,7 +49,6 @@ from soft_skills_backend.shared.errors import (
 )
 
 from ..contracts.views import build_attempt_view, build_practice_run_view, utcnow, utcnow_iso
-from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 
 
 def persist_session_start(

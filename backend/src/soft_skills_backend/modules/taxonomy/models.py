@@ -9,6 +9,7 @@ class SkillView(BaseModel):
     slug: str
     name: str
     description: str
+    organisation_id: str | None = None
 
 
 class CompetencyView(BaseModel):
@@ -16,6 +17,7 @@ class CompetencyView(BaseModel):
     name: str
     description: str
     skill_slugs: list[str] = Field(default_factory=list)
+    organisation_id: str | None = None
 
 
 class RubricView(BaseModel):
@@ -25,6 +27,7 @@ class RubricView(BaseModel):
     content_type: str
     schema_version: str
     name: str
+    organisation_id: str | None = None
 
 
 class TaxonomySnapshot(BaseModel):

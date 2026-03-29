@@ -5,7 +5,18 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from soft_skills_backend.platform.db.base import Base
@@ -127,20 +138,28 @@ class SkillRecord(Base):
     """Platform-defined skill."""
 
     __tablename__ = "skills"
+    __table_args__ = (UniqueConstraint("slug", "organisation_id", name="uq_skill_org_slug"),)
 
     slug: Mapped[str] = mapped_column(String(64), primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str] = mapped_column(Text)
+    organisation_id: Mapped[str | None] = mapped_column(
+        String(32), ForeignKey("organisations.id"), index=True, nullable=True
+    )
 
 
 class CompetencyRecord(Base):
     """Platform-defined competency."""
 
     __tablename__ = "competencies"
+    __table_args__ = (UniqueConstraint("slug", "organisation_id", name="uq_competency_org_slug"),)
 
     slug: Mapped[str] = mapped_column(String(64), primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str] = mapped_column(Text)
+    organisation_id: Mapped[str | None] = mapped_column(
+        String(32), ForeignKey("organisations.id"), index=True, nullable=True
+    )
 
 
 class CompetencySkillMapRecord(Base):
@@ -150,6 +169,24 @@ class CompetencySkillMapRecord(Base):
 
     competency_slug: Mapped[str] = mapped_column(String(64), primary_key=True)
     skill_slug: Mapped[str] = mapped_column(String(64), primary_key=True)
+    weight: Mapped[float]
+
+
+class OrganisationSkillMapRecord(Base):
+    """Mapping between org competencies and org skills (overrides canon for that org)."""
+
+    __tablename__ = "org_skill_maps"
+    __table_args__ = (
+        UniqueConstraint(
+            "organisation_id", "competency_slug", "skill_slug", name="uq_org_skill_map"
+        ),
+        Index("ix_org_skill_maps_org", "organisation_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[str] = mapped_column(String(32), index=True)
+    competency_slug: Mapped[str] = mapped_column(String(64), index=True)
+    skill_slug: Mapped[str] = mapped_column(String(64), index=True)
     weight: Mapped[float]
 
 
@@ -165,6 +202,9 @@ class RubricRecord(Base):
     schema_version: Mapped[str] = mapped_column(String(32))
     name: Mapped[str] = mapped_column(String(255))
     criteria: Mapped[list[str]] = mapped_column(JSON, default=list)
+    organisation_id: Mapped[str | None] = mapped_column(
+        String(32), ForeignKey("organisations.id"), index=True, nullable=True
+    )
 
 
 class RubricCriterionRecord(Base):
@@ -222,8 +262,11 @@ class PromptItemRecord(Base):
     __tablename__ = "prompt_items"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
-    collection_id: Mapped[str] = mapped_column(String(32), index=True)
+    collection_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
     author_user_id: Mapped[str] = mapped_column(String(32), index=True)
+    organisation_id: Mapped[str | None] = mapped_column(
+        String(32), ForeignKey("organisations.id"), index=True, nullable=True
+    )
     prompt_type: Mapped[str] = mapped_column(String(32), index=True)
     title: Mapped[str] = mapped_column(String(255))
     prompt_text: Mapped[str] = mapped_column(Text)
@@ -241,8 +284,11 @@ class ScenarioRecord(Base):
     __tablename__ = "scenarios"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
-    collection_id: Mapped[str] = mapped_column(String(32), index=True)
+    collection_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
     author_user_id: Mapped[str] = mapped_column(String(32), index=True)
+    organisation_id: Mapped[str | None] = mapped_column(
+        String(32), ForeignKey("organisations.id"), index=True, nullable=True
+    )
     title: Mapped[str] = mapped_column(String(255))
     business_context: Mapped[str] = mapped_column(Text)
     learner_objective: Mapped[str] = mapped_column(Text)

@@ -27,16 +27,16 @@ class ProviderSession(TypedDict):
 class AuthAdapter(Protocol):
     """Swappable auth provider interface."""
 
-    async def get_actor(self, request: Request) -> "Actor | None":
+    async def get_actor(self, request: Request) -> Actor | None:
         """Resolve authenticated actor from request, or None if not authenticated."""
 
     async def validate_session(self, token: str) -> ProviderSession | None:
         """Validate provider-specific token and return session info."""
 
-    async def require_actor(self, request: Request) -> "Actor":
+    async def require_actor(self, request: Request) -> Actor:
         """Require authenticated actor or raise auth error."""
 
-    async def require_org_admin(self, request: Request) -> "Actor":
+    async def require_org_admin(self, request: Request) -> Actor:
         """Require org admin actor or raise auth error."""
 
 

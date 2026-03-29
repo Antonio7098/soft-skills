@@ -484,7 +484,6 @@ async def export_analytics(
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=analytics_overview.csv"},
         )
-    import json
 
     return StreamingResponse(
         iter([overview.model_dump_json()]),

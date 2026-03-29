@@ -34,7 +34,6 @@ from soft_skills_backend.modules.catalog.domain.models import (
     GeneratedPromptItemPlanBatch,
     GeneratedScenarioDraft,
 )
-from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.modules.catalog.infra.realtime import (
     GenerationExecution,
     GenerationRealtimeBroker,
@@ -47,6 +46,7 @@ from soft_skills_backend.modules.catalog.workflows.generation.prompt_item_pipeli
 )
 from soft_skills_backend.modules.practice.workflows.assessment import TypedLLMOutput
 from soft_skills_backend.platform.db.models import RubricRecord
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.workflows.stageflow import StageflowPipelineSupport
 from soft_skills_backend.platform.workflows.stageflow_runtime import StageflowRuntime
 from soft_skills_backend.shared.auth import Actor

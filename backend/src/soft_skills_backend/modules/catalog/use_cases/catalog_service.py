@@ -35,7 +35,6 @@ from soft_skills_backend.modules.catalog.contracts.scenario_commands import (
     ScenarioUpdateCommand,
 )
 from soft_skills_backend.modules.catalog.contracts.scenario_views import ScenarioView
-from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.modules.catalog.infra.realtime import GenerationRealtimeBroker
 from soft_skills_backend.modules.catalog.workflows.collections.service import CollectionService
 from soft_skills_backend.modules.catalog.workflows.generation.service import (
@@ -44,6 +43,7 @@ from soft_skills_backend.modules.catalog.workflows.generation.service import (
 from soft_skills_backend.modules.catalog.workflows.prompt_items.service import PromptItemService
 from soft_skills_backend.modules.catalog.workflows.scenarios.service import ScenarioService
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.workflows.stageflow_runtime import StageflowRuntime
 from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.ports.llm import LLMProvider

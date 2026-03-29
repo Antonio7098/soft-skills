@@ -8,9 +8,10 @@ import socket
 import tempfile
 import threading
 import time
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator, cast
+from typing import Any, cast
 
 import httpx
 import websockets

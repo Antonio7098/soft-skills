@@ -38,6 +38,7 @@ class ScenarioCreateCommand(BaseModel):
     mock_company: MockCompanyInput | None = None
     mock_people: list[MockPersonInput] = Field(default_factory=list)
     supporting_artifacts: list[ScenarioSupportingArtifactInput] = Field(default_factory=list)
+    organisation_id: str | None = None
 
 
 class ScenarioUpdateCommand(ScenarioCreateCommand):
@@ -80,6 +81,7 @@ class ScenarioView(BaseModel):
     supporting_artifacts: list[ScenarioSupportingArtifactView] = Field(default_factory=list)
     mock_company: MockCompanyView | None = None
     mock_people: list[MockPersonView] = Field(default_factory=list)
+    organisation_id: str | None = None
 
 
 class PromptItemCreateCommand(BaseModel):
@@ -89,6 +91,7 @@ class PromptItemCreateCommand(BaseModel):
     difficulty: str
     target_skill_slugs: list[str]
     rubric_id: str
+    organisation_id: str | None = None
 
 
 class PromptItemUpdateCommand(PromptItemCreateCommand):
@@ -104,6 +107,7 @@ class PromptItemView(BaseModel):
     lifecycle_state: str
     target_skill_slugs: list[str]
     rubric_id: str
+    organisation_id: str | None = None
 
 
 class CollectionCreateCommand(BaseModel):

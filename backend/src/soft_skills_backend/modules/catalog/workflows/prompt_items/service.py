@@ -19,9 +19,9 @@ from soft_skills_backend.modules.catalog.domain.validators import (
     require_collection_owner_or_admin,
     validate_prompt_command,
 )
-from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.modules.catalog.workflows.collections.service import CollectionService
 from soft_skills_backend.platform.db.models import CollectionRecord, PromptItemRecord
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.workflows.stageflow import (
     StageflowPipelineSupport,
     StageflowStageResult,

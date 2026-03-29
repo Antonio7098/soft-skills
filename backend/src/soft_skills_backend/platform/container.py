@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker

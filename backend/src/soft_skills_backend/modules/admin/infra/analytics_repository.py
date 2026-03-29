@@ -620,11 +620,7 @@ class AdminAnalyticsRepository:
         to_date: datetime | None = None,
     ) -> TelemetryOverviewView:
         from soft_skills_backend.modules.admin.contracts.views import (
-            TelemetryErrorBreakdownView,
-            TelemetryLatencyBucketView,
             TelemetryOverviewView,
-            TelemetryPipelineHealthView,
-            TelemetryProviderMetricView,
         )
 
         with self._session_factory() as session:
@@ -756,7 +752,7 @@ class AdminAnalyticsRepository:
             )
 
             pipeline_by_trace = {p.trace_id: p for p in pipeline_runs if p.trace_id}
-            trace_spans: dict[str, int] = {tid: 0 for tid in trace_ids_set}
+            trace_spans: dict[str, int] = dict.fromkeys(trace_ids_set, 0)
             for pc in provider_calls:
                 if pc.trace_id:
                     trace_spans[pc.trace_id] = trace_spans.get(pc.trace_id, 0) + 1

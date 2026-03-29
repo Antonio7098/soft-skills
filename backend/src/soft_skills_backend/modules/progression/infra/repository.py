@@ -52,6 +52,7 @@ from soft_skills_backend.platform.db.models import (
     SkillRecord,
 )
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.workflows.stageflow import (
     metadata_value,
     request_id_from_context,
@@ -63,8 +64,6 @@ from soft_skills_backend.shared.errors import (
     persistence_error,
     validation_error,
 )
-
-from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 
 
 def _utcnow() -> datetime:

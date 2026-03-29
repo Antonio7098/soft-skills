@@ -147,18 +147,23 @@ def validate_collection_command(
             "Collections must target at least one competency",
             code="SS-VALIDATION-004",
         )
-    require_existing_skills(session, command.target_skill_slugs)
-    require_existing_competencies(session, command.target_competency_slugs)
-    require_existing_rubrics(session, command.rubric_ids)
+    require_existing_skills(session, command.target_skill_slugs, command.organisation_id)
+    require_existing_competencies(session, command.target_competency_slugs, command.organisation_id)
+    require_existing_rubrics(session, command.rubric_ids, command.organisation_id)
     require_skill_competency_alignment(
-        session, command.target_skill_slugs, command.target_competency_slugs
+        session,
+        command.target_skill_slugs,
+        command.target_competency_slugs,
+        command.organisation_id,
     )
-    require_rubric_content_alignment(session, command.content_format_mix, command.rubric_ids)
+    require_rubric_content_alignment(
+        session, command.content_format_mix, command.rubric_ids, command.organisation_id
+    )
 
 
 def validate_prompt_command(
     session: Session,
-    collection: CollectionRecord,
+    collection: CollectionRecord | None,
     command: PromptItemCreateCommand | PromptItemUpdateCommand,
 ) -> None:
     validate_difficulty(command.difficulty)
@@ -169,9 +174,8 @@ def validate_prompt_command(
             details={"prompt_type": command.prompt_type},
         )
     is_quick_practice = command.prompt_type == "quick_practice_prompt"
-    if not is_quick_practice:
-        require_existing_skills(session, command.target_skill_slugs)
-    require_existing_rubrics(session, [command.rubric_id])
+    require_existing_skills(session, command.target_skill_slugs, command.organisation_id)
+    require_existing_rubrics(session, [command.rubric_id], command.organisation_id)
     rubric = session.get(RubricRecord, command.rubric_id)
     if rubric is None:
         raise validation_error("Rubric was not found", details={"rubric_id": command.rubric_id})
@@ -182,19 +186,20 @@ def validate_prompt_command(
             code="SS-VALIDATION-006",
             details={"prompt_type": command.prompt_type, "rubric_id": command.rubric_id},
         )
-    if not is_quick_practice and not set(command.target_skill_slugs).issubset(
-        set(collection.target_skill_slugs)
-    ):
-        raise validation_error(
-            "Prompt item skills must be a subset of the collection skills",
-            code="SS-VALIDATION-007",
-        )
-    if command.prompt_type not in collection.content_format_mix:
-        raise validation_error(
-            "Prompt item type must be enabled on the collection",
-            code="SS-VALIDATION-037",
-            details={"prompt_type": command.prompt_type, "collection_id": collection.id},
-        )
+    if collection is not None:
+        if not is_quick_practice and not set(command.target_skill_slugs).issubset(
+            set(collection.target_skill_slugs)
+        ):
+            raise validation_error(
+                "Prompt item skills must be a subset of the collection skills",
+                code="SS-VALIDATION-007",
+            )
+        if command.prompt_type not in collection.content_format_mix:
+            raise validation_error(
+                "Prompt item type must be enabled on the collection",
+                code="SS-VALIDATION-037",
+                details={"prompt_type": command.prompt_type, "collection_id": collection.id},
+            )
 
 
 def validate_scenario_command(
@@ -561,11 +566,18 @@ def validate_mock_world(command: ScenarioCreateCommand | ScenarioUpdateCommand) 
         )
 
 
-def require_existing_skills(session: Session, skill_slugs: list[str]) -> None:
-    existing = {
-        record.slug
-        for record in session.query(SkillRecord).filter(SkillRecord.slug.in_(skill_slugs)).all()
-    }
+def require_existing_skills(
+    session: Session, skill_slugs: list[str], organisation_id: str | None = None
+) -> None:
+    query = session.query(SkillRecord).filter(SkillRecord.slug.in_(skill_slugs))
+    if organisation_id is not None:
+        query = query.filter(
+            (SkillRecord.organisation_id.is_(None))
+            | (SkillRecord.organisation_id == organisation_id)
+        )
+    elif organisation_id is None:
+        query = query.filter(SkillRecord.organisation_id.is_(None))
+    existing = {record.slug for record in query.all()}
     missing = sorted(set(skill_slugs) - existing)
     if missing:
         raise validation_error(
@@ -575,13 +587,18 @@ def require_existing_skills(session: Session, skill_slugs: list[str]) -> None:
         )
 
 
-def require_existing_competencies(session: Session, competency_slugs: list[str]) -> None:
-    existing = {
-        record.slug
-        for record in session.query(CompetencyRecord)
-        .filter(CompetencyRecord.slug.in_(competency_slugs))
-        .all()
-    }
+def require_existing_competencies(
+    session: Session, competency_slugs: list[str], organisation_id: str | None = None
+) -> None:
+    query = session.query(CompetencyRecord).filter(CompetencyRecord.slug.in_(competency_slugs))
+    if organisation_id is not None:
+        query = query.filter(
+            (CompetencyRecord.organisation_id.is_(None))
+            | (CompetencyRecord.organisation_id == organisation_id)
+        )
+    elif organisation_id is None:
+        query = query.filter(CompetencyRecord.organisation_id.is_(None))
+    existing = {record.slug for record in query.all()}
     missing = sorted(set(competency_slugs) - existing)
     if missing:
         raise validation_error(
@@ -591,13 +608,18 @@ def require_existing_competencies(session: Session, competency_slugs: list[str])
         )
 
 
-def require_existing_rubrics(session: Session, rubric_ids: list[str]) -> None:
-    existing = {
-        record.rubric_id
-        for record in session.query(RubricRecord)
-        .filter(RubricRecord.rubric_id.in_(rubric_ids))
-        .all()
-    }
+def require_existing_rubrics(
+    session: Session, rubric_ids: list[str], organisation_id: str | None = None
+) -> None:
+    query = session.query(RubricRecord).filter(RubricRecord.rubric_id.in_(rubric_ids))
+    if organisation_id is not None:
+        query = query.filter(
+            (RubricRecord.organisation_id.is_(None))
+            | (RubricRecord.organisation_id == organisation_id)
+        )
+    elif organisation_id is None:
+        query = query.filter(RubricRecord.organisation_id.is_(None))
+    existing = {record.rubric_id for record in query.all()}
     missing = sorted(set(rubric_ids) - existing)
     if missing:
         raise validation_error(
@@ -608,7 +630,10 @@ def require_existing_rubrics(session: Session, rubric_ids: list[str]) -> None:
 
 
 def require_skill_competency_alignment(
-    session: Session, skill_slugs: list[str], competency_slugs: list[str]
+    session: Session,
+    skill_slugs: list[str],
+    competency_slugs: list[str],
+    organisation_id: str | None = None,
 ) -> None:
     pairs = {
         (record.competency_slug, record.skill_slug)
@@ -616,6 +641,31 @@ def require_skill_competency_alignment(
         .filter(CompetencySkillMapRecord.competency_slug.in_(competency_slugs))
         .all()
     }
+    if organisation_id is not None:
+        from soft_skills_backend.platform.db.models import (
+            CompetencyRecord,
+            OrganisationSkillMapRecord,
+        )
+
+        canon_competencies = {
+            record.slug
+            for record in session.query(CompetencyRecord)
+            .filter(CompetencyRecord.organisation_id.is_(None))
+            .all()
+        }
+        for comp_slug in competency_slugs:
+            if comp_slug in canon_competencies:
+                continue
+            org_comp_pairs = {
+                (record.competency_slug, record.skill_slug)
+                for record in session.query(OrganisationSkillMapRecord)
+                .filter(
+                    OrganisationSkillMapRecord.organisation_id == organisation_id,
+                    OrganisationSkillMapRecord.competency_slug == comp_slug,
+                )
+                .all()
+            }
+            pairs = pairs | org_comp_pairs
     uncovered = [
         skill_slug
         for skill_slug in skill_slugs
@@ -630,14 +680,20 @@ def require_skill_competency_alignment(
 
 
 def require_rubric_content_alignment(
-    session: Session, content_format_mix: list[str], rubric_ids: list[str]
+    session: Session,
+    content_format_mix: list[str],
+    rubric_ids: list[str],
+    organisation_id: str | None = None,
 ) -> None:
-    rubrics = {
-        record.rubric_id: record
-        for record in session.query(RubricRecord)
-        .filter(RubricRecord.rubric_id.in_(rubric_ids))
-        .all()
-    }
+    query = session.query(RubricRecord).filter(RubricRecord.rubric_id.in_(rubric_ids))
+    if organisation_id is not None:
+        query = query.filter(
+            (RubricRecord.organisation_id.is_(None))
+            | (RubricRecord.organisation_id == organisation_id)
+        )
+    elif organisation_id is None:
+        query = query.filter(RubricRecord.organisation_id.is_(None))
+    rubrics = {record.rubric_id: record for record in query.all()}
     expected_types = set(content_format_mix)
     actual_types = {record.content_type for record in rubrics.values()}
     missing_types = sorted(expected_types - actual_types)

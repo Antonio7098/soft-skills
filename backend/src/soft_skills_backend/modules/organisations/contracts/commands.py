@@ -65,3 +65,54 @@ class UpdateMemberCommand(BaseModel):
     """Update a member's role in an organisation."""
 
     role: str = Field(..., pattern="^(admin|member)$")
+
+
+class CreateOrgSkillCommand(BaseModel):
+    """Create an org-specific skill."""
+
+    slug: str = Field(..., min_length=1, max_length=64)
+    name: str = Field(..., min_length=1, max_length=255)
+    description: str
+
+
+class UpdateOrgSkillCommand(BaseModel):
+    """Update an org-specific skill."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+
+
+class CreateOrgCompetencyCommand(BaseModel):
+    """Create an org-specific competency."""
+
+    slug: str = Field(..., min_length=1, max_length=64)
+    name: str = Field(..., min_length=1, max_length=255)
+    description: str
+    skill_slugs: list[str] = Field(default_factory=list)
+
+
+class UpdateOrgCompetencyCommand(BaseModel):
+    """Update an org-specific competency."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    skill_slugs: list[str] | None = None
+
+
+class CreateOrgRubricCommand(BaseModel):
+    """Create an org-specific rubric."""
+
+    rubric_id: str = Field(..., min_length=1, max_length=128)
+    family: str = Field(..., min_length=1, max_length=64)
+    version: str = Field(..., min_length=1, max_length=32)
+    content_type: str = Field(..., min_length=1, max_length=64)
+    schema_version: str = Field(..., min_length=1, max_length=32)
+    name: str = Field(..., min_length=1, max_length=255)
+    criteria: list[str] = Field(default_factory=list)
+
+
+class UpdateOrgRubricCommand(BaseModel):
+    """Update an org-specific rubric."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    criteria: list[str] | None = None

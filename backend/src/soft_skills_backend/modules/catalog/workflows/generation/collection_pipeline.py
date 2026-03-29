@@ -30,7 +30,7 @@ from soft_skills_backend.modules.catalog.domain.models import (
     GenerationManifest,
 )
 from soft_skills_backend.modules.catalog.domain.validators import validate_generation_request
-from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
+from soft_skills_backend.modules.catalog.infra.realtime import GenerationExecution
 from soft_skills_backend.modules.catalog.workflows.generation.persistence import (
     build_planner_artifact,
     build_worker_artifact,
@@ -44,7 +44,6 @@ from soft_skills_backend.modules.catalog.workflows.generation.validation import 
     validate_collection_blueprint,
     validate_generated_collection_draft,
 )
-from soft_skills_backend.modules.catalog.infra.realtime import GenerationExecution
 from soft_skills_backend.modules.catalog.workflows.generation.workers import (
     WorkerExecutionResult,
     run_prompt_item_workers,
@@ -54,6 +53,7 @@ from soft_skills_backend.modules.practice.workflows.assessment import (
     TypedLLMOutput,
     TypedLLMResult,
 )
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.workflows.stageflow import (
     StageflowPipelineSupport,
     StageflowStageResult,

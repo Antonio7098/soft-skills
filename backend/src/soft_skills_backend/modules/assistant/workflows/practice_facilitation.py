@@ -8,7 +8,12 @@ from pydantic import BaseModel, Field, model_validator
 
 from soft_skills_backend.modules.assistant.domain.models import AssistantMessageRole
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
-from soft_skills_backend.modules.catalog import CatalogService, CollectionView, PromptItemView, ScenarioView
+from soft_skills_backend.modules.catalog import (
+    CatalogService,
+    CollectionView,
+    PromptItemView,
+    ScenarioView,
+)
 from soft_skills_backend.modules.practice.domain.practice import PracticeType
 from soft_skills_backend.modules.practice.models import (
     AttemptView,

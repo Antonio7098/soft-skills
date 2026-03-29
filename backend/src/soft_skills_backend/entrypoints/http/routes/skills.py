@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from soft_skills_backend.entrypoints.http.dependencies import (
     get_taxonomy_service,
@@ -15,9 +15,12 @@ router = APIRouter()
 
 
 @router.get("/catalog", response_model=ApiEnvelope[TaxonomySnapshot])
-async def get_catalog(request: Request) -> ApiEnvelope[TaxonomySnapshot]:
+async def get_catalog(
+    request: Request,
+    organisation_id: str | None = Query(default=None),
+) -> ApiEnvelope[TaxonomySnapshot]:
     service = get_taxonomy_service(request)
-    return ok_response(request, service.snapshot())
+    return ok_response(request, service.snapshot(organisation_id=organisation_id))
 
 
 @router.post("/bootstrap-canon", response_model=ApiEnvelope[TaxonomySnapshot])

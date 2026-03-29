@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.modules.taxonomy.models import (
@@ -15,6 +16,7 @@ from soft_skills_backend.modules.taxonomy.models import (
 from soft_skills_backend.platform.db.models import (
     CompetencyRecord,
     CompetencySkillMapRecord,
+    OrganisationSkillMapRecord,
     RubricCriterionRecord,
     RubricRecord,
     SkillRecord,
@@ -496,27 +498,119 @@ class TaxonomyService:
         )
         return self.snapshot()
 
-    def snapshot(self) -> TaxonomySnapshot:
+    def snapshot(self, organisation_id: str | None = None) -> TaxonomySnapshot:
         with self._session_factory() as session:
-            skills = [
-                SkillView(slug=record.slug, name=record.name, description=record.description)
-                for record in session.query(SkillRecord).order_by(SkillRecord.name).all()
-            ]
-            mappings = session.query(CompetencySkillMapRecord).all()
-            competency_to_skills: dict[str, list[str]] = {}
-            for mapping in mappings:
-                competency_to_skills.setdefault(mapping.competency_slug, []).append(
-                    mapping.skill_slug
+            query_filters = []
+            if organisation_id is not None:
+                query_filters.append(
+                    or_(
+                        SkillRecord.organisation_id.is_(None),
+                        SkillRecord.organisation_id == organisation_id,
+                    )
                 )
-            competencies = [
-                CompetencyView(
+            elif organisation_id is None:
+                query_filters.append(SkillRecord.organisation_id.is_(None))
+
+            skills = [
+                SkillView(
                     slug=record.slug,
                     name=record.name,
                     description=record.description,
-                    skill_slugs=sorted(competency_to_skills.get(record.slug, [])),
+                    organisation_id=record.organisation_id,
                 )
-                for record in session.query(CompetencyRecord).order_by(CompetencyRecord.name).all()
+                for record in session.query(SkillRecord)
+                .filter(*query_filters)
+                .order_by(SkillRecord.name)
+                .all()
             ]
+
+            if organisation_id is not None:
+                org_skill_slugs = {s.slug for s in skills if s.organisation_id == organisation_id}
+                canon_skill_slugs = {s.slug for s in skills if s.organisation_id is None}
+                all_skill_slugs = org_skill_slugs | canon_skill_slugs
+
+                org_maps = (
+                    session.query(OrganisationSkillMapRecord)
+                    .filter(OrganisationSkillMapRecord.organisation_id == organisation_id)
+                    .all()
+                )
+                org_competency_to_skills: dict[str, list[str]] = {}
+                for mapping in org_maps:
+                    org_competency_to_skills.setdefault(mapping.competency_slug, []).append(
+                        mapping.skill_slug
+                    )
+
+                mappings: list[CompetencySkillMapRecord] = (
+                    session.query(CompetencySkillMapRecord)
+                    .filter(CompetencySkillMapRecord.skill_slug.in_(all_skill_slugs))
+                    .all()
+                )
+                canon_competency_to_skills: dict[str, list[str]] = {}
+                for comp_skill_mapping in mappings:
+                    canon_competency_to_skills.setdefault(
+                        comp_skill_mapping.competency_slug, []
+                    ).append(comp_skill_mapping.skill_slug)
+
+                def get_skill_slugs_for_competency(comp_slug: str) -> list[str]:
+                    if comp_slug in org_competency_to_skills:
+                        return sorted(org_competency_to_skills[comp_slug])
+                    return sorted(canon_competency_to_skills.get(comp_slug, []))
+
+                comp_query_filters = []
+                comp_query_filters.append(
+                    or_(
+                        CompetencyRecord.organisation_id.is_(None),
+                        CompetencyRecord.organisation_id == organisation_id,
+                    )
+                )
+
+                competencies = [
+                    CompetencyView(
+                        slug=record.slug,
+                        name=record.name,
+                        description=record.description,
+                        skill_slugs=get_skill_slugs_for_competency(record.slug),
+                        organisation_id=record.organisation_id,
+                    )
+                    for record in session.query(CompetencyRecord)
+                    .filter(*comp_query_filters)
+                    .order_by(CompetencyRecord.name)
+                    .all()
+                ]
+            else:
+                all_mappings: list[CompetencySkillMapRecord] = session.query(
+                    CompetencySkillMapRecord
+                ).all()
+                competency_to_skills: dict[str, list[str]] = {}
+                for comp_skill_mapping in all_mappings:
+                    competency_to_skills.setdefault(comp_skill_mapping.competency_slug, []).append(
+                        comp_skill_mapping.skill_slug
+                    )
+                competencies = [
+                    CompetencyView(
+                        slug=record.slug,
+                        name=record.name,
+                        description=record.description,
+                        skill_slugs=sorted(competency_to_skills.get(record.slug, [])),
+                        organisation_id=record.organisation_id,
+                    )
+                    for record in session.query(CompetencyRecord)
+                    .filter(CompetencyRecord.organisation_id.is_(None))
+                    .order_by(CompetencyRecord.name)
+                    .all()
+                ]
+
+            rubric_filters = []
+            if organisation_id is not None:
+                rubric_filters.append(
+                    or_(
+                        RubricRecord.organisation_id.is_(None),
+                        RubricRecord.organisation_id == organisation_id,
+                    )
+                )
+            elif organisation_id is None:
+                rubric_filters.append(RubricRecord.organisation_id.is_(None))
+
             rubrics = [
                 RubricView(
                     rubric_id=record.rubric_id,
@@ -525,7 +619,11 @@ class TaxonomyService:
                     content_type=record.content_type,
                     schema_version=record.schema_version,
                     name=record.name,
+                    organisation_id=record.organisation_id,
                 )
-                for record in session.query(RubricRecord).order_by(RubricRecord.rubric_id).all()
+                for record in session.query(RubricRecord)
+                .filter(*rubric_filters)
+                .order_by(RubricRecord.rubric_id)
+                .all()
             ]
         return TaxonomySnapshot(skills=skills, competencies=competencies, rubrics=rubrics)

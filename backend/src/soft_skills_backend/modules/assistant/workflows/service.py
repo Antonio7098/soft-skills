@@ -34,15 +34,15 @@ from soft_skills_backend.modules.assistant.infra.realtime import (
     AssistantRealtimeBroker,
 )
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
+from soft_skills_backend.modules.assistant.workflows.practice_facilitation import (
+    AssistantPracticeState,
+)
 from soft_skills_backend.modules.assistant.workflows.prompting import (
     ASSISTANT_FINAL_RESPONSE_PROMPT_NAME,
     ASSISTANT_FINAL_RESPONSE_PROMPT_VERSION,
     ASSISTANT_PROMPT_NAME,
     ASSISTANT_PROMPT_VERSION,
     render_tool_definitions,
-)
-from soft_skills_backend.modules.assistant.workflows.practice_facilitation import (
-    AssistantPracticeState,
 )
 from soft_skills_backend.modules.assistant.workflows.runtime_models import AssistantDecision
 from soft_skills_backend.modules.assistant.workflows.tools import (

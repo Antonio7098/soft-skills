@@ -32,7 +32,6 @@ from soft_skills_backend.modules.catalog.domain.validators import (
     validate_collection_unsave,
     validate_lifecycle_transition,
 )
-from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.db.models import (
     CollectionRatingRecord,
     CollectionRecord,
@@ -40,6 +39,7 @@ from soft_skills_backend.platform.db.models import (
     PromptItemRecord,
     ScenarioRecord,
 )
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.workflows.stageflow import (
     StageflowPipelineSupport,
     StageflowStageResult,

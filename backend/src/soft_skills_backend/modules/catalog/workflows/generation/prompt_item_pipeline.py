@@ -33,7 +33,6 @@ from soft_skills_backend.modules.catalog.domain.validators import (
     validate_prompt_command,
     validate_prompt_item_generation_request,
 )
-from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.modules.catalog.workflows.generation.persistence import (
     build_planner_artifact,
     build_worker_artifact,
@@ -56,6 +55,7 @@ from soft_skills_backend.modules.practice.workflows.assessment import (
     TypedLLMResult,
 )
 from soft_skills_backend.platform.db.models import PromptItemRecord
+from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.workflows.stageflow import (
     StageflowPipelineSupport,
     StageflowStageResult,
