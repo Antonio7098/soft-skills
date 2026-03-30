@@ -26,14 +26,12 @@ from soft_skills_backend.modules.assistant.domain.models import (
 )
 from soft_skills_backend.modules.identity.models import LearnerProfileView
 from soft_skills_backend.platform.db.models import (
-    AssessmentRecord,
     AssistantMessageRecord,
     AssistantApprovalRequestRecord,
     AssistantSessionRecord,
     AssistantStreamEventRecord,
     AssistantToolCallRecord,
     AssistantTurnRecord,
-    AttemptRecord,
     LearnerProfileRecord,
     UserAccountRecord,
 )
@@ -298,46 +296,6 @@ class AssistantRepository:
                     practice_preferences=dict(profile.practice_preferences),
                 ).model_dump(mode="json"),
             }
-
-    def load_recent_attempts(self, *, actor: Actor, limit: int = 5) -> list[dict[str, Any]]:
-        with self._session_factory() as session:
-            attempts = (
-                session.query(AttemptRecord)
-                .filter(AttemptRecord.user_id == actor.user_id)
-                .order_by(AttemptRecord.created_at.desc())
-                .limit(limit)
-                .all()
-            )
-            payload: list[dict[str, Any]] = []
-            for attempt in attempts:
-                assessment = None
-                if attempt.assessment_id is not None:
-                    assessment = session.get(AssessmentRecord, attempt.assessment_id)
-                payload.append(
-                    {
-                        "attempt_id": attempt.id,
-                        "session_id": attempt.session_id,
-                        "status": attempt.status,
-                        "practice_type": attempt.practice_type,
-                        "content_item_id": attempt.content_item_id,
-                        "response_text": attempt.response_text,
-                        "created_at": attempt.created_at.isoformat(),
-                        "assessed_at": (
-                            None if attempt.assessed_at is None else attempt.assessed_at.isoformat()
-                        ),
-                        "assessment": None
-                        if assessment is None
-                        else {
-                            "assessment_id": assessment.id,
-                            "overall_score": assessment.overall_score,
-                            "strengths": list(assessment.strengths),
-                            "weaknesses": list(assessment.weaknesses),
-                            "next_actions": list(assessment.next_actions),
-                            "skill_scores": list(assessment.skill_scores),
-                        },
-                    }
-                )
-            return payload
 
     def mark_turn_running(self, *, turn_id: str, pipeline_run_id: str) -> AssistantTurnView:
         now = datetime.now(UTC)

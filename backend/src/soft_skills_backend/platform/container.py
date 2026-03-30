@@ -31,8 +31,12 @@ from soft_skills_backend.modules.admin_agent.workflows.service import (
 from soft_skills_backend.modules.admin.domain.prompt_registry import PromptRegistry
 from soft_skills_backend.modules.admin.infra.prompt_repository import PromptRepository
 from soft_skills_backend.modules.assistant import AssistantService
+from soft_skills_backend.modules.assistant.domain.redactor import AssistantResultRedactor
+from soft_skills_backend.modules.assistant.domain.schema_registry import AssistantSchemaRegistry
 from soft_skills_backend.modules.assistant.infra.realtime import AssistantRealtimeBroker
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
+from soft_skills_backend.modules.assistant.infra.sql_executor import AssistantSqlExecutor
+from soft_skills_backend.modules.assistant.infra.sql_guard import AssistantSqlGuard
 from soft_skills_backend.modules.assistant.workflows.approval_service import (
     AssistantApprovalService,
 )
@@ -244,6 +248,17 @@ def build_container(settings: Settings) -> AppContainer:
         session_factory=session_factory,
         workflow_events=workflow_events,
     )
+    assistant_schema_registry = AssistantSchemaRegistry()
+    assistant_sql_guard = AssistantSqlGuard(
+        schema_registry=assistant_schema_registry,
+        row_limit=settings.admin_agent_query_row_limit,
+    )
+    assistant_sql_executor = AssistantSqlExecutor(
+        session_factory=session_factory,
+        redactor=AssistantResultRedactor(),
+        row_limit=settings.admin_agent_query_row_limit,
+        timeout_seconds=settings.admin_agent_query_timeout_seconds,
+    )
     assistant_approval_service = AssistantApprovalService(repository=assistant_repository)
     assistant_service = AssistantService(
         repository=assistant_repository,
@@ -252,6 +267,9 @@ def build_container(settings: Settings) -> AppContainer:
             repository=assistant_repository,
             approvals=assistant_approval_service,
             broker=assistant_broker,
+            schema_registry=assistant_schema_registry,
+            sql_guard=assistant_sql_guard,
+            sql_executor=assistant_sql_executor,
             catalog_service=catalog_service,
             practice_service=practice_service,
             progression_service=progression_service,

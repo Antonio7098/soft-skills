@@ -411,10 +411,18 @@ class SmokeBackendClient:
         user_id: str,
         session_id: str,
         message: str,
+        organisation_id: str | None = None,
     ) -> JsonObject:
         response = await self._client.post(
             f"/api/assistant/sessions/{session_id}/turns",
-            headers={"X-User-ID": user_id},
+            headers={
+                "X-User-ID": user_id,
+                **(
+                    {}
+                    if organisation_id is None
+                    else {"X-Organisation-ID": organisation_id}
+                ),
+            },
             json={"message": message},
         )
         self.require_ok(response, "create assistant turn")

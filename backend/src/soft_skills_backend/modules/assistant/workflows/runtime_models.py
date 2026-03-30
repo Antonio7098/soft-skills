@@ -7,10 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, model_validator
 
 AssistantToolName = Literal[
-    "list_collections",
-    "get_collection",
-    "list_recent_attempts",
-    "get_attempt",
+    "query_user_context",
     "start_collection_practice",
     "get_active_practice",
     "submit_active_practice_response",

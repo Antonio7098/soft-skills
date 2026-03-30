@@ -118,6 +118,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
+    if (res.status === 401) {
+      const isLoginPage = window.location.pathname === '/login';
+      if (!isLoginPage) {
+        window.location.href = '/login';
+      }
+      throw new ApiRequestError('Session expired', { status: 401 });
+    }
     const body = await res.json().catch(() => ({}));
     throw new ApiRequestError(body?.error?.message ?? `API error ${res.status}`, { status: res.status });
   }

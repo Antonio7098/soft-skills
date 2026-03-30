@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from collections.abc import AsyncGenerator
 from pathlib import Path
@@ -13,6 +14,9 @@ SRC_PATH = Path(__file__).resolve().parents[1] / "src"
 src_str = str(SRC_PATH)
 if src_str not in sys.path:
     sys.path.insert(0, src_str)
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+os.chdir(BACKEND_ROOT)
 
 from soft_skills_backend.app import create_app
 from soft_skills_backend.config import Settings
@@ -35,7 +39,7 @@ def app(test_settings: Settings):
 async def client(app) -> AsyncGenerator[httpx.AsyncClient, None]:
     loop = asyncio.get_running_loop()
     app.state.container.background_tasks.attach(loop)
-    transport = httpx.ASGITransport(app=app)
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(
         transport=transport,
         base_url="http://testserver",

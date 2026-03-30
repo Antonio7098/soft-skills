@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import cast
+from uuid import uuid4
 
 import httpx
 import websockets
 
 from soft_skills_backend.app import create_app
 from soft_skills_backend.config import Settings
+from soft_skills_backend.platform.db.models import AssessmentRecord, AttemptRecord
 from soft_skills_backend.shared.errors import provider_error
 from soft_skills_backend.smoke.contracts import SmokeCase, SmokeContext
 from soft_skills_backend.smoke.support.actors import SmokeActorBootstrap
@@ -133,6 +136,297 @@ class AssistantReadRuntimeSmoke(_AssistantRuntimeSmoke):
             "message_count": len(messages),
             "assistant_message_preview": str(assistant_message.get("content", ""))[:160],
         }
+
+
+class AssistantReadSqlWorkflowSmoke(SmokeCase):
+    """Local deterministic assistant SQL-read workflow smoke."""
+
+    name = "assistant-read-sql-workflow"
+    description = "Run a local assistant turn that reads learner-safe SQL through query_user_context."
+
+    def run(self, context: SmokeContext) -> AssistantRuntimeSmokeResult:
+        return asyncio.run(asyncio.wait_for(self._run(context.settings), timeout=60.0))
+
+    async def _run(self, settings: Settings) -> AssistantRuntimeSmokeResult:
+        with TemporaryDirectory(prefix="soft-skills-assistant-sql-smoke-") as temp_dir:
+            database_path = Path(temp_dir) / "assistant-sql-smoke.db"
+            smoke_settings = settings.model_copy(
+                update={
+                    "environment": "test",
+                    "database_url": f"sqlite+pysqlite:///{database_path}",
+                    "provider_max_retries": 0,
+                }
+            )
+            app = create_app(smoke_settings)
+            app.state.container.background_tasks.attach(asyncio.get_running_loop())
+            SmokeApplicationSessionFactory()._migrate(smoke_settings)
+            app.state.container.assistant_service._workflows._llm_provider = (  # type: ignore[attr-defined]
+                _ApprovalSequencedAssistantProvider(
+                    payloads=[
+                        {
+                            "tool_calls": [
+                                {
+                                    "call_id": "call-read",
+                                    "tool_name": "query_user_context",
+                                    "arguments": {
+                                        "sql": (
+                                            "SELECT COUNT(*) AS attempt_count "
+                                            "FROM assistant_safe_attempt_summaries_v"
+                                        )
+                                    },
+                                }
+                            ],
+                            "final_response": None,
+                        },
+                        {
+                            "tool_calls": [],
+                            "final_response": "You have one assessed attempt on record.",
+                        },
+                    ]
+                )
+            )
+            app.state.container.assistant_service._workflows._tools._auto_allow_tools = frozenset(  # type: ignore[attr-defined]
+                tool_name
+                for tool_name in app.state.container.assistant_service._workflows._tools._auto_allow_tools  # type: ignore[attr-defined]
+                if tool_name != "start_collection_practice"
+            )
+            transport = httpx.ASGITransport(app=app)
+            try:
+                async with httpx.AsyncClient(
+                    transport=transport,
+                    base_url="http://testserver",
+                ) as client:
+                    backend = SmokeBackendClient(
+                        client,
+                        session_factory=app.state.container.session_factory,
+                    )
+                    actors = await SmokeActorBootstrap(backend).prepare()
+                    organisation = await backend.create_organisation(
+                        user_id=actors.admin_id,
+                        name="Assistant SQL Smoke Org",
+                        slug=f"assistant-sql-smoke-{uuid4().hex[:8]}",
+                    )
+                    await backend.add_member(
+                        user_id=actors.admin_id,
+                        organisation_id=str(organisation["id"]),
+                        new_member_id=actors.learner_id,
+                    )
+                    self._seed_attempt_summary(
+                        app.state.container.session_factory,
+                        user_id=actors.learner_id,
+                    )
+                    session_payload = await backend.create_assistant_session(
+                        user_id=actors.learner_id,
+                        title="Assistant SQL Smoke",
+                    )
+                    turn_payload = await backend.create_assistant_turn(
+                        user_id=actors.learner_id,
+                        session_id=str(session_payload["id"]),
+                        message="How many assessed attempts do I have?",
+                        organisation_id=str(organisation["id"]),
+                    )
+                    turn = await backend.wait_for_assistant_turn(
+                        user_id=actors.learner_id,
+                        session_id=str(session_payload["id"]),
+                        turn_id=str(turn_payload["id"]),
+                    )
+                    if str(turn["status"]) != "completed":
+                        raise provider_error(
+                            "Assistant SQL smoke did not complete successfully",
+                            code="SS-PROVIDER-011",
+                            details={
+                                "turn_status": turn.get("status"),
+                                "last_error_code": turn.get("last_error_code"),
+                            },
+                        )
+                    tool_names = [
+                        str(tool["tool_name"])
+                        for tool in cast(list[JsonObject], turn.get("tool_calls", []))
+                    ]
+                    if "query_user_context" not in tool_names:
+                        raise provider_error(
+                            "Assistant SQL smoke did not invoke query_user_context",
+                            code="SS-PROVIDER-011",
+                            details={"tool_names": tool_names},
+                        )
+                    messages = await backend.list_assistant_messages(
+                        user_id=actors.learner_id,
+                        session_id=str(session_payload["id"]),
+                    )
+                    assistant_message = cast(JsonObject, messages[-1]) if messages else {}
+                    return AssistantRuntimeSmokeResult(
+                        status="ok",
+                        session_id=str(session_payload["id"]),
+                        turn_id=str(turn_payload["id"]),
+                        turn_status=str(turn["status"]),
+                        tool_names=tool_names,
+                        message_count=len(messages),
+                        assistant_message_preview=str(assistant_message.get("content", ""))[:160],
+                    )
+            finally:
+                await app.state.container.background_tasks.shutdown()
+                await app.state.container.shutdown()
+                app.state.container.dispose()
+
+
+class AssistantReadSqlDeniedSmoke(SmokeCase):
+    """Local deterministic assistant SQL-denial workflow smoke."""
+
+    name = "assistant-read-sql-denied"
+    description = "Run a local assistant turn that is denied when it attempts raw-table SQL."
+
+    def run(self, context: SmokeContext) -> AssistantRuntimeSmokeResult:
+        return asyncio.run(asyncio.wait_for(self._run(context.settings), timeout=60.0))
+
+    async def _run(self, settings: Settings) -> AssistantRuntimeSmokeResult:
+        with TemporaryDirectory(prefix="soft-skills-assistant-sql-denied-smoke-") as temp_dir:
+            database_path = Path(temp_dir) / "assistant-sql-denied-smoke.db"
+            smoke_settings = settings.model_copy(
+                update={
+                    "environment": "test",
+                    "database_url": f"sqlite+pysqlite:///{database_path}",
+                    "provider_max_retries": 0,
+                }
+            )
+            app = create_app(smoke_settings)
+            app.state.container.background_tasks.attach(asyncio.get_running_loop())
+            SmokeApplicationSessionFactory()._migrate(smoke_settings)
+            app.state.container.assistant_service._workflows._llm_provider = (  # type: ignore[attr-defined]
+                _ApprovalSequencedAssistantProvider(
+                    payloads=[
+                        {
+                            "tool_calls": [
+                                {
+                                    "call_id": "call-read",
+                                    "tool_name": "query_user_context",
+                                    "arguments": {
+                                        "sql": "SELECT COUNT(*) AS user_count FROM user_accounts"
+                                    },
+                                }
+                            ],
+                            "final_response": None,
+                        }
+                    ]
+                )
+            )
+            transport = httpx.ASGITransport(app=app)
+            try:
+                async with httpx.AsyncClient(
+                    transport=transport,
+                    base_url="http://testserver",
+                ) as client:
+                    backend = SmokeBackendClient(
+                        client,
+                        session_factory=app.state.container.session_factory,
+                    )
+                    actors = await SmokeActorBootstrap(backend).prepare()
+                    session_payload = await backend.create_assistant_session(
+                        user_id=actors.learner_id,
+                        title="Assistant SQL Denied Smoke",
+                    )
+                    turn_payload = await backend.create_assistant_turn(
+                        user_id=actors.learner_id,
+                        session_id=str(session_payload["id"]),
+                        message="How many global users exist?",
+                    )
+                    turn = await backend.wait_for_assistant_turn(
+                        user_id=actors.learner_id,
+                        session_id=str(session_payload["id"]),
+                        turn_id=str(turn_payload["id"]),
+                    )
+                    if str(turn["status"]) != "failed":
+                        raise provider_error(
+                            "Assistant SQL denied smoke did not fail as expected",
+                            code="SS-PROVIDER-011",
+                            details={
+                                "turn_status": turn.get("status"),
+                                "last_error_code": turn.get("last_error_code"),
+                            },
+                        )
+                    tool_names = [
+                        str(tool["tool_name"])
+                        for tool in cast(list[JsonObject], turn.get("tool_calls", []))
+                    ]
+                    tool_calls = cast(list[JsonObject], turn.get("tool_calls", []))
+                    if not tool_calls or str(tool_calls[0].get("error_code")) != "SS-VALIDATION-318":
+                        raise provider_error(
+                            "Assistant SQL denied smoke did not surface the expected validation error",
+                            code="SS-PROVIDER-011",
+                            details={"tool_calls": tool_calls},
+                        )
+                    return AssistantRuntimeSmokeResult(
+                        status="ok",
+                        session_id=str(session_payload["id"]),
+                        turn_id=str(turn_payload["id"]),
+                        turn_status=str(turn["status"]),
+                        tool_names=tool_names,
+                        message_count=0,
+                        assistant_message_preview=None,
+                    )
+            finally:
+                await app.state.container.background_tasks.shutdown()
+                await app.state.container.shutdown()
+                app.state.container.dispose()
+
+    def _seed_attempt_summary(self, session_factory: Any, *, user_id: str) -> None:
+        now = datetime.now(UTC)
+        attempt_id = uuid4().hex
+        assessment_id = uuid4().hex
+        with session_factory() as session:
+            session.add(
+                AttemptRecord(
+                    id=attempt_id,
+                    session_id=uuid4().hex,
+                    user_id=user_id,
+                    workflow_id=uuid4().hex,
+                    practice_type="quick_practice",
+                    content_item_id=uuid4().hex,
+                    content_item_type="prompt_item",
+                    status="assessed",
+                    response_mode="text",
+                    response_text="Learner response",
+                    delivery_version="v1",
+                    rubric_id="quick_practice_reset_timeline@v1",
+                    rubric_version="v1",
+                    assessment_id=assessment_id,
+                    last_error_code=None,
+                    trace_id=uuid4().hex[:32],
+                    created_at=now,
+                    submitted_at=now,
+                    assessed_at=now,
+                )
+            )
+            session.add(
+                AssessmentRecord(
+                    id=assessment_id,
+                    attempt_id=attempt_id,
+                    session_id=uuid4().hex,
+                    user_id=user_id,
+                    workflow_id=uuid4().hex,
+                    practice_type="quick_practice",
+                    validation_status="validated",
+                    prompt_version="test.prompt.v1",
+                    rubric_id="quick_practice_reset_timeline@v1",
+                    rubric_version="v1",
+                    schema_version="test.schema.v1",
+                    config_version="test.config.v1",
+                    provider="test-provider",
+                    model_slug="test-model",
+                    overall_score=4,
+                    skill_scores=[],
+                    evidence=[],
+                    rationale="sound rationale",
+                    strengths=["Clear framing"],
+                    weaknesses=["Could be more specific"],
+                    next_actions=["Add a sharper tradeoff"],
+                    raw_payload={},
+                    rejection_code=None,
+                    trace_id=uuid4().hex[:32],
+                    pipeline_run_id=uuid4().hex,
+                    created_at=now,
+                )
+            )
+            session.commit()
 
 
 class _ApprovalSequencedAssistantProvider:

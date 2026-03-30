@@ -37,24 +37,38 @@ def test_settings_without_otel(tmp_path: Path) -> Settings:
 
 @pytest.fixture()
 def app_with_otel(test_settings_with_otel: Settings):
+    alembic_config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
+    alembic_config.set_main_option(
+        "script_location",
+        str(Path(__file__).resolve().parents[2] / "alembic"),
+    )
+    alembic_config.set_main_option("sqlalchemy.url", test_settings_with_otel.database_url)
+    command.upgrade(alembic_config, "head")
     return create_app(test_settings_with_otel)
 
 
 @pytest.fixture()
 def app_without_otel(test_settings_without_otel: Settings):
+    alembic_config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
+    alembic_config.set_main_option(
+        "script_location",
+        str(Path(__file__).resolve().parents[2] / "alembic"),
+    )
+    alembic_config.set_main_option("sqlalchemy.url", test_settings_without_otel.database_url)
+    command.upgrade(alembic_config, "head")
     return create_app(test_settings_without_otel)
 
 
 @pytest_asyncio.fixture()
 async def client_with_otel(app_with_otel) -> AsyncGenerator[httpx.AsyncClient, None]:
-    transport = httpx.ASGITransport(app=app_with_otel)
+    transport = httpx.ASGITransport(app=app_with_otel, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as async_client:
         yield async_client
 
 
 @pytest_asyncio.fixture()
 async def client_without_otel(app_without_otel) -> AsyncGenerator[httpx.AsyncClient, None]:
-    transport = httpx.ASGITransport(app=app_without_otel)
+    transport = httpx.ASGITransport(app=app_without_otel, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as async_client:
         yield async_client
 
@@ -78,10 +92,6 @@ async def test_readiness_endpoint_includes_otel_checks(
     client_without_otel,
     test_settings_without_otel,
 ) -> None:
-    alembic_config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
-    alembic_config.set_main_option("sqlalchemy.url", test_settings_without_otel.database_url)
-    command.upgrade(alembic_config, "head")
-
     response = await client_without_otel.get("/api/health/readiness")
     payload = response.json()
 

@@ -293,9 +293,12 @@ class AdminAnalyticsRepository:
                 ],
             )
             snapshot_payloads = [record.snapshot_payload for record in latest_snapshots.values()]
-            thirty_days_ago = datetime.utcnow().replace(
-                hour=0, minute=0, second=0, microsecond=0
-            ) - timedelta(days=30)
+            thirty_days_ago = (
+                datetime.now(UTC)
+                .replace(hour=0, minute=0, second=0, microsecond=0)
+                .replace(tzinfo=None)
+                - timedelta(days=30)
+            )
             active_learner_ids: set[str] = set()
             for session_record in sessions:
                 created_at = session_record.created_at

@@ -28,12 +28,16 @@ from soft_skills_backend.modules.admin.workflows.prompt_render_stage import (
 )
 from soft_skills_backend.modules.assistant.contracts.stream import AssistantStreamEvent
 from soft_skills_backend.modules.assistant.contracts.views import AssistantTurnView
+from soft_skills_backend.modules.assistant.contracts.sql import QueryUserContextCommand
+from soft_skills_backend.modules.assistant.domain.schema_registry import AssistantSchemaRegistry
 from soft_skills_backend.modules.assistant.domain.models import AssistantTurnStatus
 from soft_skills_backend.modules.assistant.infra.realtime import (
     ActiveTurnExecution,
     AssistantRealtimeBroker,
 )
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
+from soft_skills_backend.modules.assistant.infra.sql_executor import AssistantSqlExecutor
+from soft_skills_backend.modules.assistant.infra.sql_guard import AssistantSqlGuard
 from soft_skills_backend.modules.assistant.workflows.practice_facilitation import (
     AssistantPracticeState,
 )
@@ -107,6 +111,9 @@ class AssistantWorkflowService:
         repository: AssistantRepository,
         approvals: AssistantApprovalService,
         broker: AssistantRealtimeBroker,
+        schema_registry: AssistantSchemaRegistry,
+        sql_guard: AssistantSqlGuard,
+        sql_executor: AssistantSqlExecutor,
         catalog_service: CatalogService,
         practice_service: PracticeService,
         progression_service: ProgressionService,
@@ -118,6 +125,9 @@ class AssistantWorkflowService:
         self._llm_provider = llm_provider
         self._repository = repository
         self._broker = broker
+        self._schema_registry = schema_registry
+        self._sql_guard = sql_guard
+        self._sql_executor = sql_executor
         self._progression = progression_service
         self._prompt_registry = prompt_registry
         self._stageflow = StageflowPipelineSupport.from_runtime(stageflow_runtime)
@@ -134,6 +144,8 @@ class AssistantWorkflowService:
             repository=repository,
             approvals=approvals,
             broker=broker,
+            sql_guard=sql_guard,
+            sql_executor=sql_executor,
             catalog_service=catalog_service,
             practice_service=practice_service,
             stageflow_support=self._stageflow,
@@ -299,11 +311,24 @@ class AssistantWorkflowService:
             )
 
         async def attempts_enrich(_ctx: StageContext) -> Any:
-            attempts = self._repository.load_recent_attempts(actor=execution.actor, limit=5)
+            guarded = self._sql_guard.validate_and_scope(
+                QueryUserContextCommand(
+                    sql=(
+                        "SELECT attempt_id, practice_type, status, overall_score, "
+                        "strength_summary, next_action_summary, created_at, assessed_at "
+                        "FROM assistant_safe_attempt_summaries_v "
+                        "ORDER BY created_at DESC LIMIT 5"
+                    )
+                )
+            )
+            result = await self._sql_executor.execute(
+                actor=execution.actor,
+                query=guarded,
+            )
             return ok_output(
                 StageflowStageResult(
-                    payload=attempts,
-                    summary={"attempt_count": len(attempts)},
+                    payload=result.rows,
+                    summary={"attempt_count": len(result.rows)},
                 )
             )
 
@@ -338,6 +363,7 @@ class AssistantWorkflowService:
                         },
                         sort_keys=True,
                     ),
+                    "read_schema_context": self._schema_registry.render_prompt_context(),
                     "practice_state": cast(
                         AssistantPracticeState,
                         payload_from_inputs(ctx, "session_state_enrich"),

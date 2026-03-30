@@ -255,8 +255,8 @@ class TestToolInvokedEvent:
         tool_requests = [
             AssistantToolRequest(
                 call_id="call-1",
-                tool_name="list_recent_attempts",
-                arguments={"limit": 2},
+                tool_name="query_user_context",
+                arguments={"sql": "SELECT attempt_id FROM assistant_safe_attempt_summaries_v"},
             )
         ]
 
@@ -279,5 +279,5 @@ class TestToolInvokedEvent:
         assert mock_ctx.try_emit_event.call_count == 1
         call_kwargs = mock_ctx.try_emit_event.call_args[0]
         assert call_kwargs[0] == "tool.invoked"
-        assert call_kwargs[1]["tool_name"] == "list_recent_attempts"
+        assert call_kwargs[1]["tool_name"] == "query_user_context"
         assert call_kwargs[1]["call_id"] == "call-1"

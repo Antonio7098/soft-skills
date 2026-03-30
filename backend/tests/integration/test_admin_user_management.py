@@ -475,7 +475,7 @@ async def test_update_user_status_activate(app, client, test_settings) -> None:
         client, admin_id=admin["id"], org_id=org_id, member_id=member["id"], role="member"
     )
 
-    client.patch(
+    await client.patch(
         f"/api/admin/users/{member['id']}/status",
         headers={"X-User-ID": admin["id"], "X-Organisation-ID": org_id},
         json={"is_active": False},

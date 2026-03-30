@@ -21,7 +21,9 @@ from .suites.assistant_runtime import (
     AssistantApprovalWorkflowSmoke,
     AssistantGenerationRuntimeSmoke,
     AssistantPracticeRuntimeSmoke,
+    AssistantReadSqlDeniedSmoke,
     AssistantReadRuntimeSmoke,
+    AssistantReadSqlWorkflowSmoke,
     AssistantStreamRuntimeSmoke,
 )
 from .suites.auth_flows import AuthFlowsSmoke
@@ -52,6 +54,8 @@ def build_default_registry() -> SmokeRegistry:
             ProviderBaselineSmoke(),
             AdminAgentSmoke(),
             AssistantApprovalWorkflowSmoke(),
+            AssistantReadSqlDeniedSmoke(),
+            AssistantReadSqlWorkflowSmoke(),
             AssistantReadRuntimeSmoke(),
             AssistantGenerationRuntimeSmoke(),
             AssistantPracticeRuntimeSmoke(),

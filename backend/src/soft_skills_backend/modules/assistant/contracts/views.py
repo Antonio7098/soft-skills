@@ -86,3 +86,15 @@ class AssistantSessionView(BaseModel):
     updated_at: datetime
     turns: list[AssistantTurnView] = Field(default_factory=list)
     messages: list[AssistantMessageView] = Field(default_factory=list)
+
+
+class QueryUserContextResultView(BaseModel):
+    tool_name: str = "query_user_context"
+    approval_state: str = "auto_allowed"
+    sql: str
+    params: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+    source_views: list[str] = Field(default_factory=list)
+    row_count: int
+    row_cap_applied: bool
+    duration_ms: int
+    rows: list[dict[str, Any]] = Field(default_factory=list)

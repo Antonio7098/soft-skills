@@ -29,8 +29,9 @@ async function isApiReachable(): Promise<boolean> {
       return false;
     }
 
-    const payload = await res.json() as { status?: string; ok?: boolean };
-    return payload.status === 'ok' || payload.ok === true;
+    const envelope = await res.json() as { data?: { status?: string; ok?: boolean }; status?: string; ok?: boolean };
+    const payload = envelope.data ?? envelope;
+    return payload.status === 'ok' || payload.status === 'ready' || payload.ok === true;
   } catch {
     return false;
   }

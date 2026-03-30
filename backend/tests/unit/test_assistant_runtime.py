@@ -20,8 +20,8 @@ def test_assistant_decision_requires_exactly_one_action() -> None:
             tool_calls=[
                 {  # type: ignore[list-item]
                     "call_id": "call-1",
-                    "tool_name": "list_recent_attempts",
-                    "arguments": {},
+                    "tool_name": "query_user_context",
+                    "arguments": {"sql": "SELECT attempt_id FROM assistant_safe_attempt_summaries_v"},
                 }
             ],
             final_response="Both set",

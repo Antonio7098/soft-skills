@@ -40,7 +40,7 @@ export function UserAppGuard({ children }: GuardProps) {
     return <AuthStateCard title="Session Unavailable" message={error} actionLabel="Retry" onAction={() => void refreshSession()} />;
   }
   if (!isAuthenticated) {
-    return <AuthStateCard title="Sign-in Required" message="This area requires an authenticated user session." />;
+    return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 }

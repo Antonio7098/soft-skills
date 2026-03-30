@@ -11,9 +11,12 @@ from stageflow.api import Pipeline, StageKind, stage
 from stageflow.core import StageContext
 
 from soft_skills_backend.config import Settings
+from soft_skills_backend.modules.assistant.contracts.sql import QueryUserContextCommand
 from soft_skills_backend.modules.assistant.domain.models import AssistantApprovalStatus
 from soft_skills_backend.modules.assistant.infra.realtime import AssistantRealtimeBroker
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
+from soft_skills_backend.modules.assistant.infra.sql_executor import AssistantSqlExecutor
+from soft_skills_backend.modules.assistant.infra.sql_guard import AssistantSqlGuard
 from soft_skills_backend.modules.assistant.workflows.approval_service import (
     AssistantApprovalService,
 )
@@ -25,7 +28,6 @@ from soft_skills_backend.modules.assistant.workflows.runtime_models import Assis
 from soft_skills_backend.modules.catalog import CatalogService
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
     ChatCollectionGenerationCommand,
-    CollectionListFilters,
 )
 from soft_skills_backend.modules.catalog.contracts.prompt_item_commands import (
     ChatPromptItemGenerationCommand,
@@ -70,6 +72,8 @@ class AssistantToolExecutor:
         repository: AssistantRepository,
         approvals: AssistantApprovalService,
         broker: AssistantRealtimeBroker,
+        sql_guard: AssistantSqlGuard,
+        sql_executor: AssistantSqlExecutor,
         catalog_service: CatalogService,
         practice_service: PracticeService,
         stageflow_support: StageflowPipelineSupport,
@@ -78,6 +82,8 @@ class AssistantToolExecutor:
         self._repository = repository
         self._approvals = approvals
         self._broker = broker
+        self._sql_guard = sql_guard
+        self._sql_executor = sql_executor
         self._catalog = catalog_service
         self._practice = practice_service
         self._stageflow = stageflow_support
@@ -306,26 +312,15 @@ class AssistantToolExecutor:
         tool_request: AssistantToolRequest,
     ) -> tuple[dict[str, Any], str | None]:
         arguments = tool_request.arguments
-        if tool_request.tool_name == "list_collections":
-            filters = CollectionListFilters.model_validate(arguments)
-            result = self._catalog.list_collections(execution.actor, filters)
-            return {"collections": [item.model_dump(mode="json") for item in result]}, None
-        if tool_request.tool_name == "get_collection":
-            collection_id = _require_string(arguments, "collection_id")
-            collection = self._catalog.get_collection(execution.actor, collection_id)
-            return {"collection": collection.model_dump(mode="json")}, None
-        if tool_request.tool_name == "list_recent_attempts":
-            limit = int(arguments.get("limit", 5))
-            limit = max(1, min(limit, 10))
-            return {
-                "attempts": self._repository.load_recent_attempts(
-                    actor=execution.actor, limit=limit
-                )
-            }, None
-        if tool_request.tool_name == "get_attempt":
-            attempt_id = _require_string(arguments, "attempt_id")
-            attempt = self._practice.get_attempt(execution.actor, attempt_id)
-            return {"attempt": attempt.model_dump(mode="json")}, None
+        if tool_request.tool_name == "query_user_context":
+            guarded = self._sql_guard.validate_and_scope(
+                QueryUserContextCommand.model_validate(arguments)
+            )
+            result = await self._sql_executor.execute(
+                actor=execution.actor,
+                query=guarded,
+            )
+            return result.model_dump(mode="json"), None
         if tool_request.tool_name == "start_collection_practice":
             result = await self._practice_tools.start_collection_practice(
                 actor=execution.actor,

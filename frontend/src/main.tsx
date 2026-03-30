@@ -22,6 +22,7 @@ import { InterviewSession } from './pages/session/InterviewSession';
 import { ScenarioSession } from './pages/session/ScenarioSession';
 import { PracticeRunSession } from './pages/session/PracticeRunSession';
 import { Chat } from './pages/Chat';
+import { Login } from './pages/Login';
 import {
   AdminLayout,
   AdminOverview,
@@ -44,6 +45,10 @@ import {
 import './index.css';
 
 const router = createBrowserRouter([
+  {
+    path: '/login',
+    element: <Login />,
+  },
   {
     path: '/',
     element: <UserAppGuard><MainLayout /></UserAppGuard>,

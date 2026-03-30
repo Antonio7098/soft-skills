@@ -50,6 +50,10 @@ def test_default_registry_includes_practice_run_lifecycle_smoke() -> None:
 
     assert registry.names() == [
         "provider-baseline",
+        "admin-agent",
+        "assistant-approval-workflow",
+        "assistant-read-sql-denied",
+        "assistant-read-sql-workflow",
         "assistant-read-runtime",
         "assistant-generation-runtime",
         "assistant-practice-runtime",
@@ -60,6 +64,7 @@ def test_default_registry_includes_practice_run_lifecycle_smoke() -> None:
         "generation-prompt-items-chat",
         "generation-latency-envelope",
         "generation-streaming",
+        "generation-cancellation",
         "auth-flows",
         "evaluation-benchmark",
         "eval-dashboard",
@@ -72,6 +77,7 @@ def test_default_registry_includes_practice_run_lifecycle_smoke() -> None:
         "organisation-management",
         "admin-user-management",
         "admin-analytics",
+        "admin-telemetry",
         "pipeline-visualization",
         "telemetry",
         "full-user-journey",

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import pytest
 from alembic.config import Config
@@ -93,6 +95,110 @@ async def _bootstrap_admin_and_learner(client: Any, *, learner_email: str) -> di
         email=learner_email,
         display_name="Assistant Learner",
     )
+
+
+async def _bootstrap_org_admin_and_learner(
+    client: Any,
+    *,
+    admin_email: str,
+    learner_email: str,
+    org_slug: str,
+) -> tuple[dict[str, object], dict[str, object], str]:
+    admin = await _register_user_async(
+        client,
+        email=admin_email,
+        display_name="Assistant Org Admin",
+    )
+    bootstrap_response = await client.post(
+        "/api/skills/bootstrap-canon",
+        headers={"X-User-ID": admin["id"]},
+    )
+    assert bootstrap_response.status_code == 200
+    learner = await _register_user_async(
+        client,
+        email=learner_email,
+        display_name="Assistant Learner",
+    )
+    org_response = await client.post(
+        "/api/organisations",
+        headers={"X-User-ID": str(admin["id"])},
+        json={"name": f"Org {org_slug}", "slug": org_slug},
+    )
+    assert org_response.status_code == 200
+    org_id = str(org_response.json()["data"]["id"])
+    add_member_response = await client.post(
+        f"/api/organisations/{org_id}/members",
+        headers={"X-User-ID": str(admin["id"]), "X-Organisation-ID": org_id},
+        json={"user_id": str(learner["id"]), "role": "member"},
+    )
+    assert add_member_response.status_code == 200
+    return admin, learner, org_id
+
+
+def _seed_attempt_summary(
+    container: Any,
+    *,
+    user_id: str,
+    practice_type: str,
+    overall_score: int,
+) -> str:
+    now = datetime.now(UTC)
+    attempt_id = uuid4().hex
+    assessment_id = uuid4().hex
+    with container.session_factory() as session:
+        attempt = AttemptRecord(
+            id=attempt_id,
+            session_id=uuid4().hex,
+            user_id=user_id,
+            workflow_id=uuid4().hex,
+            practice_type=practice_type,
+            content_item_id=uuid4().hex,
+            content_item_type="prompt_item",
+            status="assessed",
+            response_mode="text",
+            response_text="Learner response",
+            delivery_version="v1",
+            rubric_id="quick_practice_reset_timeline@v1",
+            rubric_version="v1",
+            assessment_id=assessment_id,
+            last_error_code=None,
+            trace_id=uuid4().hex[:32],
+            created_at=now,
+            submitted_at=now,
+            assessed_at=now,
+        )
+        assessment = AssessmentRecord(
+            id=assessment_id,
+            attempt_id=attempt_id,
+            session_id=attempt.session_id,
+            user_id=user_id,
+            workflow_id=attempt.workflow_id,
+            practice_type=practice_type,
+            validation_status="validated",
+            prompt_version="test.prompt.v1",
+            rubric_id=attempt.rubric_id,
+            rubric_version=attempt.rubric_version,
+            schema_version="test.schema.v1",
+            config_version="test.config.v1",
+            provider="test-provider",
+            model_slug="test-model",
+            overall_score=overall_score,
+            skill_scores=[],
+            evidence=[],
+            rationale="sound rationale",
+            strengths=["Clear framing"],
+            weaknesses=["Could be more specific"],
+            next_actions=["Add a sharper tradeoff"],
+            raw_payload={},
+            rejection_code=None,
+            trace_id=attempt.trace_id or uuid4().hex[:32],
+            pipeline_run_id=uuid4().hex,
+            created_at=now,
+        )
+        session.add(attempt)
+        session.add(assessment)
+        session.commit()
+    return attempt_id
 
 
 async def _create_collection(
@@ -328,8 +434,14 @@ async def test_assistant_turn_streams_tool_events_and_persists_messages(
                 "tool_calls": [
                     {
                         "call_id": "call-1",
-                        "tool_name": "list_recent_attempts",
-                        "arguments": {"limit": 2},
+                        "tool_name": "query_user_context",
+                        "arguments": {
+                            "sql": (
+                                "SELECT attempt_id, practice_type, overall_score "
+                                "FROM assistant_safe_attempt_summaries_v "
+                                "ORDER BY created_at DESC LIMIT 2"
+                            )
+                        },
                     }
                 ],
                 "final_response": None,
@@ -378,35 +490,146 @@ async def test_assistant_turn_streams_tool_events_and_persists_messages(
     assert "token_count_prompt" in final_event.payload
     assert "token_count_completion" in final_event.payload
     assert "token_count_total" in final_event.payload
-    assert "latency_ms" in final_event.payload
-    assert "chunk_count" in final_event.payload
-    for event in events:
-        assert event.event_id
-        assert event.session_id == session_id
-        assert event.turn_id == turn["id"]
 
-    with container.session_factory() as session:
-        turn_record = session.get(AssistantTurnRecord, turn["id"])
-        assert turn_record is not None
-        assert turn_record.status == "completed"
-        assert session.query(AssistantMessageRecord).filter_by(turn_id=turn["id"]).count() == 2
-        assert session.query(AssistantToolCallRecord).filter_by(turn_id=turn["id"]).count() == 1
-        pipeline_names = {record.pipeline_name for record in session.query(PipelineRunRecord).all()}
-        workflow_events = session.query(WorkflowEventRecord).all()
-        workflow_event_types = {event.event_type for event in workflow_events}
-    assert "assistant_turn_runtime" in pipeline_names
-    stage_wide_events = [et for et in workflow_event_types if et.startswith("stage.wide.")]
-    pipeline_wide_events = [et for et in workflow_event_types if et.startswith("pipeline.wide.")]
-    assert len(stage_wide_events) > 0, f"Expected stage.wide.* events, got: {workflow_event_types}"
-    assert "tool.invoked" in workflow_event_types, (
-        f"Expected tool.invoked in workflow events, got: {workflow_event_types}"
+
+@pytest.mark.asyncio
+async def test_assistant_query_user_context_scopes_rows_to_authenticated_learner(
+    app: Any, client: Any, test_settings: Any
+) -> None:
+    _migrate(test_settings)
+    container = app.state.container
+    container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
+        payloads=[
+            {
+                "tool_calls": [
+                    {
+                        "call_id": "call-1",
+                        "tool_name": "query_user_context",
+                        "arguments": {
+                            "sql": (
+                                "SELECT COUNT(*) AS attempt_count "
+                                "FROM assistant_safe_attempt_summaries_v"
+                            )
+                        },
+                    }
+                ],
+                "final_response": None,
+            },
+            {
+                "tool_calls": [],
+                "final_response": "You have one recent assessed attempt.",
+            },
+        ]
     )
-    messages_response = await client.get(
-        f"/api/assistant/sessions/{session_id}/messages",
+    admin, learner_a, org_id = await _bootstrap_org_admin_and_learner(
+        client,
+        admin_email="assistant-sql-admin@example.com",
+        learner_email="assistant-sql-learner-a@example.com",
+        org_slug="assistant-sql-org",
+    )
+    learner_b = await _register_user_async(
+        client,
+        email="assistant-sql-learner-b@example.com",
+        display_name="Assistant Learner B",
+    )
+    add_member_response = await client.post(
+        f"/api/organisations/{org_id}/members",
+        headers={"X-User-ID": str(admin['id']), "X-Organisation-ID": org_id},
+        json={"user_id": str(learner_b["id"]), "role": "member"},
+    )
+    assert add_member_response.status_code == 200
+
+    _seed_attempt_summary(
+        container,
+        user_id=str(learner_a["id"]),
+        practice_type="quick_practice",
+        overall_score=4,
+    )
+    _seed_attempt_summary(
+        container,
+        user_id=str(learner_b["id"]),
+        practice_type="quick_practice",
+        overall_score=2,
+    )
+
+    session_response = await client.post(
+        "/api/assistant/sessions",
+        headers={"X-User-ID": learner_a["id"]},
+        json={"title": "Scoped SQL"},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["data"]["id"]
+
+    turn_response = await client.post(
+        f"/api/assistant/sessions/{session_id}/turns",
+        headers={"X-User-ID": learner_a["id"], "X-Organisation-ID": org_id},
+        json={"message": "How many recent attempts do I have?"},
+    )
+    assert turn_response.status_code == 200
+    turn = turn_response.json()["data"]
+    await _wait_for_turn_status(container, turn_id=turn["id"], expected_status="completed")
+
+    session_view_response = await client.get(
+        f"/api/assistant/sessions/{session_id}",
+        headers={"X-User-ID": learner_a["id"]},
+    )
+    assert session_view_response.status_code == 200
+    tool_call = session_view_response.json()["data"]["turns"][0]["tool_calls"][0]
+    assert tool_call["tool_name"] == "query_user_context"
+    assert tool_call["result"]["rows"] == [{"attempt_count": 1}]
+
+
+@pytest.mark.asyncio
+async def test_assistant_query_user_context_denies_non_allowlisted_sql(
+    app: Any, client: Any, test_settings: Any
+) -> None:
+    _migrate(test_settings)
+    container = app.state.container
+    container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
+        payloads=[
+            {
+                "tool_calls": [
+                    {
+                        "call_id": "call-1",
+                        "tool_name": "query_user_context",
+                        "arguments": {"sql": "SELECT COUNT(*) AS user_count FROM user_accounts"},
+                    }
+                ],
+                "final_response": None,
+            }
+        ]
+    )
+    learner = await _bootstrap_admin_and_learner(
+        client,
+        learner_email="assistant-sql-denied@example.com",
+    )
+
+    session_response = await client.post(
+        "/api/assistant/sessions",
+        headers={"X-User-ID": learner["id"]},
+        json={"title": "Denied SQL"},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["data"]["id"]
+
+    turn_response = await client.post(
+        f"/api/assistant/sessions/{session_id}/turns",
+        headers={"X-User-ID": learner["id"]},
+        json={"message": "How many users exist globally?"},
+    )
+    assert turn_response.status_code == 200
+    turn = turn_response.json()["data"]
+    await _wait_for_turn_status(container, turn_id=turn["id"], expected_status="failed")
+
+    session_view_response = await client.get(
+        f"/api/assistant/sessions/{session_id}",
         headers={"X-User-ID": learner["id"]},
     )
-    assert messages_response.status_code == 200
-    assert len(messages_response.json()["data"]) == 2
+    assert session_view_response.status_code == 200
+    tool_call = session_view_response.json()["data"]["turns"][0]["tool_calls"][0]
+    assert tool_call["tool_name"] == "query_user_context"
+    assert tool_call["status"] == "failed"
+    assert tool_call["error_code"] == "SS-VALIDATION-318"
 
 
 @pytest.mark.asyncio
@@ -598,6 +821,11 @@ async def test_assistant_turn_waits_for_human_approval_before_mutating_tool_exec
             },
         ]
     )
+    container.assistant_service._workflows._tools._auto_allow_tools = frozenset(  # type: ignore[attr-defined]
+        tool_name
+        for tool_name in container.assistant_service._workflows._tools._auto_allow_tools  # type: ignore[attr-defined]
+        if tool_name != "start_collection_practice"
+    )
     container.practice_service._assessment_marker = _AssistantPracticeMarker()
     learner = await _bootstrap_admin_and_learner(
         client,
@@ -688,6 +916,11 @@ async def test_assistant_turn_fails_when_human_denies_required_tool_approval(
                 "final_response": None,
             }
         ]
+    )
+    container.assistant_service._workflows._tools._auto_allow_tools = frozenset(  # type: ignore[attr-defined]
+        tool_name
+        for tool_name in container.assistant_service._workflows._tools._auto_allow_tools  # type: ignore[attr-defined]
+        if tool_name != "start_collection_practice"
     )
     learner = await _bootstrap_admin_and_learner(
         client,

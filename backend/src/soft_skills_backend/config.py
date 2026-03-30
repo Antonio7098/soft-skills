@@ -52,10 +52,7 @@ class Settings(BaseSettings):
     smoke_timeout_seconds: float = Field(default=10.0, gt=0)
     tool_approval_timeout_seconds: float = Field(default=60.0, gt=0, le=300.0)
     tool_approval_auto_allow: Annotated[tuple[str, ...], NoDecode] = (
-        "list_collections",
-        "get_collection",
-        "list_recent_attempts",
-        "get_attempt",
+        "query_user_context",
         "query_admin_data",
         "start_collection_practice",
         "get_active_practice",

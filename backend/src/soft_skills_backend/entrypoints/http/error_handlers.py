@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -45,7 +47,7 @@ def register_error_handlers(app: FastAPI, settings: Settings) -> None:
                 code="SS-VALIDATION-001",
                 category=ErrorCategory.VALIDATION,
                 message="Request validation failed",
-                details={"errors": exc.errors()},
+                details={"errors": _sanitize_for_json(exc.errors())},
             ),
             meta=response_meta(request),
         )
@@ -67,3 +69,13 @@ def register_error_handlers(app: FastAPI, settings: Settings) -> None:
             meta=response_meta(request),
         )
         return JSONResponse(status_code=500, content=payload.model_dump(mode="json"))
+
+
+def _sanitize_for_json(value: Any) -> Any:
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _sanitize_for_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_sanitize_for_json(item) for item in value]
+    return str(value)
