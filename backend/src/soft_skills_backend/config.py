@@ -12,6 +12,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 class LLMTaskKind(StrEnum):
     ASSISTANT = "assistant"
+    ADMIN_AGENT = "admin_agent"
     MARKING_PER_SKILL = "marking_per_skill"
     MARKING_AGGREGATION = "marking_aggregation"
     CREATOR_BLUEPRINT = "creator_blueprint"
@@ -55,6 +56,7 @@ class Settings(BaseSettings):
         "get_collection",
         "list_recent_attempts",
         "get_attempt",
+        "query_admin_data",
         "start_collection_practice",
         "get_active_practice",
         "submit_active_practice_response",
@@ -75,6 +77,12 @@ class Settings(BaseSettings):
 
     llm_assistant_model: str = Field(default="openai/gpt-oss-20b")
     llm_assistant_prompt_version: str = Field(default="assistant.chat.v1")
+    llm_admin_agent_model: str | None = Field(default=None)
+    llm_admin_agent_planning_prompt_version: str = Field(default="admin-agent.plan.v1")
+    admin_agent_runtime_config_version: str = Field(default="admin-agent.runtime.v1")
+    admin_agent_query_timeout_seconds: float = Field(default=5.0, gt=0, le=30.0)
+    admin_agent_query_row_limit: int = Field(default=50, ge=1, le=200)
+    admin_agent_conversation_history_limit: int = Field(default=4, ge=0, le=10)
 
     llm_marking_per_skill_model: str | None = Field(default=None)
     llm_marking_per_skill_prompt_version: str = Field(
@@ -128,6 +136,8 @@ class Settings(BaseSettings):
         match task:
             case LLMTaskKind.ASSISTANT:
                 return self.llm_assistant_model
+            case LLMTaskKind.ADMIN_AGENT:
+                return self.llm_admin_agent_model or self.llm_default_model
             case LLMTaskKind.MARKING_PER_SKILL:
                 return self.llm_marking_per_skill_model or self.llm_default_model
             case LLMTaskKind.MARKING_AGGREGATION:
@@ -144,6 +154,8 @@ class Settings(BaseSettings):
         match task:
             case LLMTaskKind.ASSISTANT:
                 return self.llm_assistant_prompt_version
+            case LLMTaskKind.ADMIN_AGENT:
+                return self.llm_admin_agent_planning_prompt_version
             case LLMTaskKind.MARKING_PER_SKILL:
                 return self.llm_marking_per_skill_prompt_version
             case LLMTaskKind.MARKING_AGGREGATION:

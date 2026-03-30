@@ -27,6 +27,16 @@ Stageflow workflows in SoftSkills.
 - **Description:** Assistant real-provider smokes initially appeared unconfigured when run from repo root because the backend runtime expected configuration loading from `backend/.env`. Running from `backend/` resolved the issue and the assistant smoke suites completed successfully.
 - **Recommendations:** Make smoke environment loading independent of caller working directory, or document more explicitly that backend real-provider smokes must run from the backend root when local `.env` files are relied on.
 
+**Cross-Session Event Writes Locked SQLite Before Owning Transaction Commit** (2026-03-30)
+- **Reference File:** `backend/src/soft_skills_backend/modules/admin/use_cases/admin_service.py`
+- **Description:** `add_user_to_org()` created a new user inside one SQLAlchemy session, flushed the row, and then emitted `identity.user_registered.v1` through the workflow-event repository on a second session before the first transaction committed. Under smoke SQLite this caused `database is locked` failures and broke the broader admin verification sweep.
+- **Recommendations:** When workflow events are persisted through a separate repository/session, emit them only after the owning transaction commits. Longer term, move write-side observability onto a shared unit-of-work or outbox pattern so transactional ordering is explicit.
+
+**Tool-Spawned Child Pipelines Need Their Own Explicit Timeout Budget** (2026-03-30)
+- **Reference File:** `backend/src/soft_skills_backend/modules/assistant/workflows/tools.py`
+- **Description:** The assistant generation smoke continued to fail at roughly 30 seconds even after the parent assistant turn and the underlying catalog generation service had larger timeout budgets. The missing piece was the tool-layer `run_logged_subpipeline(...)` wrapper itself, which was still inheriting Stageflow's default timeout for the child wrapper pipeline.
+- **Recommendations:** Whenever a Stageflow workflow wraps another long-running provider-backed workflow in a subpipeline helper, assign an explicit timeout at the wrapper layer as well as in the inner service. Do not assume the parent or inner pipeline budget automatically covers the intermediate child wrapper.
+
 ## DX Improvements
 
 <!-- Format:
@@ -121,3 +131,8 @@ Stageflow workflows in SoftSkills.
 - **Reference File:** `backend/src/soft_skills_backend/modules/catalog/workflows/generation/service.py`
 - **Description:** SoftSkills originally emitted generation progress through an application callback that scheduled broker publication later on the event loop. For live cancellation, that was too weak: by the time the UI saw `prompt_items_work`, the expensive work could already be underway or even completed. The local fix now publishes progress immediately and adds a cooperative pre-work cancellation checkpoint, but the broader lesson is that stage-completion-oriented progress is a poor control surface for cancellation.
 - **Recommendations:** Stageflow observability would be stronger with explicit stage-start events and ordering guarantees that are suitable for live control loops, not just post-hoc reporting. Cancellation-sensitive applications should not have to approximate this with local realtime brokers and manually timed checkpoints.
+
+**Agent Smokes Need Constrained Prompts And Seeded Allowlist Rows** (2026-03-30)
+- **Reference File:** `backend/src/soft_skills_backend/smoke/suites/admin_agent_smoke/smoke.py`
+- **Description:** The admin-agent smoke could return a syntactically valid zero-row investigation when the prompt was too open-ended, even though the SQL guard, views, and execution path were healthy. Seeding explicit rows across the allowlisted investigation views and constraining the prompt to a named safe view made the smoke prove the intended tool path rather than merely proving that the planner emitted valid JSON.
+- **Recommendations:** For Stageflow-planned agent smokes, tie the fixture data and prompt wording tightly enough that a passing smoke demonstrates the specific view or tool contract the sprint introduced.

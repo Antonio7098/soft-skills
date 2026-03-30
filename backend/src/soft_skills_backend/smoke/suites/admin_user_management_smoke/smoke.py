@@ -139,13 +139,6 @@ class AdminUserManagementSmoke(SmokeCase):
         added_user_email = str(add_result["email"])
         added_user_id = str(add_result["user_id"])
 
-        await backend.add_member(
-            user_id=actors.admin_id,
-            organisation_id=org_id,
-            new_member_id=added_user_id,
-            role="member",
-        )
-
         bulk_suspend_result = await backend.admin_bulk_user_operation(
             user_id=actors.admin_id,
             organisation_id=org_id,

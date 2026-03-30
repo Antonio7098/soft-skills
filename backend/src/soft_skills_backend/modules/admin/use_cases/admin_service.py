@@ -403,6 +403,7 @@ class AdminService:
             )
 
         with self._session_factory() as session:
+            registration_event: WorkflowEvent | None = None
             user = (
                 session.query(UserAccountRecord)
                 .filter(func.lower(UserAccountRecord.email) == command.email.lower())
@@ -423,11 +424,9 @@ class AdminService:
                 session.add(user)
                 session.flush()
 
-                self._workflow_events.record(
-                    WorkflowEvent(
-                        event_type="identity.user_registered.v1",
-                        payload={"user_id": user.id, "email": user.email},
-                    )
+                registration_event = WorkflowEvent(
+                    event_type="identity.user_registered.v1",
+                    payload={"user_id": user.id, "email": user.email},
                 )
 
             existing_membership = (
@@ -457,6 +456,9 @@ class AdminService:
             )
             session.add(membership)
             session.commit()
+
+            if registration_event is not None:
+                self._workflow_events.record(registration_event)
 
             self._workflow_events.record(
                 WorkflowEvent(

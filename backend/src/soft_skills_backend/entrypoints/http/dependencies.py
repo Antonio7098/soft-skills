@@ -8,6 +8,7 @@ from fastapi import Request
 
 from soft_skills_backend.entrypoints.http.health import HealthService
 from soft_skills_backend.modules.admin import AdminService
+from soft_skills_backend.modules.admin_agent import AdminAgentService
 from soft_skills_backend.modules.assistant import AssistantService
 from soft_skills_backend.modules.assistant.infra.realtime import AssistantRealtimeBroker
 from soft_skills_backend.modules.catalog import CatalogService
@@ -76,6 +77,10 @@ def get_identity_service(request: Request) -> IdentityService:
 
 def get_admin_service(request: Request) -> AdminService:
     return get_container(request).admin_service
+
+
+def get_admin_agent_service(request: Request) -> AdminAgentService:
+    return get_container(request).admin_agent_service
 
 
 def get_taxonomy_service(request: Request) -> TaxonomyService:

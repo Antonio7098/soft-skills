@@ -13,6 +13,21 @@ from soft_skills_backend.engines.marking.domain.rubric_repository import (
 )
 from soft_skills_backend.entrypoints.http.health import HealthService
 from soft_skills_backend.modules.admin import AdminService
+from soft_skills_backend.modules.admin_agent import AdminAgentService
+from soft_skills_backend.modules.admin_agent.domain.redactor import (
+    AdminAgentResultRedactor,
+)
+from soft_skills_backend.modules.admin_agent.domain.schema_registry import (
+    AdminAgentSchemaRegistry,
+)
+from soft_skills_backend.modules.admin_agent.infra.repository import AdminAgentRepository
+from soft_skills_backend.modules.admin_agent.infra.sql_executor import (
+    AdminAgentSqlExecutor,
+)
+from soft_skills_backend.modules.admin_agent.infra.sql_guard import AdminAgentSqlGuard
+from soft_skills_backend.modules.admin_agent.workflows.service import (
+    AdminAgentWorkflowService,
+)
 from soft_skills_backend.modules.admin.domain.prompt_registry import PromptRegistry
 from soft_skills_backend.modules.admin.infra.prompt_repository import PromptRepository
 from soft_skills_backend.modules.assistant import AssistantService
@@ -76,6 +91,7 @@ class AppContainer:
     auth_provider: AuthAdapter
     identity_service: IdentityService
     admin_service: AdminService
+    admin_agent_service: AdminAgentService
     taxonomy_service: TaxonomyService
     assistant_service: AssistantService
     assistant_broker: AssistantRealtimeBroker
@@ -149,16 +165,39 @@ def build_container(settings: Settings) -> AppContainer:
         pipeline_execution_traces=pipeline_execution_traces,
         pipeline_runs=pipeline_runs,
     )
-    taxonomy_service = TaxonomyService(
-        session_factory=session_factory,
-        workflow_events=workflow_events,
-    )
     assistant_broker = AssistantRealtimeBroker()
     generation_broker = GenerationRealtimeBroker()
     provider_call_logger = DatabaseProviderCallLogger(provider_calls)
     llm_provider = OpenAICompatibleLLMProvider(
         settings=settings,
         provider_call_logger=provider_call_logger,
+    )
+    admin_agent_repository = AdminAgentRepository(session_factory=session_factory)
+    admin_agent_schema_registry = AdminAgentSchemaRegistry()
+    admin_agent_sql_guard = AdminAgentSqlGuard(
+        schema_registry=admin_agent_schema_registry,
+        row_limit=settings.admin_agent_query_row_limit,
+    )
+    admin_agent_sql_executor = AdminAgentSqlExecutor(
+        session_factory=session_factory,
+        redactor=AdminAgentResultRedactor(),
+        row_limit=settings.admin_agent_query_row_limit,
+        timeout_seconds=settings.admin_agent_query_timeout_seconds,
+    )
+    admin_agent_service = AdminAgentService(
+        workflows=AdminAgentWorkflowService(
+            settings=settings,
+            llm_provider=llm_provider,
+            repository=admin_agent_repository,
+            schema_registry=admin_agent_schema_registry,
+            sql_guard=admin_agent_sql_guard,
+            sql_executor=admin_agent_sql_executor,
+            stageflow_runtime=stageflow_runtime,
+        )
+    )
+    taxonomy_service = TaxonomyService(
+        session_factory=session_factory,
+        workflow_events=workflow_events,
     )
     catalog_service = CatalogService(
         settings=settings,
@@ -241,6 +280,7 @@ def build_container(settings: Settings) -> AppContainer:
         auth_provider=auth_provider,
         identity_service=identity_service,
         admin_service=admin_service,
+        admin_agent_service=admin_agent_service,
         taxonomy_service=taxonomy_service,
         assistant_service=assistant_service,
         assistant_broker=assistant_broker,

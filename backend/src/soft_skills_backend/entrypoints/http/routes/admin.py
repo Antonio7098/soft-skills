@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 
 from soft_skills_backend.entrypoints.http.dependencies import (
     get_admin_service,
@@ -469,7 +469,7 @@ async def export_analytics(
     format: str = Query(default="json"),
     from_date: datetime | None = Query(default=None),
     to_date: datetime | None = Query(default=None),
-) -> StreamingResponse:
+) -> Response:
     actor = await require_admin_actor(request)
     service = get_admin_service(request)
     overview = service.get_analytics_overview(actor, from_date, to_date)
@@ -479,14 +479,14 @@ async def export_analytics(
             f"{overview.total_learners},{overview.active_learners_30d},{overview.total_sessions},{overview.total_attempts},{overview.submitted_attempts},{overview.validated_assessments},{overview.rejected_assessments},{overview.avg_validated_score}",
         ]
         content = "\n".join(csv_lines)
-        return StreamingResponse(
-            iter([content]),
+        return Response(
+            content=content,
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=analytics_overview.csv"},
         )
 
-    return StreamingResponse(
-        iter([overview.model_dump_json()]),
+    return Response(
+        content=overview.model_dump_json(),
         media_type="application/json",
         headers={"Content-Disposition": "attachment; filename=analytics_overview.json"},
     )

@@ -83,6 +83,7 @@ class AssistantToolExecutor:
         self._stageflow = stageflow_support
         self._approval_timeout_seconds = settings.tool_approval_timeout_seconds
         self._auto_allow_tools = frozenset(settings.tool_approval_auto_allow)
+        self._generation_timeout_ms = int(max(60_000, settings.smoke_timeout_seconds * 4_000))
         self._practice_tools = AssistantPracticeCoordinator(
             repository=repository,
             catalog_service=catalog_service,
@@ -415,6 +416,7 @@ class AssistantToolExecutor:
             result_stage_name="generation",
             execution_mode="assistant_generation",
             service="soft_skills_backend.assistant",
+            timeout_ms=self._generation_timeout_ms,
         )
         if not result.success or result.data is None:
             raise orchestration_error(
@@ -422,7 +424,10 @@ class AssistantToolExecutor:
                 code="SS-ORCHESTRATION-204",
                 details={"child_run_id": str(result.child_run_id), "error": result.error},
             )
-        return {"generation": result.data["payload"]}, str(result.child_run_id)
+        return (
+            {"generation": _summarize_generation_payload(result.data["payload"])},
+            str(result.child_run_id),
+        )
 
     async def _run_generate_prompt_items(
         self,
@@ -464,6 +469,7 @@ class AssistantToolExecutor:
             result_stage_name="generation",
             execution_mode="assistant_generation",
             service="soft_skills_backend.assistant",
+            timeout_ms=self._generation_timeout_ms,
         )
         if not result.success or result.data is None:
             raise orchestration_error(
@@ -471,7 +477,10 @@ class AssistantToolExecutor:
                 code="SS-ORCHESTRATION-204",
                 details={"child_run_id": str(result.child_run_id), "error": result.error},
             )
-        return {"generation": result.data["payload"]}, str(result.child_run_id)
+        return (
+            {"generation": _summarize_generation_payload(result.data["payload"])},
+            str(result.child_run_id),
+        )
 
     async def _publish_tool_started(
         self,
@@ -549,6 +558,24 @@ def _optional_string(payload: dict[str, Any], key: str) -> str | None:
         code="SS-VALIDATION-215",
         details={"argument": key, "expected_type": "string"},
     )
+
+
+def _summarize_generation_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    collection = payload.get("collection", {})
+    prompt_items = collection.get("prompt_items", [])
+    scenarios = collection.get("scenarios", [])
+    return {
+        "collection_id": collection.get("id"),
+        "title": collection.get("title"),
+        "difficulty": collection.get("difficulty"),
+        "content_format_mix": collection.get("content_format_mix", []),
+        "prompt_item_count": len(prompt_items) if isinstance(prompt_items, list) else 0,
+        "scenario_count": len(scenarios) if isinstance(scenarios, list) else 0,
+        "generation_artifact_id": payload.get("generation_artifact_id"),
+        "generation_mode": payload.get("generation_mode"),
+        "provider": payload.get("provider"),
+        "model_slug": payload.get("model_slug"),
+    }
 
 
 def stage_now():

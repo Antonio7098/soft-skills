@@ -107,6 +107,15 @@ class AssistantReadRuntimeSmoke(_AssistantRuntimeSmoke):
             session_id=str(session_payload["id"]),
             turn_id=str(turn_payload["id"]),
         )
+        if str(turn["status"]) != "completed":
+            raise provider_error(
+                "Assistant read smoke did not complete successfully",
+                code="SS-PROVIDER-011",
+                details={
+                    "turn_status": turn.get("status"),
+                    "last_error_code": turn.get("last_error_code"),
+                },
+            )
         messages = await backend.list_assistant_messages(
             user_id=user_id,
             session_id=str(session_payload["id"]),
@@ -372,6 +381,16 @@ class AssistantGenerationRuntimeSmoke(_AssistantRuntimeSmoke):
             turn_id=str(turn_payload["id"]),
             timeout_seconds=240.0,
         )
+        if str(turn["status"]) != "completed":
+            raise provider_error(
+                "Assistant generation smoke did not complete successfully",
+                code="SS-PROVIDER-011",
+                details={
+                    "turn_status": turn.get("status"),
+                    "last_error_code": turn.get("last_error_code"),
+                    "tool_calls": turn.get("tool_calls", []),
+                },
+            )
         tool_names = [
             str(tool["tool_name"]) for tool in cast(list[JsonObject], turn.get("tool_calls", []))
         ]

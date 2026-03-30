@@ -1,5 +1,17 @@
 # Admin Super Agent - Proposal
 
+## Implementation Status
+
+Implemented in Sprint 14 on 2026-03-29.
+
+Delivered backend scope:
+
+- `POST /admin-agent/chat` behind organisation-admin auth
+- `admin_agent_*` investigation views with org-scoped safe columns
+- one auto-allowed read-only SQL tool: `query_admin_data`
+- Stageflow planning/query/response pipeline with audit events
+- unit, integration, and provider-backed smoke coverage
+
 ## Overview
 
 An AI-powered admin assistant for investigation and analytics across the admin dashboard. For MVP, the agent should not get a large catalog of bespoke tools. Instead, it should receive:

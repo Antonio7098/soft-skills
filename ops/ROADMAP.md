@@ -270,7 +270,7 @@ Sprint 13 was too large and has been split into 9 focused sprints for better man
 **Detail:** [ops/sprints/sprint-13h-user-cohort-analytics.md](ops/sprints/sprint-13h-user-cohort-analytics.md)
 
 ### Sprint 14: Admin Super Agent
-**Status:** Not Started
+**Status:** Completed
 **Detail:** [ops/sprints/sprint-14-admin-super-agent.md](ops/sprints/sprint-14-admin-super-agent.md)
 
 **Key Outcomes:**

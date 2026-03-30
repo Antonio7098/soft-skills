@@ -420,6 +420,28 @@ class SmokeBackendClient:
         self.require_ok(response, "create assistant turn")
         return self.data(response)
 
+    async def admin_agent_chat(
+        self,
+        *,
+        user_id: str,
+        organisation_id: str,
+        message: str,
+        conversation_id: str | None = None,
+    ) -> JsonObject:
+        payload: JsonObject = {"message": message}
+        if conversation_id is not None:
+            payload["conversation_id"] = conversation_id
+        response = await self._client.post(
+            "/api/admin-agent/chat",
+            headers={
+                "X-User-ID": user_id,
+                "X-Organisation-ID": organisation_id,
+            },
+            json=payload,
+        )
+        self.require_ok(response, "run admin agent chat")
+        return self.data(response)
+
     async def get_assistant_session(self, *, user_id: str, session_id: str) -> JsonObject:
         response = await self._client.get(
             f"/api/assistant/sessions/{session_id}",

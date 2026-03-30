@@ -28,47 +28,47 @@
 
 ## Scope Checklist
 
-- [ ] Task 14.1: Add `admin_agent_*` SQL views with allowlisted columns, org scoping hooks, and PII-safe payload shaping
-- [ ] Task 14.2: Implement schema registry/context for allowed views, columns, joins, field descriptions, and example query patterns
-- [ ] Task 14.3: Add typed request/response contracts for `query_admin_data` and `POST /admin-agent/chat`
-- [ ] Task 14.4: Implement SQL guardrails for `SELECT`-only validation, approved target enforcement, bounded limits, and denial errors
-- [ ] Task 14.5: Implement scoped SQL executor with org predicate injection, timeout/row caps, auditing, and defensive output redaction
-- [ ] Task 14.6: Implement Stageflow admin-agent pipeline with guard, enrich, planning, query, and respond stages
-- [ ] Task 14.7: Integrate with approval-capable tooling infrastructure from `human-approval-workflows.md`, keeping the read-only SQL tool auto-allowed for MVP
-- [ ] Task 14.8: Expose `POST /admin-agent/chat` behind admin auth and organisation context
-- [ ] Task 14.9: Emit `admin.agent.*`, tool, approval-state, and query audit events sufficient for replay and debugging
-- [ ] Task 14.10: Documentation updates for canonical spec, contracts, and sprint sequencing
+- [x] Task 14.1: Add `admin_agent_*` SQL views with allowlisted columns, org scoping hooks, and PII-safe payload shaping
+- [x] Task 14.2: Implement schema registry/context for allowed views, columns, joins, field descriptions, and example query patterns
+- [x] Task 14.3: Add typed request/response contracts for `query_admin_data` and `POST /admin-agent/chat`
+- [x] Task 14.4: Implement SQL guardrails for `SELECT`-only validation, approved target enforcement, bounded limits, and denial errors
+- [x] Task 14.5: Implement scoped SQL executor with org predicate injection, timeout/row caps, auditing, and defensive output redaction
+- [x] Task 14.6: Implement Stageflow admin-agent pipeline with guard, enrich, planning, query, and respond stages
+- [x] Task 14.7: Integrate with approval-capable tooling infrastructure from `human-approval-workflows.md`, keeping the read-only SQL tool auto-allowed for MVP
+- [x] Task 14.8: Expose `POST /admin-agent/chat` behind admin auth and organisation context
+- [x] Task 14.9: Emit `admin.agent.*`, tool, approval-state, and query audit events sufficient for replay and debugging
+- [x] Task 14.10: Documentation updates for canonical spec, contracts, and sprint sequencing
 
 ## Constitution And Quality Checklist
 
-- [ ] Competency growth remains the product outcome, not activity theater
-- [ ] All new external boundaries are typed and schema-validated
-- [ ] Fail-fast and fail-loud behavior is preserved with stable error codes
-- [ ] Route handlers remain thin; business rules stay out of transport layers
-- [ ] Dependency injection and adapter boundaries remain explicit
-- [ ] Critical workflow artifacts are durably persisted where required
-- [ ] Traces, logs, and events cover all changed workflow steps
-- [ ] Prompt, model, and config versions are preserved for admin-agent runs where applicable
-- [ ] No silent fallback is introduced in SQL validation, scoping, redaction, or tool execution
-- [ ] The agent can read only from admin-safe views and never from raw base tables
+- [x] Competency growth remains the product outcome, not activity theater
+- [x] All new external boundaries are typed and schema-validated
+- [x] Fail-fast and fail-loud behavior is preserved with stable error codes
+- [x] Route handlers remain thin; business rules stay out of transport layers
+- [x] Dependency injection and adapter boundaries remain explicit
+- [x] Critical workflow artifacts are durably persisted where required
+- [x] Traces, logs, and events cover all changed workflow steps
+- [x] Prompt, model, and config versions are preserved for admin-agent runs where applicable
+- [x] No silent fallback is introduced in SQL validation, scoping, redaction, or tool execution
+- [x] The agent can read only from admin-safe views and never from raw base tables
 
 ## Testing And Documentation Checklist
 
-- [ ] Unit Tests: deterministic coverage for SQL validation, schema registry, redaction rules, pseudonymization, and request/response schemas
-- [ ] Integration Tests: API, persistence, Stageflow pipeline, audit events, and org-scoped query execution coverage
-- [ ] Smoke Tests With Real Provider: add and run an `admin-agent` smoke that performs representative read-only investigations against seeded safe views
-- [ ] Failure Path Coverage: explicit tests for invalid SQL, disallowed views/columns, missing org scope, timeout/row-limit failures, provider failures, and redaction/approval configuration errors
-- [ ] Documentation Updates: update canonical docs in `ops/`, the roadmap/sprint docs, and any affected contracts
+- [x] Unit Tests: deterministic coverage for SQL validation, schema registry, redaction rules, pseudonymization, and request/response schemas
+- [x] Integration Tests: API, persistence, Stageflow pipeline, audit events, and org-scoped query execution coverage
+- [x] Smoke Tests With Real Provider: add and run an `admin-agent` smoke that performs representative read-only investigations against seeded safe views
+- [x] Failure Path Coverage: explicit tests for invalid SQL, disallowed views/columns, missing org scope, timeout/row-limit failures, provider failures, and redaction/approval configuration errors
+- [x] Documentation Updates: update canonical docs in `ops/`, the roadmap/sprint docs, and any affected contracts
 
 ## Success Criteria
 
-- [ ] Primary sprint goal is met in a backend-usable form
-- [ ] Admins can query investigation-safe data via `POST /admin-agent/chat` using the single read-only SQL tool
-- [ ] Queries are restricted to approved admin-safe views with enforced org scoping and bounded execution
-- [ ] No raw PII or disallowed content reaches the external LLM provider
-- [ ] Tests pass at unit, integration, and smoke level for the sprint scope
-- [ ] Canonical docs reflect the implemented behavior and security boundary
-- [ ] Observability artifacts are sufficient to explain every successful and denied agent query
+- [x] Primary sprint goal is met in a backend-usable form
+- [x] Admins can query investigation-safe data via `POST /admin-agent/chat` using the single read-only SQL tool
+- [x] Queries are restricted to approved admin-safe views with enforced org scoping and bounded execution
+- [x] No raw PII or disallowed content reaches the external LLM provider
+- [x] Tests pass at unit, integration, and smoke level for the sprint scope
+- [x] Canonical docs reflect the implemented behavior and security boundary
+- [x] Observability artifacts are sufficient to explain every successful and denied agent query
 
 Minimum Viable Sprint:
 Tasks 14.1, 14.3, 14.4, 14.5, 14.6, and 14.8 are the critical path. Approval infrastructure is assumed to exist already; this sprint only needs to consume it safely for a read-only auto-allowed tool.
@@ -110,18 +110,18 @@ Key decisions, tradeoffs, and implementation notes:
 
 ## Review And Sign-Off
 
-- Sprint Status: Not Started
-- Completion Date: [Date]
+- Sprint Status: Completed
+- Completion Date: 2026-03-29
 
 Checklist:
 
-- [ ] Primary goal achieved
-- [ ] Constitution and quality checks passed
-- [ ] Unit tests completed
-- [ ] Integration tests completed
-- [ ] Smoke tests with real provider completed
-- [ ] Documentation updated
-- [ ] Code review completed
+- [x] Primary goal achieved
+- [x] Constitution and quality checks passed
+- [x] Unit tests completed
+- [x] Integration tests completed
+- [x] Smoke tests with real provider completed
+- [x] Documentation updated
+- [x] Code review completed
 
 Next Sprint Priorities:
 
