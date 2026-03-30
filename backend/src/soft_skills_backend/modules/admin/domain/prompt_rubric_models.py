@@ -19,8 +19,8 @@ class PromptVersion(BaseModel):
     output_schema: dict[str, Any] | None = None
     status: str = "draft"
     parent_version_id: int | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class RubricVersion(BaseModel):
@@ -31,5 +31,5 @@ class RubricVersion(BaseModel):
     version: str
     criteria: list[dict[str, Any]] = Field(default_factory=list)
     status: str = "draft"
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
