@@ -12,7 +12,7 @@ from soft_skills_backend.platform.db.models import (
     AssessmentSkillEvidenceRecord,
     AssessmentSkillResultRecord,
     AttemptRecord,
-    RubricCriterionRecord,
+    RubricVersionRecord,
 )
 from soft_skills_backend.shared.errors import provider_error
 from soft_skills_backend.smoke.contracts import SmokeCase, SmokeContext
@@ -124,10 +124,14 @@ class _AssessmentMarkingSmoke(SmokeCase, ABC):
                         .filter(AssessmentSkillEvidenceRecord.assessment_id == assessment_id)
                         .count()
                     )
-                    rubric_criteria_count = 0 if attempt_record is None else (
-                        session.query(RubricCriterionRecord)
-                        .filter(RubricCriterionRecord.rubric_id == attempt_record.rubric_id)
-                        .count()
+                    rubric_criteria_count = (
+                        0
+                        if attempt_record is None
+                        else (
+                            session.query(RubricCriterionRecord)
+                            .filter(RubricCriterionRecord.rubric_id == attempt_record.rubric_id)
+                            .count()
+                        )
                     )
             return AssessmentMarkingSmokeResult(
                 status="ok",

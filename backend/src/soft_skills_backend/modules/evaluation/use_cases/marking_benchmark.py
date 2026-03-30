@@ -42,7 +42,7 @@ from soft_skills_backend.modules.practice.workflows.assessment.models import (
 from soft_skills_backend.modules.practice.workflows.assessment_service import (
     model_slug_matches_execution_source,
 )
-from soft_skills_backend.platform.db.models import RubricCriterionRecord, RubricRecord
+from soft_skills_backend.platform.db.models import RubricRecord, RubricVersionRecord
 from soft_skills_backend.platform.providers.llm.openai_compatible import (
     OpenAICompatibleLLMProvider,
 )

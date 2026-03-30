@@ -31,8 +31,8 @@ from soft_skills_backend.platform.db.models import (
     MockCompanyRecord,
     MockPersonRecord,
     PromptItemRecord,
-    RubricCriterionRecord,
     RubricRecord,
+    RubricVersionRecord,
     ScenarioRecord,
     ScenarioSupportingArtifactRecord,
 )
@@ -349,33 +349,23 @@ def _persist_generated_quick_practice_rubric(
             code="SS-DOMAIN-029",
             details={"title": prompt_item.title},
         )
-    rubric_id = f"quick_practice_generated_{uuid4().hex}@v1"
-    criterion_refs = [criterion.criterion_ref for criterion in generated_rubric.criteria]
-    session.add(
-        RubricRecord(
-            rubric_id=rubric_id,
-            family="quick_practice_generated",
-            version="v1",
-            content_type="quick_practice_prompt",
-            schema_version="v1",
-            name=generated_rubric.title,
-            criteria=criterion_refs,
-        )
-    )
+    rubric_id = f"quick_practice_generated_{uuid4().hex}"
+    now = datetime.now(UTC)
+
+    # Build criteria JSON array
+    criteria_json = []
     for position, criterion in enumerate(generated_rubric.criteria, start=1):
         criterion_key = criterion.skill_slug or criterion.criterion_ref
-        session.add(
-            RubricCriterionRecord(
-                rubric_id=rubric_id,
-                rubric_version="v1",
-                criterion_ref=criterion.criterion_ref,
-                skill_slug=criterion_key,
-                title=criterion.title,
-                description=criterion.description,
-                weight=1.0,
-                required=True,
-                position=position,
-                levels_json=[
+        criteria_json.append(
+            {
+                "criterion_ref": criterion.criterion_ref,
+                "skill_slug": criterion_key,
+                "title": criterion.title,
+                "description": criterion.description,
+                "weight": 1.0,
+                "required": True,
+                "position": position,
+                "levels": [
                     {
                         f"level_{level.level}": {
                             "description": level.description,
@@ -384,8 +374,35 @@ def _persist_generated_quick_practice_rubric(
                     }
                     for level in criterion.levels
                 ],
-            )
+            }
         )
+
+    # Create parent rubric record
+    session.add(
+        RubricRecord(
+            id=rubric_id,
+            skill_slug="quick_practice_generated",
+            organisation_id=None,
+            name=generated_rubric.title,
+            description=generated_rubric.title,
+            content_type="quick_practice_prompt",
+            schema_version="v1",
+            created_at=now,
+            updated_at=now,
+        )
+    )
+
+    # Create child rubric version record with embedded criteria
+    session.add(
+        RubricVersionRecord(
+            rubric_id=rubric_id,
+            version="v1",
+            criteria=criteria_json,
+            status="published",
+            created_at=now,
+            updated_at=now,
+        )
+    )
     return rubric_id
 
 

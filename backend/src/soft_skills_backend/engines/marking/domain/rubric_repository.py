@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Protocol
+from typing import Any, Protocol
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -13,7 +13,7 @@ from soft_skills_backend.engines.marking import (
     RubricLevel,
     RubricScale,
 )
-from soft_skills_backend.platform.db.models import RubricCriterionRecord, RubricRecord
+from soft_skills_backend.platform.db.models import RubricRecord, RubricVersionRecord
 from soft_skills_backend.shared.errors import validation_error
 
 
@@ -31,7 +31,7 @@ class RubricRepository(Protocol):
 
 
 class SqlAlchemyRubricRepository:
-    """SQLAlchemy rubric loader backed by the rubric criteria table."""
+    """SQLAlchemy rubric loader backed by the new rubric_versions table."""
 
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
@@ -51,48 +51,74 @@ class SqlAlchemyRubricRepository:
                     code="SS-VALIDATION-071",
                     details={"rubric_id": rubric_id},
                 )
-            query = session.query(RubricCriterionRecord).filter(
-                RubricCriterionRecord.rubric_id == rubric_id
+            # Get the latest published version
+            version = (
+                session.query(RubricVersionRecord)
+                .filter(
+                    RubricVersionRecord.rubric_id == rubric_id,
+                    RubricVersionRecord.status == "published",
+                )
+                .order_by(RubricVersionRecord.version.desc())
+                .first()
             )
-            if required is not None:
-                query = query.filter(RubricCriterionRecord.skill_slug.in_(sorted(required)))
-            records = query.order_by(RubricCriterionRecord.position).all()
-        if not records:
+            if version is None:
+                raise validation_error(
+                    "Rubric version was not found",
+                    code="SS-VALIDATION-074",
+                    details={"rubric_id": rubric_id},
+                )
+
+        criteria_data = version.criteria
+        criteria = [
+            self._to_criterion(criterion_data)
+            for criterion_data in criteria_data
+            if _criterion_matches_required(criterion_data, required)
+        ]
+        if not criteria:
             raise validation_error(
                 "Rubric criteria were not found",
                 code="SS-VALIDATION-072",
                 details={"rubric_id": rubric_id},
             )
-        criteria = [self._to_criterion(record) for record in records]
         maximum_score = max(level.level for criterion in criteria for level in criterion.levels)
         return RubricDefinition(
-            rubric_id=rubric.rubric_id,
-            rubric_version=rubric.version,
+            rubric_id=rubric.id,
+            rubric_version=version.version,
             scale=RubricScale(minimum_score=1, maximum_score=maximum_score),
             criteria=criteria,
         )
 
     def get_skill_criterion(self, rubric_id: str, skill_slug: str) -> RubricCriterion:
         with self._session_factory() as session:
-            record = (
-                session.query(RubricCriterionRecord)
+            version = (
+                session.query(RubricVersionRecord)
                 .filter(
-                    RubricCriterionRecord.rubric_id == rubric_id,
-                    RubricCriterionRecord.skill_slug == skill_slug,
+                    RubricVersionRecord.rubric_id == rubric_id,
+                    RubricVersionRecord.status == "published",
                 )
-                .one_or_none()
+                .order_by(RubricVersionRecord.version.desc())
+                .first()
             )
-        if record is None:
-            raise validation_error(
-                "Rubric criterion was not found",
-                code="SS-VALIDATION-073",
-                details={"rubric_id": rubric_id, "skill_slug": skill_slug},
-            )
-        return self._to_criterion(record)
+            if version is None:
+                raise validation_error(
+                    "Rubric version was not found",
+                    code="SS-VALIDATION-074",
+                    details={"rubric_id": rubric_id},
+                )
 
-    def _to_criterion(self, record: RubricCriterionRecord) -> RubricCriterion:
+        for criterion_data in version.criteria:
+            if criterion_data.get("criterion_ref") == skill_slug:
+                return self._to_criterion(criterion_data)
+
+        raise validation_error(
+            "Rubric criterion was not found",
+            code="SS-VALIDATION-073",
+            details={"rubric_id": rubric_id, "skill_slug": skill_slug},
+        )
+
+    def _to_criterion(self, data: dict[str, Any]) -> RubricCriterion:
         levels: list[RubricLevel] = []
-        for item in list(record.levels_json):
+        for item in list(data.get("levels", [])):
             if not item:
                 continue
             label, payload = next(iter(item.items()))
@@ -106,10 +132,16 @@ class SqlAlchemyRubricRepository:
             )
         levels.sort(key=lambda item: item.level)
         return RubricCriterion(
-            criterion_ref=record.criterion_ref,
-            title=record.title,
-            description=record.description,
-            weight=record.weight,
-            required=record.required,
+            criterion_ref=data.get("criterion_ref", ""),
+            title=data.get("title", ""),
+            description=data.get("description", ""),
+            weight=data.get("weight", 0.0),
+            required=data.get("required", True),
             levels=levels,
         )
+
+
+def _criterion_matches_required(criterion_data: dict[str, Any], required: set[str] | None) -> bool:
+    if required is None:
+        return True
+    return criterion_data.get("criterion_ref") in required

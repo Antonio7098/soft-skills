@@ -17,8 +17,8 @@ from soft_skills_backend.platform.db.models import (
     CompetencyRecord,
     CompetencySkillMapRecord,
     OrganisationSkillMapRecord,
-    RubricCriterionRecord,
     RubricRecord,
+    RubricVersionRecord,
     SkillRecord,
 )
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository

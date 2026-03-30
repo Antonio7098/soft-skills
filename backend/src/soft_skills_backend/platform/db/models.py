@@ -194,39 +194,68 @@ class OrganisationSkillMapRecord(Base):
     weight: Mapped[float]
 
 
+class OrganisationPromptConfigRecord(Base):
+    """Org-level prompt config override by task_kind."""
+
+    __tablename__ = "organisation_prompt_configs"
+
+    organisation_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    task_kind: Mapped[str] = mapped_column(String(32), primary_key=True)
+    prompt_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    prompt_version_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class OrganisationRubricConfigRecord(Base):
+    """Org-level rubric config override by skill_slug."""
+
+    __tablename__ = "organisation_rubric_configs"
+
+    organisation_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    skill_slug: Mapped[str] = mapped_column(String(64), primary_key=True)
+    rubric_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    rubric_version_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class RubricRecord(Base):
-    """Versioned rubric family record."""
+    """Parent rubric entity (new parent-child model)."""
 
     __tablename__ = "rubrics"
 
-    rubric_id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    family: Mapped[str] = mapped_column(String(64), index=True)
-    version: Mapped[str] = mapped_column(String(32))
-    content_type: Mapped[str] = mapped_column(String(64), index=True)
-    schema_version: Mapped[str] = mapped_column(String(32))
-    name: Mapped[str] = mapped_column(String(255))
-    criteria: Mapped[list[str]] = mapped_column(JSON, default=list)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    skill_slug: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     organisation_id: Mapped[str | None] = mapped_column(
         String(32), ForeignKey("organisations.id"), index=True, nullable=True
     )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    schema_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("skill_slug", "organisation_id", name="uq_rubric_skill_org"),
+    )
 
 
-class RubricCriterionRecord(Base):
-    """One stored rubric criterion with scored levels."""
+class RubricVersionRecord(Base):
+    """Child rubric version entity with embedded criteria."""
 
-    __tablename__ = "rubric_criteria"
+    __tablename__ = "rubric_versions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    rubric_id: Mapped[str] = mapped_column(String(128), index=True)
-    rubric_version: Mapped[str] = mapped_column(String(32))
-    criterion_ref: Mapped[str] = mapped_column(String(64), index=True)
-    skill_slug: Mapped[str] = mapped_column(String(64), index=True)
-    title: Mapped[str] = mapped_column(String(255))
-    description: Mapped[str] = mapped_column(Text)
-    weight: Mapped[float]
-    required: Mapped[bool] = mapped_column(default=True)
-    position: Mapped[int] = mapped_column(Integer, default=0)
-    levels_json: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    rubric_id: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    version: Mapped[str] = mapped_column(String(64), nullable=False)
+    criteria: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("rubric_id", "version", name="uq_rubric_version_rubric_version"),
+    )
 
 
 class CollectionRecord(Base):
@@ -419,24 +448,42 @@ class ContentGenerationArtifactRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class PromptRecord(Base):
+    """Parent prompt entity."""
+
+    __tablename__ = "prompts"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    organisation_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prompt_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    variables_schema: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    __table_args__ = (UniqueConstraint("organisation_id", "name", name="uq_prompt_org_name"),)
+
+
 class PromptVersionRecord(Base):
-    """Database-backed versioned prompt template."""
+    """Database-backed versioned prompt template (child of PromptRecord)."""
 
     __tablename__ = "prompt_versions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(128), index=True)
-    version: Mapped[str] = mapped_column(String(64), index=True)
-    prompt_type: Mapped[str] = mapped_column(String(32), index=True)
-    template: Mapped[str] = mapped_column(Text)
+    prompt_id: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    version: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    template: Mapped[str] = mapped_column(Text, nullable=False)
     variables_schema: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     output_schema: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    status: Mapped[str] = mapped_column(String(32), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True, nullable=False, default="draft")
     parent_version_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
-    __table_args__ = (Index("ix_prompt_versions_name_version", "name", "version", unique=True),)
+    __table_args__ = (
+        UniqueConstraint("prompt_id", "version", name="uq_prompt_version_prompt_version"),
+    )
 
 
 class PromptRenderMetricsRecord(Base):

@@ -19,7 +19,7 @@ from soft_skills_backend.modules.admin.contracts.views import (
     RubricCriterionView,
     RubricView,
 )
-from soft_skills_backend.platform.db.models import RubricCriterionRecord, RubricRecord
+from soft_skills_backend.platform.db.models import RubricRecord, RubricVersionRecord
 from soft_skills_backend.shared.errors import domain_error
 
 

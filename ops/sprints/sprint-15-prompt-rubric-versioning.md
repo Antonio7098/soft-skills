@@ -182,10 +182,10 @@ Key decisions, tradeoffs, and implementation notes:
    - Legacy RubricCriterionRecord merged into rubric_versions.criteria JSON
    - Legacy columns removed after migration verification
 
-6. Config UUID Resolution Strategy (TBD before Phase 3):
-   - Option A: Look up by name after seeding and populate config dynamically
-   - Option B: Use deterministic UUIDs in builtin_prompts.py seeding
-   - Option C: Hybrid - keep a name→UUID lookup in config resolution
+6. Config UUID Resolution Strategy (DECIDED - Option A):
+   - Use name-based lookup after seeding (no deterministic UUIDs needed for builtins)
+   - PromptRepositoryV2.get_by_name_version() resolves name+version to (prompt_id, version_id)
+   - PromptResolutionService caches name→id mappings
 
 7. Org Config Version Validation:
    - OrganisationPromptConfig and OrganisationRubricConfig must reference status = published versions
@@ -196,15 +196,41 @@ Key decisions, tradeoffs, and implementation notes:
    - Deleting a Prompt deletes all PromptVersions and cascades to OrganisationPromptConfig
    - Deleting a Rubric deletes all RubricVersions and cascades to OrganisationRubricConfig
 
-9. Data Migration Scope:
-   - MVP spec constraint "No migration of existing data" needs resolution
-   - Phase 2 tasks 2.1-2.4 assume production data exists and must be migrated
-   - Decide: clean seed approach vs full migration before sprint start
+9. Data Migration Scope (RESOLVED):
+   - MVP spec "start fresh" constraint interpreted as: rename existing tables to _legacy_ prefix
+   - New tables seeded from scratch, no data migrated from legacy tables
 ```
+
+## Deferred Items
+
+The following items were deferred to a future sprint due to scope management and MVP constraints:
+
+**Phase 1:**
+- Task 1.10: Add prompt_version_id FK to ContentGenerationArtifactRecord
+
+**Phase 3 (Config Migration):**
+- Task 3.1: Update config.py - replace string-based prompt versions with UUID + int pairs
+- Task 3.2: Update MarkingRuntimeConfig - per_skill and aggregation prompt references
+- Task 3.3: Update CatalogGenerationRuntimeConfig - all prompt references
+- Task 3.4: Update runtime config JSON artifacts to use UUID + int pairs
+
+**Phase 4 (Registry Updates):**
+- Task 4.4: Update PromptRegistry.render() signature to use UUIDs
+- Task 4.5: Add org resolution logic to PromptRegistry (org config → global fallback)
+- Task 4.6: Create RubricRegistry with org resolution (org config → global fallback)
+
+**Phase 5-8 (Full Implementation):**
+- Tasks 5.1-5.13: Service & API layer complete rewrite
+- Tasks 6.1-6.7: Runtime consumer updates
+- Tasks 7.1-7.3: Legacy column cleanup
+- Tasks 8.1-8.3: Documentation updates
+
+**Rationale:**
+The MVP spec defines "Minimum Viable Sprint" as Phase 1 (schema) + Phase 2 (migration) + Phase 3 (config) + Phase 4 (domain/repo core). Completed phases 1, 2, and partial phase 4 provide the foundation for the parent-child model with new tables and repositories. The deferred items require broader architectural changes that should be validated against this foundation before proceeding.
 
 ## Review And Sign-Off
 
-- Sprint Status: Not Started
+- Sprint Status: In Progress (Foundation Complete)
 - Completion Date: [Date]
 
 Checklist:
