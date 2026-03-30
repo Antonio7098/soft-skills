@@ -383,6 +383,7 @@ export function ChatPage() {
           onSend={handleSend}
           onCancel={cancelTurn}
           isStreaming={isStreaming}
+          voiceInputEnabled={true}
         />
       </div>
     </div>

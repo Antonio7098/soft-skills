@@ -130,6 +130,13 @@ class Settings(BaseSettings):
     groq_llm_creator_prompt_item_model: str | None = Field(default=None)
     groq_llm_creator_scenario_model: str | None = Field(default=None)
 
+    deepgram_api_key: str | None = Field(
+        default=None,
+        validation_alias="DEEPGRAM_API_KEY",
+    )
+    deepgram_model: str = Field(default="nova-3")
+    deepgram_language: str = Field(default="en-US")
+
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
     def _normalize_cors_allowed_origins(

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, type KeyboardEvent } from 'react';
 import { cn } from '@/lib/cn';
+import { VoiceInputButton } from '@/components/voice/VoiceInputButton';
 
 interface ChatInputProps {
   readonly onSend: (message: string) => void;
@@ -7,6 +8,7 @@ interface ChatInputProps {
   readonly isStreaming: boolean;
   readonly disabled?: boolean;
   readonly placeholder?: string;
+  readonly voiceInputEnabled?: boolean;
 }
 
 export function ChatInput({
@@ -15,8 +17,10 @@ export function ChatInput({
   isStreaming,
   disabled = false,
   placeholder = 'Ask me anything about your practice...',
+  voiceInputEnabled = false,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
+  const [interimText, setInterimText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = useCallback(() => {
@@ -24,7 +28,7 @@ export function ChatInput({
     if (!trimmed || disabled) return;
     onSend(trimmed);
     setValue('');
-    // Reset textarea height
+    setInterimText('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -48,7 +52,17 @@ export function ChatInput({
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, []);
 
-  const canSend = value.trim().length > 0 && !disabled && !isStreaming;
+  const handleVoiceTranscript = useCallback((transcript: string, isFinal: boolean) => {
+    if (isFinal) {
+      setValue((prev) => prev + transcript);
+      setInterimText('');
+    } else {
+      setInterimText(transcript);
+    }
+  }, []);
+
+  const displayValue = value + (interimText ? ` ${interimText}` : '');
+  const canSend = (value.trim().length > 0 || interimText.trim().length > 0) && !disabled && !isStreaming;
   const actionDisabled = isStreaming ? !onCancel : !canSend;
 
   return (
@@ -61,9 +75,16 @@ export function ChatInput({
           disabled ? 'opacity-60 pointer-events-none' : 'border-line',
         )}
       >
+        {voiceInputEnabled && (
+          <VoiceInputButton
+            onTranscript={handleVoiceTranscript}
+            disabled={disabled || isStreaming}
+          />
+        )}
+
         <textarea
           ref={textareaRef}
-          value={value}
+          value={displayValue}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
@@ -75,6 +96,7 @@ export function ChatInput({
             'placeholder:text-content-tertiary',
             'focus:outline-none',
             'min-h-[24px] max-h-[200px] leading-[24px]',
+            interimText && 'italic text-content-secondary',
           )}
         />
 
