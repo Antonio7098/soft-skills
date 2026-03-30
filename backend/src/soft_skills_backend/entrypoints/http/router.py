@@ -21,6 +21,7 @@ from soft_skills_backend.entrypoints.http.routes import (
     providers,
     skills,
     users,
+    voice,
 )
 
 api_router = APIRouter()
@@ -40,3 +41,4 @@ api_router.include_router(practice_runs.router, prefix="/practice-runs", tags=["
 api_router.include_router(progress.router, prefix="/progress", tags=["progress"])
 api_router.include_router(providers.router, prefix="/providers", tags=["providers"])
 api_router.include_router(organisations.router, prefix="/organisations", tags=["organisations"])
+api_router.include_router(voice.router, prefix="/voice", tags=["voice"])
