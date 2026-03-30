@@ -27,41 +27,41 @@
 
 ### Phase 1: Schema Changes
 
-- [ ] Task 1.1: Create `prompts` table with organisation_id (nullable), unique constraint on (organisation_id, name)
-- [ ] Task 1.2: Create `prompt_versions` table (replace flat PromptVersionRecord)
-- [ ] Task 1.3: Create `rubrics` table with (skill_slug, organisation_id) unique constraint
-- [ ] Task 1.4: Create `rubric_versions` table with embedded criteria JSON
-- [ ] Task 1.5: Create `organisation_prompt_configs` table (organisation_id, task_kind as PK)
-- [ ] Task 1.6: Create `organisation_rubric_configs` table (organisation_id, skill_slug as PK)
-- [ ] Task 1.7: Add prompt_version_id, rubric_version_id FKs to AssessmentRecord
-- [ ] Task 1.8: Add rubric_version_id FK to AttemptRecord
-- [ ] Task 1.9: Add rubric_version_id FK to PracticeSessionRecord
-- [ ] Task 1.10: Add prompt_version_id FK to ContentGenerationArtifactRecord
+- [x] Task 1.1: Create `prompts` table with organisation_id (nullable), unique constraint on (organisation_id, name)
+- [x] Task 1.2: Create `prompt_versions` table (replace flat PromptVersionRecord)
+- [x] Task 1.3: Create `rubrics` table with (skill_slug, organisation_id) unique constraint
+- [x] Task 1.4: Create `rubric_versions` table with embedded criteria JSON
+- [x] Task 1.5: Create `organisation_prompt_configs` table (organisation_id, task_kind as PK)
+- [x] Task 1.6: Create `organisation_rubric_configs` table (organisation_id, skill_slug as PK)
+- [x] Task 1.7: Add rubric_version_id FK to AssessmentRecord (prompt_version_id deferred)
+- [x] Task 1.8: Add rubric_version_id FK to AttemptRecord
+- [x] Task 1.9: Add rubric_version_id FK to PracticeSessionRecord
+- [ ] Task 1.10: Add prompt_version_id FK to ContentGenerationArtifactRecord (deferred)
 
 ### Phase 2: Data Migration
 
-- [ ] Task 2.1: Migrate PromptVersionRecord → Prompt + PromptVersion (global, organisation_id = NULL)
-- [ ] Task 2.2: Migrate RubricRecord → Rubric + RubricVersion (global, organisation_id = NULL)
-- [ ] Task 2.3: Populate FK columns in Assessment, Attempt, PracticeSession, ContentGenerationArtifact
-- [ ] Task 2.4: Mark all existing records as status = published
+- [x] Task 2.1: Migrate PromptVersionRecord → Prompt + PromptVersion (global, organisation_id = NULL) - per MVP "start fresh" constraint, legacy tables renamed to _legacy_
+- [x] Task 2.2: Migrate RubricRecord → Rubric + RubricVersion (global, organisation_id = NULL) - per MVP "start fresh" constraint
+- [x] Task 2.3: Populate FK columns in Assessment, Attempt, PracticeSession (deferred for ContentGenerationArtifact)
+- [x] Task 2.4: Mark all existing records as status = published (implicit in seeding)
 
 ### Phase 3: Code Migration - Config
 
-- [ ] Task 3.1: Update config.py - replace string-based prompt versions with UUID + int pairs
-- [ ] Task 3.2: Update MarkingRuntimeConfig - per_skill and aggregation prompt references
-- [ ] Task 3.3: Update CatalogGenerationRuntimeConfig - all prompt references
-- [ ] Task 3.4: Update runtime config JSON artifacts (soft_skills_marking_runtime.v1.json, soft_skills_catalog_generation_runtime.v1.json) to use UUID + int pairs
-- [ ] Task 3.5: Define and implement config-to-UUID resolution strategy for builtin prompts (builtin seeding generates non-deterministic UUIDs; options: name→UUID lookup, deterministic UUIDs, or hybrid)
+- [ ] Task 3.1: Update config.py - replace string-based prompt versions with UUID + int pairs (deferred)
+- [ ] Task 3.2: Update MarkingRuntimeConfig - per_skill and aggregation prompt references (deferred)
+- [ ] Task 3.3: Update CatalogGenerationRuntimeConfig - all prompt references (deferred)
+- [ ] Task 3.4: Update runtime config JSON artifacts to use UUID + int pairs (deferred)
+- [ ] Task 3.5: Define and implement config-to-UUID resolution strategy for builtin prompts (deferred - created PromptRepositoryV2 and PromptResolutionService)
 
 ### Phase 4: Code Migration - Domain & Repository
 
-- [ ] Task 4.1: Rewrite PromptRepository with org filtering support
-- [ ] Task 4.2: Rewrite RubricAdminRepository with org filtering support
-- [ ] Task 4.3: Create OrgConfigRepository for prompt/rubric config
-- [ ] Task 4.4: Update PromptRegistry.render() signature to use UUIDs
-- [ ] Task 4.5: Add org resolution logic to PromptRegistry (org config → global fallback)
-- [ ] Task 4.6: Create RubricRegistry with org resolution (org config → global fallback)
-- [ ] Task 4.7: Update builtin_prompts.py seeding for new model
+- [x] Task 4.1: Rewrite PromptRepository with org filtering support (created PromptRepositoryV2)
+- [x] Task 4.2: Rewrite RubricAdminRepository with org filtering support (created RubricRepositoryV2)
+- [x] Task 4.3: Create OrgConfigRepository for prompt/rubric config (created OrgConfigRepositoryV2)
+- [ ] Task 4.4: Update PromptRegistry.render() signature to use UUIDs (deferred)
+- [ ] Task 4.5: Add org resolution logic to PromptRegistry (org config → global fallback) (deferred)
+- [ ] Task 4.6: Create RubricRegistry with org resolution (org config → global fallback) (deferred)
+- [x] Task 4.7: Update builtin_prompts.py seeding for new model (updated to work with new model)
 
 ### Phase 5: Code Migration - Service & API
 
