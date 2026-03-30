@@ -121,19 +121,21 @@ class AssistantToolExecutor:
         tool_request: AssistantToolRequest,
     ) -> ToolPromptResult:
         requires_approval = self._requires_approval(tool_request.tool_name)
+        arguments_payload = tool_request.arguments_payload()
         tool_call = self._repository.create_tool_call(
             turn_id=execution.turn_id,
             tool_name=tool_request.tool_name,
-            args_payload=tool_request.arguments,
+            args_payload=arguments_payload,
             waiting_for_approval=requires_approval,
         )
         try:
             if requires_approval:
                 await self._await_human_approval(
-                    execution=execution,
-                    tool_request=tool_request,
-                    tool_call_id=tool_call.id,
-                )
+                execution=execution,
+                tool_request=tool_request,
+                tool_call_id=tool_call.id,
+                arguments_payload=arguments_payload,
+            )
                 tool_call = self._repository.mark_tool_call_running(tool_call_id=tool_call.id)
             await self._publish_tool_started(
                 execution=execution,
@@ -230,12 +232,13 @@ class AssistantToolExecutor:
         execution: ToolExecutionContext,
         tool_request: AssistantToolRequest,
         tool_call_id: str,
+        arguments_payload: dict[str, Any],
     ) -> None:
         approval = await self._approvals.request_tool_approval(
             tool_call_id=tool_call_id,
             approval_message=_approval_message(tool_request),
             payload_summary={
-                "arguments": tool_request.arguments,
+                "arguments": arguments_payload,
                 "call_id": tool_request.call_id,
             },
             timeout_seconds=self._approval_timeout_seconds,
@@ -311,7 +314,7 @@ class AssistantToolExecutor:
         execution: ToolExecutionContext,
         tool_request: AssistantToolRequest,
     ) -> tuple[dict[str, Any], str | None]:
-        arguments = tool_request.arguments
+        arguments = tool_request.arguments_payload()
         if tool_request.tool_name == "query_user_context":
             guarded = self._sql_guard.validate_and_scope(
                 QueryUserContextCommand.model_validate(arguments)
@@ -494,7 +497,7 @@ class AssistantToolExecutor:
                     "tool_call_id": tool_call_id,
                     "call_id": tool_request.call_id,
                     "tool_name": tool_request.tool_name,
-                    "arguments": tool_request.arguments,
+                    "arguments": tool_request.arguments_payload(),
                 },
                 emitted_at=emitted_at,
             ),
@@ -580,18 +583,19 @@ def stage_now():
 
 
 def _approval_message(tool_request: AssistantToolRequest) -> str:
+    arguments = tool_request.arguments_payload()
     if tool_request.tool_name == "generate_collection":
-        title = tool_request.arguments.get("title")
+        title = arguments.get("title")
         return f"Approve generate_collection for '{title}'?" if isinstance(title, str) else "Approve generate_collection?"
     if tool_request.tool_name == "generate_prompt_items":
-        collection_id = tool_request.arguments.get("collection_id")
+        collection_id = arguments.get("collection_id")
         return (
             f"Approve generate_prompt_items for collection {collection_id}?"
             if isinstance(collection_id, str)
             else "Approve generate_prompt_items?"
         )
     if tool_request.tool_name == "start_collection_practice":
-        collection_id = tool_request.arguments.get("collection_id")
+        collection_id = arguments.get("collection_id")
         return (
             f"Approve start_collection_practice for collection {collection_id}?"
             if isinstance(collection_id, str)

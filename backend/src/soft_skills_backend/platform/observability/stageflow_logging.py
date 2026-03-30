@@ -13,6 +13,7 @@ from soft_skills_backend.platform.observability.events import (
     ProviderCallLog,
     WorkflowEvent,
 )
+from soft_skills_backend.platform.providers.openrouter_pricing import calculate_cost
 from soft_skills_backend.shared.errors import AppError, ErrorCategory
 from soft_skills_backend.shared.ports import (
     PipelineRunRepository,
@@ -285,12 +286,23 @@ class DatabaseProviderCallLogger:
         error: str | None = None,
         **metrics: object,
     ) -> None:
+        # Extract usage metrics
+        usage = metrics.get("usage", {})
+        prompt_tokens = int(usage.get("prompt_tokens", 0)) if usage else 0
+        completion_tokens = int(usage.get("completion_tokens", 0)) if usage else 0
+
+        # Calculate cost
+        model_id = metrics.get("model_id")
+        cost_usd = 0.0
+        if model_id and prompt_tokens + completion_tokens > 0:
+            cost_usd = calculate_cost(str(model_id), prompt_tokens, completion_tokens)
+
         self._repository.upsert(
             ProviderCallLog(
                 call_id=str(call_id),
                 operation=str(metrics.get("operation", "unknown")),
                 provider=str(metrics.get("provider", "unknown")),
-                model_id=None if metrics.get("model_id") is None else str(metrics["model_id"]),
+                model_id=None if model_id is None else str(model_id),
                 success=success,
                 latency_ms=latency_ms,
                 error=error,
@@ -302,5 +314,8 @@ class DatabaseProviderCallLogger:
                 else str(metrics["request_id"]),
                 trace_id=None if metrics.get("trace_id") is None else str(metrics["trace_id"]),
                 metrics={key: value for key, value in metrics.items() if value is not None},
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cost_usd=cost_usd,
             )
         )

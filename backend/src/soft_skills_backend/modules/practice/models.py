@@ -224,6 +224,19 @@ class PracticeRunListItemView(BaseModel):
     completed_at: str | None = None
 
 
+class AttemptHistoryItemView(BaseModel):
+    """Compact learner history row."""
+
+    id: str
+    session_id: str
+    title: str
+    practice_type: PracticeType
+    score: float
+    skill_slugs: list[str] = Field(default_factory=list)
+    created_at: str
+    status: AttemptStatus
+
+
 class StartPracticeSessionCommand(BaseModel):
     """Quick-practice session start payload."""
 

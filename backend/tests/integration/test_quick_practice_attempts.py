@@ -27,7 +27,7 @@ from soft_skills_backend.shared.errors import provider_error, validation_error
 def _migrate(test_settings) -> None:
     alembic_config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
     alembic_config.set_main_option("sqlalchemy.url", test_settings.database_url)
-    command.upgrade(alembic_config, "head")
+    command.upgrade(alembic_config, "heads")
 
 
 async def _register_user(client, *, email: str, display_name: str):
@@ -152,6 +152,44 @@ class FakeSuccessMarker:
             model_slug="gpt-4.1-mini",
             schema_version="quick-practice-assessment-output.v1",
         )
+
+
+@pytest.mark.asyncio
+async def test_attempt_history_returns_compact_rows(app, client, test_settings) -> None:
+    _migrate(test_settings)
+    learner, prompt = await _seed_quick_practice_prompt(client)
+    app.state.container.practice_service._assessment_marker = FakeSuccessMarker()
+
+    start_response = await client.post(
+        "/api/attempts/quick-practice/sessions",
+        headers={"X-User-ID": learner["id"]},
+        json={"prompt_item_id": prompt["id"]},
+    )
+    assert start_response.status_code == 200
+    attempt_id = start_response.json()["data"]["attempt_id"]
+
+    submit_response = await client.post(
+        f"/api/attempts/{attempt_id}/submit",
+        headers={"X-User-ID": learner["id"]},
+        json={
+            "response_text": (
+                "I hear why the date matters to you. The earliest realistic date is next Friday, "
+                "and I can confirm scope with the team by tomorrow."
+            )
+        },
+    )
+    assert submit_response.status_code == 200
+
+    history_response = await client.get(
+        "/api/attempts/history",
+        headers={"X-User-ID": learner["id"]},
+    )
+    assert history_response.status_code == 200
+    history = history_response.json()["data"]
+    assert len(history) == 1
+    assert history[0]["id"] == attempt_id
+    assert history[0]["title"] == "Reset the timeline"
+    assert history[0]["practice_type"] == "quick_practice"
 
 
 class FakeMissingMetadataMarker:

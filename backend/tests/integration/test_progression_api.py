@@ -18,7 +18,7 @@ from soft_skills_backend.platform.db.models import (
 def _migrate(test_settings) -> None:
     alembic_config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
     alembic_config.set_main_option("sqlalchemy.url", test_settings.database_url)
-    command.upgrade(alembic_config, "head")
+    command.upgrade(alembic_config, "heads")
 
 
 async def _register_user(client, *, email: str, display_name: str):
@@ -243,3 +243,26 @@ async def test_progress_recalculate_creates_audit_record(app, client, test_setti
 
     assert recalc_record is not None
     assert recalc_record.status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_progress_dashboard_returns_empty_state_for_new_learner(
+    client, test_settings
+) -> None:
+    _migrate(test_settings)
+    learner = await _register_user(
+        client,
+        email="new-learner-progress@example.com",
+        display_name="New Learner Progress",
+    )
+
+    progress_response = await client.get(
+        "/api/progress/me",
+        headers={"X-User-ID": learner["id"]},
+    )
+    assert progress_response.status_code == 200
+    payload = progress_response.json()["data"]
+    assert payload["snapshot"]["learner_id"] == learner["id"]
+    assert payload["snapshot"]["skill_states"] == []
+    assert payload["snapshot"]["competency_states"] == []
+    assert payload["recommendation"]["items"] == []

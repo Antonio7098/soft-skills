@@ -2,21 +2,53 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import secrets
 from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.modules.identity.models import (
+    DeleteAccountResult,
     LearnerProfileView,
+    LoginUserCommand,
     RegisterUserCommand,
     UpdateProfileCommand,
     UserView,
 )
-from soft_skills_backend.platform.db.models import LearnerProfileRecord, UserAccountRecord
+from soft_skills_backend.platform.db.models import (
+    LearnerProfileRecord,
+    OrganisationMembershipRecord,
+    UserAccountRecord,
+)
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
 from soft_skills_backend.platform.observability.events import WorkflowEvent
-from soft_skills_backend.shared.errors import domain_error
+from soft_skills_backend.shared.errors import auth_error, domain_error
+
+
+def _hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 200_000)
+    return f"{salt}${digest.hex()}"
+
+
+def _verify_password(password: str, password_hash: str | None) -> bool:
+    if not password_hash or "$" not in password_hash:
+        return False
+    salt, expected = password_hash.split("$", 1)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 200_000)
+    return hmac.compare_digest(digest.hex(), expected)
+
+
+LEGACY_PASSWORD_CLAIM_CUTOFF = datetime(2026, 3, 30, 10, 20, tzinfo=UTC)
+
+
+def _coerce_utc_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 class IdentityService:
@@ -49,6 +81,7 @@ class IdentityService:
                 display_name=command.display_name,
                 auth_provider="internal",
                 auth_subject=command.email,
+                password_hash=_hash_password(command.password),
                 created_at=now,
             )
             profile = LearnerProfileRecord(
@@ -71,6 +104,49 @@ class IdentityService:
             )
         )
         return self.get_user(user.id)
+
+    def login_user(self, command: LoginUserCommand) -> UserView:
+        with self._session_factory() as session:
+            user = session.query(UserAccountRecord).filter_by(email=command.email).one_or_none()
+            if user is None or not user.is_active:
+                raise auth_error(
+                    "Invalid email or password",
+                    code="SS-AUTH-011",
+                    status_code=401,
+                    details={"email": command.email},
+                )
+
+            password_matches = _verify_password(command.password, user.password_hash)
+            if not password_matches and self._should_claim_legacy_password(user):
+                user.password_hash = _hash_password(command.password)
+                session.commit()
+                password_matches = True
+
+            if not password_matches:
+                raise auth_error(
+                    "Invalid email or password",
+                    code="SS-AUTH-011",
+                    status_code=401,
+                    details={"email": command.email},
+                )
+            user_id = user.id
+
+        self._workflow_events.record(
+            WorkflowEvent(
+                event_type="identity.user_logged_in.v1",
+                payload={"user_id": user_id},
+                request_id=user_id,
+                workflow_id=user_id,
+            )
+        )
+        return self.get_user(user_id)
+
+    def _should_claim_legacy_password(self, user: UserAccountRecord) -> bool:
+        return (
+            user.auth_provider == "internal"
+            and _coerce_utc_datetime(user.created_at) < LEGACY_PASSWORD_CLAIM_CUTOFF
+            and _verify_password("password123", user.password_hash)
+        )
 
     def get_user(self, user_id: str) -> UserView:
         with self._session_factory() as session:
@@ -131,3 +207,28 @@ class IdentityService:
             )
         )
         return self.get_user(user_id)
+
+    def delete_user(self, user_id: str) -> DeleteAccountResult:
+        with self._session_factory() as session:
+            user = session.get(UserAccountRecord, user_id)
+            if user is None:
+                raise domain_error(
+                    "User was not found",
+                    code="SS-DOMAIN-003",
+                    status_code=404,
+                    details={"user_id": user_id},
+                )
+            session.query(LearnerProfileRecord).filter_by(user_id=user_id).delete()
+            session.query(OrganisationMembershipRecord).filter_by(user_id=user_id).delete()
+            session.query(UserAccountRecord).filter_by(id=user_id).delete()
+            session.commit()
+
+        self._workflow_events.record(
+            WorkflowEvent(
+                event_type="identity.user_deleted.v1",
+                payload={"user_id": user_id},
+                request_id=user_id,
+                workflow_id=user_id,
+            )
+        )
+        return DeleteAccountResult(deleted_user_id=user_id, status="deleted")

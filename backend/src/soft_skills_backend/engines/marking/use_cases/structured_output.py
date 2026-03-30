@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 import json
 from dataclasses import dataclass
 from typing import Any, TypeVar, cast
@@ -14,6 +15,7 @@ from soft_skills_backend.engines.marking.contracts.models import (
 )
 from soft_skills_backend.shared.errors import AppError, validation_error
 from soft_skills_backend.shared.ports.llm import LLMProvider
+from soft_skills_backend.shared.ports.models import JsonSchemaResponseFormat
 from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
@@ -36,6 +38,13 @@ class StructuredOutputRejectionError(Exception):
 
     app_error: AppError
     raw_payload: dict[str, Any]
+
+
+class StructuredOutputRepairMode(StrEnum):
+    """How typed output should react to malformed provider output."""
+
+    FAIL_FAST = "fail_fast"
+    SELF_CORRECT = "self_correct"
 
 
 class PromptLibrary:
@@ -87,10 +96,18 @@ class TypedLLMOutput:
         *,
         schema_version: str,
         max_validation_retries: int,
+        repair_mode: StructuredOutputRepairMode = StructuredOutputRepairMode.SELF_CORRECT,
+        timeout_seconds: float | None = None,
+        transport_schema_name: str | None = None,
     ) -> None:
         self._model_type = model_type
         self._schema_version = schema_version
         self._max_validation_retries = max_validation_retries
+        self._repair_mode = repair_mode
+        self._timeout_seconds = timeout_seconds
+        self._transport_schema_name = (
+            transport_schema_name or _default_transport_schema_name(model_type.__name__)
+        )
 
     async def generate(
         self,
@@ -101,10 +118,21 @@ class TypedLLMOutput:
     ) -> TypedLLMResult:
         retry_messages = list(messages)
         last_payload: dict[str, Any] = {}
+        transport_schema = JsonSchemaResponseFormat(
+            name=self._transport_schema_name,
+            schema=self._model_type.model_json_schema(),
+            strict=True,
+        )
         for attempt in range(self._max_validation_retries + 1):
             completion = await provider.complete_json(
                 messages=retry_messages,
                 call_context=call_context,
+                response_schema=JsonSchemaResponseFormat(
+                    name=transport_schema.name,
+                    schema=transport_schema.normalized_schema(),
+                    strict=transport_schema.strict,
+                ),
+                timeout_seconds=self._timeout_seconds,
             )
             try:
                 payload = _coerce_json_payload(completion.content)
@@ -118,7 +146,10 @@ class TypedLLMOutput:
                     model_slug=completion.model_slug,
                 )
             except (json.JSONDecodeError, ValidationError) as exc:
-                if attempt >= self._max_validation_retries:
+                if (
+                    self._repair_mode == StructuredOutputRepairMode.FAIL_FAST
+                    or attempt >= self._max_validation_retries
+                ):
                     raise StructuredOutputRejectionError(
                         app_error=validation_error(
                             "Provider returned malformed structured output",
@@ -163,3 +194,14 @@ def _stringify_provider_content(content: str | dict[str, Any]) -> str:
     if isinstance(content, str):
         return content
     return json.dumps(content)
+
+
+def _default_transport_schema_name(model_name: str) -> str:
+    sanitized = [
+        character.lower() if character.isalnum() else "_"
+        for character in model_name.strip()
+    ]
+    collapsed = "".join(sanitized).strip("_")
+    while "__" in collapsed:
+        collapsed = collapsed.replace("__", "_")
+    return collapsed or "structured_output"

@@ -14,6 +14,8 @@ def test_assistant_schema_registry_contains_allowlisted_views() -> None:
     assert "assistant_safe_attempt_summaries_v" in registry.allowed_views()
     assert "overall_score" in registry.get_view("assistant_safe_attempt_summaries_v").columns
     assert registry.join_hints
+    assert registry.resolve_view_name("assistant_safe_collections_v1") == "assistant_safe_collections_v"
+    assert registry.resolve_column_name("assistant_safe_collections_v", "collection_name") == "title"
     assert "Allowed learner-safe views" in registry.render_prompt_context()
 
 
@@ -39,6 +41,42 @@ def test_assistant_sql_guard_scopes_user_and_org_filters_and_limit() -> None:
     assert "LIMIT :_assistant_row_limit" in guarded.scoped_sql
 
 
+def test_assistant_sql_guard_canonicalizes_safe_view_suffix_and_wildcard() -> None:
+    guard = AssistantSqlGuard(
+        schema_registry=AssistantSchemaRegistry(),
+        row_limit=25,
+    )
+
+    guarded = guard.validate_and_scope(
+        QueryUserContextCommand(
+            sql="SELECT * FROM assistant_safe_collections ORDER BY updated_at DESC"
+        )
+    )
+
+    assert guarded.source_views == ("assistant_safe_collections_v",)
+    assert "assistant_safe_collections_v" in guarded.sql
+    assert "SELECT *" not in guarded.sql
+    assert "title" in guarded.sql
+    assert "updated_at" in guarded.sql
+
+
+def test_assistant_sql_guard_canonicalizes_collection_aliases() -> None:
+    guard = AssistantSqlGuard(
+        schema_registry=AssistantSchemaRegistry(),
+        row_limit=25,
+    )
+
+    guarded = guard.validate_and_scope(
+        QueryUserContextCommand(
+            sql="SELECT collection_id, collection_name FROM assistant_safe_collections_v1"
+        )
+    )
+
+    assert guarded.source_views == ("assistant_safe_collections_v",)
+    assert "assistant_safe_collections_v" in guarded.sql
+    assert "title AS collection_name" in guarded.sql
+
+
 def test_assistant_sql_guard_rejects_disallowed_patterns() -> None:
     guard = AssistantSqlGuard(
         schema_registry=AssistantSchemaRegistry(),
@@ -46,7 +84,6 @@ def test_assistant_sql_guard_rejects_disallowed_patterns() -> None:
     )
 
     invalid_sql = (
-        "SELECT * FROM assistant_safe_attempt_summaries_v",
         "SELECT attempt_id FROM attempts",
         "SELECT attempt_id FROM assistant_safe_attempt_summaries_v -- sneaky",
         "DELETE FROM assistant_safe_attempt_summaries_v",

@@ -18,6 +18,7 @@ from soft_skills_backend.entrypoints.http.routes import (
     organisations,
     practice_runs,
     progress,
+    providers,
     skills,
     users,
 )
@@ -37,4 +38,5 @@ api_router.include_router(collections.router, prefix="/collections", tags=["coll
 api_router.include_router(attempts.router, prefix="/attempts", tags=["attempts"])
 api_router.include_router(practice_runs.router, prefix="/practice-runs", tags=["practice-runs"])
 api_router.include_router(progress.router, prefix="/progress", tags=["progress"])
+api_router.include_router(providers.router, prefix="/providers", tags=["providers"])
 api_router.include_router(organisations.router, prefix="/organisations", tags=["organisations"])

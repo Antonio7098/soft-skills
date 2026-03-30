@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +43,7 @@ class AssistantSchemaRegistry:
                         "summary",
                         "target_audience",
                         "difficulty",
+                        "lifecycle_state",
                         "content_format_mix",
                         "target_skill_slugs",
                         "target_competency_slugs",
@@ -156,6 +158,14 @@ class AssistantSchemaRegistry:
                 description="Link recommendations to the progression snapshot that produced them.",
             ),
         )
+        self._column_aliases: dict[str, dict[str, str]] = {
+            "assistant_safe_collections_v": {
+                "id": "collection_id",
+                "collection_name": "title",
+                "name": "title",
+            }
+        }
+        self._versioned_view_pattern = re.compile(r"^(assistant_safe_[a-zA-Z0-9_]+_v)\d+$")
 
     @property
     def join_hints(self) -> tuple[AssistantJoinHint, ...]:
@@ -169,6 +179,28 @@ class AssistantSchemaRegistry:
 
     def has_view(self, name: str) -> bool:
         return name in self._views
+
+    def resolve_view_name(self, name: str) -> str | None:
+        if name in self._views:
+            return name
+        match = self._versioned_view_pattern.match(name)
+        if match:
+            candidate = match.group(1)
+            if candidate in self._views:
+                return candidate
+        if not name.endswith("_v"):
+            candidate = f"{name}_v"
+            if candidate in self._views:
+                return candidate
+        return None
+
+    def resolve_column_name(self, view_name: str, column_name: str) -> str | None:
+        view = self._views.get(view_name)
+        if view is None:
+            return None
+        if column_name in view.columns:
+            return column_name
+        return self._column_aliases.get(view_name, {}).get(column_name)
 
     def render_prompt_context(self) -> str:
         sections: list[str] = ["Allowed learner-safe views:"]

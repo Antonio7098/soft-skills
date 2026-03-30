@@ -249,11 +249,11 @@ class TestToolInvokedEvent:
         mock_ctx.try_emit_event = MagicMock()
 
         from soft_skills_backend.modules.assistant.workflows.runtime_models import (
-            AssistantToolRequest,
+            QueryUserContextToolRequest,
         )
 
         tool_requests = [
-            AssistantToolRequest(
+            QueryUserContextToolRequest(
                 call_id="call-1",
                 tool_name="query_user_context",
                 arguments={"sql": "SELECT attempt_id FROM assistant_safe_attempt_summaries_v"},

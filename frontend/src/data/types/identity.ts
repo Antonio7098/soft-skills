@@ -45,14 +45,25 @@ export interface UserView {
 export interface RegisterUserCommand {
   readonly email: string;
   readonly display_name: string;
+  readonly password?: string;
   readonly role?: string;
   readonly target_role?: string;
   readonly goals?: string[];
   readonly practice_preferences?: Record<string, string>;
 }
 
+export interface LoginUserCommand {
+  readonly email: string;
+  readonly password: string;
+}
+
 export interface UpdateProfileCommand {
   readonly target_role?: string | null;
   readonly goals?: string[] | null;
   readonly practice_preferences?: Record<string, string> | null;
+}
+
+export interface DeleteAccountResult {
+  readonly deleted_user_id: string;
+  readonly status: string;
 }

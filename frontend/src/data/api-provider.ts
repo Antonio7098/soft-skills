@@ -2,15 +2,18 @@ import type { DataProvider } from './provider';
 import type {
   UserView,
   AuthSessionView,
+  LoginUserCommand,
   TaxonomySnapshot,
   CollectionView,
   CollectionListFilters,
   QuickPracticeSessionView,
   AttemptView,
+  AttemptHistoryItem,
   InterviewSessionView,
   ScenarioSessionView,
   PracticeRunView,
   PracticeSessionView,
+  CompetencyProgressView,
   CollectionGenerationView,
   AdminUserView,
   AdminUserListView,
@@ -29,6 +32,7 @@ import type {
   EvaluationComparisonView,
   BenchmarkDashboardView,
   EvaluationCaseDetailView,
+  ProviderModel,
   PromptSummaryView,
   PromptVersionView,
   PromptAnalyticsView,
@@ -52,6 +56,7 @@ import type {
   OrgRubricView,
   PromptItemView,
   ScenarioView,
+  DeleteAccountResult,
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
@@ -99,6 +104,27 @@ function setStoredActiveOrganisationId(organisationId: string | null): void {
   sessionStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
 }
 
+function clearStoredSession(): void {
+  clearUserId();
+  setStoredActiveOrganisationId(null);
+}
+
+function isUnauthorizedError(error: unknown): error is ApiRequestError {
+  return error instanceof ApiRequestError && error.status === 401;
+}
+
+function buildAnonymousSession(): AuthSessionView {
+  return {
+    status: 'anonymous',
+    actor: null,
+    platform_role: 'anonymous',
+    org_memberships: [],
+    active_organisation_id: null,
+    capabilities: [],
+    data_mode: 'api',
+  };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = {
     'Content-Type': 'application/json',
@@ -119,17 +145,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     if (res.status === 401) {
+      const body = await res.json().catch(() => ({}));
+      const isAuthAction = path === '/auth/login';
       const isLoginPage = window.location.pathname === '/login';
-      if (!isLoginPage) {
+      if (!isLoginPage && !isAuthAction) {
         window.location.href = '/login';
       }
-      throw new ApiRequestError('Session expired', { status: 401 });
+      throw new ApiRequestError(body?.error?.message ?? 'Session expired', { status: 401 });
     }
     const body = await res.json().catch(() => ({}));
     throw new ApiRequestError(body?.error?.message ?? `API error ${res.status}`, { status: res.status });
   }
 
   const envelope = await res.json();
+  if (envelope.error) {
+    const errorMessage = envelope.error?.message ?? envelope.error?.code ?? JSON.stringify(envelope.error);
+    throw new ApiRequestError(errorMessage, { status: res.status });
+  }
+  if (envelope.status === 'error' || envelope.status === 'failed') {
+    const errorMessage = envelope.errors?.[0]?.message ?? envelope.message ?? JSON.stringify(envelope);
+    throw new ApiRequestError(errorMessage, { status: res.status });
+  }
   return envelope.data as T;
 }
 
@@ -143,6 +179,21 @@ export function clearUserId(): void {
 
 export function getUserId(): string | null {
   return sessionStorage.getItem(USER_ID_STORAGE_KEY);
+}
+
+function buildWebSocketUrl(path: string): string {
+  if (API_BASE.startsWith('http://') || API_BASE.startsWith('https://')) {
+    const base = new URL(API_BASE);
+    base.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:';
+    base.pathname = `${base.pathname.replace(/\/$/, '')}${path}`;
+    base.search = '';
+    base.hash = '';
+    return base.toString();
+  }
+
+  const url = new URL(`${API_BASE}${path}`, window.location.origin);
+  url.protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return url.toString();
 }
 
 function deriveSessionFromUser(user: UserView): AuthSessionView {
@@ -177,16 +228,105 @@ function deriveSessionFromUser(user: UserView): AuthSessionView {
   };
 }
 
+type ProgressDashboardApiView = {
+  snapshot: {
+    competency_states: Array<{
+      competency_slug: string;
+      score: number;
+      confidence_band: string;
+    }>;
+    skill_states: Array<{
+      skill_slug: string;
+      score: number;
+      evidence_count: number;
+      delta: number;
+    }>;
+  };
+};
+
+function mapConfidenceBand(value: string): 'low' | 'medium' | 'high' {
+  if (value === 'high' || value === 'medium' || value === 'low') {
+    return value;
+  }
+  return 'low';
+}
+
+function mapTrend(delta: number): 'up' | 'down' | 'stable' {
+  if (delta > 0) return 'up';
+  if (delta < 0) return 'down';
+  return 'stable';
+}
+
+function mapCompetencyProgress(
+  dashboard: ProgressDashboardApiView,
+  taxonomy: TaxonomySnapshot,
+): CompetencyProgressView[] {
+  return dashboard.snapshot.competency_states.map((competencyState) => {
+    const competency = taxonomy.competencies.find(
+      (item) => item.slug === competencyState.competency_slug,
+    );
+    const skillViews = dashboard.snapshot.skill_states
+      .filter((skillState) => {
+        const linkedCompetency = taxonomy.competencies.find(
+          (item) => item.slug === competencyState.competency_slug,
+        );
+        return linkedCompetency?.skills.some((skill) => skill.slug === skillState.skill_slug) ?? false;
+      })
+      .map((skillState) => {
+        const skill = taxonomy.skills.find((item) => item.slug === skillState.skill_slug);
+        return {
+          slug: skillState.skill_slug,
+          name: skill?.name ?? skillState.skill_slug,
+          score: Math.round(skillState.score),
+          evidence_count: skillState.evidence_count,
+          trend: mapTrend(skillState.delta),
+        };
+      });
+
+    return {
+      slug: competencyState.competency_slug,
+      name: competency?.name ?? competencyState.competency_slug,
+      description: competency?.description ?? '',
+      skills: skillViews,
+      overall_score: Math.round(competencyState.score),
+      confidence: mapConfidenceBand(competencyState.confidence_band),
+    };
+  });
+}
+
 export const apiDataProvider: DataProvider = {
   // --- Auth / Identity -----------------------------------------------------
-  getAuthSession: async () => deriveSessionFromUser(await request<UserView>('/users/me')),
+  getAuthSession: async () => {
+    try {
+      return deriveSessionFromUser(await request<UserView>('/users/me'));
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        clearStoredSession();
+        return buildAnonymousSession();
+      }
+      throw error;
+    }
+  },
   setActiveOrganisation: async (organisationId) => {
     setStoredActiveOrganisationId(organisationId);
-    return deriveSessionFromUser(await request<UserView>('/users/me'));
+    try {
+      return deriveSessionFromUser(await request<UserView>('/users/me'));
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        clearStoredSession();
+        return buildAnonymousSession();
+      }
+      throw error;
+    }
   },
   listAuthProfiles: async () => [],
   switchAuthProfile: async (_profileId) => {
     throw new ApiRequestError('Auth profile switching is only available in mock mode');
+  },
+  login: (cmd: LoginUserCommand) => {
+    const result = request<UserView>('/auth/login', { method: 'POST', body: JSON.stringify(cmd) });
+    result.then((user) => setUserId(user.id)).catch(() => {});
+    return result;
   },
   register: (cmd) => {
     const result = request<UserView>('/auth/register', { method: 'POST', body: JSON.stringify(cmd) });
@@ -195,6 +335,11 @@ export const apiDataProvider: DataProvider = {
   },
   getMe: () => request<UserView>('/users/me'),
   updateProfile: (cmd) => request<UserView>('/users/me/profile', { method: 'PATCH', body: JSON.stringify(cmd) }),
+  deleteMe: () => {
+    const result = request<DeleteAccountResult>('/users/me', { method: 'DELETE' });
+    result.then(() => clearStoredSession()).catch(() => {});
+    return result;
+  },
 
   // --- Taxonomy ------------------------------------------------------------
   getTaxonomy: () => request<TaxonomySnapshot>('/skills/catalog'),
@@ -266,11 +411,13 @@ export const apiDataProvider: DataProvider = {
 
   // --- Progress -----------------------------------------------------------
   getCompetencyProgress: async () => {
-    throw new Error('Progress API not yet implemented - use mock provider');
+    const [dashboard, taxonomy] = await Promise.all([
+      request<ProgressDashboardApiView>('/progress/me'),
+      request<TaxonomySnapshot>('/skills/catalog'),
+    ]);
+    return mapCompetencyProgress(dashboard, taxonomy);
   },
-  getAttemptHistory: async () => {
-    throw new Error('Attempt history API not yet implemented - use mock provider');
-  },
+  getAttemptHistory: () => request<AttemptHistoryItem[]>('/attempts/history'),
 
   // --- Admin: Users & User Management ----------------------------------------
   listAdminUsers: (params) => {
@@ -385,6 +532,9 @@ export const apiDataProvider: DataProvider = {
     return request<BenchmarkDashboardView>(`/admin/evaluations/benchmark${qs ? `?${qs}` : ''}`);
   },
   getEvalCaseDetail: (caseId) => request<EvaluationCaseDetailView>(`/admin/evaluations/cases/${caseId}`),
+
+  // --- Admin: Providers --------------------------------------------------------
+  listOpenRouterModels: () => request<ProviderModel[]>('/providers/openrouter/models'),
 
   // --- Admin: Prompts --------------------------------------------------------
   listPrompts: () => request<PromptSummaryView[]>('/admin/prompts'),
@@ -579,7 +729,7 @@ export const apiDataProvider: DataProvider = {
     }),
 
   streamAssistantTurn: (streamToken, callbacks) => {
-    const wsUrl = `${API_BASE.replace('http', 'ws')}/assistant/streams/${encodeURIComponent(streamToken)}`;
+    const wsUrl = buildWebSocketUrl(`/assistant/streams/${encodeURIComponent(streamToken)}`);
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -596,8 +746,10 @@ export const apiDataProvider: DataProvider = {
           callbacks.onToolCompleted(data.payload);
         } else if (data.type === 'tool.failed' && callbacks.onToolFailed) {
           callbacks.onToolFailed(data.payload);
+        } else if (data.type === 'turn.failed' && callbacks.onTurnFailed) {
+          callbacks.onTurnFailed(data.payload);
         } else if (data.type === 'turn.completed' && callbacks.onTurnCompleted) {
-          callbacks.onTurnCompleted(data.payload);
+          callbacks.onTurnCompleted();
         }
       } catch (error) {
         console.error('Error parsing assistant stream message:', error);

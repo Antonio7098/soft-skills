@@ -11,16 +11,13 @@ from time import perf_counter
 from typing import Any, cast
 from uuid import uuid4
 
+from pydantic import ValidationError
 from stageflow.agent.security import PromptSecurityError, PromptSecurityPolicy
 from stageflow.api import Pipeline, StageKind, stage
 from stageflow.core import StageContext, StageOutput
 
 from soft_skills_backend.config import Settings
 from soft_skills_backend.engines.marking.contracts.models import RenderedPrompt
-from soft_skills_backend.engines.marking.use_cases.structured_output import (
-    StructuredOutputRejectionError,
-    TypedLLMOutput,
-)
 from soft_skills_backend.modules.admin.domain.prompt_registry import PromptRegistry
 from soft_skills_backend.modules.admin.workflows.prompt_render_stage import (
     PromptRenderRequest,
@@ -49,9 +46,11 @@ from soft_skills_backend.modules.assistant.workflows.prompting import (
     ASSISTANT_FINAL_RESPONSE_PROMPT_VERSION,
     ASSISTANT_PROMPT_NAME,
     ASSISTANT_PROMPT_VERSION,
-    render_tool_definitions,
+    build_assistant_tool_definitions,
 )
-from soft_skills_backend.modules.assistant.workflows.runtime_models import AssistantDecision
+from soft_skills_backend.modules.assistant.workflows.runtime_models import (
+    parse_assistant_tool_requests,
+)
 from soft_skills_backend.modules.assistant.workflows.tools import (
     ASSISTANT_RUNTIME_STAGE,
     AssistantToolExecutor,
@@ -75,7 +74,7 @@ from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
 MAX_TOOL_ITERATIONS = 6
 _GENERATION_REQUEST_PATTERN = re.compile(
-    r"\b(generate|create|draft|make|add|build)\b",
+    r"\b(generate|create|draft|make|add|build|generate_collection|generate_prompt_items)\b",
     re.IGNORECASE,
 )
 _PRACTICE_STOP_PATTERN = re.compile(
@@ -86,6 +85,10 @@ _PRACTICE_RECALL_PATTERN = re.compile(
     r"\b(repeat|restate|remind)\b|"
     r"\bwhat (?:is|was)\b.*\b(question|prompt)\b|"
     r"\bshow\b.*\b(question|prompt)\b",
+    re.IGNORECASE,
+)
+_READ_TOOL_PATTERN = re.compile(
+    r"\b(progress|history|attempt|attempts|score|scores|feedback|profile|profiles|recommend|dashboard|recent|previous|how many|show|list)\b",
     re.IGNORECASE,
 )
 
@@ -131,11 +134,6 @@ class AssistantWorkflowService:
         self._progression = progression_service
         self._prompt_registry = prompt_registry
         self._stageflow = StageflowPipelineSupport.from_runtime(stageflow_runtime)
-        self._typed_output = TypedLLMOutput(
-            AssistantDecision,
-            schema_version="assistant_decision.v1",
-            max_validation_retries=1,
-        )
         self._prompt_security = PromptSecurityPolicy(
             max_user_chars=12000,
             max_tool_chars=12000,
@@ -277,7 +275,7 @@ class AssistantWorkflowService:
             messages = self._repository.load_history(
                 actor=execution.actor,
                 session_id=execution.session_id,
-                limit=24,
+                limit=self._settings.llm_assistant_conversation_history_limit,
             )
             return ok_output(
                 StageflowStageResult(
@@ -317,7 +315,7 @@ class AssistantWorkflowService:
                         "SELECT attempt_id, practice_type, status, overall_score, "
                         "strength_summary, next_action_summary, created_at, assessed_at "
                         "FROM assistant_safe_attempt_summaries_v "
-                        "ORDER BY created_at DESC LIMIT 5"
+                        f"ORDER BY created_at DESC LIMIT {self._settings.llm_assistant_recent_attempt_limit}"
                     )
                 )
             )
@@ -347,28 +345,36 @@ class AssistantWorkflowService:
             )
 
         async def planning_prompt_request(ctx: StageContext) -> Any:
+            history = cast(list[Any], payload_from_inputs(ctx, "history_enrich"))
+            latest_user_message = _latest_user_message(history)
+            include_read_schema = _should_include_read_schema_context(latest_user_message)
             prompt_request = PromptRenderRequest(
                 name=ASSISTANT_PROMPT_NAME,
                 version=ASSISTANT_PROMPT_VERSION,
                 variables={
                     "learner_context": json.dumps(
-                        {
-                            "profile": cast(dict[str, Any], payload_from_inputs(ctx, "profile_enrich")),
-                            "progress": cast(
+                        _build_compact_learner_context(
+                            latest_user_message=latest_user_message,
+                            profile=cast(dict[str, Any], payload_from_inputs(ctx, "profile_enrich")),
+                            progress=cast(
                                 dict[str, Any], payload_from_inputs(ctx, "progress_enrich")
                             ),
-                            "recent_attempts": cast(
+                            attempts=cast(
                                 list[dict[str, Any]], payload_from_inputs(ctx, "attempts_enrich")
                             ),
-                        },
+                        ),
                         sort_keys=True,
+                        separators=(",", ":"),
                     ),
-                    "read_schema_context": self._schema_registry.render_prompt_context(),
+                    "read_schema_context": (
+                        self._schema_registry.render_prompt_context()
+                        if include_read_schema
+                        else "Not needed for this turn unless you choose query_user_context."
+                    ),
                     "practice_state": cast(
                         AssistantPracticeState,
                         payload_from_inputs(ctx, "session_state_enrich"),
                     ).model_dump_json(),
-                    "tool_definitions": render_tool_definitions(),
                     "conversation_history": "Conversation history is attached as lower-priority messages.",
                 },
             )
@@ -539,6 +545,7 @@ class AssistantWorkflowService:
                 planning_prompt_request,  # type: ignore[arg-type]
                 StageKind.TRANSFORM,
                 dependencies=(
+                    "history_enrich",
                     "profile_enrich",
                     "progress_enrich",
                     "attempts_enrich",
@@ -592,9 +599,9 @@ class AssistantWorkflowService:
         history: list[Any],
         practice_state: AssistantPracticeState,
     ) -> _AssistantLoopResult:
-        messages = [{"role": "system", "content": rendered_prompt.content}]
+        messages: list[dict[str, Any]] = [{"role": "system", "content": rendered_prompt.content}]
+        tool_definitions = build_assistant_tool_definitions()
         required_tool_name = _required_tool_name(history, practice_state)
-        corrective_prompt_sent = False
         has_executed_tool = False
         for message in history:
             if message.role.value == "assistant":
@@ -613,57 +620,73 @@ class AssistantWorkflowService:
         for _ in range(MAX_TOOL_ITERATIONS):
             if active.cancel_reason is not None:
                 return _AssistantLoopResult(cancelled=True, reason=active.cancel_reason)
-            try:
-                typed = await self._typed_output.generate(
-                    self._llm_provider,
-                    messages=messages,
-                    call_context=ProviderCallContext(
-                        operation="assistant_orchestrator_decision",
-                        request_id=execution.request_id,
-                        trace_id=execution.trace_id,
-                        pipeline_run_id=str(ctx.pipeline_run_id) if ctx.pipeline_run_id else None,
-                        workflow_id=execution.workflow_id,
-                        user_id=execution.actor.user_id,
-                    ),
-                )
-            except StructuredOutputRejectionError as exc:
-                raise exc.app_error from exc
-            decision = cast(AssistantDecision, typed.parsed)
-            if decision.final_response is not None:
+            completion = await self._llm_provider.complete_with_tools(
+                messages=messages,
+                tools=tool_definitions,
+                call_context=ProviderCallContext(
+                    operation="assistant_orchestrator_decision",
+                    request_id=execution.request_id,
+                    trace_id=execution.trace_id,
+                    pipeline_run_id=str(ctx.pipeline_run_id) if ctx.pipeline_run_id else None,
+                    workflow_id=execution.workflow_id,
+                    user_id=execution.actor.user_id,
+                ),
+                timeout_seconds=self._settings.llm_assistant_timeout_seconds,
+                tool_choice=required_tool_name if required_tool_name and not has_executed_tool else None,
+            )
+            if not completion.tool_calls:
                 if required_tool_name is not None and not has_executed_tool:
-                    if corrective_prompt_sent:
-                        raise validation_error(
-                            "Assistant ignored a required generation tool request",
-                            code="SS-VALIDATION-206",
-                            details={"required_tool_name": required_tool_name},
-                        )
-                    messages.append(
-                        {
-                            "role": "system",
-                            "content": (
-                                "The latest user request requires a specific tool action. "
-                                f"You must call the `{required_tool_name}` tool next and must not "
-                                "return final_response until the tool result is available."
-                            ),
-                        }
+                    raise validation_error(
+                        "Assistant ignored a required generation tool request",
+                        code="SS-VALIDATION-206",
+                        details={"required_tool_name": required_tool_name},
                     )
-                    corrective_prompt_sent = True
-                    continue
+                final_response = (completion.content or "").strip()
+                if not final_response:
+                    raise orchestration_error(
+                        "Assistant returned neither tool calls nor a final response",
+                        code="SS-ORCHESTRATION-205",
+                    )
                 return _AssistantLoopResult(
                     cancelled=False,
                     reason=None,
-                    final_response=decision.final_response.strip(),
+                    final_response=final_response,
                     prompt_version=rendered_prompt.version,
-                    model_slug=typed.model_slug,
+                    model_slug=completion.model_slug,
                     planning_messages=list(messages),
+                    used_tools=has_executed_tool,
                 )
-            for tool_request in decision.tool_calls:
+            try:
+                tool_requests = parse_assistant_tool_requests(completion.tool_calls)
+            except ValidationError as exc:
+                clarification = _generation_clarification_for_invalid_tool_request(
+                    raw_tool_calls=completion.tool_calls,
+                    error=exc,
+                )
+                if clarification is not None:
+                    return _AssistantLoopResult(
+                        cancelled=False,
+                        reason=None,
+                        final_response=clarification,
+                        prompt_version=rendered_prompt.version,
+                        model_slug=completion.model_slug,
+                        planning_messages=list(messages),
+                        used_tools=has_executed_tool,
+                    )
+                raise
+            messages.append(
+                _provider_tool_call_message(
+                    content=completion.content,
+                    tool_requests=tool_requests,
+                )
+            )
+            for tool_request in tool_requests:
                 ctx.try_emit_event(
                     "tool.invoked",
                     {
                         "tool_name": tool_request.tool_name,
                         "call_id": tool_request.call_id,
-                        "arguments": tool_request.arguments,
+                        "arguments": tool_request.arguments_payload(),
                         "pipeline_run_id": str(ctx.pipeline_run_id)
                         if ctx.pipeline_run_id
                         else None,
@@ -672,19 +695,36 @@ class AssistantWorkflowService:
                         "workflow_id": execution.workflow_id,
                     },
                 )
-            tool_results = await self._tools.execute_many(
-                stage_ctx=ctx,
-                execution=ToolExecutionContext(
-                    actor=execution.actor,
-                    request_id=execution.request_id,
-                    trace_id=execution.trace_id,
-                    workflow_id=execution.workflow_id,
-                    session_id=execution.session_id,
-                    turn_id=execution.turn_id,
-                    stream_token=execution.stream_token,
-                ),
-                tool_requests=decision.tool_calls,
-            )
+            try:
+                tool_results = await self._tools.execute_many(
+                    stage_ctx=ctx,
+                    execution=ToolExecutionContext(
+                        actor=execution.actor,
+                        request_id=execution.request_id,
+                        trace_id=execution.trace_id,
+                        workflow_id=execution.workflow_id,
+                        session_id=execution.session_id,
+                        turn_id=execution.turn_id,
+                        stream_token=execution.stream_token,
+                    ),
+                    tool_requests=tool_requests,
+                )
+            except AppError as exc:
+                clarification = _generation_clarification_for_tool_error(
+                    tool_requests=tool_requests,
+                    error=exc,
+                )
+                if clarification is not None:
+                    return _AssistantLoopResult(
+                        cancelled=False,
+                        reason=None,
+                        final_response=clarification,
+                        prompt_version=rendered_prompt.version,
+                        model_slug=completion.model_slug,
+                        planning_messages=list(messages),
+                        used_tools=has_executed_tool,
+                    )
+                raise
             has_executed_tool = has_executed_tool or bool(tool_results)
             if active.cancel_reason is not None:
                 return _AssistantLoopResult(cancelled=True, reason=active.cancel_reason)
@@ -719,7 +759,7 @@ class AssistantWorkflowService:
         active: ActiveTurnExecution,
         rendered_prompt: RenderedPrompt,
         draft_response: str,
-        planning_messages: list[dict[str, str]],
+        planning_messages: list[dict[str, Any]],
     ) -> tuple[str, str | None, dict[str, Any]]:
         stream_messages = [
             *planning_messages,
@@ -736,6 +776,17 @@ class AssistantWorkflowService:
         completion_tokens: int | None = None
         total_tokens: int | None = None
         start_time = perf_counter()
+        if not _should_rewrite_final_response(draft_response=draft_response, planning_messages=planning_messages):
+            metrics = {
+                "latency_ms": 0,
+                "chunk_count": 0,
+                "output_chars": len(draft_response),
+                "mode": "draft_passthrough",
+                "token_count_prompt": None,
+                "token_count_completion": None,
+                "token_count_total": None,
+            }
+            return draft_response, None, metrics
         try:
             async for chunk in self._llm_provider.stream_text(
                 messages=stream_messages,
@@ -868,6 +919,7 @@ class AssistantWorkflowService:
             event_type="response.completed",
             payload={
                 "assistant_message_id": turn.assistant_message_id,
+                "content": response_text,
                 **metrics,
             },
             emitted_at=_utcnow(),
@@ -945,7 +997,8 @@ class _AssistantLoopResult:
     final_response: str = ""
     prompt_version: str | None = None
     model_slug: str | None = None
-    planning_messages: list[dict[str, str]] | None = None
+    planning_messages: list[dict[str, Any]] | None = None
+    used_tools: bool = False
 
 
 def _chunk_text(text: str, *, chunk_size: int = 80) -> list[str]:
@@ -965,6 +1018,69 @@ def _chunk_text(text: str, *, chunk_size: int = 80) -> list[str]:
         chunks.append(current)
     return chunks
 
+
+def _build_compact_learner_context(
+    *,
+    latest_user_message: str,
+    profile: dict[str, Any],
+    progress: dict[str, Any],
+    attempts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    generation_focused = _GENERATION_REQUEST_PATTERN.search(latest_user_message) is not None
+    compact_profile = {
+        key: profile.get(key)
+        for key in ("display_name", "email", "organisation_id")
+        if profile.get(key) is not None
+    }
+    context: dict[str, Any] = {"profile": compact_profile}
+    if generation_focused:
+        return context
+    context["progress"] = _compact_progress_context(progress)
+    context["recent_attempts"] = [
+        {
+            key: attempt.get(key)
+            for key in (
+                "practice_type",
+                "status",
+                "overall_score",
+                "strength_summary",
+                "next_action_summary",
+            )
+            if attempt.get(key) is not None
+        }
+        for attempt in attempts
+    ]
+    return context
+
+
+def _compact_progress_context(progress: dict[str, Any]) -> dict[str, Any]:
+    if not progress.get("available"):
+        return {"available": False}
+    dashboard = progress.get("dashboard")
+    if not isinstance(dashboard, dict):
+        return {"available": True}
+    compact: dict[str, Any] = {"available": True}
+    recommendation = dashboard.get("recommendation")
+    if isinstance(recommendation, dict):
+        compact["recommendation"] = {
+            key: recommendation.get(key)
+            for key in ("type", "title", "summary")
+            if recommendation.get(key) is not None
+        }
+    competencies = dashboard.get("competencies")
+    if isinstance(competencies, list):
+        compact["competencies"] = [
+            {
+                key: item.get(key)
+                for key in ("slug", "label", "score", "status")
+                if isinstance(item, dict) and item.get(key) is not None
+            }
+            for item in competencies[:3]
+            if isinstance(item, dict)
+        ]
+    return compact
+
+
 def _required_tool_name(history: list[Any], practice_state: AssistantPracticeState) -> str | None:
     latest_user_message = _latest_user_message(history)
     if practice_state.is_active() and _is_practice_recall_message(latest_user_message):
@@ -979,12 +1095,95 @@ def _required_generation_tool_name(latest_user_message: str) -> str | None:
         return None
     lowered = latest_user_message.lower()
     if "generate_prompt_items" in lowered:
-        return "generate_prompt_items"
+        return (
+            "generate_prompt_items"
+            if _has_sufficient_generation_detail(lowered, tool_name="generate_prompt_items")
+            else None
+        )
     if "generate_collection" in lowered:
-        return "generate_collection"
+        return (
+            "generate_collection"
+            if _has_sufficient_generation_detail(lowered, tool_name="generate_collection")
+            else None
+        )
     if "prompt item" in lowered or "prompt-item" in lowered:
-        return "generate_prompt_items"
-    return "generate_collection"
+        return (
+            "generate_prompt_items"
+            if _has_sufficient_generation_detail(lowered, tool_name="generate_prompt_items")
+            else None
+        )
+    return (
+        "generate_collection"
+        if _has_sufficient_generation_detail(lowered, tool_name="generate_collection")
+        else None
+    )
+
+
+def _has_sufficient_generation_detail(message: str, *, tool_name: str) -> bool:
+    if "generate_collection" in message or "generate_prompt_items" in message:
+        return True
+
+    detail_signals = 0
+    signal_groups = (
+        ("difficulty", "introductory", "intermediate", "advanced"),
+        ("target audience", "audience", "for ", "for early-career", "for managers"),
+        ("skill", "skills", "competency", "competencies"),
+        ("rubric", "rubrics"),
+        ("count", "counts", "one ", "two ", "three ", "4 ", "5 "),
+        ("interview_prompt", "quick_practice_prompt", "scenario", "content_format_mix"),
+    )
+    for group in signal_groups:
+        if any(token in message for token in group):
+            detail_signals += 1
+
+    if tool_name == "generate_prompt_items" and "collection" in message:
+        detail_signals += 1
+
+    return detail_signals >= 2
+
+
+def _generation_clarification_for_invalid_tool_request(
+    *,
+    raw_tool_calls: list[Any],
+    error: ValidationError,
+) -> str | None:
+    generation_tool_names = {
+        str(getattr(tool_call, "tool_name", ""))
+        for tool_call in raw_tool_calls
+    } & {"generate_collection", "generate_prompt_items"}
+    if not generation_tool_names:
+        return None
+    return (
+        "I can generate that, but I need valid platform-ready generation inputs first. "
+        "Please give me at least one real skill or competency to target, or ask me to pick from "
+        "your weak skills. Use platform content formats only: "
+        "`quick_practice_prompt`, `interview_prompt`, or `scenario_step`."
+    )
+
+
+def _generation_clarification_for_tool_error(
+    *,
+    tool_requests: list[Any],
+    error: AppError,
+) -> str | None:
+    if not any(
+        getattr(tool_request, "tool_name", None) in {"generate_collection", "generate_prompt_items"}
+        for tool_request in tool_requests
+    ):
+        return None
+    if error.category.value == "validation":
+        return (
+            "I can generate that, but I still need valid platform targets before I can run the "
+            "generation pipeline. Tell me a real skill or competency to focus on, or ask me to "
+            "pick from your weak skills."
+        )
+    child_error = str((error.details or {}).get("error", ""))
+    if error.code == "SS-ORCHESTRATION-204" and "SS-VALIDATION-" in child_error:
+        return (
+            "I can generate that, but the request still needs valid platform targets and formats. "
+            "Tell me a skill or competency to focus on, or ask me to pick from your weak skills."
+        )
+    return None
 
 
 def _latest_user_message(history: list[Any]) -> str:
@@ -996,6 +1195,44 @@ def _latest_user_message(history: list[Any]) -> str:
         ),
         "",
     )
+
+
+def _should_include_read_schema_context(message: str) -> bool:
+    return bool(message and _READ_TOOL_PATTERN.search(message))
+
+
+def _should_rewrite_final_response(
+    *, draft_response: str, planning_messages: list[dict[str, Any]]
+) -> bool:
+    if not draft_response.strip():
+        return False
+    return any(message.get("role") == "tool" for message in planning_messages)
+
+
+def _provider_tool_call_message(
+    *,
+    content: str | None,
+    tool_requests: list[Any],
+) -> dict[str, Any]:
+    return {
+        "role": "assistant",
+        "content": content or "",
+        "tool_calls": [
+            {
+                "id": tool_request.call_id,
+                "type": "function",
+                "function": {
+                    "name": tool_request.tool_name,
+                    "arguments": json.dumps(
+                        tool_request.arguments_payload(),
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                },
+            }
+            for tool_request in tool_requests
+        ],
+    }
 
 
 def _is_practice_control_message(message: str) -> bool:

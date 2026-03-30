@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from soft_skills_backend.config import Settings
+from soft_skills_backend.config import LLMTaskKind, Settings
 from soft_skills_backend.engines.marking.domain.rubric_repository import (
     SqlAlchemyRubricRepository,
 )
@@ -76,6 +76,7 @@ from soft_skills_backend.platform.observability.event_sink import DurableEventSi
 from soft_skills_backend.platform.observability.stageflow_logging import DatabaseProviderCallLogger
 from soft_skills_backend.platform.providers.llm.openai_compatible import (
     OpenAICompatibleLLMProvider,
+    build_llm_provider,
 )
 from soft_skills_backend.platform.workflows.stageflow_runtime import (
     StageflowRuntime,
@@ -172,9 +173,19 @@ def build_container(settings: Settings) -> AppContainer:
     assistant_broker = AssistantRealtimeBroker()
     generation_broker = GenerationRealtimeBroker()
     provider_call_logger = DatabaseProviderCallLogger(provider_calls)
-    llm_provider = OpenAICompatibleLLMProvider(
+    llm_provider = build_llm_provider(
         settings=settings,
         provider_call_logger=provider_call_logger,
+    )
+    assistant_llm_provider = build_llm_provider(
+        settings=settings,
+        provider_call_logger=provider_call_logger,
+        task=LLMTaskKind.ASSISTANT,
+    )
+    admin_agent_llm_provider = build_llm_provider(
+        settings=settings,
+        provider_call_logger=provider_call_logger,
+        task=LLMTaskKind.ADMIN_AGENT,
     )
     admin_agent_repository = AdminAgentRepository(session_factory=session_factory)
     admin_agent_schema_registry = AdminAgentSchemaRegistry()
@@ -191,7 +202,7 @@ def build_container(settings: Settings) -> AppContainer:
     admin_agent_service = AdminAgentService(
         workflows=AdminAgentWorkflowService(
             settings=settings,
-            llm_provider=llm_provider,
+            llm_provider=admin_agent_llm_provider,
             repository=admin_agent_repository,
             schema_registry=admin_agent_schema_registry,
             sql_guard=admin_agent_sql_guard,
@@ -263,7 +274,7 @@ def build_container(settings: Settings) -> AppContainer:
     assistant_service = AssistantService(
         repository=assistant_repository,
         workflows=AssistantWorkflowService(
-            llm_provider=llm_provider,
+            llm_provider=assistant_llm_provider,
             repository=assistant_repository,
             approvals=assistant_approval_service,
             broker=assistant_broker,

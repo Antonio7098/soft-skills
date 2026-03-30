@@ -298,6 +298,18 @@ export interface EvaluationCaseDetailView {
   readonly completed_at: string | null;
 }
 
+export interface ProviderModelPricing {
+  readonly prompt_price_per_1m: number | null;
+  readonly completion_price_per_1m: number | null;
+}
+
+export interface ProviderModel {
+  readonly id: string;
+  readonly name: string;
+  readonly provider: string;
+  readonly pricing: ProviderModelPricing | null;
+}
+
 export interface PromptSummaryView {
   readonly name: string;
   readonly prompt_type: string;

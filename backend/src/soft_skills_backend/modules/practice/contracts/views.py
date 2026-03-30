@@ -17,6 +17,7 @@ from soft_skills_backend.modules.practice.domain.practice import (
     is_attempt_terminal,
 )
 from soft_skills_backend.modules.practice.models import (
+    AttemptHistoryItemView,
     AttemptView,
     PracticeAssessmentView,
     PracticeRunItemView,
@@ -68,6 +69,36 @@ def build_attempt_view(session: Session, attempt: AttemptRecord) -> AttemptView:
         assessed_at=None if attempt.assessed_at is None else attempt.assessed_at.isoformat(),
         prompt=prompt,
         assessment=assessment,
+    )
+
+
+def build_attempt_history_item(session: Session, attempt: AttemptRecord) -> AttemptHistoryItemView:
+    """Build a compact learner history row."""
+
+    practice_session = session.get(PracticeSessionRecord, attempt.session_id)
+    if practice_session is None:
+        raise domain_error(
+            "Practice session was not found",
+            code="SS-DOMAIN-013",
+            status_code=404,
+            details={"session_id": attempt.session_id},
+        )
+    prompt = PracticePromptView.model_validate(practice_session.prompt_payload)
+    assessment = (
+        None if attempt.assessment_id is None else session.get(AssessmentRecord, attempt.assessment_id)
+    )
+    skill_slugs = list(prompt.target_skill_slugs)
+    if assessment is not None and assessment.skill_scores:
+        skill_slugs = [str(item.get("skill_slug")) for item in assessment.skill_scores if item.get("skill_slug")]
+    return AttemptHistoryItemView(
+        id=attempt.id,
+        session_id=attempt.session_id,
+        title=prompt.title,
+        practice_type=PracticeType(attempt.practice_type),
+        score=0.0 if assessment is None or assessment.overall_score is None else float(assessment.overall_score),
+        skill_slugs=skill_slugs,
+        created_at=attempt.created_at.isoformat(),
+        status=AttemptStatus(attempt.status),
     )
 
 

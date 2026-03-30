@@ -14,8 +14,10 @@ export {
   type PlatformRole,
   type LearnerProfileView,
   type UserView,
+  type LoginUserCommand,
   type RegisterUserCommand,
   type UpdateProfileCommand,
+  type DeleteAccountResult,
 } from './identity';
 
 export {

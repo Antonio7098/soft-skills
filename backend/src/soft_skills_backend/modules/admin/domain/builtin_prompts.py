@@ -8,7 +8,6 @@ from typing import Any
 
 from soft_skills_backend.config import Settings
 from soft_skills_backend.modules.assistant.workflows.prompting import assistant_prompt_templates
-from soft_skills_backend.modules.assistant.workflows.runtime_models import AssistantDecision
 from soft_skills_backend.modules.catalog.domain.models import (
     GeneratedCollectionBlueprint,
     GeneratedPromptItemDraft,
@@ -37,7 +36,7 @@ def built_in_prompt_definitions(settings: Settings) -> list[BuiltinPromptDefinit
     """Return the built-in prompts for assistant and catalog generation flows."""
 
     assistant_output_schemas = {
-        "assistant_orchestrator": AssistantDecision.model_json_schema(),
+        "assistant_orchestrator": None,
         "assistant_final_response": None,
     }
     catalog_output_schemas = {

@@ -31,7 +31,12 @@ from soft_skills_backend.platform.db.models import (
     PracticeRunRecord,
     WorkflowEventRecord,
 )
-from soft_skills_backend.shared.ports.models import ProviderCompletion, ProviderTextChunk
+from soft_skills_backend.shared.ports.models import (
+    ProviderCompletion,
+    ProviderTextChunk,
+    ProviderToolCall,
+    ProviderToolCompletion,
+)
 
 
 def _migrate(test_settings: Any) -> None:
@@ -41,7 +46,7 @@ def _migrate(test_settings: Any) -> None:
         str(Path(__file__).resolve().parents[2] / "alembic"),
     )
     alembic_config.set_main_option("sqlalchemy.url", test_settings.database_url)
-    alembic_command.upgrade(alembic_config, "head")
+    alembic_command.upgrade(alembic_config, "heads")
 
 
 def _register_user(client: TestClient, *, email: str, display_name: str) -> dict[str, object]:
@@ -349,13 +354,62 @@ class _SequencedAssistantProvider:
         self._payloads = payloads
         self._delay_seconds = delay_seconds
 
-    async def complete_json(self, *, messages: Any, call_context: Any) -> ProviderCompletion:
+    async def complete_json(
+        self,
+        *,
+        messages: Any,
+        call_context: Any,
+        response_schema: Any = None,
+        timeout_seconds: Any = None,
+    ) -> ProviderCompletion:
         assert call_context.operation == "assistant_orchestrator_decision"
+        assert response_schema is not None
+        assert timeout_seconds is not None
         if self._delay_seconds > 0:
             await asyncio.sleep(self._delay_seconds)
         payload = self._payloads.pop(0)
         return ProviderCompletion(
             content=payload,
+            model_slug=self.model_slug,
+            usage={"total_tokens": 10},
+            raw_response={"provider": self.provider_name},
+        )
+
+    async def complete_with_tools(
+        self,
+        *,
+        messages: Any,
+        tools: Any,
+        call_context: Any,
+        timeout_seconds: Any = None,
+        tool_choice: str | None = None,
+    ) -> ProviderToolCompletion:
+        del messages, tools, tool_choice
+        assert call_context.operation == "assistant_orchestrator_decision"
+        assert timeout_seconds is not None
+        if self._delay_seconds > 0:
+            await asyncio.sleep(self._delay_seconds)
+        payload = self._payloads.pop(0)
+        action = str(payload.get("action"))
+        if action == "tool_calls":
+            tool_calls = [
+                ProviderToolCall(
+                    call_id=str(tool_call["call_id"]),
+                    tool_name=str(tool_call["tool_name"]),
+                    arguments=dict(tool_call["arguments"]),  # type: ignore[arg-type]
+                )
+                for tool_call in payload["tool_calls"]  # type: ignore[index]
+            ]
+            return ProviderToolCompletion(
+                content=None,
+                tool_calls=tool_calls,
+                model_slug=self.model_slug,
+                usage={"total_tokens": 10},
+                raw_response={"provider": self.provider_name},
+            )
+        return ProviderToolCompletion(
+            content=str(payload.get("final_response") or ""),
+            tool_calls=[],
             model_slug=self.model_slug,
             usage={"total_tokens": 10},
             raw_response={"provider": self.provider_name},
@@ -431,6 +485,7 @@ async def test_assistant_turn_streams_tool_events_and_persists_messages(
     container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
         payloads=[
             {
+                "action": "tool_calls",
                 "tool_calls": [
                     {
                         "call_id": "call-1",
@@ -447,6 +502,7 @@ async def test_assistant_turn_streams_tool_events_and_persists_messages(
                 "final_response": None,
             },
             {
+                "action": "final_response",
                 "tool_calls": [],
                 "final_response": "You have no recent attempts yet. Start with a quick practice.",
             },
@@ -501,6 +557,7 @@ async def test_assistant_query_user_context_scopes_rows_to_authenticated_learner
     container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
         payloads=[
             {
+                "action": "tool_calls",
                 "tool_calls": [
                     {
                         "call_id": "call-1",
@@ -516,6 +573,7 @@ async def test_assistant_query_user_context_scopes_rows_to_authenticated_learner
                 "final_response": None,
             },
             {
+                "action": "final_response",
                 "tool_calls": [],
                 "final_response": "You have one recent assessed attempt.",
             },
@@ -580,6 +638,80 @@ async def test_assistant_query_user_context_scopes_rows_to_authenticated_learner
 
 
 @pytest.mark.asyncio
+async def test_assistant_query_user_context_canonicalizes_safe_view_name_and_wildcard(
+    app: Any, client: Any, test_settings: Any
+) -> None:
+    _migrate(test_settings)
+    container = app.state.container
+    container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
+        payloads=[
+            {
+                "action": "tool_calls",
+                "tool_calls": [
+                    {
+                        "call_id": "call-1",
+                        "tool_name": "query_user_context",
+                        "arguments": {
+                            "sql": (
+                                "SELECT collection_id, collection_name "
+                                "FROM assistant_safe_collections_v1 "
+                                "ORDER BY updated_at DESC LIMIT 5"
+                            )
+                        },
+                    }
+                ],
+                "final_response": None,
+            },
+            {
+                "action": "final_response",
+                "tool_calls": [],
+                "final_response": "Here are your collections.",
+            },
+        ]
+    )
+    learner = await _bootstrap_admin_and_learner(
+        client,
+        learner_email="assistant-sql-collections@example.com",
+    )
+    await _create_collection(
+        client,
+        learner_id=str(learner["id"]),
+        title="Existing Collection",
+        content_format_mix=["quick_practice_prompt"],
+        rubric_ids=["quick_practice_reset_timeline@v1"],
+        target_skill_slugs=["active-listening"],
+        target_competency_slugs=["stakeholder-management"],
+    )
+
+    session_response = await client.post(
+        "/api/assistant/sessions",
+        headers={"X-User-ID": learner["id"]},
+        json={"title": "Collections SQL"},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["data"]["id"]
+
+    turn_response = await client.post(
+        f"/api/assistant/sessions/{session_id}/turns",
+        headers={"X-User-ID": learner["id"]},
+        json={"message": "Can you check my existing collections please"},
+    )
+    assert turn_response.status_code == 200
+    turn = turn_response.json()["data"]
+    await _wait_for_turn_status(container, turn_id=turn["id"], expected_status="completed")
+
+    session_view_response = await client.get(
+        f"/api/assistant/sessions/{session_id}",
+        headers={"X-User-ID": learner["id"]},
+    )
+    assert session_view_response.status_code == 200
+    tool_call = session_view_response.json()["data"]["turns"][0]["tool_calls"][0]
+    assert tool_call["tool_name"] == "query_user_context"
+    assert tool_call["status"] == "completed"
+    assert tool_call["result"]["rows"][0]["collection_name"] == "Existing Collection"
+
+
+@pytest.mark.asyncio
 async def test_assistant_query_user_context_denies_non_allowlisted_sql(
     app: Any, client: Any, test_settings: Any
 ) -> None:
@@ -588,6 +720,7 @@ async def test_assistant_query_user_context_denies_non_allowlisted_sql(
     container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
         payloads=[
             {
+                "action": "tool_calls",
                 "tool_calls": [
                     {
                         "call_id": "call-1",
@@ -641,6 +774,7 @@ async def test_assistant_facilitates_multi_turn_practice_run(
     container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
         payloads=[
             {
+                "action": "tool_calls",
                 "tool_calls": [
                     {
                         "call_id": "call-start",
@@ -651,12 +785,14 @@ async def test_assistant_facilitates_multi_turn_practice_run(
                 "final_response": None,
             },
             {
+                "action": "final_response",
                 "tool_calls": [],
                 "final_response": (
                     "Practice started. Here is question 1. Answer it as if you were replying to the stakeholder."
                 ),
             },
             {
+                "action": "tool_calls",
                 "tool_calls": [
                     {
                         "call_id": "call-submit-1",
@@ -667,12 +803,14 @@ async def test_assistant_facilitates_multi_turn_practice_run(
                 "final_response": None,
             },
             {
+                "action": "final_response",
                 "tool_calls": [],
                 "final_response": (
                     "Nice. Here is question 2. Respond with a clear tradeoff and next step."
                 ),
             },
             {
+                "action": "tool_calls",
                 "tool_calls": [
                     {
                         "call_id": "call-submit-2",
@@ -683,6 +821,7 @@ async def test_assistant_facilitates_multi_turn_practice_run(
                 "final_response": None,
             },
             {
+                "action": "final_response",
                 "tool_calls": [],
                 "final_response": (
                     "Practice complete. You handled the pressure well and kept the response grounded."
@@ -806,6 +945,7 @@ async def test_assistant_turn_waits_for_human_approval_before_mutating_tool_exec
     container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
         payloads=[
             {
+                "action": "tool_calls",
                 "tool_calls": [
                     {
                         "call_id": "call-start",
@@ -816,6 +956,7 @@ async def test_assistant_turn_waits_for_human_approval_before_mutating_tool_exec
                 "final_response": None,
             },
             {
+                "action": "final_response",
                 "tool_calls": [],
                 "final_response": "Practice started after approval.",
             },
@@ -906,6 +1047,7 @@ async def test_assistant_turn_fails_when_human_denies_required_tool_approval(
     container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
         payloads=[
             {
+                "action": "tool_calls",
                 "tool_calls": [
                     {
                         "call_id": "call-start",
@@ -988,6 +1130,7 @@ async def test_assistant_practice_session_metadata_transitions_between_questions
     container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
         payloads=[
             {
+                "action": "tool_calls",
                 "tool_calls": [
                     {
                         "call_id": "call-start",
@@ -998,10 +1141,12 @@ async def test_assistant_practice_session_metadata_transitions_between_questions
                 "final_response": None,
             },
             {
+                "action": "final_response",
                 "tool_calls": [],
                 "final_response": "Here is question 1.",
             },
             {
+                "action": "tool_calls",
                 "tool_calls": [
                     {
                         "call_id": "call-submit-1",
@@ -1012,10 +1157,12 @@ async def test_assistant_practice_session_metadata_transitions_between_questions
                 "final_response": None,
             },
             {
+                "action": "final_response",
                 "tool_calls": [],
                 "final_response": "Here is question 2.",
             },
             {
+                "action": "tool_calls",
                 "tool_calls": [
                     {
                         "call_id": "call-submit-2",
@@ -1026,6 +1173,7 @@ async def test_assistant_practice_session_metadata_transitions_between_questions
                 "final_response": None,
             },
             {
+                "action": "final_response",
                 "tool_calls": [],
                 "final_response": "Practice complete.",
             },
@@ -1126,7 +1274,13 @@ async def test_assistant_turn_can_be_cancelled_over_websocket(
     _migrate(test_settings)
     container = app.state.container
     container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
-        payloads=[{"tool_calls": [], "final_response": "This should not complete."}],
+        payloads=[
+            {
+                "action": "final_response",
+                "tool_calls": [],
+                "final_response": "This should not complete.",
+            }
+        ],
         delay_seconds=10.0,
     )
     learner = await _register_user_async(
@@ -1176,6 +1330,7 @@ async def test_assistant_stream_replays_backlog_after_reconnect(
     container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
         payloads=[
             {
+                "action": "final_response",
                 "tool_calls": [],
                 "final_response": "Review your recent work and start with one quick practice prompt.",
             }

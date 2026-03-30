@@ -5,6 +5,7 @@ import { PageShell } from '@/design-system/patterns/PageShell';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
 import { ThemeSwitcher } from '@/components/navigation/ThemeSwitcher';
+import { ProfileCard } from '@/features/settings';
 
 export function Settings() {
   const navigate = useNavigate();
@@ -16,6 +17,8 @@ export function Settings() {
       subtitle="Manage your account preferences and application settings."
     >
       <div className="max-w-2xl flex flex-col gap-6">
+        <ProfileCard />
+
         <Card className="flex flex-col gap-6">
           <div className="flex flex-col gap-1">
             <h3 className="font-display text-display-xs text-content-primary">Appearance</h3>

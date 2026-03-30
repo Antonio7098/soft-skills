@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Mail, Lock, User, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
 import { Input } from '@/design-system/primitives/Input';
 import { AuthLayout } from '@/components/layout/AuthLayout';
-import { useData, getDataMode } from '@/data';
+import { useAuthSession } from '@/auth';
+import { useData } from '@/data';
 
 interface LoginFormData {
   email: string;
@@ -33,26 +35,26 @@ export function Login() {
   });
 
   const data = useData();
+  const { loading, isAuthenticated, isMockMode } = useAuthSession();
 
-  const isMock = getDataMode() === 'mock';
-  const isAuto = getDataMode() === 'auto';
+  if (loading) {
+    return null;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!isMock) {
-      setError('Email login is only available in demo mode. Use the demo accounts below.');
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      const user = await data.register({
+      const user = await data.login({
         email: loginData.email,
-        display_name: loginData.email.split('@')[0] || 'User',
-        role: 'standard_user',
+        password: loginData.password,
       });
       
       if (user) {
@@ -68,11 +70,6 @@ export function Login() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (!isMock) {
-      setError('Registration is only available in demo mode. Use the demo accounts below.');
-      return;
-    }
 
     if (registerData.password !== registerData.confirmPassword) {
       setError('Passwords do not match');
@@ -90,6 +87,7 @@ export function Login() {
       const user = await data.register({
         email: registerData.email,
         display_name: registerData.displayName,
+        password: registerData.password,
         role: 'standard_user',
       });
 
@@ -249,16 +247,18 @@ export function Login() {
           </p>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-line">
-          <p className="text-body-xs text-content-tertiary text-center mb-4">
-            Development mode: Quick access
-          </p>
-          <div className="flex flex-col gap-2">
-            <DevProfileButton profileId="learner-alex" label="Learner (Demo)" />
-            <DevProfileButton profileId="org-admin-alex" label="Org Admin (Demo)" />
-            <DevProfileButton profileId="superadmin-henry" label="Super Admin (Demo)" />
+        {isMockMode && (
+          <div className="mt-8 pt-6 border-t border-line">
+            <p className="text-body-xs text-content-tertiary text-center mb-4">
+              Demo mode: Quick access
+            </p>
+            <div className="flex flex-col gap-2">
+              <DevProfileButton profileId="learner-alex" label="Learner" />
+              <DevProfileButton profileId="org-admin-alex" label="Org Admin" />
+              <DevProfileButton profileId="superadmin-henry" label="Super Admin" />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </AuthLayout>
   );

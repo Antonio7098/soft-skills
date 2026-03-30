@@ -110,9 +110,11 @@ export const createMockDataProvider = (overrides: Partial<DataProvider> = {}): D
       const profile = mockAuthProfiles.find((p) => p.id === profileId) ?? mockAuthProfiles[1]!;
       return Promise.resolve(profile.session);
     }),
+    login: vi.fn().mockResolvedValue(defaultSession.actor!),
     register: vi.fn().mockResolvedValue(defaultSession.actor!),
     getMe: vi.fn().mockResolvedValue(defaultSession.actor!),
     updateProfile: vi.fn().mockResolvedValue(defaultSession.actor!),
+    deleteMe: vi.fn().mockResolvedValue({ deleted_user_id: defaultSession.actor!.id, status: 'deleted' }),
     getTaxonomy: vi.fn().mockResolvedValue({ skills: [], competencies: [] }),
     listCollections: vi.fn().mockResolvedValue([]),
     getCollection: vi.fn().mockResolvedValue({} as any),

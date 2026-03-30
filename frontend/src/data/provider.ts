@@ -2,6 +2,7 @@ import type {
   UserView,
   AuthSessionView,
   AuthProfileView,
+  LoginUserCommand,
   TaxonomySnapshot,
   CollectionView,
   CollectionListFilters,
@@ -10,6 +11,7 @@ import type {
   ScenarioCreateCommand,
   RegisterUserCommand,
   UpdateProfileCommand,
+  DeleteAccountResult,
   QuickPracticeSessionView,
   StartQuickPracticeSessionCommand,
   SubmitAttemptCommand,
@@ -41,6 +43,7 @@ import type {
   EvaluationComparisonView,
   BenchmarkDashboardView,
   EvaluationCaseDetailView,
+  ProviderModel,
   PromptSummaryView,
   PromptVersionView,
   PromptAnalyticsView,
@@ -82,9 +85,11 @@ export interface DataProvider {
   setActiveOrganisation(organisationId: string | null): Promise<AuthSessionView>;
   listAuthProfiles(): Promise<AuthProfileView[]>;
   switchAuthProfile(profileId: string): Promise<AuthSessionView>;
+  login(cmd: LoginUserCommand): Promise<UserView>;
   register(cmd: RegisterUserCommand): Promise<UserView>;
   getMe(): Promise<UserView>;
   updateProfile(cmd: UpdateProfileCommand): Promise<UserView>;
+  deleteMe(): Promise<DeleteAccountResult>;
 
   // --- Taxonomy ------------------------------------------------------------
   getTaxonomy(): Promise<TaxonomySnapshot>;
@@ -186,7 +191,7 @@ export interface DataProvider {
   listEvalSuites(): Promise<EvaluationSuiteView[]>;
   listEvalRuns(params?: { limit?: number }): Promise<EvaluationRunView[]>;
   getEvalRun(runId: string): Promise<EvaluationRunView>;
-  triggerEvalRun(cmd: { suite_id: string }): Promise<EvaluationRunView>;
+  triggerEvalRun(cmd: { suite_id: string; model_slugs?: string[]; case_ids?: string[]; tags?: string[] }): Promise<EvaluationRunView>;
   getEvalDashboard(params?: {
     from_date?: string;
     to_date?: string;
@@ -201,6 +206,9 @@ export interface DataProvider {
     to_date?: string;
   }): Promise<BenchmarkDashboardView>;
   getEvalCaseDetail(caseId: string): Promise<EvaluationCaseDetailView>;
+
+  // --- Admin: Providers --------------------------------------------------------
+  listOpenRouterModels(): Promise<ProviderModel[]>;
 
   // --- Admin: Prompts --------------------------------------------------------
   listPrompts(): Promise<PromptSummaryView[]>;

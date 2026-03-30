@@ -19,7 +19,7 @@ def _migrate(test_settings) -> None:
         str(Path(__file__).resolve().parents[2] / "alembic"),
     )
     alembic_config.set_main_option("sqlalchemy.url", test_settings.database_url)
-    alembic_command.upgrade(alembic_config, "head")
+    alembic_command.upgrade(alembic_config, "heads")
 
 
 async def _register_user(client: AsyncClient, *, email: str, display_name: str) -> dict:

@@ -6,6 +6,7 @@ import type {
   AssistantToolCallView,
 } from '@/data/types';
 import { useData } from '@/data';
+import type { DataProvider } from '@/data/provider';
 
 // ---------------------------------------------------------------------------
 // Tool classification — drives which UI component renders the tool call
@@ -25,6 +26,38 @@ export function classifyTool(toolName: string): ToolDisplayType {
   if (GENERATION_TOOLS.has(toolName)) return 'generation';
   if (PRACTICE_TOOLS.has(toolName)) return 'practice';
   return 'normal';
+}
+
+const TERMINAL_TURN_STATUSES = new Set(['completed', 'cancelled', 'failed']);
+
+async function waitForTerminalTurn(
+  data: Pick<DataProvider, 'getAssistantTurn'>,
+  turnId: string,
+  options?: {
+    attempts?: number;
+    delayMs?: number;
+  },
+): Promise<AssistantTurnView> {
+  const attempts = options?.attempts ?? 8;
+  const delayMs = options?.delayMs ?? 150;
+  let latestTurn = await data.getAssistantTurn(turnId);
+  for (let attempt = 1; attempt < attempts; attempt += 1) {
+    if (TERMINAL_TURN_STATUSES.has(latestTurn.status)) {
+      return latestTurn;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+    latestTurn = await data.getAssistantTurn(turnId);
+  }
+  return latestTurn;
+}
+
+function buildTurnFailureMessage(turn: AssistantTurnView): string {
+  switch (turn.last_error_code) {
+    case 'SS-PROVIDER-005':
+      return 'The assistant request timed out while waiting for the model provider.';
+    default:
+      return turn.last_error_code ?? 'Assistant turn failed';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +246,7 @@ export function useAssistantChat() {
   const data = useData();
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const pollTimeoutRef = useRef<number | null>(null);
 
   // ---- Session management ------------------------------------------------
 
@@ -276,15 +310,86 @@ export function useAssistantChat() {
       const turn = await data.createAssistantTurn(targetSessionId, { message });
       dispatch({ type: 'TURN_CREATED', turn });
 
+      let terminalStateHandled = false;
+      let pollAttempt = 0;
+      const clearTerminalPoll = () => {
+        if (pollTimeoutRef.current !== null) {
+          window.clearTimeout(pollTimeoutRef.current);
+          pollTimeoutRef.current = null;
+        }
+      };
+      const syncTerminalState = async (options?: { attempts?: number; delayMs?: number }) => {
+        if (terminalStateHandled) return;
+        terminalStateHandled = true;
+        try {
+          const latestTurn = await waitForTerminalTurn(data, turn.id, options);
+          if (latestTurn.status === 'failed') {
+            clearTerminalPoll();
+            dispatch({
+              type: 'TURN_FAILED',
+              error: buildTurnFailureMessage(latestTurn),
+            });
+            return;
+          }
+          if (latestTurn.status === 'cancelled') {
+            clearTerminalPoll();
+            const session = await data.getAssistantSession(targetSessionId);
+            dispatch({ type: 'SET_SESSION', session });
+            return;
+          }
+          if (latestTurn.status === 'completed') {
+            clearTerminalPoll();
+            const [session, sessions] = await Promise.all([
+              data.getAssistantSession(targetSessionId),
+              data.listAssistantSessions(),
+            ]);
+            dispatch({ type: 'SET_SESSION', session });
+            dispatch({ type: 'SET_SESSIONS', sessions });
+            return;
+          }
+          terminalStateHandled = false;
+        } catch (error) {
+          terminalStateHandled = false;
+          dispatch({
+            type: 'TURN_FAILED',
+            error: error instanceof Error ? error.message : 'Failed to sync assistant turn',
+          });
+        }
+      };
+      const scheduleTerminalPoll = () => {
+        clearTerminalPoll();
+        pollTimeoutRef.current = window.setTimeout(() => {
+          pollAttempt += 1;
+          void syncTerminalState({ attempts: 1 }).finally(() => {
+            if (pollAttempt < 120 && !terminalStateHandled) {
+              scheduleTerminalPoll();
+            }
+          });
+        }, 500);
+      };
+      scheduleTerminalPoll();
+
       // Start streaming
       cleanupRef.current?.();
       cleanupRef.current = data.streamAssistantTurn(turn.stream_token, {
         onToolStarted: (tc) => dispatch({ type: 'TOOL_STARTED', toolCall: tc }),
         onToolCompleted: (tc) => dispatch({ type: 'TOOL_UPDATED', toolCall: tc }),
         onToolFailed: (tc) => dispatch({ type: 'TOOL_UPDATED', toolCall: tc }),
-        onTurnCompleted: (completedTurn) => dispatch({ type: 'TURN_COMPLETED', turn: completedTurn }),
+        onTurnFailed: (payload) => {
+          clearTerminalPoll();
+          dispatch({
+            type: 'TURN_FAILED',
+            error: payload.message || payload.error_code || 'Assistant turn failed',
+          });
+        },
+        onTurnCompleted: () => {
+          void syncTerminalState();
+        },
         onError: (error) => dispatch({ type: 'TURN_FAILED', error }),
-        onClose: () => { cleanupRef.current = null; },
+        onClose: () => {
+          cleanupRef.current = null;
+          void syncTerminalState({ attempts: 60, delayMs: 500 });
+        },
       });
     } catch (err) {
       dispatch({ type: 'TURN_FAILED', error: err instanceof Error ? err.message : 'Failed to send message' });

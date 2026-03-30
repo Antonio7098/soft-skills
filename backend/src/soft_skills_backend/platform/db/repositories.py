@@ -233,6 +233,9 @@ class SqlAlchemyProviderCallRepository:
                     trace_id=log.trace_id,
                     metrics=log.metrics,
                     created_at=log.created_at,
+                    prompt_tokens=log.prompt_tokens,
+                    completion_tokens=log.completion_tokens,
+                    cost_usd=log.cost_usd,
                 )
                 session.add(record)
             else:
@@ -247,6 +250,9 @@ class SqlAlchemyProviderCallRepository:
                 record.trace_id = log.trace_id
                 record.metrics = log.metrics
                 record.created_at = log.created_at
+                record.prompt_tokens = log.prompt_tokens
+                record.completion_tokens = log.completion_tokens
+                record.cost_usd = log.cost_usd
             session.commit()
 
 

@@ -91,7 +91,8 @@ export interface AssistantStreamCallbacks {
   readonly onToolStarted?: (toolCall: AssistantToolCallView) => void;
   readonly onToolCompleted?: (toolCall: AssistantToolCallView) => void;
   readonly onToolFailed?: (toolCall: AssistantToolCallView) => void;
-  readonly onTurnCompleted?: (turn: AssistantTurnView) => void;
+  readonly onTurnCompleted?: () => void;
+  readonly onTurnFailed?: (error: { error_code?: string; message?: string }) => void;
   readonly onError?: (error: string) => void;
   readonly onClose?: () => void;
 }

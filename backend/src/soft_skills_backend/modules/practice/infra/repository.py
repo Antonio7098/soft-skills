@@ -13,6 +13,7 @@ from soft_skills_backend.modules.practice.domain.practice import (
     PracticeType,
 )
 from soft_skills_backend.modules.practice.models import (
+    AttemptHistoryItemView,
     AttemptGuardPayload,
     AttemptView,
     PracticeRunListItemView,
@@ -30,6 +31,7 @@ from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import AppError, auth_error, domain_error
 
 from ..contracts.views import (
+    build_attempt_history_item,
     build_attempt_view,
     build_practice_run_list_item,
     build_practice_run_view,
@@ -223,6 +225,16 @@ class PracticeRepository:
                     details={"attempt_id": attempt_id},
                 )
             return build_attempt_view(session, attempt)
+
+    def list_attempt_history(self, actor: Actor) -> list[AttemptHistoryItemView]:
+        with self._session_factory() as session:
+            attempts = (
+                session.query(AttemptRecord)
+                .filter(AttemptRecord.user_id == actor.user_id)
+                .order_by(AttemptRecord.created_at.desc())
+                .all()
+            )
+            return [build_attempt_history_item(session, attempt) for attempt in attempts]
 
     def get_practice_run(self, actor: Actor, run_id: str) -> PracticeRunView:
         with self._session_factory() as session:

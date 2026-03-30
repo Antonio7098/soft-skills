@@ -81,6 +81,9 @@ class ProviderCallRecord(Base):
     trace_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
     metrics: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(nullable=True)
 
 
 class UserAccountRecord(Base):
@@ -93,6 +96,7 @@ class UserAccountRecord(Base):
     display_name: Mapped[str] = mapped_column(String(255))
     auth_provider: Mapped[str] = mapped_column(String(64))
     auth_subject: Mapped[str] = mapped_column(String(255))
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

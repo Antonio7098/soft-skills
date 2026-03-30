@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request
 
 from soft_skills_backend.entrypoints.http.dependencies import get_identity_service, require_actor
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
-from soft_skills_backend.modules.identity import UpdateProfileCommand, UserView
+from soft_skills_backend.modules.identity import DeleteAccountResult, UpdateProfileCommand, UserView
 
 router = APIRouter()
 
@@ -23,3 +23,10 @@ async def update_profile(request: Request, command: UpdateProfileCommand) -> Api
     actor = await require_actor(request)
     service = get_identity_service(request)
     return ok_response(request, service.update_profile(actor.user_id, command))
+
+
+@router.delete("/me", response_model=ApiEnvelope[DeleteAccountResult])
+async def delete_me(request: Request) -> ApiEnvelope[DeleteAccountResult]:
+    actor = await require_actor(request)
+    service = get_identity_service(request)
+    return ok_response(request, service.delete_user(actor.user_id))

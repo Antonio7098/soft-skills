@@ -11,6 +11,7 @@ from stageflow.core import StageContext
 from soft_skills_backend.engines.marking.domain.rubric_repository import RubricRepository
 from soft_skills_backend.modules.practice.domain.practice import PracticeType
 from soft_skills_backend.modules.practice.models import (
+    AttemptHistoryItemView,
     AttemptGuardPayload,
     AttemptView,
     PracticeCorrelation,
@@ -575,6 +576,9 @@ class PracticeService:
 
     def get_attempt(self, actor: Actor, attempt_id: str) -> AttemptView:
         return self._store.get_attempt(actor, attempt_id)
+
+    def list_attempt_history(self, actor: Actor) -> list[AttemptHistoryItemView]:
+        return self._store.list_attempt_history(actor)
 
     def get_practice_run(self, actor: Actor, run_id: str) -> PracticeRunView:
         return self._store.get_practice_run(actor, run_id)

@@ -547,12 +547,7 @@ class ProgressionRepository:
                 .first()
             )
             if snapshot_record is None:
-                raise domain_error(
-                    "Progress snapshot was not found",
-                    code="SS-DOMAIN-019",
-                    status_code=404,
-                    details={"learner_id": learner_id},
-                )
+                return self._empty_dashboard(learner_id)
             recommendation_record = (
                 session.query(RecommendationArtifactRecord)
                 .filter(RecommendationArtifactRecord.learner_id == learner_id)
@@ -560,11 +555,12 @@ class ProgressionRepository:
                 .first()
             )
             if recommendation_record is None:
-                raise domain_error(
-                    "Recommendation artifact was not found",
-                    code="SS-DOMAIN-020",
-                    status_code=404,
-                    details={"learner_id": learner_id},
+                return ProgressDashboardView(
+                    snapshot=ProgressSnapshotView.model_validate(snapshot_record.snapshot_payload),
+                    recommendation=self._empty_recommendation(
+                        learner_id=learner_id,
+                        snapshot_id=str(snapshot_record.id),
+                    ),
                 )
             return ProgressDashboardView(
                 snapshot=ProgressSnapshotView.model_validate(snapshot_record.snapshot_payload),
@@ -583,13 +579,45 @@ class ProgressionRepository:
                 .first()
             )
             if recommendation_record is None:
-                raise domain_error(
-                    "Recommendation artifact was not found",
-                    code="SS-DOMAIN-020",
-                    status_code=404,
-                    details={"learner_id": learner_id},
-                )
+                return self._empty_recommendation(learner_id=learner_id, snapshot_id="")
             return RecommendationView.model_validate(recommendation_record.artifact_payload)
+
+    def _empty_dashboard(self, learner_id: str) -> ProgressDashboardView:
+        return ProgressDashboardView(
+            snapshot=ProgressSnapshotView(
+                snapshot_id="",
+                learner_id=learner_id,
+                source_assessment_id="",
+                created_at=_utcnow().isoformat(),
+                engine_version=PROGRESSION_ENGINE_VERSION,
+                schema_version=PROGRESSION_SCHEMA_VERSION,
+                config_version=PROGRESSION_CONFIG_VERSION,
+                evidence_ledger_schema_version=PROGRESSION_EVIDENCE_LEDGER_SCHEMA_VERSION,
+                trace_id="",
+                weak_skill_slugs=[],
+                stagnating_skill_slugs=[],
+                coverage_gap_skill_slugs=[],
+                skill_states=[],
+                competency_states=[],
+            ),
+            recommendation=self._empty_recommendation(learner_id=learner_id, snapshot_id=""),
+        )
+
+    def _empty_recommendation(self, *, learner_id: str, snapshot_id: str) -> RecommendationView:
+        return RecommendationView(
+            recommendation_id="",
+            learner_id=learner_id,
+            progress_snapshot_id=snapshot_id,
+            generated_at=_utcnow().isoformat(),
+            engine_version=RECOMMENDATION_ENGINE_VERSION,
+            schema_version=RECOMMENDATION_SCHEMA_VERSION,
+            config_version=RECOMMENDATION_CONFIG_VERSION,
+            trace_id="",
+            context_snapshot_id="",
+            candidate_count=0,
+            items=[],
+            alternatives=[],
+        )
 
     def _attempt_history(
         self,

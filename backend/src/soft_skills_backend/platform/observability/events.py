@@ -61,6 +61,9 @@ class ProviderCallLog(BaseModel):
     trace_id: str | None = None
     metrics: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cost_usd: float = 0.0
 
 
 class WorkflowEventRecorder:

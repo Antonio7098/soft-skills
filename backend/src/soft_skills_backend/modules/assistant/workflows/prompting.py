@@ -6,9 +6,28 @@ import json
 
 from soft_skills_backend.engines.marking.contracts.models import PromptTemplate
 from soft_skills_backend.engines.marking.use_cases.structured_output import PromptLibrary
+from soft_skills_backend.modules.assistant.workflows.practice_facilitation import (
+    StartCollectionPracticeToolArgs,
+)
+from soft_skills_backend.modules.assistant.workflows.runtime_models import (
+    EndActivePracticeToolArgs,
+    GetActivePracticeToolArgs,
+    QueryUserContextToolArgs,
+    SubmitActivePracticeResponseToolArgs,
+)
+from soft_skills_backend.modules.catalog.contracts.collection_commands import (
+    ChatCollectionGenerationCommand,
+)
+from soft_skills_backend.modules.catalog.contracts.prompt_item_commands import (
+    ChatPromptItemGenerationCommand,
+)
+from soft_skills_backend.shared.ports.models import (
+    ProviderToolDefinition,
+    normalize_strict_json_schema,
+)
 
 ASSISTANT_PROMPT_NAME = "assistant_orchestrator"
-ASSISTANT_PROMPT_VERSION = "assistant_orchestrator@v2"
+ASSISTANT_PROMPT_VERSION = "assistant_orchestrator@v4"
 ASSISTANT_FINAL_RESPONSE_PROMPT_NAME = "assistant_final_response"
 ASSISTANT_FINAL_RESPONSE_PROMPT_VERSION = "assistant_final_response@v1"
 
@@ -38,12 +57,15 @@ def assistant_prompt_templates() -> list[PromptTemplate]:
                 "1. Use tools when the user asks for data you do not already have.\n"
                 "1a. For learner read questions, prefer `query_user_context` over inventing facts or "
                 "asking for unsupported bespoke read tools.\n"
+                "1b. For `query_user_context`, use the exact allowlisted assistant view names from the schema "
+                "context, including the `_v` suffix, and project explicit columns instead of `SELECT *`.\n"
                 "2. If active practice state says a learner answer is expected, call "
                 "`submit_active_practice_response` unless the user explicitly asks to stop practice.\n"
                 "3. If the user asks to stop or end an active practice session, call `end_active_practice`.\n"
                 "4. If the user asks you to start practice from an existing collection, call `start_collection_practice`.\n"
-                "5. If the user asks you to generate or create content, you must call the matching generation tool. "
-                "Do not just explain what you would generate.\n"
+                "5. If the user asks you to generate or create content and they gave enough concrete inputs to execute, "
+                "you must call the matching generation tool. If key generation inputs are still missing, ask a concise "
+                "clarifying question instead of inventing values.\n"
                 "6. Prefer parallel tool calls when the requests are independent.\n"
                 "7. Do not invent collection, attempt, run, or progress facts.\n"
                 "8. Keep the final response concise, practical, and grounded in the returned data.\n"
@@ -54,14 +76,9 @@ def assistant_prompt_templates() -> list[PromptTemplate]:
                 "Learner context:\n{learner_context}\n\n"
                 "Learner SQL schema context:\n{read_schema_context}\n\n"
                 "Active practice state:\n{practice_state}\n\n"
-                "Available tools:\n{tool_definitions}\n\n"
                 "Conversation history:\n{conversation_history}\n\n"
-                "Return JSON matching this contract only:\n"
-                "{{"
-                "\"tool_calls\": [{{\"call_id\": \"string\", \"tool_name\": \"string\", \"arguments\": {{}}}}], "
-                "\"final_response\": \"string or null\""
-                "}}\n"
-                "Return either tool_calls or final_response, not both."
+                "Tool schemas are provided separately through native tool calling. "
+                "Call a tool directly when needed. If no tool is needed, answer normally."
             ),
         ),
         PromptTemplate(
@@ -73,74 +90,77 @@ def assistant_prompt_templates() -> list[PromptTemplate]:
                 "Use this draft plan as guidance:\n{draft_response}"
             ),
         ),
+]
+
+
+def build_assistant_tool_definitions() -> list[ProviderToolDefinition]:
+    """Return provider-native tool definitions for the assistant loop."""
+
+    return [
+        ProviderToolDefinition(
+            name="query_user_context",
+            description=(
+                "Run one read-only SELECT query against assistant_safe_* views to fetch learner "
+                "history, progress, attempts, or collection data."
+            ),
+            parameters=normalize_strict_json_schema(QueryUserContextToolArgs.model_json_schema()),
+        ),
+        ProviderToolDefinition(
+            name="start_collection_practice",
+            description="Start a practice run from an existing collection.",
+            parameters=normalize_strict_json_schema(
+                StartCollectionPracticeToolArgs.model_json_schema()
+            ),
+        ),
+        ProviderToolDefinition(
+            name="get_active_practice",
+            description="Fetch the learner's current active practice question, if any.",
+            parameters=normalize_strict_json_schema(GetActivePracticeToolArgs.model_json_schema()),
+        ),
+        ProviderToolDefinition(
+            name="submit_active_practice_response",
+            description="Submit the learner's answer for the current active practice question.",
+            parameters=normalize_strict_json_schema(
+                SubmitActivePracticeResponseToolArgs.model_json_schema()
+            ),
+        ),
+        ProviderToolDefinition(
+            name="end_active_practice",
+            description="End the learner's active practice session.",
+            parameters=normalize_strict_json_schema(EndActivePracticeToolArgs.model_json_schema()),
+        ),
+        ProviderToolDefinition(
+            name="generate_collection",
+            description=(
+                "Generate a new collection when the learner has supplied enough concrete generation "
+                "inputs to execute."
+            ),
+            parameters=normalize_strict_json_schema(
+                ChatCollectionGenerationCommand.model_json_schema()
+            ),
+        ),
+        ProviderToolDefinition(
+            name="generate_prompt_items",
+            description=(
+                "Generate prompt items inside an existing collection when the learner has supplied "
+                "enough concrete generation inputs to execute."
+            ),
+            parameters=normalize_strict_json_schema(
+                ChatPromptItemGenerationCommand.model_json_schema()
+            ),
+        ),
     ]
 
 
 def render_tool_definitions() -> str:
-    """Render the assistant tool contract for the prompt."""
+    """Render the assistant tool contract for debugging and admin views."""
 
     tools = [
         {
-            "name": "query_user_context",
-            "arguments": {
-                "sql": "required string; SELECT only against assistant_safe_*_v views",
-                "params": "optional object of scalar query params",
-            },
-        },
-        {
-            "name": "start_collection_practice",
-            "arguments": {
-                "collection_id": "required string",
-                "item_limit": "optional integer <= 5",
-                "include_prompt_items": "optional boolean",
-                "include_scenarios": "optional boolean",
-                "prompt_item_ids": "optional list[string]",
-                "scenario_ids": "optional list[string]",
-            },
-        },
-        {
-            "name": "get_active_practice",
-            "arguments": {},
-        },
-        {
-            "name": "submit_active_practice_response",
-            "arguments": {
-                "response_text": "optional string; defaults to the latest user message",
-            },
-        },
-        {
-            "name": "end_active_practice",
-            "arguments": {},
-        },
-        {
-            "name": "generate_collection",
-            "arguments": {
-                "prompt": "required string",
-                "target_audience": "required string",
-                "difficulty": "required string",
-                "content_format_mix": "required list[string]",
-                "target_skill_slugs": "required list[string]",
-                "target_competency_slugs": "required list[string]",
-                "rubric_ids": "required list[string]",
-                "counts": {
-                    "quick_practice_prompt_count": "integer",
-                    "interview_prompt_count": "integer",
-                    "scenario_count": "integer",
-                    "scenario_artifact_count": "integer",
-                },
-            },
-        },
-        {
-            "name": "generate_prompt_items",
-            "arguments": {
-                "collection_id": "required string",
-                "prompt": "required string",
-                "target_skill_slugs": "optional list[string]",
-                "counts": {
-                    "quick_practice_prompt_count": "integer",
-                    "interview_prompt_count": "integer",
-                },
-            },
-        },
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": tool.parameters,
+        }
+        for tool in build_assistant_tool_definitions()
     ]
     return json.dumps(tools, indent=2, sort_keys=True)

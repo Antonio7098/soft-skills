@@ -14,7 +14,7 @@ async def test_readiness_endpoint_reports_database_and_correlation_headers(
 ) -> None:
     alembic_config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
     alembic_config.set_main_option("sqlalchemy.url", test_settings.database_url)
-    command.upgrade(alembic_config, "head")
+    command.upgrade(alembic_config, "heads")
 
     response = await client.get("/api/health/readiness")
     payload = response.json()

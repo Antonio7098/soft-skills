@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 from soft_skills_backend.entrypoints.http.dependencies import get_practice_service, require_actor
 from soft_skills_backend.entrypoints.http.schemas import ApiEnvelope, ok_response
 from soft_skills_backend.modules.practice.models import (
+    AttemptHistoryItemView,
     AttemptView,
     PracticeCorrelation,
     PracticeSessionView,
@@ -83,6 +84,13 @@ async def submit_attempt(
         command,
     )
     return ok_response(request, payload)
+
+
+@router.get("/history", response_model=ApiEnvelope[list[AttemptHistoryItemView]])
+async def list_attempt_history(request: Request) -> ApiEnvelope[list[AttemptHistoryItemView]]:
+    actor = await require_actor(request)
+    service = get_practice_service(request)
+    return ok_response(request, service.list_attempt_history(actor))
 
 
 @router.get("/{attempt_id}", response_model=ApiEnvelope[AttemptView])

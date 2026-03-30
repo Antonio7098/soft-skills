@@ -91,7 +91,7 @@ class GenerationStreamingSmoke(SmokeCase):
             alembic_cfg = Config(str(base_path / "alembic.ini"))
             alembic_cfg.set_main_option("script_location", str(base_path / "alembic"))
             alembic_cfg.set_main_option("sqlalchemy.url", db_url)
-            alembic_command.upgrade(alembic_cfg, "head")
+            alembic_command.upgrade(alembic_cfg, "heads")
 
             test_app = create_app(smoke_settings)
 

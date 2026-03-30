@@ -12,6 +12,7 @@ from stageflow.core import StageContext
 from soft_skills_backend.config import LLMTaskKind, Settings
 from soft_skills_backend.engines.marking.use_cases.structured_output import (
     StructuredOutputRejectionError,
+    StructuredOutputRepairMode,
     TypedLLMOutput,
 )
 from soft_skills_backend.modules.admin_agent.contracts.commands import QueryAdminDataCommand
@@ -92,7 +93,10 @@ class AdminAgentWorkflowService:
         self._typed_output = TypedLLMOutput(
             AdminAgentPlan,
             schema_version="admin_agent_plan.v1",
-            max_validation_retries=1,
+            max_validation_retries=0,
+            repair_mode=StructuredOutputRepairMode.FAIL_FAST,
+            timeout_seconds=settings.llm_admin_agent_timeout_seconds,
+            transport_schema_name="admin_agent_plan",
         )
 
     async def run_chat(self, execution: AdminAgentExecutionInput) -> AdminAgentChatView:

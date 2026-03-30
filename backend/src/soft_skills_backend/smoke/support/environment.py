@@ -15,6 +15,7 @@ import httpx
 from soft_skills_backend.config import Settings
 from soft_skills_backend.shared.errors import AppError, validation_error
 from soft_skills_backend.shared.ports.models import ProviderCompletion
+from soft_skills_backend.shared.ports.models import JsonSchemaResponseFormat
 from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
 from .backend import SmokeBackendClient
@@ -38,11 +39,9 @@ class ProviderSmokePreflight:
         return self._build_provider(settings)
 
     def _build_provider(self, settings: Settings) -> _ConfiguredProvider:
-        from soft_skills_backend.platform.providers.llm.openai_compatible import (
-            OpenAICompatibleLLMProvider,
-        )
+        from soft_skills_backend.platform.providers.llm import build_llm_provider
 
-        return OpenAICompatibleLLMProvider(
+        return build_llm_provider(
             settings=settings,
             provider_call_logger=_NoOpProviderCallLogger(),
         )
@@ -115,7 +114,7 @@ class SmokeApplicationSessionFactory:
         try:
             logging.disable(logging.CRITICAL)
             with redirect_stdout(buffer), redirect_stderr(buffer):
-                command.upgrade(alembic_config, "head")
+                command.upgrade(alembic_config, "heads")
         finally:
             logging.disable(previous_disable)
             for logger_name, level in previous_levels.items():
@@ -144,4 +143,6 @@ class _ConfiguredProvider(Protocol):
         *,
         messages: list[dict[str, str]],
         call_context: ProviderCallContext,
+        response_schema: JsonSchemaResponseFormat | None = None,
+        timeout_seconds: float | None = None,
     ) -> ProviderCompletion: ...

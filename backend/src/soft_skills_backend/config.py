@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+pysqlite:///./softskills.db"
     log_level: str = "INFO"
     stageflow_event_queue_size: int = Field(default=1000, ge=1)
-    provider_name: str = "openrouter"
+    provider_name: str = "groq"
     provider_base_url: str = "https://openrouter.ai/api/v1"
     provider_api_key: str | None = None
     openrouter_api_key: str | None = Field(
@@ -50,6 +50,11 @@ class Settings(BaseSettings):
         validation_alias="OPENROUTER_BASE_URL",
     )
     smoke_timeout_seconds: float = Field(default=10.0, gt=0)
+    llm_assistant_timeout_seconds: float = Field(default=20.0, gt=0, le=120.0)
+    llm_assistant_max_retries: int = Field(default=1, ge=0, le=3)
+    llm_assistant_conversation_history_limit: int = Field(default=8, ge=2, le=24)
+    llm_assistant_recent_attempt_limit: int = Field(default=3, ge=0, le=10)
+    llm_admin_agent_timeout_seconds: float = Field(default=20.0, gt=0, le=120.0)
     tool_approval_timeout_seconds: float = Field(default=60.0, gt=0, le=300.0)
     tool_approval_auto_allow: Annotated[tuple[str, ...], NoDecode] = (
         "query_user_context",
@@ -105,6 +110,25 @@ class Settings(BaseSettings):
 
     llm_default_model: str = Field(default="openai/gpt-oss-20b")
     llm_default_backup_model: str | None = Field(default=None)
+
+    groq_api_key: str | None = Field(
+        default=None,
+        validation_alias="GROQ_API_KEY",
+    )
+    groq_base_url: str = Field(
+        default="https://api.groq.com/openai/v1",
+        validation_alias="GROQ_BASE_URL",
+    )
+    groq_default_model: str = Field(default="llama-3.3-70b-versatile")
+    groq_default_backup_model: str | None = Field(default="llama-3.1-8b-instant")
+
+    groq_llm_assistant_model: str | None = Field(default=None)
+    groq_llm_admin_agent_model: str | None = Field(default=None)
+    groq_llm_marking_per_skill_model: str | None = Field(default=None)
+    groq_llm_marking_aggregation_model: str | None = Field(default=None)
+    groq_llm_creator_blueprint_model: str | None = Field(default=None)
+    groq_llm_creator_prompt_item_model: str | None = Field(default=None)
+    groq_llm_creator_scenario_model: str | None = Field(default=None)
 
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod

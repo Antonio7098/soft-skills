@@ -17,7 +17,7 @@ from soft_skills_backend.platform.db.models import (
 def _migrate(test_settings) -> None:
     alembic_config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
     alembic_config.set_main_option("sqlalchemy.url", test_settings.database_url)
-    command.upgrade(alembic_config, "head")
+    command.upgrade(alembic_config, "heads")
 
 
 async def _register_user(client, *, email: str, display_name: str):

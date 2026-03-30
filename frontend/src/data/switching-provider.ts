@@ -47,6 +47,9 @@ class SwitchingDataProvider implements DataProvider {
   }
 
   private shouldFallbackToMock(error: unknown): boolean {
+    if (error instanceof Error && error.message.includes('not yet implemented')) {
+      return true;
+    }
     if (DATA_MODE !== 'auto') return false;
     if (error instanceof ApiRequestError) {
       return error.isNetworkError || error.status === null;
@@ -102,6 +105,13 @@ class SwitchingDataProvider implements DataProvider {
     );
   }
 
+  login(cmd) {
+    return this.withMode(
+      () => apiDataProvider.login(cmd),
+      () => mockDataProvider.login(cmd),
+    );
+  }
+
   register(cmd) {
     return this.withMode(
       () => apiDataProvider.register(cmd),
@@ -120,6 +130,13 @@ class SwitchingDataProvider implements DataProvider {
     return this.withMode(
       () => apiDataProvider.updateProfile(cmd),
       () => mockDataProvider.updateProfile(cmd),
+    );
+  }
+
+  deleteMe() {
+    return this.withMode(
+      () => apiDataProvider.deleteMe(),
+      () => mockDataProvider.deleteMe(),
     );
   }
 
@@ -322,36 +339,10 @@ class SwitchingDataProvider implements DataProvider {
   }
 
   streamAssistantTurn(streamToken, callbacks) {
-    if (!this._useApi) {
+    if (this._resolvedMode === 'mock') {
       return mockDataProvider.streamAssistantTurn(streamToken, callbacks);
     }
-
-    let mockCleanup: (() => void) | null = null;
-    let hasFallenBack = false;
-
-    const apiCleanup = apiDataProvider.streamAssistantTurn(streamToken, {
-      ...callbacks,
-      onError: (error) => {
-        if (hasFallenBack) {
-          callbacks.onError?.(error);
-          return;
-        }
-
-        hasFallenBack = true;
-        this._useApi = false;
-
-        try {
-          mockCleanup = mockDataProvider.streamAssistantTurn(streamToken, callbacks);
-        } catch {
-          callbacks.onError?.(error);
-        }
-      },
-    });
-
-    return () => {
-      apiCleanup();
-      mockCleanup?.();
-    };
+    return apiDataProvider.streamAssistantTurn(streamToken, callbacks);
   }
 
   // --- Admin: Users & User Management ----------------------------------------
@@ -538,6 +529,14 @@ class SwitchingDataProvider implements DataProvider {
     return this.withMode(
       () => apiDataProvider.getEvalCaseDetail(caseId),
       () => mockDataProvider.getEvalCaseDetail(caseId),
+    );
+  }
+
+  // --- Admin: Providers --------------------------------------------------------
+  listOpenRouterModels() {
+    return this.withMode(
+      () => apiDataProvider.listOpenRouterModels(),
+      () => mockDataProvider.listOpenRouterModels(),
     );
   }
 

@@ -26,8 +26,10 @@ class FakeProvider:
         *,
         messages: list[dict[str, str]],
         call_context: ProviderCallContext,
+        response_schema: object = None,
+        timeout_seconds: float | None = None,
     ) -> ProviderCompletion:
-        del messages, call_context
+        del messages, call_context, response_schema, timeout_seconds
         self.calls += 1
         response = self._responses.pop(0)
         return ProviderCompletion(

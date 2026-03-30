@@ -164,6 +164,7 @@ class AssistantReadSqlWorkflowSmoke(SmokeCase):
                 _ApprovalSequencedAssistantProvider(
                     payloads=[
                         {
+                            "action": "tool_calls",
                             "tool_calls": [
                                 {
                                     "call_id": "call-read",
@@ -172,13 +173,15 @@ class AssistantReadSqlWorkflowSmoke(SmokeCase):
                                         "sql": (
                                             "SELECT COUNT(*) AS attempt_count "
                                             "FROM assistant_safe_attempt_summaries_v"
-                                        )
+                                        ),
+                                        "params": [],
                                     },
                                 }
                             ],
                             "final_response": None,
                         },
                         {
+                            "action": "final_response",
                             "tool_calls": [],
                             "final_response": "You have one assessed attempt on record.",
                         },
@@ -268,6 +271,9 @@ class AssistantReadSqlWorkflowSmoke(SmokeCase):
                 await app.state.container.shutdown()
                 app.state.container.dispose()
 
+    def _seed_attempt_summary(self, session_factory: Any, *, user_id: str) -> None:
+        _seed_attempt_summary(session_factory, user_id=user_id)
+
 
 class AssistantReadSqlDeniedSmoke(SmokeCase):
     """Local deterministic assistant SQL-denial workflow smoke."""
@@ -295,12 +301,14 @@ class AssistantReadSqlDeniedSmoke(SmokeCase):
                 _ApprovalSequencedAssistantProvider(
                     payloads=[
                         {
+                            "action": "tool_calls",
                             "tool_calls": [
                                 {
                                     "call_id": "call-read",
                                     "tool_name": "query_user_context",
                                     "arguments": {
-                                        "sql": "SELECT COUNT(*) AS user_count FROM user_accounts"
+                                        "sql": "SELECT COUNT(*) AS user_count FROM user_accounts",
+                                        "params": [],
                                     },
                                 }
                             ],
@@ -368,67 +376,6 @@ class AssistantReadSqlDeniedSmoke(SmokeCase):
                 await app.state.container.shutdown()
                 app.state.container.dispose()
 
-    def _seed_attempt_summary(self, session_factory: Any, *, user_id: str) -> None:
-        now = datetime.now(UTC)
-        attempt_id = uuid4().hex
-        assessment_id = uuid4().hex
-        with session_factory() as session:
-            session.add(
-                AttemptRecord(
-                    id=attempt_id,
-                    session_id=uuid4().hex,
-                    user_id=user_id,
-                    workflow_id=uuid4().hex,
-                    practice_type="quick_practice",
-                    content_item_id=uuid4().hex,
-                    content_item_type="prompt_item",
-                    status="assessed",
-                    response_mode="text",
-                    response_text="Learner response",
-                    delivery_version="v1",
-                    rubric_id="quick_practice_reset_timeline@v1",
-                    rubric_version="v1",
-                    assessment_id=assessment_id,
-                    last_error_code=None,
-                    trace_id=uuid4().hex[:32],
-                    created_at=now,
-                    submitted_at=now,
-                    assessed_at=now,
-                )
-            )
-            session.add(
-                AssessmentRecord(
-                    id=assessment_id,
-                    attempt_id=attempt_id,
-                    session_id=uuid4().hex,
-                    user_id=user_id,
-                    workflow_id=uuid4().hex,
-                    practice_type="quick_practice",
-                    validation_status="validated",
-                    prompt_version="test.prompt.v1",
-                    rubric_id="quick_practice_reset_timeline@v1",
-                    rubric_version="v1",
-                    schema_version="test.schema.v1",
-                    config_version="test.config.v1",
-                    provider="test-provider",
-                    model_slug="test-model",
-                    overall_score=4,
-                    skill_scores=[],
-                    evidence=[],
-                    rationale="sound rationale",
-                    strengths=["Clear framing"],
-                    weaknesses=["Could be more specific"],
-                    next_actions=["Add a sharper tradeoff"],
-                    raw_payload={},
-                    rejection_code=None,
-                    trace_id=uuid4().hex[:32],
-                    pipeline_run_id=uuid4().hex,
-                    created_at=now,
-                )
-            )
-            session.commit()
-
-
 class _ApprovalSequencedAssistantProvider:
     provider_name = "test-provider"
     model_slug = "test-model"
@@ -436,13 +383,56 @@ class _ApprovalSequencedAssistantProvider:
     def __init__(self, payloads: list[dict[str, object]]) -> None:
         self._payloads = payloads
 
-    async def complete_json(self, *, messages: object, call_context: object):
-        del messages, call_context
+    async def complete_json(
+        self,
+        *,
+        messages: object,
+        call_context: object,
+        response_schema: object = None,
+        timeout_seconds: object = None,
+    ):
+        del messages, call_context, response_schema, timeout_seconds
         payload = self._payloads.pop(0)
         from soft_skills_backend.shared.ports.models import ProviderCompletion
 
         return ProviderCompletion(
             content=payload,
+            model_slug=self.model_slug,
+            usage={"total_tokens": 10},
+            raw_response={"provider": self.provider_name},
+        )
+
+    async def complete_with_tools(
+        self,
+        *,
+        messages: object,
+        tools: object,
+        call_context: object,
+        timeout_seconds: object = None,
+        tool_choice: str | None = None,
+    ):
+        del messages, tools, call_context, timeout_seconds, tool_choice
+        payload = self._payloads.pop(0)
+        from soft_skills_backend.shared.ports.models import ProviderToolCall, ProviderToolCompletion
+
+        if payload.get("action") == "tool_calls":
+            return ProviderToolCompletion(
+                content=None,
+                tool_calls=[
+                    ProviderToolCall(
+                        call_id=str(tool_call["call_id"]),
+                        tool_name=str(tool_call["tool_name"]),
+                        arguments=dict(tool_call["arguments"]),  # type: ignore[arg-type]
+                    )
+                    for tool_call in cast(list[dict[str, object]], payload["tool_calls"])
+                ],
+                model_slug=self.model_slug,
+                usage={"total_tokens": 10},
+                raw_response={"provider": self.provider_name},
+            )
+        return ProviderToolCompletion(
+            content=str(payload.get("final_response") or ""),
+            tool_calls=[],
             model_slug=self.model_slug,
             usage={"total_tokens": 10},
             raw_response={"provider": self.provider_name},
@@ -488,6 +478,7 @@ class AssistantApprovalWorkflowSmoke(SmokeCase):
                 _ApprovalSequencedAssistantProvider(
                     payloads=[
                         {
+                            "action": "tool_calls",
                             "tool_calls": [
                                 {
                                     "call_id": "call-start",
@@ -501,6 +492,7 @@ class AssistantApprovalWorkflowSmoke(SmokeCase):
                             "final_response": None,
                         },
                         {
+                            "action": "final_response",
                             "tool_calls": [],
                             "final_response": "Practice started after approval.",
                         },
@@ -945,7 +937,7 @@ class AssistantStreamRuntimeSmoke(_AssistantRuntimeSmoke):
                 "script_location", str(Path(__file__).resolve().parents[5] / "alembic")
             )
             alembic_cfg.set_main_option("sqlalchemy.url", db_url)
-            alembic_command.upgrade(alembic_cfg, "head")
+            alembic_command.upgrade(alembic_cfg, "heads")
 
         with tempfile.TemporaryDirectory(prefix="soft-skills-stream-smoke-") as temp_dir:
             db_path = Path(temp_dir) / "smoke.db"
@@ -1057,3 +1049,64 @@ class AssistantStreamRuntimeSmoke(_AssistantRuntimeSmoke):
 
     async def _run_flow(self, backend: SmokeBackendClient, user_id: str) -> JsonObject:
         return {}
+
+
+def _seed_attempt_summary(session_factory: Any, *, user_id: str) -> None:
+    now = datetime.now(UTC)
+    attempt_id = uuid4().hex
+    assessment_id = uuid4().hex
+    with session_factory() as session:
+        session.add(
+            AttemptRecord(
+                id=attempt_id,
+                session_id=uuid4().hex,
+                user_id=user_id,
+                workflow_id=uuid4().hex,
+                practice_type="quick_practice",
+                content_item_id=uuid4().hex,
+                content_item_type="prompt_item",
+                status="assessed",
+                response_mode="text",
+                response_text="Learner response",
+                delivery_version="v1",
+                rubric_id="quick_practice_reset_timeline@v1",
+                rubric_version="v1",
+                assessment_id=assessment_id,
+                last_error_code=None,
+                trace_id=uuid4().hex[:32],
+                created_at=now,
+                submitted_at=now,
+                assessed_at=now,
+            )
+        )
+        session.add(
+            AssessmentRecord(
+                id=assessment_id,
+                attempt_id=attempt_id,
+                session_id=uuid4().hex,
+                user_id=user_id,
+                workflow_id=uuid4().hex,
+                practice_type="quick_practice",
+                validation_status="validated",
+                prompt_version="test.prompt.v1",
+                rubric_id="quick_practice_reset_timeline@v1",
+                rubric_version="v1",
+                schema_version="test.schema.v1",
+                config_version="test.config.v1",
+                provider="test-provider",
+                model_slug="test-model",
+                overall_score=4,
+                skill_scores=[],
+                evidence=[],
+                rationale="sound rationale",
+                strengths=["Clear framing"],
+                weaknesses=["Could be more specific"],
+                next_actions=["Add a sharper tradeoff"],
+                raw_payload={},
+                rejection_code=None,
+                trace_id=uuid4().hex[:32],
+                pipeline_run_id=uuid4().hex,
+                created_at=now,
+            )
+        )
+        session.commit()

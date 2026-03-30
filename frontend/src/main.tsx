@@ -113,7 +113,7 @@ if (root) {
       <ThemeProvider>
         <DataProviderProvider>
           <AuthSessionProvider>
-            <RouterProvider router={router} />
+            <RouterProvider router={router} future={{ v7_startTransition: true }} />
           </AuthSessionProvider>
         </DataProviderProvider>
       </ThemeProvider>

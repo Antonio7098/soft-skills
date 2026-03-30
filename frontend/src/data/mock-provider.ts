@@ -10,8 +10,10 @@ import type {
   CollectionCreateCommand,
   PromptItemCreateCommand,
   ScenarioCreateCommand,
+  LoginUserCommand,
   RegisterUserCommand,
   UpdateProfileCommand,
+  DeleteAccountResult,
   QuickPracticeSessionView,
   StartQuickPracticeSessionCommand,
   SubmitAttemptCommand,
@@ -50,6 +52,7 @@ import type {
   EvaluationComparisonView,
   BenchmarkDashboardView,
   EvaluationCaseDetailView,
+  ProviderModel,
   PromptSummaryView,
   PromptVersionView,
   PromptAnalyticsView,
@@ -1083,6 +1086,17 @@ export const mockDataProvider: DataProvider = {
     return syncMockUserFromSession();
   },
 
+  async login(cmd: LoginUserCommand): Promise<UserView> {
+    await delay();
+    const profile = MOCK_AUTH_PROFILES.find((candidate) => candidate.session.actor?.email === cmd.email);
+    if (!profile) {
+      throw new Error('Invalid email or password');
+    }
+    setStoredProfileId(profile.id);
+    setStoredActiveOrgId(profile.session.active_organisation_id);
+    return syncMockUserFromSession().actor as UserView;
+  },
+
   async register(cmd: RegisterUserCommand): Promise<UserView> {
     await delay();
     const user: UserView = {
@@ -1121,6 +1135,14 @@ export const mockDataProvider: DataProvider = {
       },
     };
     return _user;
+  },
+
+  async deleteMe(): Promise<DeleteAccountResult> {
+    await delay();
+    const userId = syncMockUserFromSession().actor?.id ?? _user.id;
+    setStoredProfileId('learner-alex');
+    setStoredActiveOrgId('org-001');
+    return { deleted_user_id: userId, status: 'deleted' };
   },
 
   // --- Taxonomy ------------------------------------------------------------
@@ -2456,6 +2478,19 @@ export const mockDataProvider: DataProvider = {
     };
   },
 
+  // --- Admin: Providers --------------------------------------------------------
+  async listOpenRouterModels(): Promise<ProviderModel[]> {
+    await delay(200);
+    return [
+      { id: 'openai/gpt-4o', name: 'GPT-4o', provider: 'openrouter' },
+      { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openrouter' },
+      { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'openrouter' },
+      { id: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku', provider: 'openrouter' },
+      { id: 'google/gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'openrouter' },
+      { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Llama 3.1 70B', provider: 'openrouter' },
+    ];
+  },
+
   // --- Admin: Prompts --------------------------------------------------------
 
   async listPrompts(): Promise<PromptSummaryView[]> {
@@ -3093,7 +3128,7 @@ export const mockDataProvider: DataProvider = {
         callbacks.onToolCompleted?.(completedTool);
       }
 
-      callbacks.onTurnCompleted?.(latestTurn);
+      callbacks.onTurnCompleted?.();
       callbacks.onClose?.();
     }, completionDelay);
 

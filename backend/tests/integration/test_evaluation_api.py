@@ -17,7 +17,7 @@ from soft_skills_backend.shared.ports.models import ProviderCompletion
 def _migrate(test_settings) -> None:
     alembic_config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
     alembic_config.set_main_option("sqlalchemy.url", test_settings.database_url)
-    command.upgrade(alembic_config, "head")
+    command.upgrade(alembic_config, "heads")
 
 
 async def _register_user(client, *, email: str, display_name: str):
@@ -47,7 +47,15 @@ class FakeEvaluationProvider:
     def model_slug(self) -> str:
         return self._model_slug
 
-    async def complete_json(self, *, messages, call_context) -> ProviderCompletion:
+    async def complete_json(
+        self,
+        *,
+        messages,
+        call_context,
+        response_schema=None,
+        timeout_seconds=None,
+    ) -> ProviderCompletion:
+        del response_schema, timeout_seconds
         content = "\n".join(str(message.get("content", "")) for message in messages)
         operation = call_context.operation
         if operation.endswith(":aggregation"):

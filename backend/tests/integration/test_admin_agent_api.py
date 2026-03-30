@@ -24,7 +24,7 @@ def _migrate(test_settings: Any) -> None:
         str(Path(__file__).resolve().parents[2] / "alembic"),
     )
     alembic_config.set_main_option("sqlalchemy.url", test_settings.database_url)
-    alembic_command.upgrade(alembic_config, "head")
+    alembic_command.upgrade(alembic_config, "heads")
 
 
 @asynccontextmanager
@@ -71,8 +71,15 @@ class _AdminAgentProviderStub:
     def __init__(self, payloads: list[dict[str, object]]) -> None:
         self._payloads = payloads
 
-    async def complete_json(self, *, messages: object, call_context: object) -> ProviderCompletion:
-        del messages, call_context
+    async def complete_json(
+        self,
+        *,
+        messages: object,
+        call_context: object,
+        response_schema: object = None,
+        timeout_seconds: object = None,
+    ) -> ProviderCompletion:
+        del messages, call_context, response_schema, timeout_seconds
         payload = self._payloads.pop(0)
         return ProviderCompletion(
             content=payload,

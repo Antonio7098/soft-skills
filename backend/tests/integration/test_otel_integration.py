@@ -43,7 +43,7 @@ def app_with_otel(test_settings_with_otel: Settings):
         str(Path(__file__).resolve().parents[2] / "alembic"),
     )
     alembic_config.set_main_option("sqlalchemy.url", test_settings_with_otel.database_url)
-    command.upgrade(alembic_config, "head")
+    command.upgrade(alembic_config, "heads")
     return create_app(test_settings_with_otel)
 
 
@@ -55,7 +55,7 @@ def app_without_otel(test_settings_without_otel: Settings):
         str(Path(__file__).resolve().parents[2] / "alembic"),
     )
     alembic_config.set_main_option("sqlalchemy.url", test_settings_without_otel.database_url)
-    command.upgrade(alembic_config, "head")
+    command.upgrade(alembic_config, "heads")
     return create_app(test_settings_without_otel)
 
 

@@ -66,15 +66,28 @@ describe('UserAppGuard', () => {
       getAuthSession: vi.fn().mockResolvedValue(mockSession),
     });
 
-    renderWithProviders(
-      <UserAppGuard>
-        <ProtectedContent />
-      </UserAppGuard>,
-      { dataProvider: mockData }
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <DataProviderProvider provider={mockData}>
+          <AuthSessionProvider>
+            <Routes>
+              <Route path="/login" element={<div data-testid="login-page">Login</div>} />
+              <Route
+                path="/"
+                element={(
+                  <UserAppGuard>
+                    <ProtectedContent />
+                  </UserAppGuard>
+                )}
+              />
+            </Routes>
+          </AuthSessionProvider>
+        </DataProviderProvider>
+      </MemoryRouter>
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Sign-in Required')).toBeInTheDocument();
+      expect(screen.getByTestId('login-page')).toBeInTheDocument();
     });
   });
 

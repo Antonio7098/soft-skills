@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
+
+DifficultyLevel = Literal["introductory", "intermediate", "advanced"]
+ContentFormatType = Literal["quick_practice_prompt", "interview_prompt", "scenario_step"]
 
 
 class ScenarioSupportingArtifactInput(BaseModel):
@@ -98,7 +101,7 @@ class PromptItemCreateCommand(BaseModel):
     prompt_type: str
     title: str
     prompt_text: str
-    difficulty: str
+    difficulty: DifficultyLevel
     target_skill_slugs: list[str]
     rubric_id: str
     organisation_id: str | None = None
@@ -108,7 +111,7 @@ class PromptItemUpdateCommand(BaseModel):
     prompt_type: str | None = None
     title: str | None = None
     prompt_text: str | None = None
-    difficulty: str | None = None
+    difficulty: DifficultyLevel | None = None
     target_skill_slugs: list[str] | None = None
     rubric_id: str | None = None
     organisation_id: str | None = None
@@ -130,8 +133,8 @@ class CollectionCreateCommand(BaseModel):
     title: str
     summary: str
     target_audience: str
-    difficulty: str
-    content_format_mix: list[str] = Field(default_factory=list)
+    difficulty: DifficultyLevel
+    content_format_mix: list[ContentFormatType] = Field(default_factory=list)
     target_skill_slugs: list[str]
     target_competency_slugs: list[str]
     rubric_ids: list[str]
@@ -156,7 +159,7 @@ class CollectionRateCommand(BaseModel):
 
 
 class CollectionListFilters(BaseModel):
-    difficulty: str | None = None
+    difficulty: DifficultyLevel | None = None
     skill_slug: str | None = None
     competency_slug: str | None = None
     include_private: bool = True
@@ -211,8 +214,8 @@ class CollectionGenerationCounts(BaseModel):
 class StructuredCollectionGenerationCommand(BaseModel):
     title_hint: str | None = None
     target_audience: str
-    difficulty: str
-    content_format_mix: list[str]
+    difficulty: DifficultyLevel
+    content_format_mix: list[ContentFormatType]
     target_skill_slugs: list[str]
     target_competency_slugs: list[str]
     rubric_ids: list[str]
@@ -227,8 +230,8 @@ class StructuredCollectionGenerationCommand(BaseModel):
 class ChatCollectionGenerationCommand(BaseModel):
     prompt: str
     target_audience: str
-    difficulty: str
-    content_format_mix: list[str]
+    difficulty: DifficultyLevel
+    content_format_mix: list[ContentFormatType]
     target_skill_slugs: list[str]
     target_competency_slugs: list[str]
     rubric_ids: list[str]
@@ -267,7 +270,7 @@ class GeneratedPromptItemPlan(BaseModel):
     prompt_type: str
     title_hint: str
     generation_brief: str
-    difficulty: str
+    difficulty: DifficultyLevel
     target_skill_slugs: list[str]
     rubric_id: str
 
@@ -320,7 +323,7 @@ class GeneratedPromptItemDraft(BaseModel):
     prompt_type: str
     title: str
     prompt_text: str
-    difficulty: str
+    difficulty: DifficultyLevel
     target_skill_slugs: list[str]
     rubric_id: str
     generated_rubric: GeneratedQuickPracticeRubric | None = None
@@ -346,8 +349,8 @@ class GeneratedCollectionDraft(BaseModel):
     title: str
     summary: str
     target_audience: str
-    difficulty: str
-    content_format_mix: list[str]
+    difficulty: DifficultyLevel
+    content_format_mix: list[ContentFormatType]
     target_skill_slugs: list[str]
     target_competency_slugs: list[str]
     rubric_ids: list[str]
