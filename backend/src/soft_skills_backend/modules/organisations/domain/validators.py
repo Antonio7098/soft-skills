@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from sqlalchemy.orm import Session
+
 from soft_skills_backend.platform.db.models import OrganisationMembershipRecord, OrganisationRecord
 from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import auth_error, validation_error
 
 
-def validate_slug_uniqueness(session, slug: str, exclude_org_id: str | None = None) -> None:
+def validate_slug_uniqueness(
+    session: Session, slug: str, exclude_org_id: str | None = None
+) -> None:
     """Ensure slug is unique across organisations."""
     query = session.query(OrganisationRecord).filter(OrganisationRecord.slug == slug)
     if exclude_org_id:
@@ -45,7 +49,7 @@ def require_org_member(actor: Actor, organisation_id: str) -> None:
     )
 
 
-def require_unique_org_membership(session, organisation_id: str, user_id: str) -> None:
+def require_unique_org_membership(session: Session, organisation_id: str, user_id: str) -> None:
     """Ensure user is not already a member of the organisation."""
     existing = (
         session.query(OrganisationMembershipRecord)

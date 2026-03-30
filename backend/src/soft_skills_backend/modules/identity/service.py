@@ -14,6 +14,7 @@ from soft_skills_backend.modules.identity.models import (
     DeleteAccountResult,
     LearnerProfileView,
     LoginUserCommand,
+    OrganisationMembershipView,
     RegisterUserCommand,
     UpdateProfileCommand,
     UserView,
@@ -21,6 +22,7 @@ from soft_skills_backend.modules.identity.models import (
 from soft_skills_backend.platform.db.models import (
     LearnerProfileRecord,
     OrganisationMembershipRecord,
+    OrganisationRecord,
     UserAccountRecord,
 )
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
@@ -43,6 +45,9 @@ def _verify_password(password: str, password_hash: str | None) -> bool:
 
 
 LEGACY_PASSWORD_CLAIM_CUTOFF = datetime(2026, 3, 30, 10, 20, tzinfo=UTC)
+
+ADMIN_PERMISSIONS = ["collections:read", "practice:run", "admin:access", "org:read", "org:write"]
+MEMBER_PERMISSIONS = ["collections:read", "practice:run"]
 
 
 def _coerce_utc_datetime(value: datetime) -> datetime:
@@ -166,6 +171,21 @@ class IdentityService:
                     status_code=500,
                     details={"user_id": user_id},
                 )
+            memberships = (
+                session.query(OrganisationMembershipRecord).filter_by(user_id=user_id).all()
+            )
+            org_memberships = []
+            for m in memberships:
+                org = session.get(OrganisationRecord, m.organisation_id)
+                perms = ADMIN_PERMISSIONS if m.role == "admin" else MEMBER_PERMISSIONS
+                org_memberships.append(
+                    OrganisationMembershipView(
+                        organisation_id=m.organisation_id,
+                        organisation_name=org.name if org else m.organisation_id,
+                        role=m.role,
+                        permissions=perms,
+                    )
+                )
             return UserView(
                 id=user.id,
                 email=user.email,
@@ -177,6 +197,7 @@ class IdentityService:
                     goals=list(profile.goals),
                     practice_preferences=dict(profile.practice_preferences),
                 ),
+                org_memberships=org_memberships,
             )
 
     def update_profile(self, user_id: str, command: UpdateProfileCommand) -> UserView:

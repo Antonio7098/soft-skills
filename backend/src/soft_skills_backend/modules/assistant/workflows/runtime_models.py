@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, TypeAlias
+from typing import Annotated, Any, Literal, TypeAlias, cast
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
@@ -63,9 +63,10 @@ class GeneratePromptItemsToolArgs(ChatPromptItemGenerationCommand):
 class _AssistantToolRequestBase(_StrictModel):
     call_id: str = Field(min_length=1, max_length=64)
     tool_name: AssistantToolName
+    arguments: Any
 
     def arguments_payload(self) -> dict[str, Any]:
-        payload = self.arguments.model_dump(mode="json", exclude_none=True)
+        payload: Any = self.arguments.model_dump(mode="json", exclude_none=True)
         params = payload.get("params")
         if isinstance(params, list):
             payload["params"] = {
@@ -73,7 +74,7 @@ class _AssistantToolRequestBase(_StrictModel):
                 for item in params
                 if isinstance(item, dict) and isinstance(item.get("key"), str)
             }
-        return payload
+        return cast(dict[str, Any], payload)
 
 
 class QueryUserContextToolRequest(_AssistantToolRequestBase):
@@ -124,7 +125,9 @@ AssistantToolRequest: TypeAlias = Annotated[
     Field(discriminator="tool_name"),
 ]
 
-_ASSISTANT_TOOL_REQUEST_ADAPTER = TypeAdapter(AssistantToolRequest)
+_ASSISTANT_TOOL_REQUEST_ADAPTER: TypeAdapter[AssistantToolRequest] = TypeAdapter(
+    AssistantToolRequest
+)
 
 
 class AssistantDecision(_StrictModel):

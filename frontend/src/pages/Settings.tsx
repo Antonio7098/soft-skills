@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield } from 'lucide-react';
 import { useAuthSession } from '@/auth';
@@ -5,11 +6,12 @@ import { PageShell } from '@/design-system/patterns/PageShell';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
 import { ThemeSwitcher } from '@/components/navigation/ThemeSwitcher';
-import { ProfileCard } from '@/features/settings';
+import { ProfileCard, OrganisationModal, OrganisationList } from '@/features/settings';
 
 export function Settings() {
   const navigate = useNavigate();
   const { isAdmin, session, activeOrganisation } = useAuthSession();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
     <PageShell
@@ -18,6 +20,8 @@ export function Settings() {
     >
       <div className="max-w-2xl flex flex-col gap-6">
         <ProfileCard />
+
+        <OrganisationList onCreateClick={() => setIsModalOpen(true)} />
 
         <Card className="flex flex-col gap-6">
           <div className="flex flex-col gap-1">
@@ -54,8 +58,8 @@ export function Settings() {
                 </p>
               </div>
             </div>
-            <Button 
-              variant="primary" 
+            <Button
+              variant="primary"
               size="sm"
               onClick={() => navigate('/admin')}
               disabled={!isAdmin}
@@ -65,6 +69,11 @@ export function Settings() {
           </div>
         </Card>
       </div>
+
+      <OrganisationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </PageShell>
   );
 }

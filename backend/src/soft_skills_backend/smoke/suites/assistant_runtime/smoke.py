@@ -142,7 +142,9 @@ class AssistantReadSqlWorkflowSmoke(SmokeCase):
     """Local deterministic assistant SQL-read workflow smoke."""
 
     name = "assistant-read-sql-workflow"
-    description = "Run a local assistant turn that reads learner-safe SQL through query_user_context."
+    description = (
+        "Run a local assistant turn that reads learner-safe SQL through query_user_context."
+    )
 
     def run(self, context: SmokeContext) -> AssistantRuntimeSmokeResult:
         return asyncio.run(asyncio.wait_for(self._run(context.settings), timeout=60.0))
@@ -160,7 +162,7 @@ class AssistantReadSqlWorkflowSmoke(SmokeCase):
             app = create_app(smoke_settings)
             app.state.container.background_tasks.attach(asyncio.get_running_loop())
             SmokeApplicationSessionFactory()._migrate(smoke_settings)
-            app.state.container.assistant_service._workflows._llm_provider = (  # type: ignore[attr-defined]
+            app.state.container.assistant_service._workflows._llm_provider = (
                 _ApprovalSequencedAssistantProvider(
                     payloads=[
                         {
@@ -188,9 +190,9 @@ class AssistantReadSqlWorkflowSmoke(SmokeCase):
                     ]
                 )
             )
-            app.state.container.assistant_service._workflows._tools._auto_allow_tools = frozenset(  # type: ignore[attr-defined]
+            app.state.container.assistant_service._workflows._tools._auto_allow_tools = frozenset(
                 tool_name
-                for tool_name in app.state.container.assistant_service._workflows._tools._auto_allow_tools  # type: ignore[attr-defined]
+                for tool_name in app.state.container.assistant_service._workflows._tools._auto_allow_tools
                 if tool_name != "start_collection_practice"
             )
             transport = httpx.ASGITransport(app=app)
@@ -297,7 +299,7 @@ class AssistantReadSqlDeniedSmoke(SmokeCase):
             app = create_app(smoke_settings)
             app.state.container.background_tasks.attach(asyncio.get_running_loop())
             SmokeApplicationSessionFactory()._migrate(smoke_settings)
-            app.state.container.assistant_service._workflows._llm_provider = (  # type: ignore[attr-defined]
+            app.state.container.assistant_service._workflows._llm_provider = (
                 _ApprovalSequencedAssistantProvider(
                     payloads=[
                         {
@@ -356,7 +358,10 @@ class AssistantReadSqlDeniedSmoke(SmokeCase):
                         for tool in cast(list[JsonObject], turn.get("tool_calls", []))
                     ]
                     tool_calls = cast(list[JsonObject], turn.get("tool_calls", []))
-                    if not tool_calls or str(tool_calls[0].get("error_code")) != "SS-VALIDATION-318":
+                    if (
+                        not tool_calls
+                        or str(tool_calls[0].get("error_code")) != "SS-VALIDATION-318"
+                    ):
                         raise provider_error(
                             "Assistant SQL denied smoke did not surface the expected validation error",
                             code="SS-PROVIDER-011",
@@ -375,6 +380,7 @@ class AssistantReadSqlDeniedSmoke(SmokeCase):
                 await app.state.container.background_tasks.shutdown()
                 await app.state.container.shutdown()
                 app.state.container.dispose()
+
 
 class _ApprovalSequencedAssistantProvider:
     provider_name = "test-provider"
@@ -422,7 +428,7 @@ class _ApprovalSequencedAssistantProvider:
                     ProviderToolCall(
                         call_id=str(tool_call["call_id"]),
                         tool_name=str(tool_call["tool_name"]),
-                        arguments=dict(tool_call["arguments"]),  # type: ignore[arg-type]
+                        arguments=dict(tool_call["arguments"]),
                     )
                     for tool_call in cast(list[dict[str, object]], payload["tool_calls"])
                 ],
@@ -474,7 +480,7 @@ class AssistantApprovalWorkflowSmoke(SmokeCase):
             app = create_app(smoke_settings)
             app.state.container.background_tasks.attach(asyncio.get_running_loop())
             SmokeApplicationSessionFactory()._migrate(smoke_settings)
-            app.state.container.assistant_service._workflows._llm_provider = (  # type: ignore[attr-defined]
+            app.state.container.assistant_service._workflows._llm_provider = (
                 _ApprovalSequencedAssistantProvider(
                     payloads=[
                         {
@@ -534,8 +540,10 @@ class AssistantApprovalWorkflowSmoke(SmokeCase):
                             "rubric_id": "quick_practice_reset_timeline@v1",
                         },
                     )
-                    payloads = app.state.container.assistant_service._workflows._llm_provider._payloads  # type: ignore[attr-defined]
-                    payloads[0]["tool_calls"][0]["arguments"]["collection_id"] = collection_id  # type: ignore[index]
+                    payloads = (
+                        app.state.container.assistant_service._workflows._llm_provider._payloads
+                    )
+                    payloads[0]["tool_calls"][0]["arguments"]["collection_id"] = collection_id
 
                     session_payload = await backend.create_assistant_session(
                         user_id=actors.learner_id,
@@ -565,7 +573,7 @@ class AssistantApprovalWorkflowSmoke(SmokeCase):
                         user_id=actors.learner_id,
                         session_id=str(session_payload["id"]),
                     )
-                    events = app.state.container.assistant_service.list_stream_events(  # type: ignore[attr-defined]
+                    events = app.state.container.assistant_service.list_stream_events(
                         str(turn["stream_token"])
                     )
                     tool_names = [
@@ -573,7 +581,10 @@ class AssistantApprovalWorkflowSmoke(SmokeCase):
                         for tool in cast(list[JsonObject], turn.get("tool_calls", []))
                     ]
                     event_types = [event.type for event in events]
-                    if "approval.requested" not in event_types or "approval.decided" not in event_types:
+                    if (
+                        "approval.requested" not in event_types
+                        or "approval.decided" not in event_types
+                    ):
                         raise provider_error(
                             "Assistant approval smoke did not emit approval lifecycle events",
                             code="SS-PROVIDER-011",
@@ -655,10 +666,10 @@ class AssistantGenerationRuntimeSmoke(_AssistantRuntimeSmoke):
                 "Call the generate_collection tool now and do not answer directly. "
                 "Create one interview-only collection for early-career consultants. "
                 "Use prompt text intent about defending a decision with incomplete information. "
-                "Use difficulty intermediate, content_format_mix [\"interview_prompt\"], "
-                "target_skill_slugs [\"decision-justification\"], "
-                "target_competency_slugs [\"problem-solving\"], "
-                "rubric_ids [\"interview_text@v1\"], and counts with one interview prompt and zero of everything else."
+                'Use difficulty intermediate, content_format_mix ["interview_prompt"], '
+                'target_skill_slugs ["decision-justification"], '
+                'target_competency_slugs ["problem-solving"], '
+                'rubric_ids ["interview_text@v1"], and counts with one interview prompt and zero of everything else.'
             ),
         )
         turn = await backend.wait_for_assistant_turn(
@@ -720,7 +731,7 @@ class AssistantPracticeRuntimeSmoke(_AssistantRuntimeSmoke):
             flow_timeout_seconds=flow_timeout_seconds,
         )
 
-    def run(self, context: SmokeContext) -> AssistantPracticeRuntimeSmokeResult:  # type: ignore[override]
+    def run(self, context: SmokeContext) -> AssistantPracticeRuntimeSmokeResult:
         self._preflight.assert_ready(context.settings)
         try:
             return asyncio.run(
@@ -867,7 +878,9 @@ class AssistantPracticeRuntimeSmoke(_AssistantRuntimeSmoke):
                 code="SS-PROVIDER-011",
                 details={"tool_names": tool_names},
             )
-        submit_count = sum(tool_name == "submit_active_practice_response" for tool_name in tool_names)
+        submit_count = sum(
+            tool_name == "submit_active_practice_response" for tool_name in tool_names
+        )
         if submit_count < 2:
             raise provider_error(
                 "Assistant practice smoke did not submit both active practice answers",
@@ -903,7 +916,7 @@ class AssistantStreamRuntimeSmoke(_AssistantRuntimeSmoke):
             flow_timeout_seconds=flow_timeout_seconds,
         )
 
-    def run(self, context: SmokeContext) -> AssistantStreamSmokeResult:  # type: ignore[override]
+    def run(self, context: SmokeContext) -> AssistantStreamSmokeResult:
         self._preflight.assert_ready(context.settings)
         try:
             return asyncio.run(
@@ -916,7 +929,7 @@ class AssistantStreamRuntimeSmoke(_AssistantRuntimeSmoke):
                 details={"timeout_seconds": self._flow_timeout_seconds},
             ) from exc
 
-    async def _run(self, settings: Settings) -> AssistantStreamSmokeResult:  # type: ignore[override]
+    async def _run(self, settings: Settings) -> AssistantStreamSmokeResult:
         import json
         import socket
         import tempfile

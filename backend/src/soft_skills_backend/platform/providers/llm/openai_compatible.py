@@ -225,7 +225,9 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                         user_id=call_context.user_id,
                         http_status=response.status_code,
                         timeout_seconds=resolved_timeout_seconds,
-                        response_format_type=str(payload["response_format"]["type"]),
+                        response_format_type=str(
+                            cast(dict[str, object], payload["response_format"])["type"]
+                        ),
                     )
                     if (
                         response.status_code in TRANSIENT_PROVIDER_STATUS_CODES
@@ -261,7 +263,9 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     usage=usage,
                     finish_reason=finish_reason,
                     timeout_seconds=resolved_timeout_seconds,
-                    response_format_type=str(payload["response_format"]["type"]),
+                    response_format_type=str(
+                        cast(dict[str, object], payload["response_format"])["type"]
+                    ),
                 )
                 _add_llm_span_attributes(
                     operation=call_context.operation,
@@ -291,7 +295,9 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     workflow_id=call_context.workflow_id,
                     user_id=call_context.user_id,
                     timeout_seconds=resolved_timeout_seconds,
-                    response_format_type=str(payload["response_format"]["type"]),
+                    response_format_type=str(
+                        cast(dict[str, object], payload["response_format"])["type"]
+                    ),
                     error_code=exc.code,
                     response_diagnostics=_build_response_diagnostics(response_payload),
                 )
@@ -348,7 +354,9 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     workflow_id=call_context.workflow_id,
                     user_id=call_context.user_id,
                     timeout_seconds=resolved_timeout_seconds,
-                    response_format_type=str(payload["response_format"]["type"]),
+                    response_format_type=str(
+                        cast(dict[str, object], payload["response_format"])["type"]
+                    ),
                 )
                 if attempt < max_retries:
                     await asyncio.sleep(

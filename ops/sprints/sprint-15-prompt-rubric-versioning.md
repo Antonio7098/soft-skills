@@ -50,6 +50,8 @@
 - [ ] Task 3.1: Update config.py - replace string-based prompt versions with UUID + int pairs
 - [ ] Task 3.2: Update MarkingRuntimeConfig - per_skill and aggregation prompt references
 - [ ] Task 3.3: Update CatalogGenerationRuntimeConfig - all prompt references
+- [ ] Task 3.4: Update runtime config JSON artifacts (soft_skills_marking_runtime.v1.json, soft_skills_catalog_generation_runtime.v1.json) to use UUID + int pairs
+- [ ] Task 3.5: Define and implement config-to-UUID resolution strategy for builtin prompts (builtin seeding generates non-deterministic UUIDs; options: name→UUID lookup, deterministic UUIDs, or hybrid)
 
 ### Phase 4: Code Migration - Domain & Repository
 
@@ -71,19 +73,33 @@
 - [ ] Task 5.6: Restructure prompt API routes to use {prompt_id}
 - [ ] Task 5.7: Restructure rubric API routes to use {rubric_id}
 - [ ] Task 5.8: Add org config API endpoints in organisations routes
+- [ ] Task 5.9: Update admin_service.py rubric methods to delegate to RubricService instead of RubricAdminRepository
+- [ ] Task 5.10: Update admin_service.py prompt methods to delegate to rewritten PromptService
+- [ ] Task 5.11: Add version status validation to org config CRUD (reject non-published version references)
+- [ ] Task 5.12: Define and implement cascade delete semantics for org configs when parent prompt/rubric is deleted
+- [ ] Task 5.13: Investigate PromptItemRecord relationship to PromptVersionRecord; add task if org-scoped prompt-item routes need updating
 
 ### Phase 6: Code Migration - Runtime Consumers
 
-- [ ] Task 6.1: Update PromptRenderRequest to use prompt_id, version_id
+- [ ] Task 6.1: Update PromptRenderRequest to use prompt_id, version_id, and organisation_id (for org-aware rendering)
 - [ ] Task 6.2: Update workers - prompt_request_transform functions
-- [ ] Task 6.3: Update marking_provider to use FK-based lookups
+- [ ] Task 6.2b: Update marking_provider.py build_prompt_library() to use FK-based config references
+- [ ] Task 6.3: Integrate RubricRegistry into marking_provider for org-aware rubric resolution (org config → global fallback)
 - [ ] Task 6.4: Update persistence layer for FK-based lookups
 - [ ] Task 6.5: Update queries for rubric navigation
+- [ ] Task 6.6: Update catalog/workflows/generation/persistence.py _persist_generated_quick_practice_rubric to create Rubric + RubricVersion with embedded criteria JSON
+- [ ] Task 6.7: Update taxonomy/service.py rubric seeding to use new model (Rubric + RubricVersion)
 
 ### Phase 7: Cleanup
 
 - [ ] Task 7.1: Drop legacy columns (prompt_versions.name, prompt_versions.prompt_type, rubrics.family, rubrics.version, rubrics.criteria)
-- [ ] Task 7.2: Drop RubricCriterionRecord table
+- [ ] Task 7.2: Migrate all RubricCriterionRecord consumers to new rubric_versions.criteria JSON:
+       - catalog/workflows/generation/persistence.py (_persist_generated_quick_practice_rubric)
+       - evaluation/marking_benchmark.py
+       - taxonomy/service.py (rubric seeding)
+       - smoke/suites/assessment_marking/smoke.py
+       - tests/integration/test_identity_and_catalog.py
+- [ ] Task 7.3: Drop RubricCriterionRecord table (after all consumers migrated)
 
 ### Phase 8: Documentation
 
@@ -136,6 +152,8 @@ Phase 1 (schema) + Phase 2 (migration) + Phase 3 (config) + Phase 4 (domain/repo
 | Config migration from string to UUID FK pairs | Medium | Add interim migration phase; backward-compat during transition | Open |
 | Runtime resolution complexity (org config → global fallback) | Medium | Keep resolution logic in dedicated registry classes; test each resolution path | Open |
 | RubricCriterionRecord removal requires careful data migration | High | Ensure criteria JSON migration is complete before dropping table | Open |
+| Config UUID resolution for builtin prompts (chicken-and-egg) | Medium | Define strategy (name→UUID lookup, deterministic UUIDs, or hybrid) before config migration | Open |
+| Data migration scope contradiction | Medium | MVP spec says "start fresh" but Phase 2 has migration tasks - resolve before sprint start | Open |
 
 ## Sprint Notes
 
@@ -163,6 +181,25 @@ Key decisions, tradeoffs, and implementation notes:
 5. Cleanup:
    - Legacy RubricCriterionRecord merged into rubric_versions.criteria JSON
    - Legacy columns removed after migration verification
+
+6. Config UUID Resolution Strategy (TBD before Phase 3):
+   - Option A: Look up by name after seeding and populate config dynamically
+   - Option B: Use deterministic UUIDs in builtin_prompts.py seeding
+   - Option C: Hybrid - keep a name→UUID lookup in config resolution
+
+7. Org Config Version Validation:
+   - OrganisationPromptConfig and OrganisationRubricConfig must reference status = published versions
+   - API rejects references to draft/archived versions
+   - Runtime fails loud if referenced version becomes archived
+
+8. Cascade Delete:
+   - Deleting a Prompt deletes all PromptVersions and cascades to OrganisationPromptConfig
+   - Deleting a Rubric deletes all RubricVersions and cascades to OrganisationRubricConfig
+
+9. Data Migration Scope:
+   - MVP spec constraint "No migration of existing data" needs resolution
+   - Phase 2 tasks 2.1-2.4 assume production data exists and must be migrated
+   - Decide: clean seed approach vs full migration before sprint start
 ```
 
 ## Review And Sign-Off

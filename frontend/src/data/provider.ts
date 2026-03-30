@@ -72,6 +72,9 @@ import type {
   OrgRubricView,
   PromptItemView,
   ScenarioView,
+  OrganisationView,
+  OrganisationListView,
+  CreateOrganisationCommand,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -90,6 +93,10 @@ export interface DataProvider {
   getMe(): Promise<UserView>;
   updateProfile(cmd: UpdateProfileCommand): Promise<UserView>;
   deleteMe(): Promise<DeleteAccountResult>;
+
+  // --- Organisations --------------------------------------------------------
+  createOrganisation(cmd: CreateOrganisationCommand): Promise<OrganisationView>;
+  listOrganisations(): Promise<OrganisationListView[]>;
 
   // --- Taxonomy ------------------------------------------------------------
   getTaxonomy(): Promise<TaxonomySnapshot>;

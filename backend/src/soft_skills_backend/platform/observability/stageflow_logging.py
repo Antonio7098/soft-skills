@@ -284,12 +284,16 @@ class DatabaseProviderCallLogger:
         success: bool,
         latency_ms: int,
         error: str | None = None,
-        **metrics: object,
+        **metrics: dict[str, object],
     ) -> None:
         # Extract usage metrics
         usage = metrics.get("usage", {})
-        prompt_tokens = int(usage.get("prompt_tokens", 0)) if usage else 0
-        completion_tokens = int(usage.get("completion_tokens", 0)) if usage else 0
+        if isinstance(usage, dict):
+            prompt_tokens = int(usage.get("prompt_tokens", 0))
+            completion_tokens = int(usage.get("completion_tokens", 0))
+        else:
+            prompt_tokens = 0
+            completion_tokens = 0
 
         # Calculate cost
         model_id = metrics.get("model_id")

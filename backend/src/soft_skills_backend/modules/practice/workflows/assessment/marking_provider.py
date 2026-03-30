@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Protocol, cast
+from typing import Callable, Protocol, cast
 
 from soft_skills_backend.config import Settings
 from soft_skills_backend.engines.config import load_marking_runtime_config
@@ -89,9 +89,7 @@ class DefaultAssessmentMarkingProvider:
     def model_slug(self) -> str:
         return self._llm_provider.model_slug
 
-    def _required_rubric_skills(
-        self, prompt_payload: ResolvedAttemptPayload
-    ) -> list[str] | None:
+    def _required_rubric_skills(self, prompt_payload: ResolvedAttemptPayload) -> list[str] | None:
         if prompt_payload.prompt.practice_type == PracticeType.QUICK_PRACTICE:
             if not prompt_payload.prompt.target_skill_slugs:
                 return None
@@ -311,7 +309,7 @@ class DefaultAssessmentMarkingProvider:
         typed_output: TypedLLMOutput,
         messages: list[dict[str, str]],
         call_context: ProviderCallContext,
-        verifier,
+        verifier: Callable[[object], None],
     ) -> TypedLLMResult:
         retry_messages = list(messages)
         last_result: TypedLLMResult | None = None

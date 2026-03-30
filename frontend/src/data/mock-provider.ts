@@ -88,6 +88,9 @@ import type {
   OrgSkillView,
   OrgCompetencyView,
   OrgRubricView,
+  OrganisationView,
+  OrganisationListView,
+  CreateOrganisationCommand,
 } from './types';
 import {
   SEED_SKILLS,
@@ -208,6 +211,8 @@ const _saves = new Map<string, Set<string>>();
 const _ratings = new Map<string, Map<string, number>>();
 const MOCK_PROFILE_STORAGE_KEY = 'ss_mock_auth_profile_id';
 const MOCK_ACTIVE_ORG_STORAGE_KEY = 'ss_mock_active_organisation_id';
+const _createdOrganisations: OrganisationView[] = [];
+const _createdMemberships: OrganisationMembershipView[] = [];
 
 function delay(ms = 300): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -242,7 +247,7 @@ const MOCK_AUTH_PROFILES: AuthProfileView[] = [
     description: 'Learner in Acme Sales',
     session: {
       status: 'authenticated',
-      actor: { ...SEED_CURRENT_USER },
+      actor: { ...SEED_CURRENT_USER, org_memberships: [createMembership('org-001', 'Acme Sales', 'member')] },
       platform_role: 'learner',
       org_memberships: [createMembership('org-001', 'Acme Sales', 'member')],
       active_organisation_id: 'org-001',
@@ -256,7 +261,7 @@ const MOCK_AUTH_PROFILES: AuthProfileView[] = [
     description: 'Org admin for Acme Sales',
     session: {
       status: 'authenticated',
-      actor: { ...SEED_CURRENT_USER, role: 'admin' },
+      actor: { ...SEED_CURRENT_USER, role: 'admin', org_memberships: [createMembership('org-001', 'Acme Sales', 'org_admin')] },
       platform_role: 'admin',
       org_memberships: [createMembership('org-001', 'Acme Sales', 'org_admin')],
       active_organisation_id: 'org-001',
@@ -282,6 +287,10 @@ const MOCK_AUTH_PROFILES: AuthProfileView[] = [
           goals: ['Audit org content', 'Manage platform configuration'],
           practice_preferences: {},
         },
+        org_memberships: [
+          createMembership('org-001', 'Acme Sales', 'org_admin'),
+          createMembership('org-002', 'Acme Support', 'org_admin'),
+        ],
       },
       platform_role: 'superadmin',
       org_memberships: [
@@ -322,15 +331,20 @@ function getProfileDefinition(profileId = getStoredProfileId()): AuthProfileView
 function materializeSession(profileId = getStoredProfileId()): AuthSessionView {
   const profile = getProfileDefinition(profileId);
   const storedOrgId = getStoredActiveOrgId();
-  const availableOrgIds = new Set(profile.session.org_memberships.map((membership) => membership.organisation_id));
+  const actorId = profile.session.actor?.id ?? null;
+  const createdMemberships = actorId
+    ? _createdMemberships.filter((m) => m.organisation_id !== undefined)
+    : [];
+  const allMemberships = [...profile.session.org_memberships, ...createdMemberships];
+  const availableOrgIds = new Set(allMemberships.map((membership) => membership.organisation_id));
   const activeOrgId = storedOrgId && availableOrgIds.has(storedOrgId)
     ? storedOrgId
-    : profile.session.active_organisation_id;
+    : profile.session.active_organisation_id ?? allMemberships[0]?.organisation_id ?? null;
 
   return {
     ...profile.session,
     actor: profile.session.actor ? { ...profile.session.actor } : null,
-    org_memberships: profile.session.org_memberships.map((membership) => ({ ...membership })),
+    org_memberships: allMemberships.map((membership) => ({ ...membership })),
     active_organisation_id: activeOrgId,
     capabilities: [...profile.session.capabilities],
   };
@@ -338,7 +352,16 @@ function materializeSession(profileId = getStoredProfileId()): AuthSessionView {
 
 function syncMockUserFromSession(): AuthSessionView {
   const session = materializeSession();
-  _user = session.actor ? { ...session.actor } : { ...SEED_CURRENT_USER };
+  const actorId = session.actor?.id ?? null;
+  const createdMemberships = actorId
+    ? _createdMemberships.filter((m) => m.organisation_id !== undefined)
+    : [];
+  _user = session.actor
+    ? {
+        ...session.actor,
+        org_memberships: [...(session.actor.org_memberships ?? []), ...createdMemberships],
+      }
+    : { ...SEED_CURRENT_USER, org_memberships: [] };
   return session;
 }
 
@@ -1111,6 +1134,7 @@ export const mockDataProvider: DataProvider = {
         goals: cmd.goals ?? [],
         practice_preferences: cmd.practice_preferences ?? {},
       },
+      org_memberships: [],
     };
     _user = user;
     return user;
@@ -1143,6 +1167,62 @@ export const mockDataProvider: DataProvider = {
     setStoredProfileId('learner-alex');
     setStoredActiveOrgId('org-001');
     return { deleted_user_id: userId, status: 'deleted' };
+  },
+
+  // --- Organisations -------------------------------------------------------
+
+  async createOrganisation(cmd: CreateOrganisationCommand): Promise<OrganisationView> {
+    await delay();
+    const session = syncMockUserFromSession();
+    const actorId = session.actor?.id;
+    if (!actorId) {
+      throw new Error('Authentication required');
+    }
+    const existingSlug = _createdOrganisations.find((o) => o.slug === cmd.slug);
+    if (existingSlug) {
+      throw new Error('An organisation with this slug already exists');
+    }
+    const newOrg: OrganisationView = {
+      id: `org-${uid()}`,
+      name: cmd.name,
+      slug: cmd.slug,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    _createdOrganisations.push(newOrg);
+    const membership: OrganisationMembershipView = {
+      organisation_id: newOrg.id,
+      organisation_name: newOrg.name,
+      role: 'org_admin',
+      permissions: DEFAULT_ORG_ADMIN_PERMISSIONS,
+    };
+    _createdMemberships.push(membership);
+    setStoredActiveOrgId(newOrg.id);
+    return newOrg;
+  },
+
+  async listOrganisations(): Promise<OrganisationListView[]> {
+    await delay();
+    const session = syncMockUserFromSession();
+    const actorId = session.actor?.id;
+    if (!actorId) {
+      return [];
+    }
+    const memberships = _createdMemberships.filter(
+      (m) => m.organisation_id !== undefined,
+    );
+    return memberships
+      .map((m) => {
+        const org = _createdOrganisations.find((o) => o.id === m.organisation_id);
+        if (!org) return null;
+        return {
+          id: org.id,
+          name: org.name,
+          slug: org.slug,
+          member_count: 1,
+        };
+      })
+      .filter((org): org is OrganisationListView => org !== null);
   },
 
   // --- Taxonomy ------------------------------------------------------------

@@ -362,4 +362,35 @@ describe('Mock Data Provider Methods', () => {
     const session = await mockDataProvider.setActiveOrganisation('org-002');
     expect(session.active_organisation_id).toBe('org-002');
   });
+
+  it('createOrganisation is mockable', async () => {
+    const mockDataProvider = createMockDataProvider({
+      createOrganisation: vi.fn().mockResolvedValue({
+        id: 'org-new',
+        name: 'New Org',
+        slug: 'new-org',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      }),
+    });
+
+    const org = await mockDataProvider.createOrganisation({ name: 'New Org', slug: 'new-org' });
+    expect(org.name).toBe('New Org');
+    expect(org.slug).toBe('new-org');
+    expect(mockDataProvider.createOrganisation).toHaveBeenCalledWith({ name: 'New Org', slug: 'new-org' });
+  });
+
+  it('listOrganisations is mockable', async () => {
+    const mockDataProvider = createMockDataProvider({
+      listOrganisations: vi.fn().mockResolvedValue([
+        { id: 'org-001', name: 'Acme Sales', slug: 'acme-sales', member_count: 3 },
+        { id: 'org-002', name: 'Acme Support', slug: 'acme-support', member_count: 5 },
+      ]),
+    });
+
+    const orgs = await mockDataProvider.listOrganisations();
+    expect(orgs).toHaveLength(2);
+    expect(orgs[0].name).toBe('Acme Sales');
+    expect(orgs[1].member_count).toBe(5);
+  });
 });

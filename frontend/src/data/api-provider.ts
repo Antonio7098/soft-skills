@@ -197,25 +197,19 @@ function buildWebSocketUrl(path: string): string {
 }
 
 function deriveSessionFromUser(user: UserView): AuthSessionView {
-  const activeOrganisationId = getStoredActiveOrganisation();
+  const storedActiveOrgId = getStoredActiveOrganisation();
   const platformRole = user.role === 'superadmin'
     ? 'superadmin'
     : user.role === 'admin'
       ? 'admin'
       : 'learner';
-  const orgMemberships: AuthSessionView['org_memberships'] = activeOrganisationId
-    ? [{
-        organisation_id: activeOrganisationId,
-        organisation_name: activeOrganisationId,
-        role: platformRole === 'learner' ? 'member' : 'org_admin',
-        permissions: platformRole === 'learner'
-          ? ['collections:read', 'practice:run']
-          : ['admin:access', 'org:read', 'org:write', 'collections:read', 'practice:run'],
-      }]
-    : [];
-  const capabilities: AuthSessionView['capabilities'] = platformRole === 'learner'
-    ? ['app:access']
-    : ['app:access', 'admin:access'];
+  const orgMemberships = user.org_memberships ?? [];
+  const activeOrganisationId = storedActiveOrgId ?? orgMemberships[0]?.organisation_id ?? null;
+  const hasOrgAdmin = orgMemberships.some((m) => m.role === 'org_admin');
+  const capabilities: AuthSessionView['capabilities'] =
+    platformRole === 'learner' && !hasOrgAdmin
+      ? ['app:access']
+      : ['app:access', 'admin:access'];
 
   return {
     status: 'authenticated',
@@ -340,6 +334,12 @@ export const apiDataProvider: DataProvider = {
     result.then(() => clearStoredSession()).catch(() => {});
     return result;
   },
+
+  // --- Organisations --------------------------------------------------------
+  createOrganisation: (cmd) =>
+    request<import('./types').OrganisationView>('/organisations', { method: 'POST', body: JSON.stringify(cmd) }),
+  listOrganisations: () =>
+    request<import('./types').OrganisationListView[]>('/organisations'),
 
   // --- Taxonomy ------------------------------------------------------------
   getTaxonomy: () => request<TaxonomySnapshot>('/skills/catalog'),

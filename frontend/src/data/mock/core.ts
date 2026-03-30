@@ -823,6 +823,7 @@ export const SEED_CURRENT_USER: UserView = {
     goals: ['Improve stakeholder management', 'Prepare for behavioural interviews', 'Build executive presence'],
     practice_preferences: { session_length: '15-30 min', focus_area: 'stakeholder-management' },
   },
+  org_memberships: [],
 };
 
 export const SEED_ATTEMPT_HISTORY: AttemptHistoryItem[] = [

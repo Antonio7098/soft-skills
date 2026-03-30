@@ -105,8 +105,8 @@ class TypedLLMOutput:
         self._max_validation_retries = max_validation_retries
         self._repair_mode = repair_mode
         self._timeout_seconds = timeout_seconds
-        self._transport_schema_name = (
-            transport_schema_name or _default_transport_schema_name(model_type.__name__)
+        self._transport_schema_name = transport_schema_name or _default_transport_schema_name(
+            model_type.__name__
         )
 
     async def generate(
@@ -116,7 +116,7 @@ class TypedLLMOutput:
         messages: list[dict[str, str]],
         call_context: ProviderCallContext,
     ) -> TypedLLMResult:
-        retry_messages = list(messages)
+        retry_messages: list[dict[str, object]] = list(messages)
         last_payload: dict[str, Any] = {}
         transport_schema = JsonSchemaResponseFormat(
             name=self._transport_schema_name,
@@ -198,8 +198,7 @@ def _stringify_provider_content(content: str | dict[str, Any]) -> str:
 
 def _default_transport_schema_name(model_name: str) -> str:
     sanitized = [
-        character.lower() if character.isalnum() else "_"
-        for character in model_name.strip()
+        character.lower() if character.isalnum() else "_" for character in model_name.strip()
     ]
     collapsed = "".join(sanitized).strip("_")
     while "__" in collapsed:

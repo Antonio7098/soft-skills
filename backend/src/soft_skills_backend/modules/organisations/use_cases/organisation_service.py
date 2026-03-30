@@ -35,6 +35,7 @@ from soft_skills_backend.modules.organisations.contracts.commands import (
     UpdateOrgSkillCommand,
 )
 from soft_skills_backend.modules.organisations.contracts.views import (
+    OrganisationListView,
     OrganisationMemberView,
     OrganisationView,
     OrgCompetencyView,
@@ -124,6 +125,31 @@ class OrganisationService:
             created_at=created_org.created_at.isoformat(),
             updated_at=created_org.updated_at.isoformat(),
         )
+
+    def list_organisations_for_user(self, actor: Actor) -> list[OrganisationListView]:
+        """List all organisations the user belongs to."""
+        with self._repo._session_factory() as session:
+            memberships = (
+                session.query(OrganisationMembershipRecord).filter_by(user_id=actor.user_id).all()
+            )
+            orgs = []
+            for m in memberships:
+                org = session.get(OrganisationRecord, m.organisation_id)
+                if org:
+                    member_count = (
+                        session.query(OrganisationMembershipRecord)
+                        .filter_by(organisation_id=org.id)
+                        .count()
+                    )
+                    orgs.append(
+                        OrganisationListView(
+                            id=org.id,
+                            name=org.name,
+                            slug=org.slug,
+                            member_count=member_count,
+                        )
+                    )
+            return orgs
 
     def get_organisation(
         self,

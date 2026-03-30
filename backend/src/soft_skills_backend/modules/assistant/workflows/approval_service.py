@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from uuid import UUID
 
 from stageflow.tools.approval import ApprovalDecision
 
@@ -88,9 +89,7 @@ class AssistantApprovalService:
             actor=actor,
             request_id=request_id,
             status=(
-                AssistantApprovalStatus.APPROVED
-                if granted
-                else AssistantApprovalStatus.DENIED
+                AssistantApprovalStatus.APPROVED if granted else AssistantApprovalStatus.DENIED
             ),
             reason=reason,
         )
@@ -101,7 +100,5 @@ class AssistantApprovalService:
         return approval
 
 
-def _as_uuid(value: str):
-    from uuid import UUID
-
+def _as_uuid(value: str) -> UUID:
     return UUID(hex=value)

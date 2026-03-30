@@ -1129,7 +1129,7 @@ class AdminService:
             return None
         if trace.organisation_id and trace.organisation_id != resolved_org:
             trace_ids = self._analytics._organisation_trace_ids(
-                self._session_factory().__call__(), resolved_org
+                self._session_factory(), resolved_org
             )
             if trace_id not in trace_ids:
                 raise domain_error(

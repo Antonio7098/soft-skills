@@ -358,7 +358,9 @@ class AssistantWorkflowService:
                     "learner_context": json.dumps(
                         _build_compact_learner_context(
                             latest_user_message=latest_user_message,
-                            profile=cast(dict[str, Any], payload_from_inputs(ctx, "profile_enrich")),
+                            profile=cast(
+                                dict[str, Any], payload_from_inputs(ctx, "profile_enrich")
+                            ),
                             progress=cast(
                                 dict[str, Any], payload_from_inputs(ctx, "progress_enrich")
                             ),
@@ -406,7 +408,9 @@ class AssistantWorkflowService:
                 ctx=ctx,
                 execution=execution,
                 active=active,
-                rendered_prompt=cast(RenderedPrompt, payload_from_inputs(ctx, "planning_prompt_render")),
+                rendered_prompt=cast(
+                    RenderedPrompt, payload_from_inputs(ctx, "planning_prompt_render")
+                ),
                 history=cast(list[Any], payload_from_inputs(ctx, "history_enrich")),
                 practice_state=cast(
                     AssistantPracticeState,
@@ -515,40 +519,40 @@ class AssistantWorkflowService:
             )
 
         return Pipeline.from_stages(
-            stage("input_guard", input_guard, StageKind.GUARD),  # type: ignore[arg-type]
+            stage("input_guard", input_guard, StageKind.GUARD),
             stage(
                 "history_enrich",
-                history_enrich,  # type: ignore[arg-type]
+                history_enrich,
                 StageKind.ENRICH,
                 dependencies=("input_guard",),
             ),
             stage(
                 "profile_enrich",
-                profile_enrich,  # type: ignore[arg-type]
+                profile_enrich,
                 StageKind.ENRICH,
                 dependencies=("input_guard",),
             ),
             stage(
                 "progress_enrich",
-                progress_enrich,  # type: ignore[arg-type]
+                progress_enrich,
                 StageKind.ENRICH,
                 dependencies=("input_guard",),
             ),
             stage(
                 "attempts_enrich",
-                attempts_enrich,  # type: ignore[arg-type]
+                attempts_enrich,
                 StageKind.ENRICH,
                 dependencies=("input_guard",),
             ),
             stage(
                 "session_state_enrich",
-                session_state_enrich,  # type: ignore[arg-type]
+                session_state_enrich,
                 StageKind.ENRICH,
                 dependencies=("input_guard",),
             ),
             stage(
                 "planning_prompt_request",
-                planning_prompt_request,  # type: ignore[arg-type]
+                planning_prompt_request,
                 StageKind.TRANSFORM,
                 dependencies=(
                     "history_enrich",
@@ -560,13 +564,13 @@ class AssistantWorkflowService:
             ),
             stage(
                 "planning_prompt_render",
-                planning_prompt_render,  # type: ignore[arg-type]
+                planning_prompt_render,
                 StageKind.TRANSFORM,
                 dependencies=("planning_prompt_request",),
             ),
             stage(
                 ASSISTANT_RUNTIME_STAGE,
-                assistant_runtime,  # type: ignore[arg-type]
+                assistant_runtime,
                 StageKind.AGENT,
                 dependencies=(
                     "history_enrich",
@@ -576,19 +580,19 @@ class AssistantWorkflowService:
             ),
             stage(
                 "final_response_prompt_request",
-                final_response_prompt_request,  # type: ignore[arg-type]
+                final_response_prompt_request,
                 StageKind.TRANSFORM,
                 dependencies=(ASSISTANT_RUNTIME_STAGE,),
             ),
             stage(
                 "final_response_prompt_render",
-                final_response_prompt_render,  # type: ignore[arg-type]
+                final_response_prompt_render,
                 StageKind.TRANSFORM,
                 dependencies=("final_response_prompt_request",),
             ),
             stage(
                 "final_response_work",
-                final_response_work,  # type: ignore[arg-type]
+                final_response_work,
                 StageKind.WORK,
                 dependencies=(ASSISTANT_RUNTIME_STAGE, "final_response_prompt_render"),
             ),
@@ -638,7 +642,9 @@ class AssistantWorkflowService:
                     user_id=execution.actor.user_id,
                 ),
                 timeout_seconds=self._settings.llm_assistant_timeout_seconds,
-                tool_choice=required_tool_name if required_tool_name and not has_executed_tool else None,
+                tool_choice=required_tool_name
+                if required_tool_name and not has_executed_tool
+                else None,
             )
             if not completion.tool_calls:
                 if required_tool_name is not None and not has_executed_tool:
@@ -782,7 +788,9 @@ class AssistantWorkflowService:
         completion_tokens: int | None = None
         total_tokens: int | None = None
         start_time = perf_counter()
-        if not _should_rewrite_final_response(draft_response=draft_response, planning_messages=planning_messages):
+        if not _should_rewrite_final_response(
+            draft_response=draft_response, planning_messages=planning_messages
+        ):
             metrics = {
                 "latency_ms": 0,
                 "chunk_count": 0,
@@ -1154,8 +1162,7 @@ def _generation_clarification_for_invalid_tool_request(
     error: ValidationError,
 ) -> str | None:
     generation_tool_names = {
-        str(getattr(tool_call, "tool_name", ""))
-        for tool_call in raw_tool_calls
+        str(getattr(tool_call, "tool_name", "")) for tool_call in raw_tool_calls
     } & {"generate_collection", "generate_prompt_items"}
     if not generation_tool_names:
         return None

@@ -5,6 +5,7 @@ export type * from './catalog';
 export type * from './practice';
 export type * from './admin';
 export type * from './assistant';
+export type * from './organisation';
 
 export {
   type AuthSessionView,
@@ -19,6 +20,12 @@ export {
   type UpdateProfileCommand,
   type DeleteAccountResult,
 } from './identity';
+
+export {
+  type OrganisationView,
+  type OrganisationListView,
+  type CreateOrganisationCommand,
+} from './organisation';
 
 export {
   type SkillView,

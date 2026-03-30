@@ -41,6 +41,15 @@ class LearnerProfileView(BaseModel):
     practice_preferences: dict[str, str] = Field(default_factory=dict)
 
 
+class OrganisationMembershipView(BaseModel):
+    """User's organisation membership."""
+
+    organisation_id: str
+    organisation_name: str
+    role: str
+    permissions: list[str] = Field(default_factory=list)
+
+
 class UserView(BaseModel):
     """User response payload."""
 
@@ -50,6 +59,7 @@ class UserView(BaseModel):
     auth_provider: str
     created_at: datetime
     profile: LearnerProfileView
+    org_memberships: list[OrganisationMembershipView] = Field(default_factory=list)
 
 
 class DeleteAccountResult(BaseModel):

@@ -28,6 +28,7 @@ from soft_skills_backend.modules.organisations import (
     CreateOrgCompetencyCommand,
     CreateOrgRubricCommand,
     CreateOrgSkillCommand,
+    OrganisationListView,
     OrganisationMemberView,
     OrganisationView,
     OrgCompetencyView,
@@ -68,6 +69,13 @@ async def create_organisation(
         command=command,
     )
     return ok_response(request, payload)
+
+
+@router.get("", response_model=ApiEnvelope[list[OrganisationListView]])
+async def list_organisations(request: Request) -> ApiEnvelope[list[OrganisationListView]]:
+    actor = await require_actor(request)
+    service = get_organisation_service(request)
+    return ok_response(request, service.list_organisations_for_user(actor))
 
 
 @router.get("/{organisation_id}", response_model=ApiEnvelope[OrganisationView])

@@ -306,7 +306,9 @@ class AdminAgentWorkflowService:
 
         async def response_formulation(ctx: StageContext) -> Any:
             plan_payload = cast(_PlanPayload, payload_from_inputs(ctx, "query_planning"))
-            query_result = cast(QueryAdminDataResultView, payload_from_inputs(ctx, "query_execution"))
+            query_result = cast(
+                QueryAdminDataResultView, payload_from_inputs(ctx, "query_execution")
+            )
             message = _format_response_message(
                 question=execution.message,
                 intent_summary=plan_payload.plan.intent_summary,
@@ -351,28 +353,28 @@ class AdminAgentWorkflowService:
             )
 
         return Pipeline.from_stages(
-            stage("input_guard", input_guard, StageKind.GUARD),  # type: ignore[arg-type]
+            stage("input_guard", input_guard, StageKind.GUARD),
             stage(
                 "context_enrich",
-                context_enrich,  # type: ignore[arg-type]
+                context_enrich,
                 StageKind.ENRICH,
                 dependencies=("input_guard",),
             ),
             stage(
                 "query_planning",
-                query_planning,  # type: ignore[arg-type]
+                query_planning,
                 StageKind.AGENT,
                 dependencies=("context_enrich",),
             ),
             stage(
                 "query_execution",
-                query_execution,  # type: ignore[arg-type]
+                query_execution,
                 StageKind.WORK,
                 dependencies=("query_planning",),
             ),
             stage(
                 "response_formulation",
-                response_formulation,  # type: ignore[arg-type]
+                response_formulation,
                 StageKind.TRANSFORM,
                 dependencies=("query_planning", "query_execution"),
             ),

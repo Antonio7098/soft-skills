@@ -40,6 +40,7 @@ export interface UserView {
   readonly auth_provider: string;
   readonly created_at: string;
   readonly profile: LearnerProfileView;
+  readonly org_memberships: OrganisationMembershipView[];
 }
 
 export interface RegisterUserCommand {

@@ -17,10 +17,10 @@ from soft_skills_backend.platform.providers.openrouter_pricing import (
 router = APIRouter()
 
 
-@router.get("/providers/openrouter/models", response_model=ApiEnvelope[list[dict]])
+@router.get("/providers/openrouter/models", response_model=ApiEnvelope[list[dict[str, object]]])
 async def list_openrouter_models(
     request: Request, force_refresh: bool = False
-) -> ApiEnvelope[list[dict]]:
+) -> ApiEnvelope[list[dict[str, object]]]:
     """List available models from OpenRouter with pricing."""
     settings: Settings = request.app.state.settings
 

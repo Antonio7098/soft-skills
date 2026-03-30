@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
@@ -16,6 +17,7 @@ from soft_skills_backend.modules.assistant.domain.models import AssistantApprova
 from soft_skills_backend.modules.assistant.infra.realtime import AssistantRealtimeBroker
 from soft_skills_backend.modules.assistant.infra.repository import AssistantRepository
 from soft_skills_backend.modules.assistant.infra.sql_executor import AssistantSqlExecutor
+from soft_skills_backend.modules.assistant.contracts.views import QueryUserContextResultView
 from soft_skills_backend.modules.assistant.infra.sql_guard import AssistantSqlGuard
 from soft_skills_backend.modules.assistant.workflows.approval_service import (
     AssistantApprovalService,
@@ -131,11 +133,11 @@ class AssistantToolExecutor:
         try:
             if requires_approval:
                 await self._await_human_approval(
-                execution=execution,
-                tool_request=tool_request,
-                tool_call_id=tool_call.id,
-                arguments_payload=arguments_payload,
-            )
+                    execution=execution,
+                    tool_request=tool_request,
+                    tool_call_id=tool_call.id,
+                    arguments_payload=arguments_payload,
+                )
                 tool_call = self._repository.mark_tool_call_running(tool_call_id=tool_call.id)
             await self._publish_tool_started(
                 execution=execution,
@@ -325,35 +327,35 @@ class AssistantToolExecutor:
             )
             return result.model_dump(mode="json"), None
         if tool_request.tool_name == "start_collection_practice":
-            result = await self._practice_tools.start_collection_practice(
+            practice_result = await self._practice_tools.start_collection_practice(
                 actor=execution.actor,
                 session_id=execution.session_id,
                 request_id=execution.request_id,
                 trace_id=execution.trace_id,
                 args=StartCollectionPracticeToolArgs.model_validate(arguments),
             )
-            return {"practice": result.model_dump(mode="json")}, None
+            return {"practice": practice_result.model_dump(mode="json")}, None
         if tool_request.tool_name == "get_active_practice":
-            result = self._practice_tools.get_active_practice(
+            practice_result = self._practice_tools.get_active_practice(
                 actor=execution.actor,
                 session_id=execution.session_id,
             )
-            return {"practice": result.model_dump(mode="json")}, None
+            return {"practice": practice_result.model_dump(mode="json")}, None
         if tool_request.tool_name == "submit_active_practice_response":
-            result = await self._practice_tools.submit_active_practice_response(
+            practice_result = await self._practice_tools.submit_active_practice_response(
                 actor=execution.actor,
                 session_id=execution.session_id,
                 request_id=execution.request_id,
                 trace_id=execution.trace_id,
                 response_text=_optional_string(arguments, "response_text"),
             )
-            return {"practice": result.model_dump(mode="json")}, None
+            return {"practice": practice_result.model_dump(mode="json")}, None
         if tool_request.tool_name == "end_active_practice":
-            result = self._practice_tools.end_active_practice(
+            practice_result = self._practice_tools.end_active_practice(
                 actor=execution.actor,
                 session_id=execution.session_id,
             )
-            return {"practice": result.model_dump(mode="json")}, None
+            return {"practice": practice_result.model_dump(mode="json")}, None
         if tool_request.tool_name == "generate_collection":
             return await self._run_generate_collection(
                 parent_ctx=stage_ctx,
@@ -402,7 +404,7 @@ class AssistantToolExecutor:
             )
 
         pipeline = Pipeline.from_stages(
-            stage("generation", generation_stage, StageKind.WORK),  # type: ignore[arg-type]
+            stage("generation", generation_stage, StageKind.WORK),
             name="assistant_generate_collection",
         )
         result = await run_logged_subpipeline(
@@ -455,7 +457,7 @@ class AssistantToolExecutor:
             )
 
         pipeline = Pipeline.from_stages(
-            stage("generation", generation_stage, StageKind.WORK),  # type: ignore[arg-type]
+            stage("generation", generation_stage, StageKind.WORK),
             name="assistant_generate_prompt_items",
         )
         result = await run_logged_subpipeline(
@@ -576,8 +578,8 @@ def _summarize_generation_payload(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def stage_now():
-    from datetime import UTC, datetime
+def stage_now() -> datetime:
+    from datetime import UTC
 
     return datetime.now(UTC)
 
@@ -586,7 +588,11 @@ def _approval_message(tool_request: AssistantToolRequest) -> str:
     arguments = tool_request.arguments_payload()
     if tool_request.tool_name == "generate_collection":
         title = arguments.get("title")
-        return f"Approve generate_collection for '{title}'?" if isinstance(title, str) else "Approve generate_collection?"
+        return (
+            f"Approve generate_collection for '{title}'?"
+            if isinstance(title, str)
+            else "Approve generate_collection?"
+        )
     if tool_request.tool_name == "generate_prompt_items":
         collection_id = arguments.get("collection_id")
         return (

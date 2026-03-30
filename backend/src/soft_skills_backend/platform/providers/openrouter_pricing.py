@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -20,7 +20,7 @@ def get_cached_pricing() -> dict[str, dict[str, float]]:
     """Get cached pricing from file, or empty dict if none."""
     if _PRICING_CACHE_FILE.exists():
         try:
-            return json.loads(_PRICING_CACHE_FILE.read_text())
+            return cast(dict[str, dict[str, float]], json.loads(_PRICING_CACHE_FILE.read_text()))
         except Exception:
             return {}
     return {}
@@ -32,7 +32,7 @@ def save_pricing_cache(pricing: dict[str, dict[str, float]]) -> None:
     get_cached_pricing.cache_clear()
 
 
-def _extract_price_per_1m(pricing: dict | None) -> float | None:
+def _extract_price_per_1m(pricing: dict[str, object] | None) -> float | None:
     """Extract price per 1M tokens from OpenRouter pricing object."""
     if not pricing:
         return None
@@ -42,7 +42,7 @@ def _extract_price_per_1m(pricing: dict | None) -> float | None:
     return None
 
 
-def _extract_completion_price_per_1m(pricing: dict | None) -> float | None:
+def _extract_completion_price_per_1m(pricing: dict[str, object] | None) -> float | None:
     """Extract completion price per 1M tokens from OpenRouter pricing object."""
     if not pricing:
         return None
@@ -67,7 +67,7 @@ def fetch_and_cache_pricing(settings: Settings) -> dict[str, dict[str, float]]:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    async def _fetch():
+    async def _fetch() -> dict[str, object]:
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 "https://openrouter.ai/api/v1/models",
@@ -75,16 +75,23 @@ def fetch_and_cache_pricing(settings: Settings) -> dict[str, dict[str, float]]:
                 timeout=60.0,
             )
             response.raise_for_status()
-            return response.json()
+            return cast(dict[str, object], response.json())
 
     data = loop.run_until_complete(_fetch())
 
-    for m in data.get("data", []):
-        if m.get("id") and m.get("pricing"):
-            model_id = m["id"]
+    for m in cast(list[dict[str, object]], data.get("data", [])):
+        model_id = cast(str, m.get("id"))
+        pricing = m.get("pricing")
+        if model_id and pricing:
             cache[model_id] = {
-                "prompt_price_per_1m": _extract_price_per_1m(m.get("pricing")) or 0,
-                "completion_price_per_1m": _extract_completion_price_per_1m(m.get("pricing")) or 0,
+                "prompt_price_per_1m": _extract_price_per_1m(
+                    cast(dict[str, object] | None, pricing)
+                )
+                or 0,
+                "completion_price_per_1m": _extract_completion_price_per_1m(
+                    cast(dict[str, object] | None, pricing)
+                )
+                or 0,
             }
 
     save_pricing_cache(cache)

@@ -60,9 +60,7 @@ class AssistantSqlGuard:
         return GuardedAssistantQuery(
             sql=sql,
             scoped_sql=(
-                "SELECT * FROM "
-                f"({scoped_sql}) AS assistant_result "
-                "LIMIT :_assistant_row_limit"
+                f"SELECT * FROM ({scoped_sql}) AS assistant_result LIMIT :_assistant_row_limit"
             ),
             params=dict(command.params),
             source_views=source_views,
@@ -177,13 +175,13 @@ class AssistantSqlGuard:
                 continue
             if stripped.endswith(".*"):
                 qualifier = stripped[:-2]
-                view_name = aliases.get(qualifier)
-                if view_name is None:
+                expanded_view_name: str | None = aliases.get(qualifier)
+                if expanded_view_name is None:
                     expanded_items.append(item)
                     continue
                 expanded_items.extend(
                     f"{qualifier}.{column}"
-                    for column in self._schema_registry.get_view(view_name).columns
+                    for column in self._schema_registry.get_view(expanded_view_name).columns
                 )
                 changed = True
                 continue
@@ -211,15 +209,17 @@ class AssistantSqlGuard:
         qualifier = match.group("qualifier")
         column = match.group("column")
         alias = match.group("alias")
+        view_name: str
         if qualifier is None:
             unique_views = tuple(dict.fromkeys(aliases.values()))
             if len(unique_views) != 1:
                 return item
             view_name = unique_views[0]
         else:
-            view_name = aliases.get(qualifier)
-            if view_name is None:
+            resolved_view_name = aliases.get(qualifier)
+            if resolved_view_name is None:
                 return item
+            view_name = resolved_view_name
 
         resolved_column = self._schema_registry.resolve_column_name(view_name, column)
         if resolved_column is None or resolved_column == column:
@@ -255,13 +255,13 @@ class AssistantSqlGuard:
                     "(:organisation_id IS NULL AND organisation_id IS NULL))"
                 )
             if view_name == "assistant_safe_collections_v":
-                predicates.append("(author_user_id = :user_id OR lifecycle_state = 'published_public')")
+                predicates.append(
+                    "(author_user_id = :user_id OR lifecycle_state = 'published_public')"
+                )
             if "user_id" in view.scope_columns:
                 predicates.append("user_id = :user_id")
             return (
-                f"{keyword} "
-                f"(SELECT * FROM {view_name} WHERE {' AND '.join(predicates)}) "
-                f"AS {alias}"
+                f"{keyword} (SELECT * FROM {view_name} WHERE {' AND '.join(predicates)}) AS {alias}"
             )
 
         return _RELATION_PATTERN.sub(replace, sql)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from time import perf_counter
-from typing import Any
+from typing import Any, Mapping, cast
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -86,4 +86,4 @@ class AdminAgentSqlExecutor:
                 details={"reason": str(exc)},
             ) from exc
         duration_ms = int((perf_counter() - started) * 1000)
-        return self._redactor.redact_rows(rows), duration_ms
+        return self._redactor.redact_rows(cast(list[Mapping[str, Any]], rows)), duration_ms
