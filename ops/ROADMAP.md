@@ -286,6 +286,25 @@ Sprint 13 was too large and has been split into 9 focused sprints for better man
 
 ---
 
+## Sprint 15: Prompt & Rubric Versioning Restructure
+
+**Purpose:** Restructure prompts and rubrics from flat family-based versioning to explicit parent-child relationships with org scoping support, and add org-level prompt/rubric config overrides.
+
+**Key Outcomes:**
+- Prompt (parent) → PromptVersion (child) model with explicit FKs
+- Rubric (parent) → RubricVersion (child) model with explicit FKs
+- Org scoping: NULL organisation_id = global, non-NULL = org-scoped
+- OrganisationPromptConfig for org-level prompt overrides by LLMTaskKind
+- OrganisationRubricConfig for org-level rubric overrides by skill_slug
+- Runtime resolution: org config → global default fallback
+- config.py updated to use UUID + int FK pairs instead of string versions
+
+**Exit Criteria:** The backend supports explicit prompt/rubric versioning with org scoping and org-level overrides without breaking existing assessment or generation flows.
+
+**Detail:** [ops/sprints/sprint-15-prompt-rubric-versioning.md](ops/sprints/sprint-15-prompt-rubric-versioning.md)
+
+---
+
 ## Rules For Using This Roadmap
 
 - Frontend is intentionally omitted here and can move on its own cadence.

@@ -32,12 +32,13 @@ contracts, or sequencing change.
 20. [Sprint 13g: User Management API](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13g-user-management-api.md)
 21. [Sprint 13h: User Cohort Analytics](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13h-user-cohort-analytics.md)
 22. [Sprint 14: Admin Super Agent](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-14-admin-super-agent.md)
+23. [Sprint 15: Prompt & Rubric Versioning Restructure](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-15-prompt-rubric-versioning.md)
 
 ## Active Sprint
 
 The current active sprint for backend execution is:
 
-- [Sprint 13b: Monitoring/Telemetry](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-13b-monitoring-telemetry.md)
+- [Sprint 15: Prompt & Rubric Versioning Restructure](/home/antonioborgerees/df/soft-skills/ops/sprints/sprint-15-prompt-rubric-versioning.md)
 
 ## Common Rules
 
