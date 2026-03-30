@@ -284,6 +284,7 @@ def build_container(settings: Settings) -> AppContainer:
             catalog_service=catalog_service,
             practice_service=practice_service,
             progression_service=progression_service,
+            taxonomy_service=taxonomy_service,
             stageflow_runtime=stageflow_runtime,
             prompt_registry=prompt_registry,
             settings=settings,

@@ -32,6 +32,43 @@ class AssistantSchemaRegistry:
             view.name: view
             for view in (
                 AssistantViewSchema(
+                    name="assistant_safe_skills_v",
+                    description=(
+                        "Available platform skills visible within the current organisation."
+                    ),
+                    columns=(
+                        "organisation_id",
+                        "skill_slug",
+                        "name",
+                        "description",
+                    ),
+                    scope_columns=("organisation_id",),
+                    examples=(
+                        "SELECT skill_slug, name "
+                        "FROM assistant_safe_skills_v "
+                        "ORDER BY name ASC",
+                    ),
+                ),
+                AssistantViewSchema(
+                    name="assistant_safe_competencies_v",
+                    description=(
+                        "Available platform competencies visible within the current organisation."
+                    ),
+                    columns=(
+                        "organisation_id",
+                        "competency_slug",
+                        "name",
+                        "description",
+                        "skill_slugs",
+                    ),
+                    scope_columns=("organisation_id",),
+                    examples=(
+                        "SELECT competency_slug, name, skill_slugs "
+                        "FROM assistant_safe_competencies_v "
+                        "ORDER BY name ASC",
+                    ),
+                ),
+                AssistantViewSchema(
                     name="assistant_safe_collections_v",
                     description=(
                         "Collections visible to the learner within the current organisation."
@@ -159,6 +196,14 @@ class AssistantSchemaRegistry:
             ),
         )
         self._column_aliases: dict[str, dict[str, str]] = {
+            "assistant_safe_skills_v": {
+                "slug": "skill_slug",
+                "skill_name": "name",
+            },
+            "assistant_safe_competencies_v": {
+                "slug": "competency_slug",
+                "competency_name": "name",
+            },
             "assistant_safe_collections_v": {
                 "id": "collection_id",
                 "collection_name": "title",

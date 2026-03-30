@@ -59,6 +59,7 @@ from soft_skills_backend.modules.assistant.workflows.tools import (
 from soft_skills_backend.modules.catalog import CatalogService
 from soft_skills_backend.modules.practice import PracticeService
 from soft_skills_backend.modules.progression import ProgressionService
+from soft_skills_backend.modules.taxonomy import TaxonomyService
 from soft_skills_backend.platform.workflows.stageflow import (
     StageflowPipelineSupport,
     StageflowStageResult,
@@ -120,6 +121,7 @@ class AssistantWorkflowService:
         catalog_service: CatalogService,
         practice_service: PracticeService,
         progression_service: ProgressionService,
+        taxonomy_service: TaxonomyService,
         stageflow_runtime: StageflowRuntime,
         prompt_registry: PromptRegistry,
         settings: Settings,
@@ -132,6 +134,7 @@ class AssistantWorkflowService:
         self._sql_guard = sql_guard
         self._sql_executor = sql_executor
         self._progression = progression_service
+        self._taxonomy = taxonomy_service
         self._prompt_registry = prompt_registry
         self._stageflow = StageflowPipelineSupport.from_runtime(stageflow_runtime)
         self._prompt_security = PromptSecurityPolicy(
@@ -370,6 +373,9 @@ class AssistantWorkflowService:
                         self._schema_registry.render_prompt_context()
                         if include_read_schema
                         else "Not needed for this turn unless you choose query_user_context."
+                    ),
+                    "taxonomy_context": self._taxonomy.render_prompt_context(
+                        execution.actor.organisation_id
                     ),
                     "practice_state": cast(
                         AssistantPracticeState,

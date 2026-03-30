@@ -627,3 +627,18 @@ class TaxonomyService:
                 .all()
             ]
         return TaxonomySnapshot(skills=skills, competencies=competencies, rubrics=rubrics)
+
+    def render_prompt_context(self, organisation_id: str | None = None) -> str:
+        return render_taxonomy_prompt_context(self.snapshot(organisation_id))
+
+
+def render_taxonomy_prompt_context(snapshot: TaxonomySnapshot) -> str:
+    skill_slugs = ", ".join(skill.slug for skill in snapshot.skills) or "none"
+    sections: list[str] = [f"Skills: {skill_slugs}", "Competencies:"]
+    for competency in snapshot.competencies:
+        skills = ", ".join(competency.skill_slugs) if competency.skill_slugs else "none"
+        sections.append(f"- {competency.slug}: [{skills}]")
+    sections.append("Rules:")
+    sections.append("- Use these slugs exactly when choosing skills or competencies.")
+    sections.append("- Do not invent skills or competencies that are not listed above.")
+    return "\n".join(sections)

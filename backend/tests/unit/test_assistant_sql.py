@@ -11,11 +11,14 @@ from soft_skills_backend.shared.errors import AppError
 def test_assistant_schema_registry_contains_allowlisted_views() -> None:
     registry = AssistantSchemaRegistry()
 
+    assert "assistant_safe_skills_v" in registry.allowed_views()
+    assert "assistant_safe_competencies_v" in registry.allowed_views()
     assert "assistant_safe_attempt_summaries_v" in registry.allowed_views()
     assert "overall_score" in registry.get_view("assistant_safe_attempt_summaries_v").columns
     assert registry.join_hints
     assert registry.resolve_view_name("assistant_safe_collections_v1") == "assistant_safe_collections_v"
     assert registry.resolve_column_name("assistant_safe_collections_v", "collection_name") == "title"
+    assert registry.resolve_column_name("assistant_safe_skills_v", "slug") == "skill_slug"
     assert "Allowed learner-safe views" in registry.render_prompt_context()
 
 
@@ -75,6 +78,24 @@ def test_assistant_sql_guard_canonicalizes_collection_aliases() -> None:
     assert guarded.source_views == ("assistant_safe_collections_v",)
     assert "assistant_safe_collections_v" in guarded.sql
     assert "title AS collection_name" in guarded.sql
+
+
+def test_assistant_sql_guard_accepts_taxonomy_skill_view() -> None:
+    guard = AssistantSqlGuard(
+        schema_registry=AssistantSchemaRegistry(),
+        row_limit=25,
+    )
+
+    guarded = guard.validate_and_scope(
+        QueryUserContextCommand(
+            sql="SELECT slug, skill_name FROM assistant_safe_skills_v ORDER BY name ASC"
+        )
+    )
+
+    assert guarded.source_views == ("assistant_safe_skills_v",)
+    assert "skill_slug AS slug" in guarded.sql
+    assert "name AS skill_name" in guarded.sql
+    assert "organisation_id = :organisation_id" in guarded.scoped_sql
 
 
 def test_assistant_sql_guard_rejects_disallowed_patterns() -> None:
