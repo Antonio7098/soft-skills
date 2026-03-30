@@ -30,20 +30,29 @@ class PromptRepositoryV2:
     ) -> tuple[str, datetime]:
         """Get or create a prompt parent record, return (id, created_at)."""
         with self._session_factory() as session:
-            from soft_skills_backend.platform.db.models import PromptVersionRecord
+            from soft_skills_backend.platform.db.models import PromptRecord
 
             result = (
-                session.query(PromptVersionRecord)
+                session.query(PromptRecord)
                 .filter(
-                    PromptVersionRecord.name == name,
-                    PromptVersionRecord.prompt_type == prompt_type,
+                    PromptRecord.name == name,
+                    PromptRecord.organisation_id == organisation_id,
                 )
                 .first()
             )
             now = datetime.now(UTC)
-            if result is None:
-                return (name, now)
-            return (str(result.id), result.created_at)
+            if result is not None:
+                return (result.id, result.created_at)
+            record = PromptRecord(
+                id=name,
+                name=name,
+                prompt_type=prompt_type,
+                organisation_id=organisation_id,
+                variables_schema={},
+            )
+            session.add(record)
+            session.commit()
+            return (name, now)
 
     def create_version(
         self,
@@ -78,14 +87,27 @@ class PromptRepositoryV2:
         if self._builtins_seeded:
             return
         with self._session_factory() as session:
-            from soft_skills_backend.platform.db.models import PromptVersionRecord
+            from soft_skills_backend.platform.db.models import PromptRecord, PromptVersionRecord
 
             for definition in definitions:
+                prompt_record = (
+                    session.query(PromptRecord).filter(PromptRecord.name == definition.name).first()
+                )
+                if prompt_record is None:
+                    prompt_record = PromptRecord(
+                        id=definition.name,
+                        name=definition.name,
+                        prompt_type=definition.prompt_type,
+                        variables_schema=definition.variables_schema,
+                    )
+                    session.add(prompt_record)
+                    session.flush()
+
                 existing = (
                     session.query(PromptVersionRecord)
                     .filter(
+                        PromptVersionRecord.prompt_id == definition.name,
                         PromptVersionRecord.version == definition.version,
-                        PromptVersionRecord.template == definition.template,
                     )
                     .first()
                 )
@@ -106,12 +128,15 @@ class PromptRepositoryV2:
     def get_by_name_version(self, name: str, version: str) -> PromptVersionRecord | None:
         """Get prompt version by parent name and version string."""
         with self._session_factory() as session:
-            from soft_skills_backend.platform.db.models import PromptVersionRecord
+            from soft_skills_backend.platform.db.models import PromptRecord, PromptVersionRecord
 
+            prompt_record = session.query(PromptRecord).filter(PromptRecord.name == name).first()
+            if prompt_record is None:
+                return None
             return (
                 session.query(PromptVersionRecord)
                 .filter(
-                    PromptVersionRecord.prompt_id == name,
+                    PromptVersionRecord.prompt_id == prompt_record.id,
                     PromptVersionRecord.version == version,
                 )
                 .first()
@@ -127,11 +152,14 @@ class PromptRepositoryV2:
     def list_by_name(self, name: str) -> list[PromptVersionRecord]:
         """List all versions of a prompt by parent name."""
         with self._session_factory() as session:
-            from soft_skills_backend.platform.db.models import PromptVersionRecord
+            from soft_skills_backend.platform.db.models import PromptRecord, PromptVersionRecord
 
+            prompt_record = session.query(PromptRecord).filter(PromptRecord.name == name).first()
+            if prompt_record is None:
+                return []
             return (
                 session.query(PromptVersionRecord)
-                .filter(PromptVersionRecord.prompt_id == name)
+                .filter(PromptVersionRecord.prompt_id == prompt_record.id)
                 .order_by(PromptVersionRecord.version.desc())
                 .all()
             )

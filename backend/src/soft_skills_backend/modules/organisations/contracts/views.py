@@ -56,10 +56,9 @@ class OrgRubricView(BaseModel):
     """Org-specific rubric view."""
 
     rubric_id: str
-    family: str
-    version: str
+    skill_slug: str
     content_type: str
     schema_version: str
     name: str
-    criteria: list[str] = Field(default_factory=list)
+    description: str | None = None
     organisation_id: str

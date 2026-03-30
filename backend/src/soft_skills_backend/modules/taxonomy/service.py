@@ -448,42 +448,45 @@ class TaxonomyService:
                         )
             if session.query(RubricRecord).count() == 0:
                 for rubric_seed in RUBRIC_SEEDS:
+                    rubric_id = rubric_seed.rubric_id
+                    criteria_data = [
+                        {
+                            "criterion_ref": criterion.criterion_ref,
+                            "skill_slug": criterion.skill_slug,
+                            "title": criterion.title,
+                            "description": criterion.description,
+                            "weight": criterion.weight,
+                            "required": criterion.required,
+                            "position": criterion.position,
+                            "levels": [
+                                {
+                                    f"level_{level.level}": {
+                                        "description": level.description,
+                                        "examples": list(level.examples),
+                                    }
+                                }
+                                for level in criterion.levels
+                            ],
+                        }
+                        for criterion in rubric_seed.criteria
+                    ]
                     session.add(
                         RubricRecord(
-                            rubric_id=rubric_seed.rubric_id,
-                            family=rubric_seed.family,
-                            version=rubric_seed.version,
+                            id=rubric_id,
+                            skill_slug="general",
+                            name=rubric_seed.name,
                             content_type=rubric_seed.content_type,
                             schema_version=rubric_seed.schema_version,
-                            name=rubric_seed.name,
-                            criteria=[criterion.skill_slug for criterion in rubric_seed.criteria],
                         )
                     )
-            if session.query(RubricCriterionRecord).count() == 0:
-                for rubric_seed in RUBRIC_SEEDS:
-                    for criterion in rubric_seed.criteria:
-                        session.add(
-                            RubricCriterionRecord(
-                                rubric_id=rubric_seed.rubric_id,
-                                rubric_version=rubric_seed.version,
-                                criterion_ref=criterion.criterion_ref,
-                                skill_slug=criterion.skill_slug,
-                                title=criterion.title,
-                                description=criterion.description,
-                                weight=criterion.weight,
-                                required=criterion.required,
-                                position=criterion.position,
-                                levels_json=[
-                                    {
-                                        f"level_{level.level}": {
-                                            "description": level.description,
-                                            "examples": list(level.examples),
-                                        }
-                                    }
-                                    for level in criterion.levels
-                                ],
-                            )
+                    session.add(
+                        RubricVersionRecord(
+                            rubric_id=rubric_id,
+                            version=rubric_seed.version,
+                            criteria=criteria_data,
+                            status="published",
                         )
+                    )
             session.commit()
 
         self._workflow_events.record(
@@ -613,9 +616,8 @@ class TaxonomyService:
 
             rubrics = [
                 RubricView(
-                    rubric_id=record.rubric_id,
-                    family=record.family,
-                    version=record.version,
+                    rubric_id=record.id,
+                    skill_slug=record.skill_slug,
                     content_type=record.content_type,
                     schema_version=record.schema_version,
                     name=record.name,
@@ -623,7 +625,7 @@ class TaxonomyService:
                 )
                 for record in session.query(RubricRecord)
                 .filter(*rubric_filters)
-                .order_by(RubricRecord.rubric_id)
+                .order_by(RubricRecord.id)
                 .all()
             ]
         return TaxonomySnapshot(skills=skills, competencies=competencies, rubrics=rubrics)

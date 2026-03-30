@@ -1,4 +1,4 @@
-"""Prompt registry persistence."""
+"""Prompt registry persistence with parent-child model."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.platform.db.models import (
+    PromptRecord,
     PromptRenderEventRecord,
     PromptRenderMetricsRecord,
     PromptVersionRecord,
@@ -18,11 +19,40 @@ if TYPE_CHECKING:
 
 
 class PromptRepository:
-    """Persist and retrieve prompt version records."""
+    """Persist and retrieve prompt version records with parent-child model."""
 
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
         self._builtins_seeded = False
+
+    def _get_or_create_prompt_record(
+        self,
+        session: Session,
+        name: str,
+        prompt_type: str,
+        organisation_id: str | None = None,
+    ) -> PromptRecord:
+        """Get or create a PromptRecord parent and return it."""
+        existing = (
+            session.query(PromptRecord)
+            .filter(
+                PromptRecord.name == name,
+                PromptRecord.organisation_id == organisation_id,
+            )
+            .first()
+        )
+        if existing is not None:
+            return existing
+
+        record = PromptRecord(
+            id=name,
+            name=name,
+            prompt_type=prompt_type,
+            organisation_id=organisation_id,
+            variables_schema={},
+        )
+        session.add(record)
+        return record
 
     def create(
         self,
@@ -34,12 +64,15 @@ class PromptRepository:
         output_schema: dict[str, Any] | None,
         status: str,
         parent_version_id: int | None = None,
+        organisation_id: str | None = None,
     ) -> PromptVersionRecord:
         with self._session_factory() as session:
+            prompt_record = self._get_or_create_prompt_record(
+                session, name, prompt_type, organisation_id
+            )
             record = PromptVersionRecord(
-                name=name,
+                prompt_id=prompt_record.id,
                 version=version,
-                prompt_type=prompt_type,
                 template=template,
                 variables_schema=variables_schema,
                 output_schema=output_schema,
@@ -56,10 +89,13 @@ class PromptRepository:
             return
         with self._session_factory() as session:
             for definition in definitions:
+                prompt_record = self._get_or_create_prompt_record(
+                    session, definition.name, definition.prompt_type
+                )
                 existing = (
                     session.query(PromptVersionRecord)
                     .filter(
-                        PromptVersionRecord.name == definition.name,
+                        PromptVersionRecord.prompt_id == prompt_record.id,
                         PromptVersionRecord.version == definition.version,
                     )
                     .first()
@@ -68,9 +104,8 @@ class PromptRepository:
                     continue
                 session.add(
                     PromptVersionRecord(
-                        name=definition.name,
+                        prompt_id=prompt_record.id,
                         version=definition.version,
-                        prompt_type=definition.prompt_type,
                         template=definition.template,
                         variables_schema=definition.variables_schema,
                         output_schema=definition.output_schema,
@@ -82,10 +117,13 @@ class PromptRepository:
 
     def get_by_name_version(self, name: str, version: str) -> PromptVersionRecord | None:
         with self._session_factory() as session:
+            prompt_record = session.query(PromptRecord).filter(PromptRecord.name == name).first()
+            if prompt_record is None:
+                return None
             return (
                 session.query(PromptVersionRecord)
                 .filter(
-                    PromptVersionRecord.name == name,
+                    PromptVersionRecord.prompt_id == prompt_record.id,
                     PromptVersionRecord.version == version,
                 )
                 .first()
@@ -95,47 +133,60 @@ class PromptRepository:
         with self._session_factory() as session:
             return session.get(PromptVersionRecord, id)
 
+    def get_prompt_type(self, name: str) -> str:
+        with self._session_factory() as session:
+            prompt_record = session.query(PromptRecord).filter(PromptRecord.name == name).first()
+            if prompt_record is None:
+                return ""
+            return prompt_record.prompt_type
+
     def list_by_name(self, name: str) -> list[PromptVersionRecord]:
         with self._session_factory() as session:
+            prompt_record = session.query(PromptRecord).filter(PromptRecord.name == name).first()
+            if prompt_record is None:
+                return []
             return (
                 session.query(PromptVersionRecord)
-                .filter(PromptVersionRecord.name == name)
+                .filter(PromptVersionRecord.prompt_id == prompt_record.id)
                 .order_by(PromptVersionRecord.version.desc())
                 .all()
             )
 
     def list_latest_by_name(self) -> list[PromptVersionRecord]:
         with self._session_factory() as session:
-            subquery = (
-                session.query(
-                    PromptVersionRecord.name,
-                    PromptVersionRecord.version,
+            prompt_records = session.query(PromptRecord).all()
+            result: list[PromptVersionRecord] = []
+            for prompt_record in prompt_records:
+                latest = (
+                    session.query(PromptVersionRecord)
+                    .filter(
+                        PromptVersionRecord.prompt_id == prompt_record.id,
+                        PromptVersionRecord.status == "published",
+                    )
+                    .order_by(PromptVersionRecord.version.desc())
+                    .first()
                 )
-                .filter(PromptVersionRecord.status == "published")
-                .order_by(PromptVersionRecord.name, PromptVersionRecord.version.desc())
-                .distinct(PromptVersionRecord.name)
-            ).subquery()
+                if latest is not None:
+                    result.append(latest)
+            return result
 
-            query = session.query(PromptVersionRecord).join(
-                subquery,
-                (PromptVersionRecord.name == subquery.c.name)
-                & (PromptVersionRecord.version == subquery.c.version),
-            )
-            return query.all()
-
-    def list_all_names(self) -> list[tuple[str, PromptVersionRecord]]:
+    def list_all_names(self) -> list[tuple[str, str, PromptVersionRecord]]:
         with self._session_factory() as session:
-            records = (
-                session.query(PromptVersionRecord)
-                .filter(PromptVersionRecord.status == "published")
-                .order_by(PromptVersionRecord.name, PromptVersionRecord.version.desc())
-                .all()
-            )
-            name_to_latest: dict[str, PromptVersionRecord] = {}
-            for record in records:
-                if record.name not in name_to_latest:
-                    name_to_latest[record.name] = record
-            return list(name_to_latest.items())
+            result: list[tuple[str, str, PromptVersionRecord]] = []
+            prompt_records = session.query(PromptRecord).all()
+            for prompt_record in prompt_records:
+                latest = (
+                    session.query(PromptVersionRecord)
+                    .filter(
+                        PromptVersionRecord.prompt_id == prompt_record.id,
+                        PromptVersionRecord.status == "published",
+                    )
+                    .order_by(PromptVersionRecord.version.desc())
+                    .first()
+                )
+                if latest is not None:
+                    result.append((prompt_record.name, prompt_record.prompt_type, latest))
+            return result
 
     def update(
         self,

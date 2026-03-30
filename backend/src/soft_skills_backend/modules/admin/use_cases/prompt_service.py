@@ -42,12 +42,12 @@ class PromptService:
         return [
             PromptSummaryView(
                 name=name,
-                prompt_type=record.prompt_type,
+                prompt_type=prompt_type,
                 latest_version=record.version,
                 status=record.status,
                 created_at=record.created_at.isoformat(),
             )
-            for name, record in name_records
+            for name, prompt_type, record in name_records
         ]
 
     def list_versions(self, actor: Actor, name: str) -> list[PromptVersionView]:
@@ -58,9 +58,9 @@ class PromptService:
         return [
             PromptVersionView(
                 id=r.id,
-                name=r.name,
+                name=name,
                 version=r.version,
-                prompt_type=r.prompt_type,
+                prompt_type=self._prompts.get_prompt_type(name),
                 template=r.template,
                 variables_schema=r.variables_schema,
                 output_schema=r.output_schema,
@@ -81,9 +81,9 @@ class PromptService:
             return None
         return PromptVersionView(
             id=record.id,
-            name=record.name,
+            name=name,
             version=record.version,
-            prompt_type=record.prompt_type,
+            prompt_type=self._prompts.get_prompt_type(name),
             template=record.template,
             variables_schema=record.variables_schema,
             output_schema=record.output_schema,
@@ -109,9 +109,9 @@ class PromptService:
         )
         return PromptVersionView(
             id=record.id,
-            name=record.name,
+            name=command.name,
             version=record.version,
-            prompt_type=record.prompt_type,
+            prompt_type=command.prompt_type,
             template=record.template,
             variables_schema=record.variables_schema,
             output_schema=record.output_schema,
@@ -160,9 +160,9 @@ class PromptService:
             return None
         return PromptVersionView(
             id=updated.id,
-            name=updated.name,
+            name=name,
             version=updated.version,
-            prompt_type=updated.prompt_type,
+            prompt_type=self._prompts.get_prompt_type(name),
             template=updated.template,
             variables_schema=updated.variables_schema,
             output_schema=updated.output_schema,
@@ -196,9 +196,9 @@ class PromptService:
             return None
         return PromptVersionView(
             id=updated.id,
-            name=updated.name,
+            name=name,
             version=updated.version,
-            prompt_type=updated.prompt_type,
+            prompt_type=self._prompts.get_prompt_type(name),
             template=updated.template,
             variables_schema=updated.variables_schema,
             output_schema=updated.output_schema,
@@ -232,9 +232,9 @@ class PromptService:
             return None
         return PromptVersionView(
             id=updated.id,
-            name=updated.name,
+            name=name,
             version=updated.version,
-            prompt_type=updated.prompt_type,
+            prompt_type=self._prompts.get_prompt_type(name),
             template=updated.template,
             variables_schema=updated.variables_schema,
             output_schema=updated.output_schema,
@@ -255,8 +255,8 @@ class PromptService:
         if metrics is None:
             return PromptAnalyticsView(
                 prompt_version_id=record.id,
-                name=record.name,
-                version=record.version,
+                name=name,
+                version=version,
                 render_count=0,
                 success_count=0,
                 failure_count=0,
@@ -266,8 +266,8 @@ class PromptService:
             )
         return PromptAnalyticsView(
             prompt_version_id=metrics.prompt_version_id,
-            name=record.name,
-            version=record.version,
+            name=name,
+            version=version,
             render_count=metrics.render_count,
             success_count=metrics.success_count,
             failure_count=metrics.failure_count,

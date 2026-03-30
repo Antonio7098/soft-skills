@@ -34,24 +34,52 @@ class GroqLLMProvider(OpenAICompatibleLLMProvider):
             model = self._get_task_model(settings, task)
             if model:
                 return model
+        elif settings.llm_marking_per_skill_model:
+            return settings.llm_marking_per_skill_model
+        elif settings.llm_marking_aggregation_model:
+            return settings.llm_marking_aggregation_model
+        elif settings.llm_creator_blueprint_model:
+            return settings.llm_creator_blueprint_model
+        elif settings.llm_creator_prompt_item_model:
+            return settings.llm_creator_prompt_item_model
+        elif settings.llm_creator_scenario_model:
+            return settings.llm_creator_scenario_model
+        elif settings.llm_assistant_model:
+            return settings.llm_assistant_model
+        elif settings.llm_admin_agent_model:
+            return settings.llm_admin_agent_model
         return settings.groq_default_model or self.default_model_slug
 
     def _get_task_model(self, settings: Settings, task: LLMTaskKind) -> str | None:
         match task:
             case LLMTaskKind.ASSISTANT:
-                return settings.groq_llm_assistant_model
+                return settings.groq_llm_assistant_model or settings.llm_assistant_model
             case LLMTaskKind.ADMIN_AGENT:
-                return settings.groq_llm_admin_agent_model
+                return settings.groq_llm_admin_agent_model or settings.llm_admin_agent_model
             case LLMTaskKind.MARKING_PER_SKILL:
-                return settings.groq_llm_marking_per_skill_model
+                return (
+                    settings.groq_llm_marking_per_skill_model
+                    or settings.llm_marking_per_skill_model
+                )
             case LLMTaskKind.MARKING_AGGREGATION:
-                return settings.groq_llm_marking_aggregation_model
+                return (
+                    settings.groq_llm_marking_aggregation_model
+                    or settings.llm_marking_aggregation_model
+                )
             case LLMTaskKind.CREATOR_BLUEPRINT:
-                return settings.groq_llm_creator_blueprint_model
+                return (
+                    settings.groq_llm_creator_blueprint_model
+                    or settings.llm_creator_blueprint_model
+                )
             case LLMTaskKind.CREATOR_PROMPT_ITEM:
-                return settings.groq_llm_creator_prompt_item_model
+                return (
+                    settings.groq_llm_creator_prompt_item_model
+                    or settings.llm_creator_prompt_item_model
+                )
             case LLMTaskKind.CREATOR_SCENARIO:
-                return settings.groq_llm_creator_scenario_model
+                return (
+                    settings.groq_llm_creator_scenario_model or settings.llm_creator_scenario_model
+                )
         return None
 
     def _get_backup_model_slug(self, settings: Settings) -> str | None:

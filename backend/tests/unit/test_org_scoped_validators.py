@@ -18,8 +18,8 @@ from soft_skills_backend.modules.catalog.domain.models import (
 )
 from soft_skills_backend.platform.db.models import (
     CompetencyRecord,
-    RubricCriterionRecord,
     RubricRecord,
+    RubricVersionRecord,
     SkillRecord,
     Base,
 )
@@ -137,13 +137,11 @@ def test_require_existing_competencies_with_org_id(session: Session) -> None:
 
 def test_require_existing_rubrics_with_null_org_id(session: Session) -> None:
     canon_rubric = RubricRecord(
-        rubric_id="canon-rubric@v1",
-        family="canon-rubric",
-        version="v1",
+        id="canon-rubric@v1",
+        skill_slug="active-listening",
         content_type="quick_practice_prompt",
         schema_version="v1",
         name="Canon Rubric",
-        criteria=[],
         organisation_id=None,
     )
     session.add(canon_rubric)
@@ -157,23 +155,19 @@ def test_require_existing_rubrics_with_null_org_id(session: Session) -> None:
 
 def test_require_existing_rubrics_with_org_id(session: Session) -> None:
     canon_rubric = RubricRecord(
-        rubric_id="shared-rubric@v1",
-        family="shared-rubric",
-        version="v1",
+        id="shared-rubric@v1",
+        skill_slug="active-listening",
         content_type="quick_practice_prompt",
         schema_version="v1",
         name="Shared Rubric",
-        criteria=[],
         organisation_id=None,
     )
     org_rubric = RubricRecord(
-        rubric_id="org-rubric@v1",
-        family="org-rubric",
-        version="v1",
+        id="org-rubric@v1",
+        skill_slug="active-listening",
         content_type="quick_practice_prompt",
         schema_version="v1",
         name="Org Rubric",
-        criteria=[],
         organisation_id="org-123",
     )
     session.add(canon_rubric)

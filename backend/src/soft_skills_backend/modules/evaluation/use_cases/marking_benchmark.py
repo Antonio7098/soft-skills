@@ -136,40 +136,48 @@ class MarkingBenchmarkRunner:
                 rubric = rubric_map[rubric_id]
                 existing = session.get(RubricRecord, rubric_id)
                 if existing is None:
-                    existing = RubricRecord(rubric_id=rubric_id)
+                    existing = RubricRecord(
+                        id=rubric_id,
+                        skill_slug=rubric.skill_slug
+                        if hasattr(rubric, "skill_slug") and rubric.skill_slug
+                        else "general",
+                    )
                     session.add(existing)
-                existing.family = rubric.family
-                existing.version = rubric.version
+                existing.name = rubric.name
                 existing.content_type = rubric.content_type
                 existing.schema_version = rubric.schema_version
-                existing.name = rubric.name
-                existing.criteria = [criterion.skill_slug for criterion in rubric.criteria]
-                session.query(RubricCriterionRecord).filter(
-                    RubricCriterionRecord.rubric_id == rubric_id
+                session.query(RubricVersionRecord).filter(
+                    RubricVersionRecord.rubric_id == rubric_id
                 ).delete()
-                for criterion in rubric.criteria:
-                    session.add(
-                        RubricCriterionRecord(
-                            rubric_id=rubric.rubric_id,
-                            rubric_version=rubric.version,
-                            criterion_ref=criterion.criterion_ref,
-                            skill_slug=criterion.skill_slug,
-                            title=criterion.title,
-                            description=criterion.description,
-                            weight=criterion.weight,
-                            required=criterion.required,
-                            position=criterion.position,
-                            levels_json=[
-                                {
-                                    f"level_{level.level}": {
-                                        "description": level.description,
-                                        "examples": list(level.examples),
-                                    }
+                criteria_data = [
+                    {
+                        "criterion_ref": criterion.criterion_ref,
+                        "skill_slug": criterion.skill_slug,
+                        "title": criterion.title,
+                        "description": criterion.description,
+                        "weight": criterion.weight,
+                        "required": criterion.required,
+                        "position": criterion.position,
+                        "levels": [
+                            {
+                                f"level_{level.level}": {
+                                    "description": level.description,
+                                    "examples": list(level.examples),
                                 }
-                                for level in criterion.levels
-                            ],
-                        )
+                            }
+                            for level in criterion.levels
+                        ],
+                    }
+                    for criterion in rubric.criteria
+                ]
+                session.add(
+                    RubricVersionRecord(
+                        rubric_id=rubric.rubric_id,
+                        version=rubric.version,
+                        criteria=criteria_data,
+                        status="published",
                     )
+                )
             session.commit()
 
     def _build_marker(self, model_slug: str) -> DefaultAssessmentMarkingProvider:

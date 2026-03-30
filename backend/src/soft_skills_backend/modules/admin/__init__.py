@@ -13,6 +13,7 @@ from soft_skills_backend.modules.admin.contracts.commands import (
     CreatePromptCommand,
     CreateRubricCommand,
     CreateRubricCriterionCommand,
+    CreateRubricVersionCommand,
     PublishPromptCommand,
     RubricCriterionCommand,
     RubricCriterionLevelCommand,

@@ -30,6 +30,7 @@ from soft_skills_backend.platform.db.models import (
     MockPersonRecord,
     PromptItemRecord,
     RubricRecord,
+    RubricVersionRecord,
     ScenarioRecord,
 )
 from soft_skills_backend.platform.workflows.stageflow import StageflowStageResult
@@ -108,8 +109,19 @@ def _load_prompt_item_context(
         raise validation_error(
             "Prompt item rubric mapping is invalid",
             code="SS-VALIDATION-023",
-            details={"prompt_item_id": prompt.id, "rubric_id": rubric.rubric_id},
+            details={"prompt_item_id": prompt.id, "rubric_id": rubric.id},
         )
+
+    rubric_version_record = (
+        session.query(RubricVersionRecord)
+        .filter(
+            RubricVersionRecord.rubric_id == rubric.id,
+            RubricVersionRecord.status == "published",
+        )
+        .order_by(RubricVersionRecord.version.desc())
+        .first()
+    )
+    rubric_version = rubric_version_record.version if rubric_version_record else "v1"
 
     prompt_view = PracticePromptView(
         practice_type=start_input.practice_type,
@@ -122,8 +134,8 @@ def _load_prompt_item_context(
         delivery_version=PRACTICE_DELIVERY_VERSIONS[start_input.practice_type],
         response_mode="text",
         target_skill_slugs=list(prompt.target_skill_slugs),
-        rubric_id=rubric.rubric_id,
-        rubric_version=rubric.version,
+        rubric_id=rubric.id,
+        rubric_version=rubric_version,
         interview_context=start_input.interview_context,
     )
     return StageflowStageResult(
@@ -131,7 +143,7 @@ def _load_prompt_item_context(
         summary={
             "content_item_id": prompt.id,
             "practice_type": start_input.practice_type.value,
-            "rubric_id": rubric.rubric_id,
+            "rubric_id": rubric.id,
         },
     )
 
@@ -177,8 +189,19 @@ def _load_scenario_context(
         raise validation_error(
             "Scenario rubric mapping is invalid",
             code="SS-VALIDATION-027",
-            details={"scenario_id": scenario.id, "rubric_id": rubric.rubric_id},
+            details={"scenario_id": scenario.id, "rubric_id": rubric.id},
         )
+
+    rubric_version_record = (
+        session.query(RubricVersionRecord)
+        .filter(
+            RubricVersionRecord.rubric_id == rubric.id,
+            RubricVersionRecord.status == "published",
+        )
+        .order_by(RubricVersionRecord.version.desc())
+        .first()
+    )
+    rubric_version = rubric_version_record.version if rubric_version_record else "v1"
 
     company_record = (
         session.query(MockCompanyRecord)
@@ -228,8 +251,8 @@ def _load_scenario_context(
         delivery_version=PRACTICE_DELIVERY_VERSIONS[PracticeType.SCENARIO],
         response_mode="text",
         target_skill_slugs=list(scenario.target_skill_slugs),
-        rubric_id=rubric.rubric_id,
-        rubric_version=rubric.version,
+        rubric_id=rubric.id,
+        rubric_version=rubric_version,
         scenario_context=scenario_context,
     )
     return StageflowStageResult(
@@ -237,7 +260,7 @@ def _load_scenario_context(
         summary={
             "content_item_id": scenario.id,
             "practice_type": PracticeType.SCENARIO.value,
-            "rubric_id": rubric.rubric_id,
+            "rubric_id": rubric.id,
             "stakeholder_count": len(scenario_context.mock_people),
             "artifact_count": len(scenario_context.artifacts),
         },
@@ -350,6 +373,18 @@ def load_resolved_attempt(
                 code="SS-VALIDATION-024",
                 details={"rubric_id": practice_session.rubric_id},
             )
+
+        rubric_version_record = (
+            session.query(RubricVersionRecord)
+            .filter(
+                RubricVersionRecord.rubric_id == rubric.id,
+                RubricVersionRecord.status == "published",
+            )
+            .order_by(RubricVersionRecord.version.desc())
+            .first()
+        )
+        rubric_version = rubric_version_record.version if rubric_version_record else "v1"
+
         prompt = PracticePromptView.model_validate(practice_session.prompt_payload)
         if not prompt.rubric_version:
             raise validation_error(
@@ -363,9 +398,9 @@ def load_resolved_attempt(
                 session_id=guard.session_id,
                 workflow_id=guard.workflow_id,
                 response_text=guard.response_text,
-                prompt=prompt.model_copy(update={"rubric_version": rubric.version}),
+                prompt=prompt.model_copy(update={"rubric_version": rubric_version}),
             ),
-            summary={"attempt_id": guard.attempt_id, "rubric_id": rubric.rubric_id},
+            summary={"attempt_id": guard.attempt_id, "rubric_id": rubric.id},
         )
 
 

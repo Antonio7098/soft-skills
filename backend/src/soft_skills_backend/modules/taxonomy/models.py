@@ -22,8 +22,7 @@ class CompetencyView(BaseModel):
 
 class RubricView(BaseModel):
     rubric_id: str
-    family: str
-    version: str
+    skill_slug: str
     content_type: str
     schema_version: str
     name: str

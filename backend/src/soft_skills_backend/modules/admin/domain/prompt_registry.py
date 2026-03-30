@@ -73,7 +73,7 @@ class PromptRegistry:
                 output_schema=record.output_schema,
             )
             rendered = RenderedPrompt(
-                name=record.name,
+                name=record.prompt_id,
                 version=record.version,
                 content=record.template.format(**variables),
             )

@@ -669,25 +669,23 @@ class OrganisationService:
         require_org_admin(actor, organisation_id)
 
         rubric = RubricRecord(
-            rubric_id=command.rubric_id,
-            family=command.family,
-            version=command.version,
+            id=command.rubric_id,
+            skill_slug=command.skill_slug,
             content_type=command.content_type,
             schema_version=command.schema_version,
             name=command.name,
-            criteria=command.criteria,
+            description=command.description,
             organisation_id=organisation_id,
         )
         created = self._repo.create_rubric(rubric)
 
         return OrgRubricView(
-            rubric_id=created.rubric_id,
-            family=created.family,
-            version=created.version,
+            rubric_id=created.id,
+            skill_slug=created.skill_slug,
             content_type=created.content_type,
             schema_version=created.schema_version,
             name=created.name,
-            criteria=created.criteria,
+            description=created.description,
             organisation_id=cast(str, created.organisation_id),
         )
 
@@ -710,13 +708,12 @@ class OrganisationService:
             )
 
         return OrgRubricView(
-            rubric_id=rubric.rubric_id,
-            family=rubric.family,
-            version=rubric.version,
+            rubric_id=rubric.id,
+            skill_slug=rubric.skill_slug,
             content_type=rubric.content_type,
             schema_version=rubric.schema_version,
             name=rubric.name,
-            criteria=rubric.criteria,
+            description=rubric.description,
             organisation_id=cast(str, rubric.organisation_id),
         )
 
@@ -731,13 +728,12 @@ class OrganisationService:
         rubrics = self._repo.list_rubrics(organisation_id)
         return [
             OrgRubricView(
-                rubric_id=r.rubric_id,
-                family=r.family,
-                version=r.version,
+                rubric_id=r.id,
+                skill_slug=r.skill_slug,
                 content_type=r.content_type,
                 schema_version=r.schema_version,
                 name=r.name,
-                criteria=r.criteria,
+                description=r.description,
                 organisation_id=cast(str, r.organisation_id),
             )
             for r in rubrics
@@ -768,19 +764,18 @@ class OrganisationService:
 
         if command.name is not None:
             rubric.name = command.name
-        if command.criteria is not None:
-            rubric.criteria = command.criteria
+        if command.description is not None:
+            rubric.description = command.description
 
         updated = self._repo.update_rubric(rubric)
 
         return OrgRubricView(
-            rubric_id=updated.rubric_id,
-            family=updated.family,
-            version=updated.version,
+            rubric_id=updated.id,
+            skill_slug=updated.skill_slug,
             content_type=updated.content_type,
             schema_version=updated.schema_version,
             name=updated.name,
-            criteria=updated.criteria,
+            description=updated.description,
             organisation_id=cast(str, updated.organisation_id),
         )
 

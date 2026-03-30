@@ -293,7 +293,7 @@ class OrganisationRepository:
                 session.query(RubricRecord)
                 .filter(
                     RubricRecord.organisation_id == rubric.organisation_id,
-                    RubricRecord.rubric_id == rubric.rubric_id,
+                    RubricRecord.id == rubric.id,
                 )
                 .first()
             )
@@ -303,7 +303,7 @@ class OrganisationRepository:
                     code="SS-ORG-003",
                     status_code=409,
                     details={
-                        "rubric_id": rubric.rubric_id,
+                        "rubric_id": rubric.id,
                         "organisation_id": rubric.organisation_id,
                     },
                 )
@@ -319,7 +319,7 @@ class OrganisationRepository:
                 session.query(RubricRecord)
                 .filter(
                     RubricRecord.organisation_id == organisation_id,
-                    RubricRecord.rubric_id == rubric_id,
+                    RubricRecord.id == rubric_id,
                 )
                 .first()
             )
@@ -330,7 +330,7 @@ class OrganisationRepository:
             return (
                 session.query(RubricRecord)
                 .filter(RubricRecord.organisation_id == organisation_id)
-                .order_by(RubricRecord.rubric_id)
+                .order_by(RubricRecord.id)
                 .all()
             )
 
@@ -347,7 +347,7 @@ class OrganisationRepository:
         with self._session_factory() as session:
             session.query(RubricRecord).filter(
                 RubricRecord.organisation_id == organisation_id,
-                RubricRecord.rubric_id == rubric_id,
+                RubricRecord.id == rubric_id,
             ).delete()
             session.commit()
 

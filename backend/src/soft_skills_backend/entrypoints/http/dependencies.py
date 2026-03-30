@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from fastapi import Request
+from fastapi import Request, WebSocket
 
 from soft_skills_backend.entrypoints.http.health import HealthService
 from soft_skills_backend.modules.admin import AdminService
@@ -69,6 +69,19 @@ async def require_org_admin_actor(request: Request) -> Actor:
 
 async def optional_actor(request: Request) -> Actor | None:
     return await get_auth_provider(request).get_actor(request)
+
+
+async def get_actor_from_websocket(websocket: WebSocket) -> Actor | None:
+    """Resolve authenticated actor from WebSocket connection."""
+    container = cast(AppContainer, websocket.app.state.container)
+    auth_provider = container.auth_provider
+    user_id = websocket.headers.get("x-user-id")
+    if not user_id:
+        return None
+    org_id = websocket.headers.get("x-organisation-id")
+    request = websocket._create_request()
+    request._headers = {"x-user-id": user_id, "x-organisation-id": org_id or ""}
+    return await auth_provider.get_actor(request)
 
 
 def get_identity_service(request: Request) -> IdentityService:

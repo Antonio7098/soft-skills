@@ -110,28 +110,37 @@ class RubricCriterionCommand(BaseModel):
 
 
 class CreateRubricCommand(BaseModel):
-    """Create a new rubric."""
+    """Create a new rubric with initial version."""
 
     rubric_id: str
-    family: str
-    version: str
+    skill_slug: str
+    organisation_id: str | None = None
+    name: str
+    description: str | None = None
     content_type: str
     schema_version: str
-    name: str
+    version: str
     criteria: list[RubricCriterionCommand] = Field(min_length=1)
 
 
 class UpdateRubricCommand(BaseModel):
     """Update an existing rubric."""
 
-    family: str | None = None
-    version: str | None = None
     name: str | None = None
+    description: str | None = None
+
+
+class CreateRubricVersionCommand(BaseModel):
+    """Create a new rubric version."""
+
+    version: str
+    criteria: list[RubricCriterionCommand] = Field(min_length=1)
 
 
 class RubricCriterionUpdateCommand(BaseModel):
-    """Update a rubric criterion."""
+    """Update a rubric criterion (embedded in version)."""
 
+    criterion_ref: str
     title: str | None = None
     description: str | None = None
     weight: float | None = Field(default=None, gt=0)
@@ -141,7 +150,7 @@ class RubricCriterionUpdateCommand(BaseModel):
 
 
 class CreateRubricCriterionCommand(BaseModel):
-    """Add a new criterion to an existing rubric."""
+    """Add a new criterion to an existing rubric version."""
 
     criterion_ref: str
     skill_slug: str

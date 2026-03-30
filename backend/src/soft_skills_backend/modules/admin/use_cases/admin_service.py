@@ -800,24 +800,40 @@ class AdminService:
     def delete_rubric(self, actor: Actor, rubric_id: str) -> None:
         self._rubrics.delete_rubric(rubric_id)
 
-    def create_rubric_criterion(
-        self, actor: Actor, rubric_id: str, command: CreateRubricCriterionCommand
+    def create_rubric_version(
+        self, actor: Actor, rubric_id: str, command: CreateRubricVersionCommand
     ) -> RubricView:
-        return self._rubrics.create_criterion(rubric_id, command)
+        return self._rubrics.create_version(rubric_id, command)
+
+    def add_rubric_criterion(
+        self,
+        actor: Actor,
+        rubric_id: str,
+        version: str,
+        command: CreateRubricCriterionCommand,
+    ) -> RubricView:
+        return self._rubrics.add_criterion(rubric_id, version, command)
 
     def update_rubric_criterion(
         self,
         actor: Actor,
         rubric_id: str,
+        version: str,
         criterion_ref: str,
         command: RubricCriterionUpdateCommand,
     ) -> RubricView:
-        return self._rubrics.update_criterion(rubric_id, criterion_ref, command)
+        return self._rubrics.update_criterion(rubric_id, version, criterion_ref, command)
 
     def delete_rubric_criterion(
-        self, actor: Actor, rubric_id: str, criterion_ref: str
+        self, actor: Actor, rubric_id: str, version: str, criterion_ref: str
     ) -> RubricView:
-        return self._rubrics.delete_criterion(rubric_id, criterion_ref)
+        return self._rubrics.delete_criterion(rubric_id, version, criterion_ref)
+
+    def publish_rubric_version(self, actor: Actor, rubric_id: str, version: str) -> RubricView:
+        return self._rubrics.publish_version(rubric_id, version)
+
+    def archive_rubric_version(self, actor: Actor, rubric_id: str, version: str) -> RubricView:
+        return self._rubrics.archive_version(rubric_id, version)
 
     def list_prompts(self, actor: Actor) -> list[PromptSummaryView]:
         return self._require_prompt_service().list_prompts(actor)

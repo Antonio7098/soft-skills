@@ -14,7 +14,6 @@ from soft_skills_backend.platform.db.models import (
     ContentGenerationArtifactRecord,
     PipelineRunRecord,
     PromptItemRecord,
-    RubricCriterionRecord,
     WorkflowEventRecord,
 )
 from soft_skills_backend.shared.ports.models import ProviderCompletion
@@ -937,10 +936,15 @@ async def test_catalog_generates_prompt_items_for_existing_collections(
             )
             .one()
         )
+        from soft_skills_backend.platform.db.models import RubricVersionRecord
+
+        rubric_version_record = (
+            session.query(RubricVersionRecord)
+            .filter(RubricVersionRecord.rubric_id == generated_prompt_record.rubric_id)
+            .first()
+        )
         generated_criteria_count = (
-            session.query(RubricCriterionRecord)
-            .filter(RubricCriterionRecord.rubric_id == generated_prompt_record.rubric_id)
-            .count()
+            len(rubric_version_record.criteria) if rubric_version_record else 0
         )
         pipeline_names = {record.pipeline_name for record in session.query(PipelineRunRecord).all()}
 

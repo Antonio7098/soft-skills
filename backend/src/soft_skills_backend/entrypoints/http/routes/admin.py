@@ -36,6 +36,7 @@ from soft_skills_backend.modules.admin import (
     CreatePromptCommand,
     CreateRubricCommand,
     CreateRubricCriterionCommand,
+    CreateRubricVersionCommand,
     LearnerAnalyticsView,
     PipelineDAGView,
     PipelineDefinitionView,
@@ -569,44 +570,91 @@ async def delete_rubric(
     return ok_response(request, {"status": "deleted"})
 
 
-@router.post("/rubrics/{rubric_id}/criteria", response_model=ApiEnvelope[RubricView])
-async def create_rubric_criterion(
+@router.post("/rubrics/{rubric_id}/versions", response_model=ApiEnvelope[RubricView])
+async def create_rubric_version(
     request: Request,
     rubric_id: str,
+    command: CreateRubricVersionCommand,
+) -> ApiEnvelope[RubricView]:
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.create_rubric_version(actor, rubric_id, command))
+
+
+@router.post(
+    "/rubrics/{rubric_id}/versions/{version}/criteria", response_model=ApiEnvelope[RubricView]
+)
+async def add_rubric_criterion(
+    request: Request,
+    rubric_id: str,
+    version: str,
     command: CreateRubricCriterionCommand,
 ) -> ApiEnvelope[RubricView]:
     actor = await require_admin_actor(request)
     service = get_admin_service(request)
-    return ok_response(request, service.create_rubric_criterion(actor, rubric_id, command))
+    return ok_response(request, service.add_rubric_criterion(actor, rubric_id, version, command))
 
 
 @router.patch(
-    "/rubrics/{rubric_id}/criteria/{criterion_ref}", response_model=ApiEnvelope[RubricView]
+    "/rubrics/{rubric_id}/versions/{version}/criteria/{criterion_ref}",
+    response_model=ApiEnvelope[RubricView],
 )
 async def update_rubric_criterion(
     request: Request,
     rubric_id: str,
+    version: str,
     criterion_ref: str,
     command: RubricCriterionUpdateCommand,
 ) -> ApiEnvelope[RubricView]:
     actor = await require_admin_actor(request)
     service = get_admin_service(request)
     return ok_response(
-        request, service.update_rubric_criterion(actor, rubric_id, criterion_ref, command)
+        request,
+        service.update_rubric_criterion(actor, rubric_id, version, criterion_ref, command),
     )
 
 
 @router.delete(
-    "/rubrics/{rubric_id}/criteria/{criterion_ref}", response_model=ApiEnvelope[RubricView]
+    "/rubrics/{rubric_id}/versions/{version}/criteria/{criterion_ref}",
+    response_model=ApiEnvelope[RubricView],
 )
 async def delete_rubric_criterion(
     request: Request,
     rubric_id: str,
+    version: str,
     criterion_ref: str,
 ) -> ApiEnvelope[RubricView]:
     actor = await require_admin_actor(request)
     service = get_admin_service(request)
-    return ok_response(request, service.delete_rubric_criterion(actor, rubric_id, criterion_ref))
+    return ok_response(
+        request, service.delete_rubric_criterion(actor, rubric_id, version, criterion_ref)
+    )
+
+
+@router.post(
+    "/rubrics/{rubric_id}/versions/{version}/publish", response_model=ApiEnvelope[RubricView]
+)
+async def publish_rubric_version(
+    request: Request,
+    rubric_id: str,
+    version: str,
+) -> ApiEnvelope[RubricView]:
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.publish_rubric_version(actor, rubric_id, version))
+
+
+@router.post(
+    "/rubrics/{rubric_id}/versions/{version}/archive", response_model=ApiEnvelope[RubricView]
+)
+async def archive_rubric_version(
+    request: Request,
+    rubric_id: str,
+    version: str,
+) -> ApiEnvelope[RubricView]:
+    actor = await require_admin_actor(request)
+    service = get_admin_service(request)
+    return ok_response(request, service.archive_rubric_version(actor, rubric_id, version))
 
 
 @router.get("/pipelines", response_model=ApiEnvelope[list[PipelineDefinitionView]])

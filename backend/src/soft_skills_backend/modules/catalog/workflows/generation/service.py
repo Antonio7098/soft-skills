@@ -504,12 +504,12 @@ class CatalogGenerationService:
         with self._session_factory() as session:
             rubrics = (
                 session.query(RubricRecord)
-                .filter(RubricRecord.rubric_id.in_(rubric_ids))
-                .order_by(RubricRecord.rubric_id)
+                .filter(RubricRecord.id.in_(rubric_ids))
+                .order_by(RubricRecord.id)
                 .all()
             )
         return [
-            rubric.rubric_id
+            rubric.id
             for rubric in rubrics
             if rubric.content_type in {"quick_practice_prompt", "interview_prompt"}
         ]

@@ -105,6 +105,36 @@ def upgrade() -> None:
     connection.commit()
 
     # Use raw SQL for tables with unique constraints (SQLite limitation)
+    # --- NEW RUBRICS TABLE (parent) ---
+    connection.execute(
+        sa.text(
+            "CREATE TABLE rubrics ("
+            "id VARCHAR(32) PRIMARY KEY,"
+            "skill_slug VARCHAR(64) NOT NULL,"
+            "organisation_id VARCHAR(32),"
+            "name VARCHAR(255) NOT NULL,"
+            "description TEXT,"
+            "content_type VARCHAR(64) NOT NULL,"
+            "schema_version VARCHAR(32) NOT NULL,"
+            "created_at DATETIME NOT NULL,"
+            "updated_at DATETIME NOT NULL"
+            ")"
+        )
+    )
+    connection.execute(
+        sa.text("CREATE INDEX IF NOT EXISTS ix_rubrics_skill_slug ON rubrics (skill_slug)")
+    )
+    connection.execute(
+        sa.text(
+            "CREATE INDEX IF NOT EXISTS ix_rubrics_organisation_id ON rubrics (organisation_id)"
+        )
+    )
+    connection.execute(
+        sa.text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_rubric_skill_org ON rubrics (skill_slug, organisation_id)"
+        )
+    )
+
     # --- NEW PROMPTS TABLE (parent) ---
     connection.execute(
         sa.text(
@@ -121,10 +151,14 @@ def upgrade() -> None:
         )
     )
     connection.execute(
-        sa.text("CREATE INDEX ix_prompts_organisation_id ON prompts (organisation_id)")
+        sa.text(
+            "CREATE INDEX IF NOT EXISTS ix_prompts_organisation_id ON prompts (organisation_id)"
+        )
     )
     connection.execute(
-        sa.text("CREATE UNIQUE INDEX uq_prompt_org_name ON prompts (organisation_id, name)")
+        sa.text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_prompt_org_name ON prompts (organisation_id, name)"
+        )
     )
 
     # --- NEW PROMPT VERSIONS TABLE (child, replaces current) ---
@@ -145,14 +179,16 @@ def upgrade() -> None:
         )
     )
     connection.execute(
-        sa.text("CREATE INDEX ix_prompt_versions_prompt_id ON prompt_versions (prompt_id)")
+        sa.text(
+            "CREATE INDEX IF NOT EXISTS ix_prompt_versions_prompt_id ON prompt_versions (prompt_id)"
+        )
     )
     connection.execute(
-        sa.text("CREATE INDEX ix_prompt_versions_status ON prompt_versions (status)")
+        sa.text("CREATE INDEX IF NOT EXISTS ix_prompt_versions_status ON prompt_versions (status)")
     )
     connection.execute(
         sa.text(
-            "CREATE UNIQUE INDEX uq_prompt_version_prompt_version ON prompt_versions (prompt_id, version)"
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_prompt_version_prompt_version ON prompt_versions (prompt_id, version)"
         )
     )
 
@@ -171,14 +207,16 @@ def upgrade() -> None:
         )
     )
     connection.execute(
-        sa.text("CREATE INDEX ix_rubric_versions_rubric_id ON rubric_versions (rubric_id)")
+        sa.text(
+            "CREATE INDEX IF NOT EXISTS ix_rubric_versions_rubric_id ON rubric_versions (rubric_id)"
+        )
     )
     connection.execute(
-        sa.text("CREATE INDEX ix_rubric_versions_status ON rubric_versions (status)")
+        sa.text("CREATE INDEX IF NOT EXISTS ix_rubric_versions_status ON rubric_versions (status)")
     )
     connection.execute(
         sa.text(
-            "CREATE UNIQUE INDEX uq_rubric_version_rubric_version ON rubric_versions (rubric_id, version)"
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_rubric_version_rubric_version ON rubric_versions (rubric_id, version)"
         )
     )
 

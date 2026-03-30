@@ -338,7 +338,7 @@ def validate_prompt_item_generation_request(
     compatible_content_types = {
         record.content_type
         for record in session.query(RubricRecord)
-        .filter(RubricRecord.rubric_id.in_(collection.rubric_ids))
+        .filter(RubricRecord.id.in_(collection.rubric_ids))
         .all()
     }
     if (
@@ -625,7 +625,7 @@ def require_existing_competencies(
 def require_existing_rubrics(
     session: Session, rubric_ids: list[str], organisation_id: str | None = None
 ) -> None:
-    query = session.query(RubricRecord).filter(RubricRecord.rubric_id.in_(rubric_ids))
+    query = session.query(RubricRecord).filter(RubricRecord.id.in_(rubric_ids))
     if organisation_id is not None:
         query = query.filter(
             (RubricRecord.organisation_id.is_(None))
@@ -633,7 +633,7 @@ def require_existing_rubrics(
         )
     elif organisation_id is None:
         query = query.filter(RubricRecord.organisation_id.is_(None))
-    existing = {record.rubric_id for record in query.all()}
+    existing = {record.id for record in query.all()}
     missing = sorted(set(rubric_ids) - existing)
     if missing:
         raise validation_error(
@@ -699,7 +699,7 @@ def require_rubric_content_alignment(
     rubric_ids: list[str],
     organisation_id: str | None = None,
 ) -> None:
-    query = session.query(RubricRecord).filter(RubricRecord.rubric_id.in_(rubric_ids))
+    query = session.query(RubricRecord).filter(RubricRecord.id.in_(rubric_ids))
     if organisation_id is not None:
         query = query.filter(
             (RubricRecord.organisation_id.is_(None))
@@ -707,7 +707,7 @@ def require_rubric_content_alignment(
         )
     elif organisation_id is None:
         query = query.filter(RubricRecord.organisation_id.is_(None))
-    rubrics = {record.rubric_id: record for record in query.all()}
+    rubrics = {record.id: record for record in query.all()}
     expected_types = set(content_format_mix)
     actual_types = {record.content_type for record in rubrics.values()}
     missing_types = sorted(expected_types - actual_types)

@@ -361,7 +361,7 @@ class RubricCriterionLevelView(BaseModel):
 
 
 class RubricCriterionView(BaseModel):
-    """One rubric criterion."""
+    """One rubric criterion (embedded in version)."""
 
     criterion_ref: str
     skill_slug: str
@@ -373,16 +373,29 @@ class RubricCriterionView(BaseModel):
     levels: list[RubricCriterionLevelView]
 
 
+class RubricVersionView(BaseModel):
+    """One rubric version with embedded criteria."""
+
+    id: int
+    rubric_id: str
+    version: str
+    criteria: list[RubricCriterionView]
+    status: str
+    created_at: str
+    updated_at: str | None = None
+
+
 class RubricView(BaseModel):
-    """Rubric definition view."""
+    """Rubric definition view with versions."""
 
     rubric_id: str
-    family: str
-    version: str
+    skill_slug: str
+    organisation_id: str | None = None
+    name: str
+    description: str | None = None
     content_type: str
     schema_version: str
-    name: str
-    criteria: list[RubricCriterionView] = Field(default_factory=list)
+    versions: list[RubricVersionView] = Field(default_factory=list)
 
 
 class StageDefinitionView(BaseModel):

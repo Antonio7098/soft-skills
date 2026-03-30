@@ -124,14 +124,22 @@ class _AssessmentMarkingSmoke(SmokeCase, ABC):
                         .filter(AssessmentSkillEvidenceRecord.assessment_id == assessment_id)
                         .count()
                     )
-                    rubric_criteria_count = (
-                        0
+                    rubric_version_record = (
+                        None
                         if attempt_record is None
+                        or attempt_record.rubric_id is None
+                        or attempt_record.rubric_version is None
                         else (
-                            session.query(RubricCriterionRecord)
-                            .filter(RubricCriterionRecord.rubric_id == attempt_record.rubric_id)
-                            .count()
+                            session.query(RubricVersionRecord)
+                            .filter(
+                                RubricVersionRecord.rubric_id == attempt_record.rubric_id,
+                                RubricVersionRecord.version == attempt_record.rubric_version,
+                            )
+                            .first()
                         )
+                    )
+                    rubric_criteria_count = (
+                        len(rubric_version_record.criteria) if rubric_version_record else 0
                     )
             return AssessmentMarkingSmokeResult(
                 status="ok",

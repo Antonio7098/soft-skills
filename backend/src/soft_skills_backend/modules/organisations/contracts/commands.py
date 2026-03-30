@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -103,16 +105,17 @@ class CreateOrgRubricCommand(BaseModel):
     """Create an org-specific rubric."""
 
     rubric_id: str = Field(..., min_length=1, max_length=128)
-    family: str = Field(..., min_length=1, max_length=64)
+    skill_slug: str = Field(..., min_length=1, max_length=64)
     version: str = Field(..., min_length=1, max_length=32)
     content_type: str = Field(..., min_length=1, max_length=64)
     schema_version: str = Field(..., min_length=1, max_length=32)
     name: str = Field(..., min_length=1, max_length=255)
-    criteria: list[str] = Field(default_factory=list)
+    description: str | None = Field(default=None)
+    criteria: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class UpdateOrgRubricCommand(BaseModel):
     """Update an org-specific rubric."""
 
     name: str | None = Field(default=None, min_length=1, max_length=255)
-    criteria: list[str] | None = None
+    description: str | None = Field(default=None)

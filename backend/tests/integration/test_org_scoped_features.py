@@ -186,12 +186,28 @@ async def test_org_rubrics_crud(client, test_settings) -> None:
         headers=headers,
         json={
             "rubric_id": "custom-quick-practice@v1",
-            "family": "custom_quick_practice",
+            "skill_slug": "custom_quick_practice",
             "version": "v1",
             "content_type": "quick_practice_prompt",
             "schema_version": "v1",
             "name": "Custom Quick Practice Rubric",
-            "criteria": ["custom-skill"],
+            "description": "A custom rubric for quick practice",
+            "criteria": [
+                {
+                    "criterion_ref": "custom-skill",
+                    "skill_slug": "custom-skill",
+                    "title": "Custom Skill",
+                    "description": "Demonstrates custom skill",
+                    "weight": 1.0,
+                    "required": True,
+                    "position": 0,
+                    "levels": [
+                        {"level_1": {"description": "Poor", "examples": ["Example 1"]}},
+                        {"level_2": {"description": "Fair", "examples": ["Example 2"]}},
+                        {"level_3": {"description": "Good", "examples": ["Example 3"]}},
+                    ],
+                }
+            ],
         },
     )
     assert create_response.status_code == 200
