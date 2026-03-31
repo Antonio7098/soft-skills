@@ -156,16 +156,20 @@ def build_assistant_tool_definitions() -> list[ProviderToolDefinition]:
         ProviderToolDefinition(
             name="generate_collection",
             description=(
-                "Generate a new collection. If key details are missing, ask a short "
-                "clarifying question or use your best judgment to fill gaps."
+                "Generate a new collection. The user wants YOU to create something — use "
+                "reasonable defaults for any missing fields: target_audience='professionals', "
+                "difficulty='intermediate', content_format_mix=['quick_practice_prompt'], "
+                "target_skill_slugs from the topic mentioned. DO NOT ask the user to fill in "
+                "every field — just call the tool with sensible choices."
             ),
             parameters=ChatCollectionGenerationCommand.model_json_schema(),
         ),
         ProviderToolDefinition(
             name="generate_prompt_items",
             description=(
-                "Generate prompt items in an existing collection. If key details are missing, "
-                "ask a short clarifying question or use your best judgment to fill gaps."
+                "Generate prompt items in an existing collection. The user wants YOU to create "
+                "something — use reasonable defaults for any missing fields. DO NOT ask the user "
+                "to fill in every field — just call the tool with sensible choices."
             ),
             parameters=ChatPromptItemGenerationCommand.model_json_schema(),
         ),

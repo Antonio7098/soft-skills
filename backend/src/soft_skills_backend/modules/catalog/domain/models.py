@@ -196,19 +196,10 @@ class CollectionView(BaseModel):
 
 
 class CollectionGenerationCounts(BaseModel):
-    quick_practice_prompt_count: int = Field(default=0, ge=0, le=3)
+    quick_practice_prompt_count: int = Field(default=3, ge=0, le=3)
     interview_prompt_count: int = Field(default=0, ge=0, le=3)
     scenario_count: int = Field(default=0, ge=0, le=2)
     scenario_artifact_count: int = Field(default=0, ge=0, le=3)
-
-    @model_validator(mode="after")
-    def validate_non_empty(self) -> CollectionGenerationCounts:
-        if (
-            self.quick_practice_prompt_count + self.interview_prompt_count + self.scenario_count
-            <= 0
-        ):
-            raise ValueError("At least one generated content item is required")
-        return self
 
 
 class StructuredCollectionGenerationCommand(BaseModel):
@@ -228,26 +219,24 @@ class StructuredCollectionGenerationCommand(BaseModel):
 
 
 class ChatCollectionGenerationCommand(BaseModel):
-    prompt: str
-    target_audience: str
-    difficulty: DifficultyLevel
-    content_format_mix: list[ContentFormatType]
-    target_skill_slugs: list[str]
-    target_competency_slugs: list[str]
-    rubric_ids: list[str]
-    counts: CollectionGenerationCounts
+    prompt: str = ""
+    target_audience: str = "professionals"
+    difficulty: DifficultyLevel = "intermediate"
+    content_format_mix: list[ContentFormatType] = Field(
+        default_factory=lambda: ["quick_practice_prompt"]
+    )
+    target_skill_slugs: list[str] = Field(default_factory=list)
+    target_competency_slugs: list[str] = Field(default_factory=list)
+    rubric_ids: list[str] = Field(default_factory=list)
+    counts: CollectionGenerationCounts = Field(
+        default_factory=lambda: CollectionGenerationCounts(quick_practice_prompt_count=3)
+    )
     organisation_id: str | None = None
 
 
 class PromptItemGenerationCounts(BaseModel):
-    quick_practice_prompt_count: int = Field(default=0, ge=0, le=6)
+    quick_practice_prompt_count: int = Field(default=3, ge=0, le=6)
     interview_prompt_count: int = Field(default=0, ge=0, le=6)
-
-    @model_validator(mode="after")
-    def validate_non_empty(self) -> PromptItemGenerationCounts:
-        if self.quick_practice_prompt_count + self.interview_prompt_count <= 0:
-            raise ValueError("At least one generated prompt item is required")
-        return self
 
 
 class StructuredPromptItemGenerationCommand(BaseModel):
@@ -260,9 +249,11 @@ class StructuredPromptItemGenerationCommand(BaseModel):
 
 
 class ChatPromptItemGenerationCommand(BaseModel):
-    prompt: str
+    prompt: str = ""
     target_skill_slugs: list[str] = Field(default_factory=list)
-    counts: PromptItemGenerationCounts
+    counts: PromptItemGenerationCounts = Field(
+        default_factory=lambda: PromptItemGenerationCounts(quick_practice_prompt_count=3)
+    )
     organisation_id: str | None = None
 
 
