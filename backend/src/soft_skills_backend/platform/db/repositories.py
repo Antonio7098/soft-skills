@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import re
+from datetime import datetime
+
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, sessionmaker
 
 from soft_skills_backend.platform.db.models import (
@@ -36,11 +40,16 @@ class SqlAlchemyWorkflowEventRepository:
                     workflow_id=event.workflow_id,
                     error_code=event.error_code,
                     organisation_id=event.organisation_id,
+                    user_id=event.user_id,
                     payload=event.payload,
                     occurred_at=event.occurred_at,
                 )
             )
             session.commit()
+
+    VALID_SORT_FIELDS = frozenset(
+        {"event_type", "trace_id", "workflow_id", "error_code", "occurred_at", "user_id"}
+    )
 
     def list_(
         self,
@@ -50,7 +59,13 @@ class SqlAlchemyWorkflowEventRepository:
         workflow_id: str | None = None,
         request_id: str | None = None,
         error_code: str | None = None,
+        user_id: str | None = None,
         organisation_id: str | None = None,
+        search: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        sort_by: str | None = None,
+        sort_order: str | None = None,
         offset: int = 0,
         limit: int = 50,
     ) -> list[WorkflowEventRecord]:
@@ -66,18 +81,25 @@ class SqlAlchemyWorkflowEventRepository:
                 query = query.filter(WorkflowEventRecord.request_id == request_id)
             if error_code is not None:
                 query = query.filter(WorkflowEventRecord.error_code == error_code)
+            if user_id is not None:
+                query = query.filter(WorkflowEventRecord.user_id == user_id)
             if organisation_id is not None:
-                # Include events for this org AND global events (organisation_id IS NULL)
                 query = query.filter(
                     (WorkflowEventRecord.organisation_id == organisation_id)
                     | (WorkflowEventRecord.organisation_id.is_(None))
                 )
-            return (
-                query.order_by(WorkflowEventRecord.occurred_at.desc())
-                .offset(offset)
-                .limit(limit)
-                .all()
-            )
+            if search:
+                query = self._apply_search(query, search)
+            if from_date is not None:
+                query = query.filter(WorkflowEventRecord.occurred_at >= from_date)
+            if to_date is not None:
+                query = query.filter(WorkflowEventRecord.occurred_at <= to_date)
+            order_col = self._resolve_sort_column(sort_by)
+            if sort_order and sort_order.lower() == "asc":
+                query = query.order_by(order_col.asc())
+            else:
+                query = query.order_by(order_col.desc())
+            return query.offset(offset).limit(limit).all()
 
     def count(
         self,
@@ -87,7 +109,11 @@ class SqlAlchemyWorkflowEventRepository:
         workflow_id: str | None = None,
         request_id: str | None = None,
         error_code: str | None = None,
+        user_id: str | None = None,
         organisation_id: str | None = None,
+        search: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
     ) -> int:
         with self._session_factory() as session:
             query = session.query(WorkflowEventRecord)
@@ -101,13 +127,49 @@ class SqlAlchemyWorkflowEventRepository:
                 query = query.filter(WorkflowEventRecord.request_id == request_id)
             if error_code is not None:
                 query = query.filter(WorkflowEventRecord.error_code == error_code)
+            if user_id is not None:
+                query = query.filter(WorkflowEventRecord.user_id == user_id)
             if organisation_id is not None:
-                # Include events for this org AND global events (organisation_id IS NULL)
                 query = query.filter(
                     (WorkflowEventRecord.organisation_id == organisation_id)
                     | (WorkflowEventRecord.organisation_id.is_(None))
                 )
+            if search:
+                query = self._apply_search(query, search)
+            if from_date is not None:
+                query = query.filter(WorkflowEventRecord.occurred_at >= from_date)
+            if to_date is not None:
+                query = query.filter(WorkflowEventRecord.occurred_at <= to_date)
             return query.count()
+
+    def _apply_search(self, query, pattern: str):
+        search_columns = [
+            WorkflowEventRecord.event_type,
+            WorkflowEventRecord.trace_id,
+            WorkflowEventRecord.workflow_id,
+            WorkflowEventRecord.request_id,
+            WorkflowEventRecord.error_code,
+            WorkflowEventRecord.user_id,
+        ]
+        try:
+            compiled = re.compile(pattern, re.IGNORECASE)
+        except re.error:
+            return query.filter(WorkflowEventRecord.event_type == "__never_match_invalid_regex__")
+        conditions = [col.regexp_match(pattern) for col in search_columns]
+        return query.filter(or_(*conditions))
+
+    def _resolve_sort_column(self, sort_by: str | None):
+        column_map = {
+            "event_type": WorkflowEventRecord.event_type,
+            "trace_id": WorkflowEventRecord.trace_id,
+            "workflow_id": WorkflowEventRecord.workflow_id,
+            "error_code": WorkflowEventRecord.error_code,
+            "occurred_at": WorkflowEventRecord.occurred_at,
+            "user_id": WorkflowEventRecord.user_id,
+        }
+        if sort_by and sort_by in self.VALID_SORT_FIELDS:
+            return column_map[sort_by]
+        return WorkflowEventRecord.occurred_at
 
     def get_by_id(self, event_id: str) -> WorkflowEventRecord | None:
         with self._session_factory() as session:

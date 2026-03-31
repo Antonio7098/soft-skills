@@ -784,6 +784,12 @@ export const apiDataProvider: DataProvider = {
     if (params?.workflow_id) searchParams.set('workflow_id', params.workflow_id);
     if (params?.request_id) searchParams.set('request_id', params.request_id);
     if (params?.error_code) searchParams.set('error_code', params.error_code);
+    if (params?.user_id) searchParams.set('user_id', params.user_id);
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.from_date) searchParams.set('from_date', params.from_date);
+    if (params?.to_date) searchParams.set('to_date', params.to_date);
+    if (params?.sort_by) searchParams.set('sort_by', params.sort_by);
+    if (params?.sort_order) searchParams.set('sort_order', params.sort_order);
     if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
     if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
     const qs = searchParams.toString();

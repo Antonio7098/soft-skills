@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
-import { renderWithRouter, screen, waitFor, userEvent } from '@/test/test-utils';
+import { renderWithRouter, screen, waitFor, userEvent, createMockDataProvider } from '@/test/test-utils';
 import { PracticeRunSession } from '@/pages/session/PracticeRunSession';
 
 describe('PracticeRunSession', () => {
@@ -21,7 +21,7 @@ describe('PracticeRunSession', () => {
       completed_at: null,
       items: [
         {
-          id: 'scenario-1',
+          id: 'scenario-step-1',
           item_type: 'scenario',
           title: 'Scenario Step 1',
           prompt_text: 'Question 1 of 2: Identify the stakeholder concerns.',
@@ -30,7 +30,7 @@ describe('PracticeRunSession', () => {
           status: 'active',
         },
         {
-          id: 'scenario-1',
+          id: 'scenario-step-2',
           item_type: 'scenario',
           title: 'Scenario Step 2',
           prompt_text: 'Question 2 of 2: Explain your prioritization.',
@@ -123,7 +123,7 @@ describe('PracticeRunSession', () => {
       },
     });
 
-    const dataProvider = {
+    const dataProvider = createMockDataProvider({
       getPracticeRun: vi.fn().mockResolvedValue(runAfterLoad),
       getPracticeSessions: vi.fn().mockResolvedValue(sessions),
       listCollections: vi.fn().mockResolvedValue([
@@ -173,13 +173,13 @@ describe('PracticeRunSession', () => {
         },
       ]),
       submitAttempt,
-    };
+    });
 
     renderWithRouter(
       <Routes>
         <Route path="/session/practice-run/:runId" element={<PracticeRunSession />} />
       </Routes>,
-      { dataProvider: dataProvider as any, initialEntries: ['/session/practice-run/run-1'] },
+      { dataProvider, initialEntries: ['/session/practice-run/run-1'] },
     );
 
     await waitFor(() => {

@@ -18,7 +18,7 @@ Prompt type: {prompt_type}
 Prompt: {prompt_text}
 Additional context:
 {context_block}
-Learner response: {response_text}
+Response: {response_text}
 Target role: {target_role}
 Learner goals: {goals}
 Prior assessed attempts: {prior_assessed_attempts}
@@ -31,7 +31,8 @@ Criterion levels:
 {criterion_levels}
 CRITICAL CONSTRAINTS:
 - You MUST assess only the requested skill: {skill_slug}
-- Every evidence quote must be copied directly from the learner response
+- You MUST copy EXACT words from the response text above. Do NOT paraphrase or invent quotes.
+- If the response is too short to quote, use the full response as the quote.
 - Return one or two evidence items only
 - Keep the rationale aligned to the selected rubric level
 Return JSON with these required fields exactly:

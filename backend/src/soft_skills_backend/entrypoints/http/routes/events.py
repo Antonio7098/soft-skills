@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Query, Request
 
 from soft_skills_backend.entrypoints.http.dependencies import get_container, require_admin_actor
@@ -28,6 +30,22 @@ async def list_events(
     workflow_id: str | None = Query(default=None),
     request_id: str | None = Query(default=None),
     error_code: str | None = Query(default=None),
+    user_id: str | None = Query(default=None, description="Filter by user ID"),
+    search: str | None = Query(
+        default=None,
+        description="Regex search across event_type, trace_id, workflow_id, request_id, error_code, user_id",
+    ),
+    from_date: datetime | None = Query(
+        default=None, description="Filter events from this date (inclusive)"
+    ),
+    to_date: datetime | None = Query(
+        default=None, description="Filter events up to this date (inclusive)"
+    ),
+    sort_by: str | None = Query(
+        default=None,
+        description="Sort field: event_type, trace_id, workflow_id, error_code, occurred_at, user_id",
+    ),
+    sort_order: str | None = Query(default="desc", description="Sort direction: asc or desc"),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> ApiEnvelope[PaginatedWorkflowEventsView]:
@@ -42,6 +60,12 @@ async def list_events(
             workflow_id=workflow_id,
             request_id=request_id,
             error_code=error_code,
+            user_id=user_id,
+            search=search,
+            from_date=from_date,
+            to_date=to_date,
+            sort_by=sort_by,
+            sort_order=sort_order,
             offset=offset,
             limit=limit,
         ),

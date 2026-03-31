@@ -3308,8 +3308,15 @@ export const mockDataProvider: DataProvider = {
     event_type?: string;
     trace_id?: string;
     workflow_id?: string;
+    user_id?: string;
+    user_id?: string;
     request_id?: string;
     error_code?: string;
+    search?: string;
+    from_date?: string;
+    to_date?: string;
+    sort_by?: string;
+    sort_order?: string;
     offset?: number;
     limit?: number;
   }): Promise<PaginatedWorkflowEventsView> {
@@ -3326,6 +3333,43 @@ export const mockDataProvider: DataProvider = {
     }
     if (params?.workflow_id) {
       filtered = filtered.filter((e) => e.workflow_id === params.workflow_id);
+    }
+    if (params?.request_id) {
+      filtered = filtered.filter((e) => e.request_id === params.request_id);
+    }
+    if (params?.user_id) {
+      filtered = filtered.filter((e) => e.user_id === params.user_id);
+    }
+    if (params?.search) {
+      try {
+        const regex = new RegExp(params.search, 'i');
+        const fields = ['event_type', 'trace_id', 'workflow_id', 'request_id', 'error_code', 'user_id'] as const;
+        filtered = filtered.filter((e) =>
+          fields.some((f) => e[f] && regex.test(e[f] as string))
+        );
+      } catch {
+        // Invalid regex, return empty
+        filtered = [];
+      }
+    }
+    if (params?.from_date) {
+      const fromDate = new Date(params.from_date);
+      filtered = filtered.filter((e) => new Date(e.occurred_at) >= fromDate);
+    }
+    if (params?.to_date) {
+      const toDate = new Date(params.to_date);
+      filtered = filtered.filter((e) => new Date(e.occurred_at) <= toDate);
+    }
+    const sortField = params?.sort_by || 'occurred_at';
+    const sortOrder = params?.sort_order || 'desc';
+    const validFields = ['event_type', 'trace_id', 'workflow_id', 'error_code', 'occurred_at', 'user_id'] as const;
+    if ((validFields as readonly string[]).includes(sortField)) {
+      filtered.sort((a, b) => {
+        const aVal = a[sortField as keyof typeof a] ?? '';
+        const bVal = b[sortField as keyof typeof b] ?? '';
+        const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+        return sortOrder === 'asc' ? cmp : -cmp;
+      });
     }
     const offset = params?.offset ?? 0;
     const limit = params?.limit ?? 50;

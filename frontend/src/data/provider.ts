@@ -344,6 +344,12 @@ export interface DataProvider {
     workflow_id?: string;
     request_id?: string;
     error_code?: string;
+    user_id?: string;
+    search?: string;
+    from_date?: string;
+    to_date?: string;
+    sort_by?: string;
+    sort_order?: string;
     offset?: number;
     limit?: number;
   }): Promise<PaginatedWorkflowEventsView>;

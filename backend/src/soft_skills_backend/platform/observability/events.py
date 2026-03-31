@@ -24,6 +24,7 @@ class WorkflowEvent(BaseModel):
     workflow_id: str | None = None
     error_code: str | None = None
     organisation_id: str | None = None
+    user_id: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

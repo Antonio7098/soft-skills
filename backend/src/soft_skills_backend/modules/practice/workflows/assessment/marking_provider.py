@@ -438,7 +438,7 @@ def _verify_per_skill_assessment(
     normalized_response = _normalize_text(response_text)
     for evidence in assessment.evidence:
         if (
-            len(evidence.quote.strip()) < 6
+            len(evidence.quote.strip()) < 3
             or _normalize_text(evidence.quote) not in normalized_response
         ):
             raise scoring_error(

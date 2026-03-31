@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { 
   ScrollText,
   Filter,
@@ -6,6 +6,11 @@ import {
   Clock,
   ChevronRight,
   X,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  Regex,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
@@ -20,39 +25,111 @@ const EVENT_TYPE_OPTIONS = [
   { value: 'attempt.submitted', label: 'Attempt Submitted' },
   { value: 'assessment.completed', label: 'Assessment Completed' },
   { value: 'pipeline.failed', label: 'Pipeline Failed' },
+  { value: 'auth.login.success', label: 'Login Success' },
+  { value: 'auth.login.failure', label: 'Login Failure' },
+  { value: 'verification.submitted', label: 'Verification Submitted' },
+  { value: 'verification.approved', label: 'Verification Approved' },
+  { value: 'verification.rejected', label: 'Verification Rejected' },
 ];
+
+const SORT_OPTIONS = [
+  { value: 'occurred_at', label: 'Time' },
+  { value: 'event_type', label: 'Event Type' },
+  { value: 'trace_id', label: 'Trace ID' },
+  { value: 'workflow_id', label: 'Workflow ID' },
+  { value: 'error_code', label: 'Error Code' },
+  { value: 'user_id', label: 'User ID' },
+];
+
+const PAGE_SIZE = 20;
+
+function formatDateForApi(dateStr: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString();
+}
 
 export function AdminAudit() {
   const dataProvider = useData();
   const [events, setEvents] = useState<PaginatedWorkflowEventsView | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Filters
   const [search, setSearch] = useState('');
   const [eventTypeFilter, setEventTypeFilter] = useState('');
+  const [errorCodeFilter, setErrorCodeFilter] = useState('');
+  const [userIdFilter, setUserIdFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  
+  // Sorting
+  const [sortBy, setSortBy] = useState('occurred_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
+  // Pagination
   const [page, setPage] = useState(1);
-  const pageSize = 20;
+  
+  // UI state
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<WorkflowEventView | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  useEffect(() => {
+  const loadEvents = useCallback(() => {
     setLoading(true);
-    dataProvider.listWorkflowEvents({
-      offset: (page - 1) * pageSize,
-      limit: pageSize,
-      event_type: eventTypeFilter || undefined,
-      trace_id: search || undefined,
-    })
+    const params: Record<string, string | number | undefined> = {
+      offset: (page - 1) * PAGE_SIZE,
+      limit: PAGE_SIZE,
+    };
+    if (eventTypeFilter) params.event_type = eventTypeFilter;
+    if (errorCodeFilter) params.error_code = errorCodeFilter;
+    if (userIdFilter) params.user_id = userIdFilter;
+    if (search) params.search = search;
+    if (fromDate) params.from_date = formatDateForApi(fromDate);
+    if (toDate) params.to_date = formatDateForApi(toDate);
+    if (sortBy) params.sort_by = sortBy;
+    if (sortOrder) params.sort_order = sortOrder;
+
+    dataProvider.listWorkflowEvents(params)
       .then((result) => {
-        console.log('[AdminAudit] Received events:', result);
         setEvents(result);
       })
       .catch((error) => console.error('[AdminAudit] Error loading events:', error))
       .finally(() => setLoading(false));
-  }, [dataProvider, page, eventTypeFilter, search]);
+  }, [dataProvider, page, eventTypeFilter, errorCodeFilter, search, fromDate, toDate, sortBy, sortOrder]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('desc');
+    }
+    setPage(1);
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setEventTypeFilter('');
+    setErrorCodeFilter('');
+    setUserIdFilter('');
+    setFromDate('');
+    setToDate('');
+    setPage(1);
+  };
+
+  const hasActiveFilters = search || eventTypeFilter || errorCodeFilter || userIdFilter || fromDate || toDate;
 
   const columns = [
     {
       key: 'event_type',
       header: 'Event',
+      width: '220px',
+      sortable: true,
       render: (event: WorkflowEventView) => (
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${event.error_code ? 'bg-status-error' : 'bg-status-success'}`} />
@@ -64,6 +141,7 @@ export function AdminAudit() {
       key: 'trace_id',
       header: 'Trace ID',
       width: '140px',
+      sortable: true,
       render: (event: WorkflowEventView) => (
         <span className="font-mono text-body-xs text-content-secondary">
           {event.trace_id?.slice(0, 12) || '—'}...
@@ -74,6 +152,7 @@ export function AdminAudit() {
       key: 'workflow_id',
       header: 'Workflow',
       width: '140px',
+      sortable: true,
       render: (event: WorkflowEventView) => (
         <span className="font-mono text-body-xs text-content-secondary">
           {event.workflow_id?.slice(0, 12) || '—'}...
@@ -83,7 +162,8 @@ export function AdminAudit() {
     {
       key: 'error_code',
       header: 'Error',
-      width: '100px',
+      width: '120px',
+      sortable: true,
       render: (event: WorkflowEventView) => (
         event.error_code ? (
           <Badge variant="error" size="sm">{event.error_code}</Badge>
@@ -93,9 +173,25 @@ export function AdminAudit() {
       ),
     },
     {
+      key: 'user_id',
+      header: 'User',
+      width: '120px',
+      sortable: true,
+      render: (event: WorkflowEventView) => (
+        event.user_id ? (
+          <span className="font-mono text-body-xs text-content-secondary">
+            {event.user_id.slice(0, 12)}...
+          </span>
+        ) : (
+          <span className="text-content-tertiary">—</span>
+        )
+      ),
+    },
+    {
       key: 'occurred_at',
       header: 'Time',
-      width: '160px',
+      width: '180px',
+      sortable: true,
       render: (event: WorkflowEventView) => (
         <span className="text-content-secondary">
           {new Date(event.occurred_at).toLocaleString()}
@@ -117,8 +213,15 @@ export function AdminAudit() {
     },
   ];
 
-  const totalPages = events ? Math.ceil(events.total / pageSize) : 1;
+  const totalPages = events ? Math.ceil(events.total / PAGE_SIZE) : 1;
   const errorCount = events?.items.filter((e) => e.error_code).length || 0;
+
+  const SortIndicator = ({ columnKey }: { columnKey: string }) => {
+    if (sortBy !== columnKey) return <span className="w-3 h-3 inline-block" />;
+    return sortOrder === 'asc' 
+      ? <ChevronUp className="w-3 h-3 inline-block" /> 
+      : <ChevronDown className="w-3 h-3 inline-block" />;
+  };
 
   if (loading && !events) {
     return (
@@ -157,13 +260,14 @@ export function AdminAudit() {
         />
       </div>
 
+      {/* Primary Filters */}
       <Card className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <SearchInput
             value={search}
             onChange={setSearch}
-            placeholder="Search by trace ID..."
-            className="w-64"
+            placeholder="Regex search (type, trace, workflow, user...)"
+            className="w-72"
           />
           <FilterSelect
             value={eventTypeFilter}
@@ -172,15 +276,141 @@ export function AdminAudit() {
             placeholder="All event types"
             className="w-48"
           />
+          <FilterSelect
+            value={errorCodeFilter}
+            onChange={setErrorCodeFilter}
+            options={[
+              { value: 'exists', label: 'Has Error' },
+            ]}
+            placeholder="Error status"
+            className="w-36"
+          />
+          <SearchInput
+            value={userIdFilter}
+            onChange={setUserIdFilter}
+            placeholder="Filter by user ID..."
+            className="w-48"
+          />
           <div className="flex-1" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="flex items-center gap-1.5"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            Advanced
+            {showAdvancedFilters ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </Button>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <X className="w-3.5 h-3.5 mr-1" />
+              Clear
+            </Button>
+          )}
           <span className="text-body-xs text-content-tertiary">
             {events?.total || 0} total events
           </span>
         </div>
+
+        {/* Advanced Filters */}
+        {showAdvancedFilters && (
+          <div className="flex items-center gap-3 pt-3 border-t border-line flex-wrap">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-content-tertiary" />
+              <span className="text-body-xs text-content-secondary">From:</span>
+              <input
+                type="datetime-local"
+                value={fromDate}
+                onChange={(e) => { setFromDate(e.target.value); setPage(1); }}
+                className="h-8 px-2 rounded-lg bg-surface-secondary/50 border border-line text-body-xs text-content-primary focus:outline-none focus:ring-2 focus:ring-accent/30"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-content-tertiary" />
+              <span className="text-body-xs text-content-secondary">To:</span>
+              <input
+                type="datetime-local"
+                value={toDate}
+                onChange={(e) => { setToDate(e.target.value); setPage(1); }}
+                className="h-8 px-2 rounded-lg bg-surface-secondary/50 border border-line text-body-xs text-content-primary focus:outline-none focus:ring-2 focus:ring-accent/30"
+              />
+            </div>
+            <div className="flex-1" />
+            <div className="flex items-center gap-2">
+              <span className="text-body-xs text-content-secondary">Sort:</span>
+              <FilterSelect
+                value={sortBy}
+                onChange={(val) => { setSortBy(val); setPage(1); }}
+                options={SORT_OPTIONS}
+                placeholder="Sort by"
+                className="w-32"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="flex items-center gap-1"
+              >
+                {sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                {sortOrder.toUpperCase()}
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
+      {/* Active filter badges */}
+      {hasActiveFilters && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-body-xs text-content-tertiary">Active filters:</span>
+          {search && (
+            <Badge variant="info" size="sm" className="flex items-center gap-1">
+              <Regex className="w-3 h-3" />
+              {search}
+              <button onClick={() => setSearch('')} className="ml-1 hover:text-status-error"><X className="w-3 h-3" /></button>
+            </Badge>
+          )}
+          {eventTypeFilter && (
+            <Badge variant="info" size="sm" className="flex items-center gap-1">
+              Type: {EVENT_TYPE_OPTIONS.find(o => o.value === eventTypeFilter)?.label || eventTypeFilter}
+              <button onClick={() => setEventTypeFilter('')} className="ml-1 hover:text-status-error"><X className="w-3 h-3" /></button>
+            </Badge>
+          )}
+          {errorCodeFilter && (
+            <Badge variant="error" size="sm" className="flex items-center gap-1">
+              Has errors
+              <button onClick={() => setErrorCodeFilter('')} className="ml-1 hover:text-status-error"><X className="w-3 h-3" /></button>
+            </Badge>
+          )}
+          {fromDate && (
+            <Badge variant="info" size="sm" className="flex items-center gap-1">
+              From: {new Date(fromDate).toLocaleString()}
+              <button onClick={() => setFromDate('')} className="ml-1 hover:text-status-error"><X className="w-3 h-3" /></button>
+            </Badge>
+          )}
+          {toDate && (
+            <Badge variant="info" size="sm" className="flex items-center gap-1">
+              To: {new Date(toDate).toLocaleString()}
+              <button onClick={() => setToDate('')} className="ml-1 hover:text-status-error"><X className="w-3 h-3" /></button>
+            </Badge>
+          )}
+        </div>
+      )}
+
       <DataTable
-        columns={columns}
+        columns={columns.map(col => ({
+          ...col,
+          header: col.sortable ? (
+            <button
+              onClick={() => handleSort(col.key)}
+              className="flex items-center gap-1 hover:text-content-primary transition-colors cursor-pointer"
+            >
+              {col.header}
+              <SortIndicator columnKey={col.key} />
+            </button>
+          ) : col.header,
+        }))}
         data={events?.items || []}
         keyExtractor={(event) => event.event_id}
         emptyMessage="No events found"

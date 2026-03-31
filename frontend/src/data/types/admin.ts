@@ -479,6 +479,7 @@ export interface WorkflowEventView {
   readonly trace_id: string | null;
   readonly workflow_id: string | null;
   readonly error_code: string | null;
+  readonly user_id: string | null;
   readonly payload: Record<string, unknown>;
   readonly occurred_at: string;
 }

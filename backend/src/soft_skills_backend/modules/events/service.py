@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from soft_skills_backend.modules.events.contracts import (
     PaginatedWorkflowEventsView,
     UpdateWorkflowEventCommand,
@@ -26,6 +28,12 @@ class EventsService:
         workflow_id: str | None = None,
         request_id: str | None = None,
         error_code: str | None = None,
+        user_id: str | None = None,
+        search: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        sort_by: str | None = None,
+        sort_order: str | None = None,
         offset: int = 0,
         limit: int = 50,
     ) -> PaginatedWorkflowEventsView:
@@ -35,6 +43,12 @@ class EventsService:
             workflow_id=workflow_id,
             request_id=request_id,
             error_code=error_code,
+            user_id=user_id,
+            search=search,
+            from_date=from_date,
+            to_date=to_date,
+            sort_by=sort_by,
+            sort_order=sort_order,
             organisation_id=actor.organisation_id,
             offset=offset,
             limit=limit,
@@ -45,6 +59,10 @@ class EventsService:
             workflow_id=workflow_id,
             request_id=request_id,
             error_code=error_code,
+            user_id=user_id,
+            search=search,
+            from_date=from_date,
+            to_date=to_date,
             organisation_id=actor.organisation_id,
         )
         items = [
@@ -55,6 +73,7 @@ class EventsService:
                 trace_id=r.trace_id,
                 workflow_id=r.workflow_id,
                 error_code=r.error_code,
+                user_id=r.user_id,
                 occurred_at=r.occurred_at.isoformat(),
             )
             for r in records
@@ -88,6 +107,7 @@ class EventsService:
             trace_id=record.trace_id,
             workflow_id=record.workflow_id,
             error_code=record.error_code,
+            user_id=record.user_id,
             payload=record.payload or {},
             occurred_at=record.occurred_at.isoformat(),
         )
@@ -126,6 +146,7 @@ class EventsService:
             trace_id=updated.trace_id,
             workflow_id=updated.workflow_id,
             error_code=updated.error_code,
+            user_id=updated.user_id,
             payload=updated.payload or {},
             occurred_at=updated.occurred_at.isoformat(),
         )
