@@ -22,6 +22,7 @@ export interface BulkOperationResultView {
   readonly success_count: number;
   readonly failure_count: number;
   readonly failed_user_ids: string[];
+  readonly processed?: number;
 }
 
 export interface UserSessionView {

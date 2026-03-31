@@ -3107,12 +3107,12 @@ export const mockDataProvider: DataProvider = {
   async listOpenRouterModels(): Promise<ProviderModel[]> {
     await delay(200);
     return [
-      { id: 'openai/gpt-4o', name: 'GPT-4o', provider: 'openrouter' },
-      { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openrouter' },
-      { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'openrouter' },
-      { id: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku', provider: 'openrouter' },
-      { id: 'google/gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'openrouter' },
-      { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Llama 3.1 70B', provider: 'openrouter' },
+      { id: 'openai/gpt-4o', name: 'GPT-4o', provider: 'openrouter', pricing: null },
+      { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openrouter', pricing: null },
+      { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'openrouter', pricing: null },
+      { id: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku', provider: 'openrouter', pricing: null },
+      { id: 'google/gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'openrouter', pricing: null },
+      { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Llama 3.1 70B', provider: 'openrouter', pricing: null },
     ];
   },
 

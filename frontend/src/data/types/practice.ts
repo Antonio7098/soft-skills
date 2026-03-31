@@ -179,7 +179,7 @@ export interface PracticeRunItemSummary {
   readonly id: string;
   readonly item_type: 'prompt_item' | 'scenario';
   readonly title: string;
-  readonly prompt_text: string;
+  readonly prompt_text?: string;
   readonly difficulty: Difficulty;
   readonly target_skill_slugs: string[];
   readonly status: 'pending' | 'active' | 'completed' | 'skipped';
@@ -207,6 +207,11 @@ export interface PracticeRunView {
   readonly completed_at: string | null;
   readonly items: PracticeRunItemSummary[];
   readonly summary: PracticeRunSummary;
+  readonly id?: string;
+  readonly user_id?: string;
+  readonly title?: string;
+  readonly created_at?: string;
+  readonly updated_at?: string;
 }
 
 export interface PracticeSessionView {

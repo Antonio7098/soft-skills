@@ -279,6 +279,7 @@ function ComparisonModal({ runs, onClose }: ComparisonModalProps) {
       }
       return Object.entries(modelMetrics).map(([model, m]) => ({
         model,
+        runs: m.runs,
         passRate: m.runs > 0 ? m.passed / m.runs : 0,
         avgLatency: m.runs > 0 ? m.avgLatency / m.runs : 0,
         totalCases: m.cases,

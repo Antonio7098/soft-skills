@@ -9,6 +9,7 @@ export interface CompetencyView {
   readonly name: string;
   readonly description: string;
   readonly skill_slugs: string[];
+  readonly skills: SkillView[];
 }
 
 export interface RubricView {
@@ -44,6 +45,7 @@ export interface OrgSkillView {
   readonly name: string;
   readonly description: string;
   readonly organisation_id: string;
+  readonly skill_slug?: string;
 }
 
 export interface OrgCompetencyView {

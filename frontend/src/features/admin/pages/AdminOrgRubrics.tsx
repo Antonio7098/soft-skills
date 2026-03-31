@@ -244,11 +244,11 @@ export function AdminOrgRubrics() {
                 </p>
               </div>
 
-              {selectedRubric.criteria.length > 0 && (
+              {(selectedRubric.criteria?.length ?? 0) > 0 && (
                 <div className="p-4 rounded-lg bg-surface-secondary/50 border border-line">
                   <h4 className="text-body-sm font-medium text-content-secondary mb-2">Criteria</h4>
                   <div className="flex flex-wrap gap-2">
-                    {selectedRubric.criteria.map((criterion) => (
+                    {selectedRubric.criteria!.map((criterion) => (
                       <Badge key={criterion} variant="default" size="sm">{criterion}</Badge>
                     ))}
                   </div>

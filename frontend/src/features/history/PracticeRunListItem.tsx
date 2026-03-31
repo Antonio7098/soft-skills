@@ -27,7 +27,7 @@ export function PracticeRunListItem({ run }: PracticeRunListItemProps) {
     if (expanded && !itemsLoaded && items.length === 0) {
       data.getPracticeRun(run.run_id)
         .then((fullRun) => {
-          const assessedItems = (fullRun.items ?? []).filter(item => item.status === 'assessed');
+          const assessedItems = (fullRun.items ?? []).filter(item => item.status === 'completed');
           setItems(assessedItems);
           setItemsLoaded(true);
         })
@@ -108,7 +108,7 @@ export function PracticeRunListItem({ run }: PracticeRunListItemProps) {
                   <p className="text-body-sm text-content-primary truncate">{item.title}</p>
                   <p className="text-body-xs text-content-tertiary truncate">{item.prompt_text}</p>
                 </div>
-                <Badge variant={item.status === 'assessed' ? 'success' : 'default'} size="sm" className="capitalize">
+                <Badge variant={item.status === 'completed' ? 'success' : 'default'} size="sm" className="capitalize">
                   {item.status}
                 </Badge>
               </div>
