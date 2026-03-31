@@ -17,6 +17,23 @@ from .suites.assessment_marking import (
     QuickPracticeMarkingSmoke,
     ScenarioMarkingSmoke,
 )
+from .suites.marking_edge_cases import (
+    MarkingEmptyResponseSmoke,
+    MarkingLongResponseSmoke,
+    MarkingRapidSubmissionSmoke,
+    MarkingRepeatedSubmissionSmoke,
+    MarkingSpecialCharsResponseSmoke,
+    MarkingSqlInjectionAttemptSmoke,
+)
+from .suites.assistant_edge_cases import (
+    AssistantConcurrentSessionsSmoke,
+    AssistantEmptyMessageSmoke,
+    AssistantInvalidSessionSmoke,
+    AssistantLongMessageSmoke,
+    AssistantRapidTurnsSmoke,
+    AssistantSpecialCharsSmoke,
+    AssistantToolSequenceSmoke,
+)
 from .suites.assistant_runtime import (
     AssistantApprovalWorkflowSmoke,
     AssistantGenerationRuntimeSmoke,
@@ -37,6 +54,13 @@ from .suites.content_generation import (
 from .suites.eval_dashboard_smoke import EvalDashboardSmoke
 from .suites.evaluation_smoke import EvaluationSmoke
 from .suites.full_user_journey import FullUserJourneySmoke
+from .suites.generation_edge_cases import (
+    GenerationEmptyCountsSmoke,
+    GenerationInvalidSkillSlugSmoke,
+    GenerationLongPromptSmoke,
+    GenerationMultipleCollectionsSmoke,
+    GenerationSpecialCharsPromptSmoke,
+)
 from .suites.generation_streaming import GenerationCancellationSmoke, GenerationStreamingSmoke
 from .suites.organisation_smoke import OrganisationSmoke
 from .suites.pipeline_visualization import PipelineVisualizationSmoke
@@ -60,6 +84,13 @@ def build_default_registry() -> SmokeRegistry:
             AssistantGenerationRuntimeSmoke(),
             AssistantPracticeRuntimeSmoke(),
             AssistantStreamRuntimeSmoke(),
+            AssistantLongMessageSmoke(),
+            AssistantSpecialCharsSmoke(),
+            AssistantRapidTurnsSmoke(),
+            AssistantConcurrentSessionsSmoke(),
+            AssistantEmptyMessageSmoke(),
+            AssistantToolSequenceSmoke(),
+            AssistantInvalidSessionSmoke(),
             StructuredGenerationSmoke(),
             ChatGenerationSmoke(),
             StructuredPromptItemGenerationSmoke(),
@@ -67,6 +98,11 @@ def build_default_registry() -> SmokeRegistry:
             GenerationLatencyEnvelopeSmoke(),
             GenerationStreamingSmoke(),
             GenerationCancellationSmoke(),
+            GenerationLongPromptSmoke(),
+            GenerationSpecialCharsPromptSmoke(),
+            GenerationInvalidSkillSlugSmoke(),
+            GenerationEmptyCountsSmoke(),
+            GenerationMultipleCollectionsSmoke(),
             AuthFlowsSmoke(),
             EvaluationSmoke(),
             EvalDashboardSmoke(),
@@ -74,6 +110,12 @@ def build_default_registry() -> SmokeRegistry:
             InterviewMarkingSmoke(),
             ScenarioMarkingSmoke(),
             MarkingRelationalPersistenceSmoke(),
+            MarkingEmptyResponseSmoke(),
+            MarkingLongResponseSmoke(),
+            MarkingSpecialCharsResponseSmoke(),
+            MarkingSqlInjectionAttemptSmoke(),
+            MarkingRapidSubmissionSmoke(),
+            MarkingRepeatedSubmissionSmoke(),
             PracticeSessionFlowSmoke(),
             PracticeRunLifecycleSmoke(),
             OrganisationSmoke(),
