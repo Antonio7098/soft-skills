@@ -87,8 +87,7 @@ async def generate_collection(
     config: CatalogGenerationRuntimeConfig,
     blueprint_output: TypedLLMOutput,
     prompt_item_worker_output: TypedLLMOutput,
-    scenario_shell_worker_output: TypedLLMOutput,
-    scenario_question_worker_output: TypedLLMOutput,
+    scenario_worker_output: TypedLLMOutput,
     timeout_ms: int,
     sanitize_text: Callable[[str], str],
     workplace_context_for_commands: Callable[
@@ -283,8 +282,7 @@ async def generate_collection(
             prompt_registry=prompt_registry,
             config=config,
             llm_provider=llm_provider,
-            scenario_shell_worker_output=scenario_shell_worker_output,
-            scenario_question_worker_output=scenario_question_worker_output,
+            scenario_worker_output=scenario_worker_output,
             stageflow=stageflow,
             collection_title=blueprint.title,
             target_audience=command.target_audience,
@@ -397,8 +395,8 @@ async def generate_collection(
             scenarios=[
                 build_worker_artifact(
                     provider_name=llm_provider.provider_name,
-                    pipeline_name="catalog_scenario_generation",
-                    prompt_version=config.scenario_shell_worker_prompt_version,
+                    pipeline_name="catalog_scenario_worker",
+                    prompt_version=config.scenario_worker_prompt_version,
                     worker_result=result,
                 )
                 for result in scenario_results

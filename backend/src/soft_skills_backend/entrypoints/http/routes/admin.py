@@ -57,7 +57,6 @@ from soft_skills_backend.modules.admin import (
     UpdateRubricCommand,
     UserActivityView,
 )
-from soft_skills_backend.modules.admin.contracts.unified_audit import PaginatedUnifiedAuditView
 from soft_skills_backend.modules.catalog import CollectionView
 
 router = APIRouter()
@@ -809,50 +808,3 @@ async def get_telemetry_trace(
             details={"trace_id": trace_id},
         )
     return ok_response(request, result)
-
-
-@router.get("/audit/unified", response_model=ApiEnvelope[PaginatedUnifiedAuditView])
-async def list_unified_audit_log(
-    request: Request,
-    source: str | None = Query(
-        default=None, description="Filter by source: workflow_event, pipeline_run, provider_call"
-    ),
-    event_type: str | None = Query(
-        default=None,
-        description="Filter by event type (workflow event type, pipeline name, or provider operation)",
-    ),
-    user_id: str | None = Query(default=None, description="Filter by user ID"),
-    trace_id: str | None = Query(default=None),
-    workflow_id: str | None = Query(default=None),
-    request_id: str | None = Query(default=None),
-    error_code: str | None = Query(default=None),
-    search: str | None = Query(default=None, description="Regex search across fields"),
-    from_date: datetime | None = Query(default=None),
-    to_date: datetime | None = Query(default=None),
-    sort_by: str | None = Query(default=None),
-    sort_order: str | None = Query(default="desc"),
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=50, ge=1, le=200),
-) -> ApiEnvelope[PaginatedUnifiedAuditView]:
-    actor = await require_admin_actor(request)
-    service = get_admin_service(request)
-    return ok_response(
-        request,
-        service.list_unified_audit_log(
-            actor,
-            source=source,
-            event_type=event_type,
-            user_id=user_id,
-            trace_id=trace_id,
-            workflow_id=workflow_id,
-            request_id=request_id,
-            error_code=error_code,
-            search=search,
-            from_date=from_date,
-            to_date=to_date,
-            sort_by=sort_by,
-            sort_order=sort_order,
-            offset=offset,
-            limit=limit,
-        ),
-    )

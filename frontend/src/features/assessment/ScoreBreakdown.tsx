@@ -14,7 +14,6 @@ interface ScoreBreakdownProps {
 }
 
 export function ScoreBreakdown({ overallScore, maxScore = 5, perSkillAssessments, rationale }: ScoreBreakdownProps) {
-  if (!perSkillAssessments) return null;
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}

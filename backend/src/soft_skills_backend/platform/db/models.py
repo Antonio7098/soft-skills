@@ -39,7 +39,6 @@ class WorkflowEventRecord(Base):
     workflow_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     organisation_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
-    user_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
@@ -328,7 +327,6 @@ class ScenarioRecord(Base):
     learner_objective: Mapped[str] = mapped_column(Text)
     constraints: Mapped[list[str]] = mapped_column(JSON, default=list)
     stakeholder_tensions: Mapped[list[str]] = mapped_column(JSON, default=list)
-    questions: Mapped[list[str]] = mapped_column(JSON, default=list)
     lifecycle_state: Mapped[str] = mapped_column(String(32), index=True)
     target_skill_slugs: Mapped[list[str]] = mapped_column(JSON, default=list)
     rubric_id: Mapped[str] = mapped_column(String(128), index=True)

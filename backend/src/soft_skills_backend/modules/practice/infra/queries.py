@@ -222,10 +222,6 @@ def _load_scenario_context(
         learner_objective=scenario.learner_objective,
         constraints=list(scenario.constraints),
         stakeholder_tensions=list(scenario.stakeholder_tensions),
-        questions=list(scenario.questions),
-        active_question_text=start_input.scenario_question_text,
-        active_question_index=start_input.scenario_question_index,
-        question_count=start_input.scenario_question_count,
         mock_company=(
             None
             if company_record is None
@@ -414,24 +410,9 @@ def load_resolved_attempt(
 def _build_scenario_prompt_text(context: ScenarioContextView) -> str:
     sections = [
         "Work through the following workplace scenario in a single written response.",
+        f"Business context: {context.business_context}",
+        f"Learner objective: {context.learner_objective}",
     ]
-    if context.active_question_text is not None:
-        if (
-            context.active_question_index is not None
-            and context.question_count is not None
-            and context.question_count > 0
-        ):
-            sections.append(
-                f"Question {context.active_question_index} of {context.question_count}: {context.active_question_text}"
-            )
-        else:
-            sections.append(f"Question: {context.active_question_text}")
-    sections.extend(
-        [
-            f"Business context: {context.business_context}",
-            f"Learner objective: {context.learner_objective}",
-        ]
-    )
     if context.constraints:
         sections.append(f"Constraints: {_join_items(context.constraints)}")
     if context.stakeholder_tensions:

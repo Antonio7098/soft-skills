@@ -137,55 +137,15 @@ class PracticeService:
                 list[PromptContextPayload],
                 payload_from_inputs(ctx, "prompt_enrich"),
             )
-            items: list[PracticeRunItemTransformPayload] = []
-            position = 1
-            for prompt_payload in prompt_payloads:
-                prompt = prompt_payload.prompt
-                scenario_context = prompt.scenario_context
-                if (
-                    prompt.practice_type == PracticeType.SCENARIO
-                    and scenario_context is not None
-                    and scenario_context.active_question_text is None
-                    and scenario_context.questions
-                ):
-                    question_count = len(scenario_context.questions)
-                    for question_index, question_text in enumerate(
-                        scenario_context.questions,
-                        start=1,
-                    ):
-                        expanded_prompt = prompt.model_copy(
-                            update={
-                                "scenario_context": scenario_context.model_copy(
-                                    update={
-                                        "active_question_text": question_text,
-                                        "active_question_index": question_index,
-                                        "question_count": question_count,
-                                    }
-                                ),
-                            }
-                        )
-                        expanded_prompt.prompt_text = self._render_expanded_scenario_prompt(
-                            expanded_prompt
-                        )
-                        items.append(
-                            PracticeRunItemTransformPayload(
-                                position=position,
-                                session_id=uuid4().hex,
-                                attempt_id=uuid4().hex,
-                                prompt=expanded_prompt,
-                            )
-                        )
-                        position += 1
-                    continue
-                items.append(
-                    PracticeRunItemTransformPayload(
-                        position=position,
-                        session_id=uuid4().hex,
-                        attempt_id=uuid4().hex,
-                        prompt=prompt,
-                    )
+            items = [
+                PracticeRunItemTransformPayload(
+                    position=index,
+                    session_id=uuid4().hex,
+                    attempt_id=uuid4().hex,
+                    prompt=prompt_payload.prompt,
                 )
-                position += 1
+                for index, prompt_payload in enumerate(prompt_payloads, start=1)
+            ]
             return ok_output(
                 StageflowStageResult(
                     payload=PracticeRunTransformPayload(
@@ -630,54 +590,6 @@ class PracticeService:
         return self._store.get_practice_run_sessions(actor, run_id)
 
     @staticmethod
-    def _render_expanded_scenario_prompt(prompt: Any) -> str:
-        scenario_context = prompt.scenario_context
-        assert scenario_context is not None
-        sections = ["Work through the following workplace scenario in a single written response."]
-        if (
-            scenario_context.active_question_text is not None
-            and scenario_context.active_question_index is not None
-            and scenario_context.question_count is not None
-        ):
-            sections.append(
-                "Question "
-                f"{scenario_context.active_question_index} of {scenario_context.question_count}: "
-                f"{scenario_context.active_question_text}"
-            )
-        sections.append(f"Business context: {scenario_context.business_context}")
-        sections.append(f"Learner objective: {scenario_context.learner_objective}")
-        if scenario_context.constraints:
-            sections.append("Constraints: " + "; ".join(scenario_context.constraints))
-        if scenario_context.stakeholder_tensions:
-            sections.append(
-                "Stakeholder tensions: " + "; ".join(scenario_context.stakeholder_tensions)
-            )
-        if scenario_context.mock_company is not None:
-            sections.append(
-                "Company context: "
-                f"{scenario_context.mock_company.name} ({scenario_context.mock_company.industry}) - "
-                f"{scenario_context.mock_company.operating_context}"
-            )
-        if scenario_context.mock_people:
-            sections.append(
-                "Stakeholders: "
-                + " | ".join(
-                    f"{person.name} ({person.role}): {person.relationship_to_scenario}"
-                    for person in scenario_context.mock_people
-                )
-            )
-        if scenario_context.artifacts:
-            sections.append(
-                "Artifacts: "
-                + " | ".join(
-                    f"{artifact.title} [{artifact.artifact_type}]"
-                    for artifact in scenario_context.artifacts
-                )
-            )
-        sections.append("Respond with the action or message you would deliver next.")
-        return "\n".join(sections)
-
-    @staticmethod
     def _start_input_from_run_item(
         item: StartQuickPracticeRunItemCommand
         | StartInterviewRunItemCommand
@@ -709,7 +621,4 @@ class PracticeService:
                 )
                 for index, artifact in enumerate(item.artifacts, start=1)
             ],
-            scenario_question_text=item.question_text,
-            scenario_question_index=item.question_index,
-            scenario_question_count=item.question_count,
         )

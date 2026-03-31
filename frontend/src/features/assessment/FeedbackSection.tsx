@@ -40,7 +40,6 @@ function FeedbackBlock({ title, icon, items, accentClass, iconBgClass }: Feedbac
 }
 
 export function FeedbackSection({ strengths, weaknesses, nextActions }: FeedbackSectionProps) {
-  if (!strengths || !weaknesses || !nextActions) return null;
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}

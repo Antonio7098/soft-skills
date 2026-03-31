@@ -543,7 +543,6 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
                         "target_skill_slugs": ["expectation-setting"],
                         "rubric_id": "scenario_text@v1",
                         "supporting_artifact_count": 1,
-                        "question_count": 3,
                     }
                 ],
             },
@@ -602,11 +601,6 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
                 "learner_objective": "Reset expectations without damaging trust.",
                 "constraints": ["Board review tomorrow"],
                 "stakeholder_tensions": ["Sales wants speed", "Legal wants certainty"],
-                "questions": [
-                    "What do you say to the sponsor first?",
-                    "How do you align sales and legal on a realistic path?",
-                    "What next step do you commit to before the board review?",
-                ],
                 "target_skill_slugs": ["expectation-setting"],
                 "rubric_id": "scenario_text@v1",
                 "mock_company": {

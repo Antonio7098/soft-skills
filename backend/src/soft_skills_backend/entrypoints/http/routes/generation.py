@@ -156,19 +156,12 @@ async def stream_generation(websocket: WebSocket, stream_token: str) -> None:
     container = websocket.app.state.container
     broker: GenerationRealtimeBroker = container.generation_broker
 
-    await websocket.accept()
-
     execution = broker.get_execution_by_token(stream_token)
     if execution is None:
-        await websocket.send_json(
-            {
-                "type": "error",
-                "code": "NOT_FOUND",
-                "message": "Generation not found or already completed",
-            }
-        )
         await websocket.close(code=4404)
         return
+
+    await websocket.accept()
     queue = broker.subscribe(stream_token)
     last_sequence_raw = websocket.query_params.get("last_event_id")
     last_sequence = None if last_sequence_raw is None else int(last_sequence_raw)

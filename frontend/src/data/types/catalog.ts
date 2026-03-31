@@ -41,7 +41,6 @@ export interface ScenarioView {
   readonly learner_objective: string;
   readonly constraints: string[];
   readonly stakeholder_tensions: string[];
-  readonly questions: string[];
   readonly lifecycle_state: LifecycleState;
   readonly target_skill_slugs: string[];
   readonly rubric_id: string;
@@ -131,7 +130,6 @@ export interface ScenarioCreateCommand {
   readonly learner_objective: string;
   readonly constraints?: string[];
   readonly stakeholder_tensions?: string[];
-  readonly questions?: string[];
   readonly target_skill_slugs: string[];
   readonly rubric_id: string;
   readonly mock_company?: MockCompanyInput | null;

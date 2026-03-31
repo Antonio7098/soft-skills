@@ -32,9 +32,7 @@ from soft_skills_backend.modules.catalog.domain.models import (
     GeneratedCollectionBlueprint,
     GeneratedPromptItemDraft,
     GeneratedPromptItemPlanBatch,
-    GeneratedScenarioQuestionDraft,
     GeneratedScenarioDraft,
-    GeneratedScenarioShellDraft,
 )
 from soft_skills_backend.modules.catalog.infra.realtime import (
     GenerationExecution,
@@ -55,8 +53,6 @@ from soft_skills_backend.platform.workflows.stageflow_runtime import StageflowRu
 from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import validation_error
 from soft_skills_backend.shared.ports.llm import LLMProvider
-
-logger = __import__("logging").getLogger("soft_skills_backend.generation")
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,13 +102,8 @@ class CatalogGenerationService:
             schema_version=self._config.output_schema_version,
             max_validation_retries=settings.creator_generation_validation_retries,
         )
-        self._scenario_shell_worker_output = TypedLLMOutput(
-            GeneratedScenarioShellDraft,
-            schema_version=self._config.output_schema_version,
-            max_validation_retries=settings.creator_generation_validation_retries,
-        )
-        self._scenario_question_worker_output = TypedLLMOutput(
-            GeneratedScenarioQuestionDraft,
+        self._scenario_worker_output = TypedLLMOutput(
+            GeneratedScenarioDraft,
             schema_version=self._config.output_schema_version,
             max_validation_retries=settings.creator_generation_validation_retries,
         )
@@ -164,8 +155,7 @@ class CatalogGenerationService:
             config=self._config,
             blueprint_output=self._blueprint_output,
             prompt_item_worker_output=self._prompt_item_worker_output,
-            scenario_shell_worker_output=self._scenario_shell_worker_output,
-            scenario_question_worker_output=self._scenario_question_worker_output,
+            scenario_worker_output=self._scenario_worker_output,
             timeout_ms=self._generation_timeout_ms,
             sanitize_text=self._sanitize_generation_text,
             workplace_context_for_commands=self._collection_workplace_context,
@@ -198,8 +188,7 @@ class CatalogGenerationService:
             config=self._config,
             blueprint_output=self._blueprint_output,
             prompt_item_worker_output=self._prompt_item_worker_output,
-            scenario_shell_worker_output=self._scenario_shell_worker_output,
-            scenario_question_worker_output=self._scenario_question_worker_output,
+            scenario_worker_output=self._scenario_worker_output,
             timeout_ms=self._generation_timeout_ms,
             sanitize_text=self._sanitize_generation_text,
             workplace_context_for_commands=self._collection_workplace_context,
@@ -341,8 +330,7 @@ class CatalogGenerationService:
                 config=self._config,
                 blueprint_output=self._blueprint_output,
                 prompt_item_worker_output=self._prompt_item_worker_output,
-                scenario_shell_worker_output=self._scenario_shell_worker_output,
-                scenario_question_worker_output=self._scenario_question_worker_output,
+                scenario_worker_output=self._scenario_worker_output,
                 timeout_ms=self._generation_timeout_ms,
                 sanitize_text=self._sanitize_generation_text,
                 workplace_context_for_commands=self._collection_workplace_context,
@@ -379,7 +367,6 @@ class CatalogGenerationService:
             if self._broker is not None:
                 await self._broker.publish(execution.stream_token, cancelled_event)
         except Exception as exc:
-            logger.exception("Structured generation failed for %s", execution.generation_id)
             error_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
                 generation_id=execution.generation_id,
@@ -466,8 +453,7 @@ class CatalogGenerationService:
                 config=self._config,
                 blueprint_output=self._blueprint_output,
                 prompt_item_worker_output=self._prompt_item_worker_output,
-                scenario_shell_worker_output=self._scenario_shell_worker_output,
-                scenario_question_worker_output=self._scenario_question_worker_output,
+                scenario_worker_output=self._scenario_worker_output,
                 timeout_ms=self._generation_timeout_ms,
                 sanitize_text=self._sanitize_generation_text,
                 workplace_context_for_commands=self._collection_workplace_context,
@@ -504,7 +490,6 @@ class CatalogGenerationService:
             if self._broker is not None:
                 await self._broker.publish(execution.stream_token, cancelled_event)
         except Exception as exc:
-            logger.exception("Chat generation failed for %s", execution.generation_id)
             error_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
                 generation_id=execution.generation_id,

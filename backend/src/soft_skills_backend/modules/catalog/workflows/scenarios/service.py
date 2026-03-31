@@ -91,7 +91,6 @@ class ScenarioService:
                     learner_objective=command.learner_objective,
                     constraints=list(command.constraints),
                     stakeholder_tensions=list(command.stakeholder_tensions),
-                    questions=list(command.questions),
                     lifecycle_state="draft",
                     target_skill_slugs=list(command.target_skill_slugs),
                     rubric_id=command.rubric_id,
@@ -182,7 +181,6 @@ class ScenarioService:
                 scenario.learner_objective = command.learner_objective
                 scenario.constraints = list(command.constraints)
                 scenario.stakeholder_tensions = list(command.stakeholder_tensions)
-                scenario.questions = list(command.questions)
                 scenario.target_skill_slugs = list(command.target_skill_slugs)
                 scenario.rubric_id = command.rubric_id
                 scenario.updated_at = datetime.now(UTC)

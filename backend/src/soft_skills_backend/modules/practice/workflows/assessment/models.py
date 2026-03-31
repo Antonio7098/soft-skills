@@ -62,10 +62,6 @@ class ScenarioContextView(BaseModel):
     learner_objective: str
     constraints: list[str] = Field(default_factory=list)
     stakeholder_tensions: list[str] = Field(default_factory=list)
-    questions: list[str] = Field(default_factory=list)
-    active_question_text: str | None = None
-    active_question_index: int | None = None
-    question_count: int | None = None
     mock_company: ScenarioCompanyView | None = None
     mock_people: list[ScenarioActorView] = Field(default_factory=list)
     artifacts: list[PracticeArtifactView] = Field(default_factory=list)

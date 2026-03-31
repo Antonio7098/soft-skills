@@ -479,49 +479,8 @@ export interface WorkflowEventView {
   readonly trace_id: string | null;
   readonly workflow_id: string | null;
   readonly error_code: string | null;
-  readonly user_id: string | null;
   readonly payload: Record<string, unknown>;
   readonly occurred_at: string;
-}
-
-export interface UnifiedAuditEntryView {
-  readonly id: string;
-  readonly source: 'workflow_event' | 'pipeline_run' | 'provider_call';
-  readonly event_type: string;
-  readonly user_id: string | null;
-  readonly trace_id: string | null;
-  readonly workflow_id: string | null;
-  readonly request_id: string | null;
-  readonly error_code: string | null;
-  readonly occurred_at: string;
-  readonly payload: Record<string, unknown>;
-}
-
-export interface PaginatedUnifiedAuditView {
-  readonly items: UnifiedAuditEntryView[];
-  readonly total: number;
-  readonly offset: number;
-  readonly limit: number;
-}
-
-export interface UnifiedAuditEntryView {
-  readonly id: string;
-  readonly source: 'workflow_event' | 'pipeline_run' | 'provider_call';
-  readonly event_type: string;
-  readonly user_id: string | null;
-  readonly trace_id: string | null;
-  readonly workflow_id: string | null;
-  readonly request_id: string | null;
-  readonly error_code: string | null;
-  readonly occurred_at: string;
-  readonly payload: Record<string, unknown>;
-}
-
-export interface PaginatedUnifiedAuditView {
-  readonly items: UnifiedAuditEntryView[];
-  readonly total: number;
-  readonly offset: number;
-  readonly limit: number;
 }
 
 export interface PaginatedWorkflowEventsView {

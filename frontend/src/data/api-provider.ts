@@ -65,9 +65,6 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
 const USER_ID_STORAGE_KEY = 'ss_user_id';
 const ACTIVE_ORG_STORAGE_KEY = 'ss_active_organisation_id';
 
-const COLLECTIONS_CACHE_TTL_MS = 5_000;
-let collectionsCache: { key: string; promise: Promise<CollectionView[]>; expiresAt: number } | null = null;
-
 export class ApiRequestError extends Error {
   readonly status: number | null;
   readonly isNetworkError: boolean;
@@ -95,10 +92,6 @@ function getAuthHeaders(): Record<string, string> {
 
 function getStoredActiveOrganisation(): string | null {
   return sessionStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
-}
-
-function invalidateCollectionsCache(): void {
-  collectionsCache = null;
 }
 
 export function getStoredActiveOrganisationId(): string | null {
@@ -283,7 +276,7 @@ function mapCompetencyProgress(
         const linkedCompetency = taxonomy.competencies.find(
           (item) => item.slug === competencyState.competency_slug,
         );
-        return linkedCompetency?.skills?.some((skill) => skill.slug === skillState.skill_slug) ?? false;
+        return linkedCompetency?.skills.some((skill) => skill.slug === skillState.skill_slug) ?? false;
       })
       .map((skillState) => {
         const skill = taxonomy.skills.find((item) => item.slug === skillState.skill_slug);
@@ -375,30 +368,14 @@ export const apiDataProvider: DataProvider = {
     if (filters?.author_user_id) params.set('author_user_id', filters.author_user_id);
     if (filters?.organisation_id) params.set('organisation_id', filters.organisation_id);
     const qs = params.toString();
-    const cacheKey = `/collections${qs ? `?${qs}` : ''}`;
-
-    const now = Date.now();
-    if (collectionsCache && collectionsCache.key === cacheKey && now < collectionsCache.expiresAt) {
-      return collectionsCache.promise;
-    }
-
-    const promise = request<CollectionView[]>(cacheKey);
-    collectionsCache = { key: cacheKey, promise, expiresAt: now + COLLECTIONS_CACHE_TTL_MS };
-    return promise;
+    return request<CollectionView[]>(`/collections${qs ? `?${qs}` : ''}`);
   },
   getCollection: (id) => request<CollectionView>(`/collections/${id}`),
-  createCollection: (cmd) => {
-    invalidateCollectionsCache();
-    return request<CollectionView>('/collections', { method: 'POST', body: JSON.stringify(cmd) });
-  },
-  addPromptItem: (collectionId, cmd) => {
-    invalidateCollectionsCache();
-    return request<CollectionView>(`/collections/${collectionId}/prompt-items`, { method: 'POST', body: JSON.stringify(cmd) });
-  },
-  addScenario: (collectionId, cmd) => {
-    invalidateCollectionsCache();
-    return request<CollectionView>(`/collections/${collectionId}/scenarios`, { method: 'POST', body: JSON.stringify(cmd) });
-  },
+  createCollection: (cmd) => request<CollectionView>('/collections', { method: 'POST', body: JSON.stringify(cmd) }),
+  addPromptItem: (collectionId, cmd) =>
+    request<CollectionView>(`/collections/${collectionId}/prompt-items`, { method: 'POST', body: JSON.stringify(cmd) }),
+  addScenario: (collectionId, cmd) =>
+    request<CollectionView>(`/collections/${collectionId}/scenarios`, { method: 'POST', body: JSON.stringify(cmd) }),
 
   // --- Content Generation --------------------------------------------------
   generateStructuredCollection: (cmd) =>
@@ -784,35 +761,10 @@ export const apiDataProvider: DataProvider = {
     if (params?.workflow_id) searchParams.set('workflow_id', params.workflow_id);
     if (params?.request_id) searchParams.set('request_id', params.request_id);
     if (params?.error_code) searchParams.set('error_code', params.error_code);
-    if (params?.user_id) searchParams.set('user_id', params.user_id);
-    if (params?.search) searchParams.set('search', params.search);
-    if (params?.from_date) searchParams.set('from_date', params.from_date);
-    if (params?.to_date) searchParams.set('to_date', params.to_date);
-    if (params?.sort_by) searchParams.set('sort_by', params.sort_by);
-    if (params?.sort_order) searchParams.set('sort_order', params.sort_order);
     if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
     if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
     const qs = searchParams.toString();
     return request<PaginatedWorkflowEventsView>(`/events${qs ? `?${qs}` : ''}`);
-  },
-  listUnifiedAuditLog: (params) => {
-    const searchParams = new URLSearchParams();
-    if (params?.source) searchParams.set('source', params.source);
-    if (params?.event_type) searchParams.set('event_type', params.event_type);
-    if (params?.user_id) searchParams.set('user_id', params.user_id);
-    if (params?.trace_id) searchParams.set('trace_id', params.trace_id);
-    if (params?.workflow_id) searchParams.set('workflow_id', params.workflow_id);
-    if (params?.request_id) searchParams.set('request_id', params.request_id);
-    if (params?.error_code) searchParams.set('error_code', params.error_code);
-    if (params?.search) searchParams.set('search', params.search);
-    if (params?.from_date) searchParams.set('from_date', params.from_date);
-    if (params?.to_date) searchParams.set('to_date', params.to_date);
-    if (params?.sort_by) searchParams.set('sort_by', params.sort_by);
-    if (params?.sort_order) searchParams.set('sort_order', params.sort_order);
-    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
-    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
-    const qs = searchParams.toString();
-    return request<PaginatedUnifiedAuditView>(`/admin/audit/unified${qs ? `?${qs}` : ''}`);
   },
   getWorkflowEvent: (eventId) => request<WorkflowEventView>(`/events/${encodeURIComponent(eventId)}`),
   updateWorkflowEvent: (eventId, cmd) =>

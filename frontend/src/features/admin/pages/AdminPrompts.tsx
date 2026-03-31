@@ -55,6 +55,7 @@ export function AdminPrompts() {
   const [search, setSearch] = useState('');
   const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
   const [selectedVersion, setSelectedVersion] = useState<PromptVersionView | null>(null);
+  const [showVersionModal, setShowVersionModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateVersionModal, setShowCreateVersionModal] = useState(false);
   const [selectedPromptName, setSelectedPromptName] = useState<string | null>(null);
@@ -64,7 +65,6 @@ export function AdminPrompts() {
     template: string;
     variables: Record<string, string>;
   }>({ template: '', variables: {} });
-  const [variableErrors, setVariableErrors] = useState<Record<string, boolean>>({});
 
   const refreshPrompts = () => {
     setLoading(true);
@@ -124,14 +124,6 @@ export function AdminPrompts() {
 
   const handleCreateVersion = async () => {
     if (!selectedPromptName || !newVersion.template) return;
-    if (requiredVariables.length === 0) return;
-    const missingVariables = requiredVariables.filter((v) => !newVersion.variables[v]?.trim());
-    if (missingVariables.length > 0) {
-      const errors: Record<string, boolean> = {};
-      missingVariables.forEach((v) => { errors[v] = true; });
-      setVariableErrors(errors);
-      return;
-    }
     setActionLoading(true);
     try {
       // Get parent version ID if available
@@ -140,7 +132,7 @@ export function AdminPrompts() {
       
       await dataProvider.createPrompt({
         name: selectedPromptName,
-        version: '1.0.0',
+        version: '1.0.0', // Will be auto-incremented by backend
         prompt_type: parentVersion?.prompt_type || 'assessment',
         template: newVersion.template,
         variables_schema: { type: 'object', properties: {} },
@@ -148,13 +140,17 @@ export function AdminPrompts() {
       });
       setShowCreateVersionModal(false);
       setNewVersion({ template: '', variables: {} });
-      setVariableErrors({});
       loadVersions(selectedPromptName);
     } catch (error) {
       console.error('Failed to create version:', error);
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const openVersionModal = (version: PromptVersionView) => {
+    setSelectedVersion(version);
+    setShowVersionModal(true);
   };
 
   const openCreateVersionModal = (promptName: string) => {
@@ -171,7 +167,6 @@ export function AdminPrompts() {
       template,
       variables: initialVariableValues,
     });
-    setVariableErrors({});
     setShowCreateVersionModal(true);
   };
 
@@ -285,7 +280,7 @@ export function AdminPrompts() {
                       {promptVersions.map((version) => (
                         <div
                           key={version.id}
-                          onClick={() => setSelectedVersion(version)}
+                          onClick={() => openVersionModal(version)}
                           className="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-accent/5 transition-colors cursor-pointer"
                         >
                           <Badge variant="default" size="sm">v{version.version}</Badge>
@@ -477,47 +472,27 @@ export function AdminPrompts() {
             {/* Required Variables Alert */}
             {requiredVariables.length > 0 && (
               <div className="p-3 rounded-lg bg-accent/5 border border-accent/20">
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-2">
                   <AlertCircle className="w-4 h-4 text-accent" />
                   <span className="text-body-sm font-medium text-content-primary">
-                    Required Variables ({requiredVariables.length})
+                    Required Variables
                   </span>
                 </div>
-                <div className="flex flex-col gap-2">
-                  {requiredVariables.map((variable) => {
-                    const hasError = variableErrors[variable];
-                    return (
-                      <div key={variable} className="flex items-center gap-2">
-                        <Badge
-                          variant="accent"
-                          size="sm"
-                          className="font-mono min-w-[120px]"
-                        >
-                          {`{{${variable}}}`}
-                        </Badge>
-                        <input
-                          type="text"
-                          value={newVersion.variables[variable] || ''}
-                          onChange={(e) => {
-                            setNewVersion({
-                              ...newVersion,
-                              variables: { ...newVersion.variables, [variable]: e.target.value },
-                            });
-                            if (hasError && e.target.value.trim()) {
-                              const newErrors = { ...variableErrors };
-                              delete newErrors[variable];
-                              setVariableErrors(newErrors);
-                            }
-                          }}
-                          placeholder={`Value for ${variable}`}
-                          className={`flex-1 px-3 py-1.5 rounded-lg border bg-surface-primary text-content-primary placeholder:text-content-tertiary focus:outline-none focus:ring-2 focus:ring-accent/50 text-body-sm ${
-                            hasError ? 'border-red-500 focus:ring-red-500/50' : 'border-line'
-                          }`}
-                        />
-                      </div>
-                    );
-                  })}
+                <div className="flex flex-wrap gap-2">
+                  {requiredVariables.map((variable) => (
+                    <Badge
+                      key={variable}
+                      variant="accent"
+                      size="sm"
+                      className="font-mono"
+                    >
+                      {`{{${variable}}}`}
+                    </Badge>
+                  ))}
                 </div>
+                <p className="text-body-xs text-content-secondary mt-2">
+                  These variables are detected in your template and will be highlighted
+                </p>
               </div>
             )}
 
@@ -562,16 +537,77 @@ export function AdminPrompts() {
             )}
 
             <div className="flex justify-end gap-2 pt-2 border-t border-line">
-              <Button variant="secondary" onClick={() => { setShowCreateVersionModal(false); setVariableErrors({}); }}>
+              <Button variant="secondary" onClick={() => setShowCreateVersionModal(false)}>
                 Cancel
               </Button>
               <Button 
                 onClick={handleCreateVersion} 
                 loading={actionLoading} 
                 icon={<Check className="w-4 h-4" />}
-                disabled={requiredVariables.length > 0 && requiredVariables.some((v) => !newVersion.variables[v]?.trim())}
               >
                 Create Version
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Version Detail Modal */}
+      {showVersionModal && selectedVersion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-3xl max-h-[85vh] flex flex-col gap-4 overflow-hidden">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-display text-display-xs text-content-primary">{selectedVersion.name}</h3>
+                <p className="text-body-sm text-content-tertiary">Version {selectedVersion.version}</p>
+              </div>
+              <button 
+                onClick={() => { setShowVersionModal(false); setSelectedVersion(null); }} 
+                className="p-1 rounded hover:bg-surface-secondary"
+              >
+                <X className="w-5 h-5 text-content-tertiary" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <StatusBadge status={selectedVersion.status as 'draft' | 'published' | 'archived'} />
+              <span className="text-body-xs text-content-tertiary">
+                Created {new Date(selectedVersion.created_at).toLocaleString()}
+              </span>
+            </div>
+
+            {/* Variables */}
+            {extractVariables(selectedVersion.template).length > 0 && (
+              <div className="p-3 rounded-lg bg-accent/5 border border-accent/20">
+                <h4 className="text-body-sm font-medium text-content-secondary mb-2 flex items-center gap-2">
+                  <Code className="w-4 h-4" />
+                  Variables ({extractVariables(selectedVersion.template).length})
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {extractVariables(selectedVersion.template).map((variable) => (
+                    <Badge
+                      key={variable}
+                      variant="accent"
+                      size="sm"
+                      className="font-mono"
+                    >
+                      {`{{${variable}}}`}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Template */}
+            <div className="flex flex-col gap-2 overflow-y-auto flex-1">
+              <h4 className="text-body-sm font-medium text-content-secondary">Template</h4>
+              <div className="p-4 rounded-lg bg-surface-secondary/50 border border-line">
+                <TemplateWithHighlights template={selectedVersion.template} />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-line">
+              <Button variant="secondary" onClick={() => { setShowVersionModal(false); setSelectedVersion(null); }}>
+                Close
               </Button>
             </div>
           </Card>

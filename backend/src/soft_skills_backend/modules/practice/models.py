@@ -38,9 +38,6 @@ class StartInputPayload(BaseModel):
     content_item_id: str
     interview_context: InterviewContextView | None = None
     artifacts: list[PracticeArtifactView] = Field(default_factory=list)
-    scenario_question_text: str | None = None
-    scenario_question_index: int | None = None
-    scenario_question_count: int | None = None
 
 
 class PromptContextPayload(BaseModel):
@@ -227,15 +224,6 @@ class PracticeRunListItemView(BaseModel):
     completed_at: str | None = None
 
 
-class AttemptQuestionSummaryView(BaseModel):
-    """Per-question summary within an attempt."""
-
-    question_index: int
-    question_text: str
-    score: float | None = None
-    skill_slugs: list[str] = Field(default_factory=list)
-
-
 class AttemptHistoryItemView(BaseModel):
     """Compact learner history row."""
 
@@ -247,7 +235,6 @@ class AttemptHistoryItemView(BaseModel):
     skill_slugs: list[str] = Field(default_factory=list)
     created_at: str
     status: AttemptStatus
-    questions: list[AttemptQuestionSummaryView] = Field(default_factory=list)
 
 
 class StartPracticeSessionCommand(BaseModel):
@@ -365,9 +352,6 @@ class StartScenarioRunItemCommand(BaseModel):
     practice_type: Literal["scenario"]
     scenario_id: str
     artifacts: list[ScenarioArtifactInput] = Field(default_factory=list)
-    question_text: str | None = None
-    question_index: int | None = None
-    question_count: int | None = None
 
     @field_validator("scenario_id")
     @classmethod
@@ -377,17 +361,11 @@ class StartScenarioRunItemCommand(BaseModel):
             raise ValueError("scenario_id must not be blank")
         return cleaned
 
-    @field_validator("question_text")
-    @classmethod
-    def _normalize_optional_question_text(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        cleaned = " ".join(value.strip().split())
-        return cleaned or None
-
 
 PracticeRunItemCommand = Annotated[
-    StartQuickPracticeRunItemCommand | StartInterviewRunItemCommand | StartScenarioRunItemCommand,
+    StartQuickPracticeRunItemCommand
+    | StartInterviewRunItemCommand
+    | StartScenarioRunItemCommand,
     Field(discriminator="practice_type"),
 ]
 
@@ -410,6 +388,5 @@ class SubmitAttemptCommand(BaseModel):
         if not cleaned:
             raise ValueError("response_text must not be blank")
         return cleaned
-
 
 AttemptView = PracticeAttemptView

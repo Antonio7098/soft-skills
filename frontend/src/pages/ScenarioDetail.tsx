@@ -9,8 +9,6 @@ import {
   Play,
   Briefcase,
   Globe,
-  ListChecks,
-  ArrowRight,
 } from 'lucide-react';
 import { useData } from '@/data';
 import type { CollectionView, ScenarioView } from '@/data';
@@ -258,42 +256,13 @@ export function ScenarioDetail() {
         )}
       </div>
 
-      {/* Questions */}
-      {scenario.questions.length > 0 && (
-        <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={8} className="flex flex-col gap-4">
-          <SectionHeader
-            title="Practice Questions"
-            subtitle={`${scenario.questions.length} questions to work through in order`}
-          />
-          <div className="flex flex-col gap-3">
-            {scenario.questions.map((question, i) => (
-              <Card key={i} variant="outlined" padding="md" className="flex items-start gap-4">
-                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                  <span className="text-body-sm font-semibold text-accent">{i + 1}</span>
-                </div>
-                <div className="flex flex-col gap-1 flex-1">
-                  <p className="text-body-sm text-content-primary leading-relaxed">{question}</p>
-                  <div className="flex items-center gap-1 text-body-xs text-content-tertiary">
-                    <ArrowRight className="w-3 h-3" />
-                    <span>Step {i + 1} of {scenario.questions.length}</span>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
       {/* Start CTA */}
-      <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={9}>
+      <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={8}>
         <Card variant="elevated" padding="lg" className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex flex-col gap-1 text-center sm:text-left">
             <h3 className="font-display text-display-sm text-content-primary">Ready to begin?</h3>
             <p className="text-body-sm text-content-secondary">
-              {scenario.questions.length > 0
-                ? `You'll work through ${scenario.questions.length} question${scenario.questions.length !== 1 ? 's' : ''} in order.`
-                : `You'll navigate ${scenario.mock_people.length > 0 ? scenario.mock_people.length : 'multiple'} stakeholder${scenario.mock_people.length !== 1 ? 's' : ''} across multiple steps.`
-              }
+              You'll navigate {scenario.mock_people.length > 0 ? scenario.mock_people.length : 'multiple'} stakeholder{scenario.mock_people.length !== 1 ? 's' : ''} across multiple steps.
             </p>
           </div>
           <Button

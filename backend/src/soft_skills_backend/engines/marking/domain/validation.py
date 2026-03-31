@@ -26,10 +26,7 @@ def validate_marking_decision(
         raise validation_error(
             "Marking decision prompt_id did not match the prompt contract",
             code="SS-VALIDATION-034",
-            details={
-                "expected_prompt_id": prompt.prompt_id,
-                "observed_prompt_id": decision.prompt_id,
-            },
+            details={"expected_prompt_id": prompt.prompt_id, "observed_prompt_id": decision.prompt_id},
         )
     if decision.response_id != response.response_id:
         raise validation_error(
@@ -61,9 +58,7 @@ def validate_marking_decision(
             },
         )
 
-    criterion_refs = {
-        criterion.criterion_ref for criterion in rubric.criteria if criterion.required
-    }
+    criterion_refs = {criterion.criterion_ref for criterion in rubric.criteria if criterion.required}
     observed_refs = [judgment.criterion_ref for judgment in decision.criterion_judgments]
     if len(set(observed_refs)) != len(observed_refs):
         raise scoring_error(
@@ -83,10 +78,7 @@ def validate_marking_decision(
 
     normalized_response = _normalize_text(response.content)
     for judgment in decision.criterion_judgments:
-        if (
-            judgment.score < rubric.scale.minimum_score
-            or judgment.score > rubric.scale.maximum_score
-        ):
+        if judgment.score < rubric.scale.minimum_score or judgment.score > rubric.scale.maximum_score:
             raise scoring_error(
                 "Criterion score fell outside the rubric scale",
                 code="SS-SCORING-012",
@@ -107,20 +99,14 @@ def validate_marking_decision(
                         "evidence_criterion_ref": evidence.criterion_ref,
                     },
                 )
-            if (
-                len(evidence.quote.strip()) < 3
-                or _normalize_text(evidence.quote) not in normalized_response
-            ):
+            if len(evidence.quote.strip()) < 6 or _normalize_text(evidence.quote) not in normalized_response:
                 raise scoring_error(
                     "Evidence must quote the candidate response directly",
                     code="SS-SCORING-014",
                     details={"criterion_ref": judgment.criterion_ref, "quote": evidence.quote},
                 )
 
-    if (
-        decision.overall_score < rubric.scale.minimum_score
-        or decision.overall_score > rubric.scale.maximum_score
-    ):
+    if decision.overall_score < rubric.scale.minimum_score or decision.overall_score > rubric.scale.maximum_score:
         raise scoring_error(
             "Overall score fell outside the rubric scale",
             code="SS-SCORING-015",

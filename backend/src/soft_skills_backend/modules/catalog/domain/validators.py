@@ -241,8 +241,6 @@ def validate_scenario_command(
             )
     if command.supporting_artifacts is not None:
         validate_supporting_artifacts(cast(list[object], command.supporting_artifacts))
-    if command.questions is not None:
-        validate_scenario_questions(command.questions)
     if not is_update or (
         is_update and (command.mock_company is not None or command.mock_people is not None)
     ):
@@ -580,25 +578,6 @@ def validate_supporting_artifacts(artifacts: list[object]) -> None:
             "Unsupported scenario supporting artifact type",
             code="SS-VALIDATION-044",
             details={"unsupported_artifact_types": unsupported_types},
-        )
-
-
-def validate_scenario_questions(questions: list[str]) -> None:
-    normalized = [" ".join(question.strip().split()) for question in questions]
-    blank_positions = [index for index, question in enumerate(normalized, start=1) if not question]
-    if blank_positions:
-        raise validation_error(
-            "Scenario questions must not be blank",
-            code="SS-VALIDATION-087",
-            details={"blank_positions": blank_positions},
-        )
-    lowered = [question.lower() for question in normalized]
-    duplicates = sorted({question for question in lowered if lowered.count(question) > 1})
-    if duplicates:
-        raise validation_error(
-            "Scenario questions must be unique",
-            code="SS-VALIDATION-088",
-            details={"duplicate_questions": duplicates},
         )
 
 

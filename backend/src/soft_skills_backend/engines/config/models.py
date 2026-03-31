@@ -41,10 +41,8 @@ class CatalogGenerationRuntimeConfig(BaseModel):
     prompt_item_chat_prompt_version: str
     prompt_item_worker_prompt_name: str
     prompt_item_worker_prompt_version: str
-    scenario_shell_worker_prompt_name: str
-    scenario_shell_worker_prompt_version: str
-    scenario_question_worker_prompt_name: str
-    scenario_question_worker_prompt_version: str
+    scenario_worker_prompt_name: str
+    scenario_worker_prompt_version: str
     output_schema_version: str
     config_version: str
     max_parallel_prompt_item_children: int

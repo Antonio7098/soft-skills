@@ -438,7 +438,7 @@ def _verify_per_skill_assessment(
     normalized_response = _normalize_text(response_text)
     for evidence in assessment.evidence:
         if (
-            len(evidence.quote.strip()) < 3
+            len(evidence.quote.strip()) < 6
             or _normalize_text(evidence.quote) not in normalized_response
         ):
             raise scoring_error(
@@ -464,18 +464,6 @@ def _render_context_block(prompt_payload: ResolvedAttemptPayload) -> str:
             f"- business context: {prompt.scenario_context.business_context}",
             f"- learner objective: {prompt.scenario_context.learner_objective}",
         ]
-        if prompt.scenario_context.active_question_text is not None:
-            question_prefix = "- active question: "
-            if (
-                prompt.scenario_context.active_question_index is not None
-                and prompt.scenario_context.question_count is not None
-            ):
-                question_prefix = (
-                    "- active question "
-                    f"{prompt.scenario_context.active_question_index}"
-                    f"/{prompt.scenario_context.question_count}: "
-                )
-            lines.append(question_prefix + prompt.scenario_context.active_question_text)
         if prompt.scenario_context.constraints:
             lines.append("- constraints: " + "; ".join(prompt.scenario_context.constraints))
         if prompt.scenario_context.stakeholder_tensions:

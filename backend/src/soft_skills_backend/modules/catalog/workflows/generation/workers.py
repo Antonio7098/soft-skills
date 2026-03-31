@@ -25,22 +25,16 @@ from soft_skills_backend.modules.catalog.domain.models import (
     GeneratedPromptItemDraft,
     GeneratedPromptItemPlan,
     GeneratedScenarioDraft,
-    GeneratedScenarioQuestionDraft,
     GeneratedScenarioPlan,
-    GeneratedScenarioShellDraft,
 )
-from soft_skills_backend.modules.catalog.domain.validators import (
-    validate_mock_world,
-    validate_scenario_questions,
-)
+from soft_skills_backend.modules.catalog.domain.validators import validate_mock_world
 from soft_skills_backend.modules.practice.workflows.assessment import (
     TypedLLMOutput,
     TypedLLMResult,
 )
 from soft_skills_backend.platform.providers.llm.prompts import (
     CREATOR_PROMPT_ITEM_OUTPUT_FORMAT,
-    CREATOR_SCENARIO_QUESTION_OUTPUT_FORMAT,
-    CREATOR_SCENARIO_SHELL_OUTPUT_FORMAT,
+    CREATOR_SCENARIO_OUTPUT_FORMAT,
 )
 from soft_skills_backend.platform.workflows.stageflow import (
     StageflowPipelineSupport,
@@ -112,13 +106,6 @@ def _validate_generated_scenario_draft(
                 "actual": len(draft.supporting_artifacts),
             },
         )
-    if len(draft.questions) != plan.question_count:
-        raise validation_error(
-            "Generated scenario question count did not match the worker plan",
-            code="SS-VALIDATION-089",
-            details={"expected": plan.question_count, "actual": len(draft.questions)},
-        )
-    validate_scenario_questions(draft.questions)
     validate_mock_world(cast(Any, draft))
 
 
@@ -225,8 +212,7 @@ async def run_scenario_workers(
     prompt_registry: PromptRegistry,
     config: CatalogGenerationRuntimeConfig,
     llm_provider: LLMProvider,
-    scenario_shell_worker_output: TypedLLMOutput,
-    scenario_question_worker_output: TypedLLMOutput,
+    scenario_worker_output: TypedLLMOutput,
     stageflow: StageflowPipelineSupport,
     collection_title: str,
     target_audience: str,
@@ -244,8 +230,7 @@ async def run_scenario_workers(
                 prompt_registry=prompt_registry,
                 config=config,
                 llm_provider=llm_provider,
-                scenario_shell_worker_output=scenario_shell_worker_output,
-                scenario_question_worker_output=scenario_question_worker_output,
+                scenario_worker_output=scenario_worker_output,
                 stageflow=stageflow,
                 collection_title=collection_title,
                 target_audience=target_audience,
@@ -450,8 +435,7 @@ async def _run_scenario_worker(
     prompt_registry: PromptRegistry,
     config: CatalogGenerationRuntimeConfig,
     llm_provider: LLMProvider,
-    scenario_shell_worker_output: TypedLLMOutput,
-    scenario_question_worker_output: TypedLLMOutput,
+    scenario_worker_output: TypedLLMOutput,
     stageflow: StageflowPipelineSupport,
     collection_title: str,
     target_audience: str,
@@ -468,8 +452,8 @@ async def _run_scenario_worker(
 
     async def prompt_request_transform(_ctx: StageContext) -> Any:
         prompt_request = PromptRenderRequest(
-            name=config.scenario_shell_worker_prompt_name,
-            version=config.scenario_shell_worker_prompt_version,
+            name=config.scenario_worker_prompt_name,
+            version=config.scenario_worker_prompt_version,
             variables={
                 "collection_title": collection_title,
                 "target_audience": target_audience,
@@ -478,11 +462,10 @@ async def _run_scenario_worker(
                 "target_skill_slugs": ", ".join(plan.target_skill_slugs),
                 "rubric_id": plan.rubric_id,
                 "supporting_artifact_count": plan.supporting_artifact_count,
-                "question_count": plan.question_count,
                 "allowed_artifact_types": ", ".join(sorted(ALLOWED_SCENARIO_ARTIFACT_TYPES)),
                 "title_hint": plan.title_hint,
                 "generation_brief": plan.generation_brief,
-                "output_format": CREATOR_SCENARIO_SHELL_OUTPUT_FORMAT,
+                "output_format": CREATOR_SCENARIO_OUTPUT_FORMAT,
             },
         )
         return ok_output(
@@ -507,18 +490,18 @@ async def _run_scenario_worker(
         base_messages: list[dict[str, object]] = [
             {
                 "role": "system",
-                "content": "Generate one realistic SoftSkills scenario shell. Return JSON only.",
+                "content": "Generate one realistic SoftSkills scenario draft. Return JSON only.",
             },
             {"role": "user", "content": rendered_prompt.content},
         ]
         retry_messages = list(base_messages)
         last_error: AppError | None = None
-        for _ in range(scenario_shell_worker_output._max_validation_retries + 1):
-            typed_result = await scenario_shell_worker_output.generate(
+        for _ in range(scenario_worker_output._max_validation_retries + 1):
+            typed_result = await scenario_worker_output.generate(
                 llm_provider,
                 messages=retry_messages,
                 call_context=ProviderCallContext(
-                    operation="catalog_scenario_shell_generation",
+                    operation="catalog_scenario_worker_generation",
                     request_id=request_id_from_context(ctx),
                     trace_id=metadata_value(ctx, "trace_id"),
                     pipeline_run_id=pipeline_run_id_from_context(ctx),
@@ -526,43 +509,9 @@ async def _run_scenario_worker(
                     user_id=user_id_from_context(ctx),
                 ),
             )
-            draft = cast(GeneratedScenarioShellDraft, typed_result.parsed)
+            draft = cast(GeneratedScenarioDraft, typed_result.parsed)
             try:
-                if list(draft.target_skill_slugs) != list(plan.target_skill_slugs):
-                    raise validation_error(
-                        "Generated scenario shell drifted from the worker plan metadata",
-                        code="SS-VALIDATION-069",
-                        details={"expected_rubric_id": plan.rubric_id},
-                    )
-                if draft.rubric_id is not None and plan.rubric_id is not None and draft.rubric_id != plan.rubric_id:
-                    raise validation_error(
-                        "Generated scenario shell drifted from the worker plan metadata",
-                        code="SS-VALIDATION-069",
-                        details={"expected_rubric_id": plan.rubric_id},
-                    )
-                if len(draft.supporting_artifacts) != plan.supporting_artifact_count:
-                    raise validation_error(
-                        "Generated scenario supporting artifact count did not match the worker plan",
-                        code="SS-VALIDATION-070",
-                        details={
-                            "expected": plan.supporting_artifact_count,
-                            "actual": len(draft.supporting_artifacts),
-                        },
-                    )
-                if len(draft.question_plans) != plan.question_count:
-                    raise validation_error(
-                        "Generated scenario question plan count did not match the worker plan",
-                        code="SS-VALIDATION-090",
-                        details={"expected": plan.question_count, "actual": len(draft.question_plans)},
-                    )
-                expected_indexes = list(range(1, plan.question_count + 1))
-                actual_indexes = [question_plan.index for question_plan in draft.question_plans]
-                if actual_indexes != expected_indexes:
-                    raise validation_error(
-                        "Generated scenario question plan indexes were invalid",
-                        code="SS-VALIDATION-091",
-                        details={"expected": expected_indexes, "actual": actual_indexes},
-                    )
+                _validate_generated_scenario_draft(draft=draft, plan=plan)
                 return ok_output(
                     StageflowStageResult(
                         payload=typed_result, summary={"model_slug": typed_result.model_slug}
@@ -579,7 +528,7 @@ async def _run_scenario_worker(
                     {
                         "role": "user",
                         "content": (
-                            "The previous scenario shell draft was invalid. "
+                            "The previous scenario draft was invalid. "
                             + _semantic_retry_feedback(exc)
                         ),
                     },
@@ -587,136 +536,11 @@ async def _run_scenario_worker(
         assert last_error is not None
         raise last_error
 
-    async def question_work(ctx: StageContext) -> Any:
-        shell_result = cast(TypedLLMResult, payload_from_inputs(ctx, "llm_transform"))
-        shell = cast(GeneratedScenarioShellDraft, shell_result.parsed)
-        semaphore = asyncio.Semaphore(max(1, plan.question_count))
-
-        async def run_question_worker(question_plan_index: int) -> TypedLLMResult:
-            question_plan = shell.question_plans[question_plan_index - 1]
-            async with semaphore:
-                render_result = prompt_registry.render(
-                    config.scenario_question_worker_prompt_name,
-                    version=config.scenario_question_worker_prompt_version,
-                    variables={
-                        "collection_title": collection_title,
-                        "target_audience": target_audience,
-                        "collection_difficulty": collection_difficulty,
-                        "scenario_title": shell.title,
-                        "business_context": shell.business_context,
-                        "learner_objective": shell.learner_objective,
-                        "constraints": "; ".join(shell.constraints) or "none",
-                        "stakeholder_tensions": "; ".join(shell.stakeholder_tensions) or "none",
-                        "target_skill_slugs": ", ".join(shell.target_skill_slugs),
-                        "question_index": str(question_plan.index),
-                        "question_count": str(plan.question_count),
-                        "question_generation_brief": question_plan.generation_brief,
-                        "output_format": CREATOR_SCENARIO_QUESTION_OUTPUT_FORMAT,
-                    },
-                    trace_id=metadata_value(ctx, "trace_id"),
-                    pipeline_run_id=pipeline_run_id_from_context(ctx),
-                )
-                base_messages: list[dict[str, object]] = [
-                    {
-                        "role": "system",
-                        "content": "Generate one realistic SoftSkills scenario question. Return JSON only.",
-                    },
-                    {"role": "user", "content": render_result.rendered.content},
-                ]
-                retry_messages = list(base_messages)
-                last_error: AppError | None = None
-                for _ in range(scenario_question_worker_output._max_validation_retries + 1):
-                    typed_result = await scenario_question_worker_output.generate(
-                        llm_provider,
-                        messages=retry_messages,
-                        call_context=ProviderCallContext(
-                            operation="catalog_scenario_question_generation",
-                            request_id=request_id_from_context(ctx),
-                            trace_id=metadata_value(ctx, "trace_id"),
-                            pipeline_run_id=pipeline_run_id_from_context(ctx),
-                            workflow_id=metadata_value(ctx, "workflow_id"),
-                            user_id=user_id_from_context(ctx),
-                        ),
-                    )
-                    question_draft = cast(GeneratedScenarioQuestionDraft, typed_result.parsed)
-                    try:
-                        if question_draft.index != question_plan.index:
-                            raise validation_error(
-                                "Generated scenario question index drifted from the worker plan metadata",
-                                code="SS-VALIDATION-092",
-                                details={"expected": question_plan.index, "actual": question_draft.index},
-                            )
-                        validate_scenario_questions([question_draft.question])
-                        return typed_result
-                    except AppError as exc:
-                        last_error = exc
-                        retry_messages = [
-                            *base_messages,
-                            {
-                                "role": "assistant",
-                                "content": json.dumps(typed_result.raw_payload, sort_keys=True),
-                            },
-                            {
-                                "role": "user",
-                                "content": (
-                                    "The previous scenario question draft was invalid. "
-                                    + _semantic_retry_feedback(exc)
-                                ),
-                            },
-                        ]
-                assert last_error is not None
-                raise last_error
-
-        question_results = await asyncio.gather(
-            *(run_question_worker(index) for index in range(1, plan.question_count + 1))
-        )
-        return ok_output(
-            StageflowStageResult(
-                payload=question_results,
-                summary={"generated_questions": len(question_results)},
-            )
-        )
-
     async def output_guard(ctx: StageContext) -> Any:
-        shell_result = cast(TypedLLMResult, payload_from_inputs(ctx, "llm_transform"))
-        shell = cast(GeneratedScenarioShellDraft, shell_result.parsed)
-        question_results = cast(list[TypedLLMResult], payload_from_inputs(ctx, "question_work"))
-        ordered_questions = [
-            cast(GeneratedScenarioQuestionDraft, result.parsed)
-            for result in sorted(
-                question_results,
-                key=lambda result: cast(GeneratedScenarioQuestionDraft, result.parsed).index,
-            )
-        ]
-        draft = GeneratedScenarioDraft(
-            title=shell.title,
-            business_context=shell.business_context,
-            learner_objective=shell.learner_objective,
-            constraints=list(shell.constraints),
-            stakeholder_tensions=list(shell.stakeholder_tensions),
-            questions=[question.question for question in ordered_questions],
-            target_skill_slugs=list(shell.target_skill_slugs),
-            rubric_id=shell.rubric_id,
-            mock_company=shell.mock_company,
-            mock_people=list(shell.mock_people),
-            supporting_artifacts=list(shell.supporting_artifacts),
-        )
+        typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "llm_transform"))
+        draft = cast(GeneratedScenarioDraft, typed_result.parsed)
         _validate_generated_scenario_draft(draft=draft, plan=plan)
-        return ok_output(
-            StageflowStageResult(
-                payload=TypedLLMResult(
-                    raw_payload={
-                        "shell": shell_result.raw_payload,
-                        "questions": [result.raw_payload for result in question_results],
-                    },
-                    parsed=draft,
-                    model_slug=shell_result.model_slug,
-                    schema_version=shell_result.schema_version,
-                    usage=shell_result.usage,
-                ),
-                summary={"title": draft.title},
-            )
-        )
+        return ok_output(StageflowStageResult(payload=typed_result, summary={"title": draft.title}))
 
     pipeline = Pipeline.from_stages(
         stage("input_guard", cast(Any, input_guard), StageKind.GUARD),
@@ -739,18 +563,12 @@ async def _run_scenario_worker(
             dependencies=("prompt_render_transform",),
         ),
         stage(
-            "question_work",
-            cast(Any, question_work),
-            StageKind.WORK,
-            dependencies=("llm_transform",),
-        ),
-        stage(
             "output_guard",
             cast(Any, output_guard),
             StageKind.GUARD,
-            dependencies=("llm_transform", "question_work"),
+            dependencies=("llm_transform",),
         ),
-        name="catalog_scenario_generation",
+        name="catalog_scenario_worker",
     )
     result = await run_logged_subpipeline(
         stageflow,
@@ -761,13 +579,13 @@ async def _run_scenario_worker(
         result_stage_name="output_guard",
         execution_mode="catalog_generation_worker",
         service="soft_skills_backend.catalog",
-        idempotency_key=f"catalog_scenario_generation:{request_id_from_context(parent_ctx)}:{worker_index}",
+        idempotency_key=f"catalog_scenario_worker:{request_id_from_context(parent_ctx)}:{worker_index}",
         idempotency_params=plan.model_dump(mode="json"),
         timeout_ms=timeout_ms,
     )
     if not result.success or result.data is None:
         raise validation_error(
-            "Scenario generation pipeline failed",
+            "Scenario worker pipeline failed",
             code="SS-VALIDATION-071",
             details={
                 "worker_index": worker_index,

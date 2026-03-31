@@ -120,7 +120,6 @@ def persist_generated_collection(
                 learner_objective=scenario.learner_objective,
                 constraints=list(scenario.constraints),
                 stakeholder_tensions=list(scenario.stakeholder_tensions),
-                questions=list(scenario.questions),
                 lifecycle_state="draft",
                 target_skill_slugs=list(scenario.target_skill_slugs),
                 rubric_id=scenario_rubric_id,

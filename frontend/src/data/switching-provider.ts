@@ -727,13 +727,6 @@ class SwitchingDataProvider implements DataProvider {
     );
   }
 
-  listUnifiedAuditLog(params) {
-    return this.withMode(
-      () => apiDataProvider.listUnifiedAuditLog(params),
-      () => mockDataProvider.listUnifiedAuditLog(params),
-    );
-  }
-
   getWorkflowEvent(eventId) {
     return this.withMode(
       () => apiDataProvider.getWorkflowEvent(eventId),

@@ -93,11 +93,6 @@ class PracticeFixtureSeeder:
                 "learner_objective": "Re-align the sponsor without hiding delivery risk.",
                 "constraints": ["The launch date is on the board agenda tomorrow."],
                 "stakeholder_tensions": ["Legal wants a delay and sales wants the current date."],
-                "questions": [
-                    "What do you say to the executive sponsor first?",
-                    "How do you address the conflict between sales and legal?",
-                    "What concrete next step do you commit to before the board briefing?",
-                ],
                 "target_skill_slugs": [
                     "expectation-setting",
                     "prioritization-under-pressure",

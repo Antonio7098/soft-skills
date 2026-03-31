@@ -94,8 +94,6 @@ class AssistantPracticeStartResult(BaseModel):
     practice_run_id: str
     current_question: AssistantPracticeQuestionView
     state: AssistantPracticeState
-    collection_title: str | None = None
-    session_type: str | None = None
 
 
 class AssistantPracticeAdvanceResult(BaseModel):
@@ -175,8 +173,6 @@ class AssistantPracticeCoordinator:
             practice_run_id=run.run_id,
             current_question=question,
             state=state,
-            collection_title=collection.title,
-            session_type="quick_practice" if args.item_limit <= 2 else "full_practice",
         )
 
     def get_active_practice(
@@ -214,11 +210,7 @@ class AssistantPracticeCoordinator:
         response_text: str | None = None,
     ) -> AssistantPracticeAdvanceResult:
         state = self._load_state(actor=actor, session_id=session_id)
-        if (
-            not state.is_active()
-            or state.practice_run_id is None
-            or state.current_attempt_id is None
-        ):
+        if not state.is_active() or state.practice_run_id is None or state.current_attempt_id is None:
             raise validation_error(
                 "There is no active practice question to submit",
                 code="SS-VALIDATION-208",
@@ -288,14 +280,10 @@ class AssistantPracticeCoordinator:
         collection: CollectionView,
         args: StartCollectionPracticeToolArgs,
     ) -> list[
-        StartQuickPracticeRunItemCommand
-        | StartInterviewRunItemCommand
-        | StartScenarioRunItemCommand
+        StartQuickPracticeRunItemCommand | StartInterviewRunItemCommand | StartScenarioRunItemCommand
     ]:
         items: list[
-            StartQuickPracticeRunItemCommand
-            | StartInterviewRunItemCommand
-            | StartScenarioRunItemCommand
+            StartQuickPracticeRunItemCommand | StartInterviewRunItemCommand | StartScenarioRunItemCommand
         ] = []
 
         prompt_items = self._select_prompt_items(collection=collection, args=args)
@@ -304,7 +292,7 @@ class AssistantPracticeCoordinator:
 
         scenarios = self._select_scenarios(collection=collection, args=args)
         for scenario in scenarios:
-            items.extend(_scenario_to_run_items(scenario))
+            items.append(_scenario_to_run_item(scenario))
 
         if not items:
             raise validation_error(
@@ -373,9 +361,7 @@ class AssistantPracticeCoordinator:
         )
 
 
-def _ordered_prompt_items(
-    collection: CollectionView, prompt_item_ids: list[str]
-) -> list[PromptItemView]:
+def _ordered_prompt_items(collection: CollectionView, prompt_item_ids: list[str]) -> list[PromptItemView]:
     prompt_items = {prompt_item.id: prompt_item for prompt_item in collection.prompt_items}
     ordered: list[PromptItemView] = []
     for prompt_item_id in prompt_item_ids:
@@ -438,29 +424,6 @@ def _scenario_to_run_item(scenario: ScenarioView) -> StartScenarioRunItemCommand
             for artifact in scenario.supporting_artifacts
         ],
     )
-
-
-def _scenario_to_run_items(scenario: ScenarioView) -> list[StartScenarioRunItemCommand]:
-    if not scenario.questions:
-        return [_scenario_to_run_item(scenario)]
-    return [
-        StartScenarioRunItemCommand(
-            practice_type=PracticeType.SCENARIO.value,
-            scenario_id=scenario.id,
-            artifacts=[
-                {
-                    "artifact_type": artifact.artifact_type,
-                    "title": artifact.title,
-                    "body": artifact.body,
-                }
-                for artifact in scenario.supporting_artifacts
-            ],
-            question_text=question,
-            question_index=index,
-            question_count=len(scenario.questions),
-        )
-        for index, question in enumerate(scenario.questions, start=1)
-    ]
 
 
 def _current_question_from_run(run: PracticeRunView) -> AssistantPracticeQuestionView | None:

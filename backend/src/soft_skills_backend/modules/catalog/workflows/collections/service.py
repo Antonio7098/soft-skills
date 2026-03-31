@@ -242,10 +242,7 @@ class CollectionService:
             if filters.organisation_id is not None:
                 query = query.filter(CollectionRecord.organisation_id == filters.organisation_id)
             elif actor is not None and actor.organisation_id is not None:
-                query = query.filter(
-                    (CollectionRecord.organisation_id == actor.organisation_id)
-                    | (CollectionRecord.author_user_id == actor.user_id)
-                )
+                query = query.filter(CollectionRecord.organisation_id == actor.organisation_id)
             records = query.order_by(CollectionRecord.created_at.desc()).all()
             saved_collection_ids = set()
             if actor is not None:

@@ -72,30 +72,16 @@ async def optional_actor(request: Request) -> Actor | None:
 
 
 async def get_actor_from_websocket(websocket: WebSocket) -> Actor | None:
-    """Resolve authenticated actor from WebSocket connection.
-
-    Accepts auth via headers (x-user-id, x-organisation-id) or query params
-    (user_id, organisation_id) since the browser WebSocket API does not
-    support custom headers.
-    """
+    """Resolve authenticated actor from WebSocket connection."""
     container = cast(AppContainer, websocket.app.state.container)
     auth_provider = container.auth_provider
-    user_id = websocket.headers.get("x-user-id") or websocket.query_params.get("user_id")
+    user_id = websocket.headers.get("x-user-id")
     if not user_id:
         return None
-    org_id = websocket.headers.get("x-organisation-id") or websocket.query_params.get(
-        "organisation_id"
-    )
-    synthetic_request = Request(
-        {
-            "type": "http",
-            "headers": [
-                (b"x-user-id", user_id.encode()),
-                (b"x-organisation-id", (org_id or "").encode()),
-            ],
-        }
-    )
-    return await auth_provider.get_actor(synthetic_request)
+    org_id = websocket.headers.get("x-organisation-id")
+    request = websocket._create_request()
+    request._headers = {"x-user-id": user_id, "x-organisation-id": org_id or ""}
+    return await auth_provider.get_actor(request)
 
 
 def get_identity_service(request: Request) -> IdentityService:

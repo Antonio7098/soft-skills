@@ -238,11 +238,7 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const cleanupRef = useRef<(() => void) | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const statusRef = useRef<GenerationProgressState['status']>(initialState.status);
   const GENERATION_TIMEOUT_MS = 600_000;
-
-  // Keep ref in sync so callbacks always see the latest status
-  statusRef.current = state.status;
 
   const startGeneration = useCallback(
     async (command: StructuredCollectionGenerationCommand | ChatCollectionGenerationCommand) => {
@@ -250,23 +246,19 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
       try {
         cleanupRef.current?.();
         dispatch({ type: 'RESET' });
-        statusRef.current = 'idle';
         dispatch({
           type: 'START',
           generation_id: 'pending',
           stream_token: 'pending',
         });
-        statusRef.current = 'started';
         const started = isStructured
           ? await data.generateStructuredCollection(command as StructuredCollectionGenerationCommand)
           : await data.generateChatCollection(command as ChatCollectionGenerationCommand);
         dispatch({ type: 'START', generation_id: started.generation_id, stream_token: started.stream_token });
-        statusRef.current = 'started';
 
         timeoutRef.current = setTimeout(() => {
           const errorMessage = 'Generation timed out';
           dispatch({ type: 'FAIL', error: errorMessage });
-          statusRef.current = 'failed';
           options.onError?.(errorMessage);
           cleanupRef.current?.();
           cleanupRef.current = null;
@@ -279,7 +271,6 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
               timeoutRef.current = setTimeout(() => {
                 const errorMessage = 'Generation timed out';
                 dispatch({ type: 'FAIL', error: errorMessage });
-                statusRef.current = 'failed';
                 options.onError?.(errorMessage);
                 cleanupRef.current?.();
                 cleanupRef.current = null;
@@ -329,12 +320,10 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
               }
               const collection = await data.getCollection(collectionId);
               dispatch({ type: 'COMPLETE', collection });
-              statusRef.current = 'completed';
               options.onComplete?.(collection);
             } catch (err) {
               const errorMessage = err instanceof Error ? err.message : 'Failed to load generated collection';
               dispatch({ type: 'FAIL', error: errorMessage });
-              statusRef.current = 'failed';
               options.onError?.(errorMessage);
             }
           },
@@ -350,7 +339,6 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
               || (typeof payload.reason === 'string' && payload.reason)
               || 'Generation failed';
             dispatch({ type: 'FAIL', error: errorMessage });
-            statusRef.current = 'failed';
             options.onError?.(errorMessage);
           },
           onError: (errorMessage) => {
@@ -359,7 +347,6 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
               timeoutRef.current = null;
             }
             dispatch({ type: 'FAIL', error: errorMessage });
-            statusRef.current = 'failed';
             options.onError?.(errorMessage);
           },
           onClose: () => {
@@ -368,7 +355,7 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
               timeoutRef.current = null;
             }
             cleanupRef.current = null;
-            if (statusRef.current !== 'completed' && statusRef.current !== 'failed' && statusRef.current !== 'cancelled') {
+            if (state.status !== 'completed' && state.status !== 'failed' && state.status !== 'cancelled') {
               const errorMessage = 'Generation stream closed unexpectedly';
               dispatch({ type: 'FAIL', error: errorMessage });
               options.onError?.(errorMessage);
@@ -382,7 +369,6 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
         }
         const errorMessage = err instanceof Error ? err.message : 'Generation failed';
         dispatch({ type: 'FAIL', error: errorMessage });
-        statusRef.current = 'failed';
         options.onError?.(errorMessage);
       }
     },
@@ -397,7 +383,6 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
     cleanupRef.current?.();
     cleanupRef.current = null;
     dispatch({ type: 'CANCEL' });
-    statusRef.current = 'cancelled';
   }, []);
 
   const reset = useCallback(() => {
@@ -408,7 +393,6 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
     cleanupRef.current?.();
     cleanupRef.current = null;
     dispatch({ type: 'RESET' });
-    statusRef.current = 'idle';
   }, []);
 
   return {

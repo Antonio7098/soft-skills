@@ -20,13 +20,11 @@ import { PromptDisplay } from '@/features/session/PromptDisplay';
 import { ResponseInput } from '@/features/session/ResponseInput';
 import { AssessingOverlay } from '@/features/session/AssessingOverlay';
 import { ContextPanel } from '@/features/session/ContextPanel';
-import { PostSessionResults } from '@/features/session/PostSessionResults';
 import { useData } from '@/data';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
 import type {
   PracticeRunView,
   PracticeSessionView,
-  PracticeRunItemSummary,
   AttemptView,
   ScenarioView,
 } from '@/data';
@@ -46,28 +44,17 @@ function extractScenarioQuestion(promptText: string): string {
   return lastLine;
 }
 
-function getScenarioPromptText(scenario: ScenarioView | null, item: PracticeRunItemSummary, questionIndex?: number): string {
-  if (scenario && scenario.questions.length > 0) {
-    const idx = questionIndex ?? 0;
-    const q = scenario.questions[idx];
-    if (q) {
-      return `Question ${idx + 1} of ${scenario.questions.length}: ${q}`;
-    }
-  }
-  return extractScenarioQuestion(item.prompt_text);
-}
-
 function RunProgressSidebar({ run, currentIndex }: { run: PracticeRunView; currentIndex: number }) {
   return (
     <div className="flex flex-col gap-4">
       <div>
         <h4 className="font-display text-display-xs text-content-primary mb-2">Session Progress</h4>
         <p className="text-body-xs text-content-secondary">
-          {currentIndex} of {(run.items || []).length} completed
+          {currentIndex} of {run.items.length} completed
         </p>
       </div>
       <div className="flex flex-col gap-1.5">
-        {(run.items || []).map((item, idx) => (
+        {run.items.map((item, idx) => (
           <div
             key={`${item.item_type}-${item.id}`}
             className={cn(
@@ -173,7 +160,111 @@ function ItemResultCard({ attempt, onNext, isLast }: {
         </div>
       </Card>
     </motion.div>
-);
+  );
+}
+
+function RunResultsBreakdown({ run, attempts }: { run: PracticeRunView; attempts: AttemptView[] }) {
+  const score = run.summary.overall_score;
+
+  return (
+    <motion.div
+      variants={{
+        hidden: { opacity: 0 },
+        visible: { opacity: 1, transition: { duration: 0.4, staggerChildren: 0.1 } },
+      }}
+      initial="hidden"
+      animate="visible"
+      className="flex flex-col gap-6"
+    >
+      <motion.div
+        variants={{
+          hidden: { opacity: 0, y: 16 },
+          visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+        }}
+        className="flex flex-col items-center gap-4 text-center"
+      >
+        <div className="relative">
+          <div className="absolute -inset-4 rounded-full bg-accent/5 blur-xl" />
+          <div className="relative w-24 h-24 rounded-full bg-accent/10 flex items-center justify-center">
+            <Trophy className="w-12 h-12 text-accent" />
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <h2 className="font-display text-display-md text-content-primary">Session Complete</h2>
+          <p className="text-body-md text-content-secondary">{run.title}</p>
+        </div>
+        {score !== null && (
+          <Badge variant="success" size="md">
+            Overall Score: {Math.round(score)}%
+          </Badge>
+        )}
+      </motion.div>
+
+      <Card variant="default" padding="lg" className="flex flex-col gap-4">
+        <h3 className="text-body-sm font-semibold text-content-secondary uppercase tracking-wider">
+          Per-Question Results
+        </h3>
+        <div className="flex flex-col gap-4">
+          {run.items.map((item, idx) => {
+            const attempt = attempts.find(a => a.prompt.title === item.title);
+            const itemScore = attempt?.assessment?.overall_score;
+            const rubricId = attempt?.assessment?.rubric_id ?? '';
+            const binary = rubricId.includes('quick_practice');
+
+            return (
+              <Card key={`${item.item_type}-${item.id}`} variant="outlined" padding="md" className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      'w-6 h-6 rounded-full flex items-center justify-center text-xs',
+                      item.status === 'completed' ? 'bg-status-success/20 text-status-success' : 'bg-surface-secondary text-content-tertiary',
+                    )}>
+                      {item.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5" /> : idx + 1}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-body-sm font-medium text-content-primary">{item.title}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={getDomainDifficultyVariant(item.difficulty)} size="sm">
+                          {item.difficulty}
+                        </Badge>
+                        <Badge variant="default" size="sm">
+                          {item.item_type === 'prompt_item' ? 'Question' : 'Scenario'}
+                        </Badge>
+                        {binary && <Badge variant="warning" size="sm">Pass/Fail</Badge>}
+                        {!binary && <Badge variant="accent" size="sm">1-5 Scale</Badge>}
+                      </div>
+                    </div>
+                  </div>
+                  {itemScore !== undefined && itemScore !== null && (
+                    <Badge variant={itemScore >= (binary ? 2 : 4) ? 'success' : itemScore >= (binary ? 1 : 3) ? 'warning' : 'error'} size="md">
+                      {binary
+                        ? (itemScore >= 2 ? 'Pass' : 'Fail')
+                        : `${Math.round(itemScore)}/5`}
+                    </Badge>
+                  )}
+                </div>
+
+                {attempt?.assessment && (
+                  <div className="flex flex-col gap-2 pt-2 border-t border-line">
+                    <div className="flex flex-wrap gap-1">
+                      {attempt.assessment.per_skill_assessments.map(psa => (
+                        <Badge key={psa.skill_slug} variant="accent" size="sm">
+                          {psa.skill_slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}: {binary ? (psa.score >= 2 ? 'Pass' : 'Fail') : `${psa.score}/5`}
+                        </Badge>
+                      ))}
+                    </div>
+                    {attempt.assessment.summary && (
+                      <p className="text-body-xs text-content-secondary">{attempt.assessment.summary}</p>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      </Card>
+    </motion.div>
+  );
 }
 
 export function PracticeRunSession() {
@@ -225,7 +316,7 @@ export function PracticeRunSession() {
       return;
     }
 
-    const item = (run.items || [])[currentSessionIndex];
+    const item = run.items[currentSessionIndex];
     if (!item || item.item_type !== 'scenario') {
       setCurrentScenario(null);
       return;
@@ -311,7 +402,7 @@ export function PracticeRunSession() {
     return <ErrorState message="No sessions found" onRetry={loadSession} />;
   }
 
-  const currentItem = (run.items || [])[currentSessionIndex];
+  const currentItem = run.items[currentSessionIndex];
   const isLastItem = currentSessionIndex >= sessions.length - 1;
   const isScenario = currentItem?.item_type === 'scenario' && currentScenario;
 
@@ -319,15 +410,21 @@ export function PracticeRunSession() {
     ? extractScenarioQuestion(currentItem.prompt_text)
     : currentItem.prompt_text;
 
-  if (phase === 'complete' && isLastItem && currentAttempt) {
+  if (phase === 'complete' && isLastItem) {
     return (
-      <PostSessionResults
-        attempt={currentAttempt}
-        elapsedSeconds={timer.elapsed}
-        onRetry={() => navigate(`/practice`)}
-        onContinue={() => navigate('/practice')}
-        continueLabel="Back to Practice"
-      />
+      <div className="min-h-screen bg-surface-primary flex items-center justify-center p-6">
+        <div className="max-w-2xl w-full">
+          <RunResultsBreakdown run={run} attempts={allAttempts} />
+          <div className="flex items-center justify-center gap-3 mt-8">
+            <Button variant="secondary" icon={<RotateCcw className="w-4 h-4" />} onClick={handleRetry}>
+              Practice Again
+            </Button>
+            <Button variant="primary" icon={<ArrowRight className="w-4 h-4" />} iconPosition="right" onClick={() => navigate('/practice')}>
+              Back to Practice
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -358,7 +455,6 @@ export function PracticeRunSession() {
                     skillSlugs={currentItem.target_skill_slugs}
                   />
                   <ResponseInput
-                    key={`${currentItem.id}-${currentSessionIndex}`}
                     onSubmit={handleSubmit}
                     placeholder="Write your response here..."
                     submitLabel="Submit Response"

@@ -278,7 +278,7 @@ def validate_assessment_draft(
                 details={"skill_slug": evidence.skill_slug},
             )
         if (
-            len(evidence.quote.strip()) < 3
+            len(evidence.quote.strip()) < 6
             or _normalize_text(evidence.quote) not in response_normalized
         ):
             raise scoring_error(

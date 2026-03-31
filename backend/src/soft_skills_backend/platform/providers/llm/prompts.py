@@ -9,8 +9,7 @@ CREATOR_CHAT_GENERATION_PROMPT_NAME = "creator-chat-draft"
 CREATOR_PROMPT_ITEM_STRUCTURED_GENERATION_PROMPT_NAME = "creator-prompt-items-structured-plan"
 CREATOR_PROMPT_ITEM_CHAT_GENERATION_PROMPT_NAME = "creator-prompt-items-chat-plan"
 CREATOR_PROMPT_ITEM_WORKER_PROMPT_NAME = "creator-prompt-item-worker"
-CREATOR_SCENARIO_SHELL_WORKER_PROMPT_NAME = "creator-scenario-shell-worker"
-CREATOR_SCENARIO_QUESTION_WORKER_PROMPT_NAME = "creator-scenario-question-worker"
+CREATOR_SCENARIO_WORKER_PROMPT_NAME = "creator-scenario-worker"
 
 PER_SKILL_ASSESSMENT_PROMPT = """Assess this SoftSkills text practice response for exactly one skill.
 Practice mode: {practice_type}
@@ -18,7 +17,7 @@ Prompt type: {prompt_type}
 Prompt: {prompt_text}
 Additional context:
 {context_block}
-Response: {response_text}
+Learner response: {response_text}
 Target role: {target_role}
 Learner goals: {goals}
 Prior assessed attempts: {prior_assessed_attempts}
@@ -31,8 +30,7 @@ Criterion levels:
 {criterion_levels}
 CRITICAL CONSTRAINTS:
 - You MUST assess only the requested skill: {skill_slug}
-- You MUST copy EXACT words from the response text above. Do NOT paraphrase or invent quotes.
-- If the response is too short to quote, use the full response as the quote.
+- Every evidence quote must be copied directly from the learner response
 - Return one or two evidence items only
 - Keep the rationale aligned to the selected rubric level
 Return JSON with these required fields exactly:
@@ -74,7 +72,6 @@ CREATOR_DRAFT_OUTPUT_FORMAT = """Return JSON with these required fields exactly:
   - learner_objective
   - constraints
   - stakeholder_tensions
-  - questions
   - target_skill_slugs
   - rubric_id
   - mock_company: null or object with name, industry, operating_context
@@ -107,7 +104,6 @@ CREATOR_COLLECTION_BLUEPRINT_OUTPUT_FORMAT = """Return JSON with these required 
   - target_skill_slugs
   - rubric_id
   - supporting_artifact_count
-  - question_count
 Rules:
 - Preserve requested counts exactly.
 - Do not echo deterministic request metadata that is already fixed by the system.
@@ -163,39 +159,24 @@ Rules:
 - Avoid repeating the title hint verbatim if a better specific title exists.
 - Do not include markdown fences or prose outside the JSON object."""
 
-CREATOR_SCENARIO_SHELL_OUTPUT_FORMAT = """Return JSON with these required fields exactly:
+CREATOR_SCENARIO_OUTPUT_FORMAT = """Return JSON with these required fields exactly:
 - title: string
 - business_context: string
 - learner_objective: string
 - constraints: array of strings
 - stakeholder_tensions: array of strings
-- questions: array of strings
 - target_skill_slugs: array of strings
 - rubric_id: string
 - mock_company: null or object with name, industry, operating_context
 - mock_people: array of objects with name, role, goals, communication_style, relationship_to_scenario
 - supporting_artifacts: array of objects with artifact_type, title, body
-- question_plans: array of objects with index and generation_brief
 Rules:
 - Preserve target_skill_slugs and rubric_id exactly as requested.
 - Keep the mock world internally consistent.
 - Generate exactly the requested number of supporting artifacts.
-- Generate exactly the requested number of question_plans.
-- question_plans indexes must start at 1 and increase by 1 with no gaps.
-- Each question_plans generation_brief must be concise, distinct, and progressively more challenging.
 - Every required field must be present.
 - Use [] for empty arrays and null for absent mock_company.
 - supporting_artifacts must be an array, even when the count is 0.
-- Do not include markdown fences or prose outside the JSON object."""
-
-CREATOR_SCENARIO_QUESTION_OUTPUT_FORMAT = """Return JSON with these required fields exactly:
-- index: integer
-- question: string
-Rules:
-- Preserve index exactly as requested.
-- Return one concise scenario question only.
-- The question must be grounded in the supplied scenario context.
-- The question must not restate the entire scenario.
 - Do not include markdown fences or prose outside the JSON object."""
 
 CREATOR_STRUCTURED_GENERATION_PROMPT = """Generate an editable SoftSkills creator draft.
@@ -334,7 +315,7 @@ Rules:
 - If prompt_type is not quick_practice_prompt, return generated_rubric as null.
 {output_format}"""
 
-CREATOR_SCENARIO_SHELL_WORKER_PROMPT = """Generate one editable SoftSkills scenario shell.
+CREATOR_SCENARIO_WORKER_PROMPT = """Generate one editable SoftSkills scenario draft.
 Collection context:
 - collection title: {collection_title}
 - target audience: {target_audience}
@@ -344,7 +325,6 @@ Fixed worker metadata:
 - target skills: {target_skill_slugs}
 - rubric id: {rubric_id}
 - supporting artifact count: {supporting_artifact_count}
-- question count: {question_count}
 - allowed artifact types: {allowed_artifact_types}
 Creative brief:
 - title hint: {title_hint}
@@ -356,29 +336,4 @@ Rules:
 - Do not return mock_people unless they clearly belong to the same mock_company context.
 - If there are no mock people, constraints, stakeholder tensions, or supporting artifacts, return [] for those arrays.
 - supporting_artifacts must contain exactly {supporting_artifact_count} items.
-- question_plans must contain exactly {question_count} items.
-- question_plans must progress from foundational to more complex.
-{output_format}"""
-
-CREATOR_SCENARIO_QUESTION_WORKER_PROMPT = """Generate one scenario question for a pre-planned SoftSkills scenario.
-Collection context:
-- collection title: {collection_title}
-- target audience: {target_audience}
-- collection difficulty: {collection_difficulty}
-Scenario context:
-- title: {scenario_title}
-- business context: {business_context}
-- learner objective: {learner_objective}
-- constraints: {constraints}
-- stakeholder tensions: {stakeholder_tensions}
-- target skills: {target_skill_slugs}
-- question index: {question_index}
-- question count: {question_count}
-Question brief:
-- generation brief: {question_generation_brief}
-Rules:
-- Return exactly one question.
-- Keep it concise and directly answerable by the learner.
-- Make it distinct from other likely questions by following the supplied brief.
-- Preserve index exactly as requested.
 {output_format}"""

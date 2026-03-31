@@ -12,9 +12,7 @@ from soft_skills_backend.modules.catalog.domain.models import (
     GeneratedCollectionBlueprint,
     GeneratedPromptItemDraft,
     GeneratedPromptItemPlanBatch,
-    GeneratedScenarioQuestionDraft,
     GeneratedScenarioDraft,
-    GeneratedScenarioShellDraft,
 )
 from soft_skills_backend.modules.catalog.workflows.generation.prompt_library import (
     catalog_generation_prompt_templates,
@@ -47,8 +45,7 @@ def built_in_prompt_definitions(settings: Settings) -> list[BuiltinPromptDefinit
         "creator-prompt-items-structured-plan": GeneratedPromptItemPlanBatch.model_json_schema(),
         "creator-prompt-items-chat-plan": GeneratedPromptItemPlanBatch.model_json_schema(),
         "creator-prompt-item-worker": GeneratedPromptItemDraft.model_json_schema(),
-        "creator-scenario-shell-worker": GeneratedScenarioShellDraft.model_json_schema(),
-        "creator-scenario-question-worker": GeneratedScenarioQuestionDraft.model_json_schema(),
+        "creator-scenario-worker": GeneratedScenarioDraft.model_json_schema(),
     }
 
     definitions: list[BuiltinPromptDefinition] = []

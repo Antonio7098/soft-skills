@@ -135,11 +135,6 @@ async def _seed_scenario(client) -> tuple[dict[str, object], dict[str, object]]:
             "learner_objective": "Re-align the executive sponsor without hiding the delivery risk.",
             "constraints": ["The launch date is on the board agenda tomorrow."],
             "stakeholder_tensions": ["Legal wants a delay, sales wants the current date."],
-            "questions": [
-                "What do you say to the executive sponsor first?",
-                "How do you address the conflict between sales and legal?",
-                "What concrete next step do you commit to before the board briefing?",
-            ],
             "target_skill_slugs": [
                 "expectation-setting",
                 "prioritization-under-pressure",
