@@ -18,7 +18,7 @@ export function PracticeRunListItem({ run }: PracticeRunListItemProps) {
   const [items, setItems] = useState<PracticeRunItemSummary[]>([]);
   const [itemsLoaded, setItemsLoaded] = useState(false);
 
-  const date = new Date(run.started_at);
+
 
   useEffect(() => {
     if (expanded && !itemsLoaded && items.length === 0) {

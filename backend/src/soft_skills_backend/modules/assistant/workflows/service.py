@@ -603,7 +603,8 @@ class AssistantWorkflowService:
                     ) from exc
                 messages.append(hardened)
 
-        for _ in range(MAX_TOOL_ITERATIONS):
+        for iteration in range(MAX_TOOL_ITERATIONS):
+            print(f"[DEBUG] Loop iteration {iteration}")
             if active.cancel_reason is not None:
                 return _AssistantLoopResult(cancelled=True, reason=active.cancel_reason)
             ctx.try_emit_event(
@@ -638,12 +639,16 @@ class AssistantWorkflowService:
                 timeout_seconds=self._settings.llm_assistant_timeout_seconds,
             )
             if not completion.tool_calls:
+                print(
+                    f"[DEBUG] Provider returned no tool calls, content: {completion.content[:100] if completion.content else None}"
+                )
                 final_response = (completion.content or "").strip()
                 if not final_response:
                     raise orchestration_error(
                         "Assistant returned neither tool calls nor a final response",
                         code="SS-ORCHESTRATION-205",
                     )
+                print(f"[DEBUG] Returning final response: {final_response[:100]}")
                 return _AssistantLoopResult(
                     cancelled=False,
                     reason=None,
@@ -654,6 +659,7 @@ class AssistantWorkflowService:
                     used_tools=has_executed_tool,
                 )
             try:
+                print(f"[DEBUG] Provider returned {len(completion.tool_calls)} tool calls")
                 tool_requests = parse_assistant_tool_requests(completion.tool_calls)
             except ValidationError as exc:
                 clarification = _generation_clarification_for_invalid_tool_request(
@@ -692,6 +698,11 @@ class AssistantWorkflowService:
                         "workflow_id": execution.workflow_id,
                     },
                 )
+            print(f"[DEBUG] Executing {len(tool_requests)} tools with execute_many")
+            import traceback
+            print(f"[DEBUG] Before execute_many call stack:")
+            for line in traceback.format_stack()[-5:-1]:
+                print(f"  {line.strip()}")
             try:
                 tool_results = await self._tools.execute_many(
                     stage_ctx=ctx,
@@ -706,6 +717,7 @@ class AssistantWorkflowService:
                     ),
                     tool_requests=tool_requests,
                 )
+                print(f"[DEBUG] execute_many returned {len(tool_results)} results")
             except AppError as exc:
                 clarification = _generation_clarification_for_tool_error(
                     tool_requests=tool_requests,
@@ -723,7 +735,15 @@ class AssistantWorkflowService:
                     )
                 raise
             has_executed_tool = has_executed_tool or bool(tool_results)
+            print(
+                f"[DEBUG] has_executed_tool={has_executed_tool}, tool_results_count={len(tool_results)}"
+            )
+            with open("/tmp/debug.log", "a") as f:
+                f.write(
+                    f"After tool execution: has_executed_tool={has_executed_tool}, results={len(tool_results)}\n"
+                )
             if active.cancel_reason is not None:
+                print(f"[DEBUG] Cancel reason set, returning cancelled")
                 return _AssistantLoopResult(cancelled=True, reason=active.cancel_reason)
             for tool_result in tool_results:
                 try:
@@ -742,6 +762,8 @@ class AssistantWorkflowService:
                         },
                     ) from exc
                 messages.append(hardened_tool)
+        print(f"[DEBUG] About to check iteration limit, loop has finished")
+        print(f"[DEBUG] End of loop, raising max iterations error")
         raise orchestration_error(
             "Assistant exceeded the tool iteration budget",
             code="SS-ORCHESTRATION-203",
