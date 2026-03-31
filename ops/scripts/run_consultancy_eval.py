@@ -42,15 +42,28 @@ class SimpleContext:
     """Simple context object that provides the metadata methods needed."""
     
     def __init__(self, request_id: str, trace_id: str, workflow_id: str, pipeline_run_id: str):
+        self.request_id = request_id
+        self.trace_id = trace_id
+        self.workflow_id = workflow_id
+        self.pipeline_run_id = pipeline_run_id
         self._metadata = {
             "request_id": request_id,
             "trace_id": trace_id,
             "workflow_id": workflow_id,
             "pipeline_run_id": pipeline_run_id,
         }
+        # Create a snapshot-like object to satisfy stageflow.metadata_value
+        self.snapshot = SimpleSnapshot(self._metadata)
     
     def get_metadata(self, key: str, default=None):
         return self._metadata.get(key, default)
+
+
+class SimpleSnapshot:
+    """Mock snapshot object for SimpleContext."""
+    
+    def __init__(self, metadata: dict):
+        self.metadata = metadata
 
 
 async def main():
