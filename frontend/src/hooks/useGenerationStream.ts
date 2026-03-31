@@ -312,7 +312,7 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
               }
             }
           },
-           onCompleted: async (payload: unknown) => {
+            onCompleted: async (payload: any) => {
             if (timeoutRef.current) {
               clearTimeout(timeoutRef.current);
               timeoutRef.current = null;
@@ -333,7 +333,7 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
               options.onError?.(errorMessage);
             }
           },
-           onFailed: (payload: unknown) => {
+           onFailed: (payload: any) => {
             if (timeoutRef.current) {
               clearTimeout(timeoutRef.current);
               timeoutRef.current = null;

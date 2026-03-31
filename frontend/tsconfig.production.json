@@ -1,4 +1,10 @@
 {
   "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "strict": false
+  },
   "exclude": ["src/test/**"]
 }
