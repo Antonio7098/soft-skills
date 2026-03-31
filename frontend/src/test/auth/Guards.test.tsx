@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithRouter, renderWithProviders, screen, waitFor, createMockSession, createMockDataProvider } from '@/test/test-utils';
 import { UserAppGuard, AdminGuard } from '@/auth/Guards';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { DataProviderProvider } from '@/data/DataContext';
@@ -9,10 +9,10 @@ import { AuthSessionProvider } from '@/auth/AuthSessionContext';
 import { AdminScopeProvider, useAdminScope } from '@/auth/AdminScopeContext';
 
 describe('UserAppGuard', () => {
-  it('shows loading state while session is loading', async () => {
-    const mockData = createMockDataProvider({
-      getAuthSession: vi.fn().mockImplementation(() => new Promise(() => {})),
-    });
+   it('shows loading state while session is loading', async () => {
+     const mockData = createMockDataProvider({
+       getAuthSession: vi.fn().mockImplementation(() => Promise.resolve()),
+     });
 
     renderWithProviders(
       <UserAppGuard>
@@ -120,10 +120,10 @@ describe('UserAppGuard', () => {
 });
 
 describe('AdminGuard', () => {
-  it('shows loading state while session is loading', async () => {
-    const mockData = createMockDataProvider({
-      getAuthSession: vi.fn().mockImplementation(() => new Promise(() => {})),
-    });
+   it('shows loading state while session is loading', async () => {
+     const mockData = createMockDataProvider({
+       getAuthSession: vi.fn().mockImplementation(() => Promise.resolve()),
+     });
 
     renderWithProviders(
       <AdminGuard>

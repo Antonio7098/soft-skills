@@ -239,7 +239,7 @@ export const createMockDataProvider = (overrides: Partial<DataProvider> = {}): D
     createAssistantTurn: vi.fn().mockResolvedValue({} as any),
     getAssistantTurn: vi.fn().mockResolvedValue({} as any),
     cancelAssistantTurn: vi.fn().mockResolvedValue({} as any),
-    streamAssistantTurn: vi.fn().mockReturnValue(() => {}),
+    streamAssistantTurn: vi.fn().mockImplementation(() => {}),
     ...overrides,
   } as DataProvider;
 };

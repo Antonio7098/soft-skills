@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderWithRouter, renderWithProviders, screen, waitFor, createMockSession, createMockDataProvider } from '@/test/test-utils';
 import { AdminScopeProvider, useAdminScope } from '@/auth/AdminScopeContext';
 import { AuthSessionProvider, useAuthSession } from '@/auth/AuthSessionContext';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
@@ -188,7 +188,7 @@ describe('AdminScopeContext', () => {
 
     it('returns false when session is not loaded', async () => {
       const mockData = createMockDataProvider({
-        getAuthSession: vi.fn().mockImplementation(() => new Promise(() => {})),
+         getAuthSession: vi.fn().mockImplementation(() => Promise.resolve()),
       });
 
       renderWithProviders(

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, waitFor, createMockSession, createMockDataProvider } from '@/test/test-utils';
 import { AuthSessionProvider, useAuthSession } from '@/auth/AuthSessionContext';
 import { DataProviderProvider } from '@/data/DataContext';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 
