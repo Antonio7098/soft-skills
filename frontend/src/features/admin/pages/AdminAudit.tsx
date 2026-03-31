@@ -139,8 +139,8 @@ export function AdminAudit() {
         items: sorted,
         count: items.length,
         hasError: items.some((e) => e.error_code),
-        firstAt: sorted.length > 0 ? sorted[0].occurred_at ?? null : null,
-        lastAt: sorted.length > 0 ? sorted[sorted.length - 1].occurred_at ?? null : null,
+        firstAt: sorted.length > 0 ? (sorted[0].occurred_at !== undefined ? sorted[0].occurred_at : null) : null,
+        lastAt: sorted.length > 0 ? (sorted[sorted.length - 1].occurred_at !== undefined ? sorted[sorted.length - 1].occurred_at : null) : null,
         eventTypes: [...new Set(items.map((e) => e.event_type))],
       };
     });
