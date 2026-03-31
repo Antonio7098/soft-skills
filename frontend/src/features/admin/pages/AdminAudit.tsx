@@ -277,7 +277,7 @@ export function AdminAudit() {
                       </td>
                        <td className="px-4 py-3">
                          <span className="text-body-xs text-content-secondary">
-                           {group.firstAt ? new Date(group.firstAt).toLocaleTimeString() : ' — '} — {group.lastAt ? new Date(group.lastAt).toLocaleTimeString() : ' — '}
+                           {group.firstAt != null ? new Date(group.firstAt).toLocaleTimeString() : ' — '} — {group.lastAt != null ? new Date(group.lastAt).toLocaleTimeString() : ' — '}
                          </span>
                        </td>
                       <td className="px-4 py-3">
