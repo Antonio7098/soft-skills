@@ -9,10 +9,10 @@ import { AuthSessionProvider } from '@/auth/AuthSessionContext';
 import { AdminScopeProvider, useAdminScope } from '@/auth/AdminScopeContext';
 
 describe('UserAppGuard', () => {
-   it('shows loading state while session is loading', async () => {
-     const mockData = createMockDataProvider({
-       getAuthSession: vi.fn().mockImplementation(() => Promise.resolve()),
-     });
+    it('shows loading state while session is loading', async () => {
+      const mockData = createMockDataProvider({
+        getAuthSession: vi.fn().mockResolvedValue(createMockSession({ status: 'authenticated', org_memberships: [] })),
+      });
 
     renderWithProviders(
       <UserAppGuard>
@@ -120,10 +120,10 @@ describe('UserAppGuard', () => {
 });
 
 describe('AdminGuard', () => {
-   it('shows loading state while session is loading', async () => {
-     const mockData = createMockDataProvider({
-       getAuthSession: vi.fn().mockImplementation(() => Promise.resolve()),
-     });
+    it('shows loading state while session is loading', async () => {
+      const mockData = createMockDataProvider({
+        getAuthSession: vi.fn().mockResolvedValue(createMockSession({ status: 'authenticated', org_memberships: [] })),
+      });
 
     renderWithProviders(
       <AdminGuard>

@@ -75,9 +75,9 @@ export function useVoiceInput({ onTranscript, language = 'en-US' }: UseVoiceInpu
   const start = useCallback(async () => {
     setError(null);
 
-    if (browserSupportsWebSpeech() && CHROME_OR_EDGE) {
-      const SpeechRecognition = window.SpeechRecognition || (window as typeof window & { webkitSpeechRecognition: typeof window.SpeechRecognition }).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
+     if (browserSupportsWebSpeech() && CHROME_OR_EDGE) {
+       const SpeechRecognitionCtor = window.SpeechRecognition || (window as typeof window & { webkitSpeechRecognition: typeof window.SpeechRecognition }).webkitSpeechRecognition;
+       const recognition = new SpeechRecognitionCtor();
 
       recognition.continuous = true;
       recognition.interimResults = true;

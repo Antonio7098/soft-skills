@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, ChevronDown, ChevronRight, MessageSquare, Play } from 'lucide-react';
+import { MessageSquare, Play } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
 import { Badge } from '@/design-system/primitives/Badge';
-import { Button } from '@/design-system/primitives/Button';
 import { ScoreRing } from '@/design-system/patterns/ScoreRing';
 import { useData } from '@/data';
 import type { PracticeRunView, PracticeRunItemSummary } from '@/data';

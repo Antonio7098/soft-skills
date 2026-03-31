@@ -40,14 +40,25 @@ export function AdminOrgCompetencies() {
       const globalCompetencies: CompetencyWithScope[] = taxonomy.competencies
         .filter((c) => !orgCompetencySlugs.has(c.slug))
         .map((c) => ({ ...c, scope: 'global' }));
-      const mergedOrgCompetencies: CompetencyWithScope[] = orgCompetencies.map((oc) => {
-        const fullCompetency = taxonomy.competencies.find(c => c.slug === oc.slug);
-        return {
-          ...fullCompetency,
-          scope: 'org',
-          organisation_id: orgId,
-        };
-      });
+       const mergedOrgCompetencies: CompetencyWithScope[] = orgCompetencies.map((oc) => {
+         const fullCompetency = taxonomy.competencies.find(c => c.slug === oc.slug);
+         // If we can't find the full competency, we'll use the org competency data
+         // and log a warning since this shouldn't happen in normal operation
+         if (!fullCompetency) {
+           console.warn(`Org competency ${oc.slug} not found in taxonomy`);
+           // We'll assume oc has the necessary fields, but we need to cast
+           return {
+             ...oc,
+             scope: 'org',
+             organisation_id: orgId,
+           } as CompetencyWithScope;
+         }
+         return {
+           ...fullCompetency,
+           scope: 'org',
+           organisation_id: orgId,
+         };
+       });
 
       setCompetencies([...globalCompetencies, ...mergedOrgCompetencies]);
     } catch (error) {

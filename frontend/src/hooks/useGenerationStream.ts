@@ -169,64 +169,70 @@ const initialState: GenerationProgressState = {
 };
 
 function buildActivityFromEvent(event: GenerationStreamEvent): GenerationActivityItem | null {
-  const payload = event.payload as Record<string, unknown>;
-  let message: string | null = null;
-  switch (event.stage) {
-    case 'input_guard':
-      message = 'Validated generation request.';
-      break;
-    case 'blueprint_transform':
-      message = 'Prepared blueprint planning request.';
-      break;
-    case 'blueprint_llm_transform':
-      message = typeof payload.title === 'string'
-        ? `Planned blueprint: ${payload.title}`
-        : 'Blueprint plan generated.';
-      break;
-    case 'blueprint_guard':
-      message = 'Validated the blueprint contract.';
-      break;
-    case 'prompt_items_work':
-      if (Array.isArray(payload.prompt_items) && payload.prompt_items.length > 0) {
-        message = `Generated ${payload.prompt_items.length} prompt item${payload.prompt_items.length === 1 ? '' : 's'}.`;
-      } else if (typeof payload.generated_prompt_items === 'number') {
-        message = `Prompt item workers finished ${payload.generated_prompt_items} item${payload.generated_prompt_items === 1 ? '' : 's'}.`;
-      } else {
-        message = 'Prompt item workers are running.';
-      }
-      break;
-    case 'scenarios_work':
-      message = 'Scenario workers are running.';
-      break;
-    case 'assemble_transform':
-      message = 'Assembling final collection draft.';
-      break;
-    case 'output_guard':
-      message = 'Running final validation.';
-      break;
-    case 'persistence_work':
-      message = 'Saving generated collection.';
-      break;
-    case 'completed':
-      message = 'Generation completed.';
-      break;
-    case 'failed':
-      message = typeof payload.error === 'string' ? payload.error : 'Generation failed.';
-      break;
-    case 'cancelled':
-      message = 'Generation was cancelled.';
-      break;
-    default:
-      message = null;
-  }
-  if (!message) return null;
-  return {
-    id: event.event_id,
-    stage: event.stage,
-    message,
-    timestamp: event.emitted_at,
-  };
-}
+   const payload = event.payload as Record<string, unknown>;
+   let message: string | null = null;
+   switch (event.stage) {
+     case 'input_guard':
+       message = 'Validated generation request.';
+       break;
+     case 'blueprint_transform':
+       message = 'Prepared blueprint planning request.';
+       break;
+     case 'blueprint_llm_transform':
+       if (typeof payload.title === 'string') {
+         message = `Planned blueprint: ${payload.title}`;
+       } else {
+         message = 'Blueprint plan generated.';
+       }
+       break;
+     case 'blueprint_guard':
+       message = 'Validated the blueprint contract.';
+       break;
+     case 'prompt_items_work':
+       if (Array.isArray(payload.prompt_items)) {
+         message = `Generated ${payload.prompt_items.length} prompt item${payload.prompt_items.length === 1 ? '' : 's'}.`;
+       } else if (typeof payload.generated_prompt_items === 'number') {
+         message = `Prompt item workers finished ${payload.generated_prompt_items} item${payload.generated_prompt_items === 1 ? '' : 's'}.`;
+       } else {
+         message = 'Prompt item workers are running.';
+       }
+       break;
+     case 'scenarios_work':
+       message = 'Scenario workers are running.';
+       break;
+     case 'assemble_transform':
+       message = 'Assembling final collection draft.';
+       break;
+     case 'output_guard':
+       message = 'Running final validation.';
+       break;
+     case 'persistence_work':
+       message = 'Saving generated collection.';
+       break;
+     case 'completed':
+       message = 'Generation completed.';
+       break;
+     case 'failed':
+       if (typeof payload.error === 'string') {
+         message = payload.error;
+       } else {
+         message = 'Generation failed.';
+       }
+       break;
+     case 'cancelled':
+       message = 'Generation was cancelled.';
+       break;
+     default:
+       message = null;
+   }
+   if (!message) return null;
+   return {
+     id: event.event_id,
+     stage: event.stage,
+     message,
+     timestamp: event.emitted_at,
+   };
+ }
 
 interface UseGenerationStreamOptions {
   onComplete?: (collection: GenerationProgressState['collection']) => void;

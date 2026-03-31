@@ -135,5 +135,6 @@ class AssistantProactivityAmbiguitySmoke(_AssistantProactivitySmoke):
             "tool_names": tool_names,
             "message_count": len(messages),
             "assistant_message_preview": str(assistant_message.get("content", ""))[:160],
+            "last_error_code": turn.get("last_error_code"),
             "ambiguous_message": "check my collections",
         }

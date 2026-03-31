@@ -84,7 +84,7 @@
       "name": "Competency Interview Rubric (5-level)",
       "criteria": [
         {
-          "criterion_ref": "situation-task-clarity",
+          "criterion_ref": "empathy",
           "skill_slug": "starr-framework",
           "title": "Situation & Task Clarity",
           "description": "Sets context and defines the problem clearly.",
@@ -100,7 +100,7 @@
           ]
         },
         {
-          "criterion_ref": "action-communication",
+          "criterion_ref": "active-listening",
           "skill_slug": "active-listening",
           "title": "Action: Communication & Empathy",
           "description": "Describes how they listened, empathised, and engaged.",
@@ -116,7 +116,7 @@
           ]
         },
         {
-          "criterion_ref": "action-negotiation",
+          "criterion_ref": "conflict-facilitation",
           "skill_slug": "negotiation",
           "title": "Action: Negotiation & Expectation Setting",
           "description": "Shows how they set boundaries or found common ground.",
@@ -132,7 +132,7 @@
           ]
         },
         {
-          "criterion_ref": "result",
+          "criterion_ref": "expectation-setting",
           "skill_slug": "decision-justification",
           "title": "Result",
           "description": "States a measurable or observable outcome.",
@@ -148,7 +148,7 @@
           ]
         },
         {
-          "criterion_ref": "reflection",
+          "criterion_ref": "self-reflection",
           "skill_slug": "self-reflection",
           "title": "Reflection",
           "description": "Demonstrates learning and growth.",
@@ -174,7 +174,7 @@
       "name": "Scenario Rubric (5-level)",
       "criteria": [
         {
-          "criterion_ref": "stakeholder-analysis-engagement",
+          "criterion_ref": "stakeholder-analysis",
           "skill_slug": "stakeholder-analysis",
           "title": "Stakeholder Analysis & Engagement",
           "description": "Correct identification, power/interest mapping, tailored engagement strategies, evidence of empathy.",
@@ -190,7 +190,7 @@
           ]
         },
         {
-          "criterion_ref": "interviewing-questioning",
+          "criterion_ref": "asking-the-right-questions",
           "skill_slug": "asking-the-right-questions",
           "title": "Interviewing & Questioning",
           "description": "Use of open/probing questions, active listening signals, ability to uncover hidden concerns.",
@@ -206,7 +206,7 @@
           ]
         },
         {
-          "criterion_ref": "structured-communication",
+          "criterion_ref": "structured-thinking",
           "skill_slug": "structured-thinking",
           "title": "Structured Communication & Recommendation",
           "description": "Clear use of As-Is / Gap / To-Be framework, logical options, concise executive summary, actionable next steps.",

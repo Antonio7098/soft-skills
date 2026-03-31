@@ -15,4 +15,5 @@ class AssistantProactivitySmokeResult(BaseModel):
     tool_names: list[str] = Field(default_factory=list)
     message_count: int = 0
     assistant_message_preview: str | None = None
+    last_error_code: str | None = None
     ambiguous_message: str

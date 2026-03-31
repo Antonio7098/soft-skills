@@ -12,6 +12,14 @@ print("DEBUG: Script started", flush=True, file=sys.stderr)
 backend_src = str(Path(__file__).resolve().parents[2] / "backend" / "src")
 sys.path.insert(0, backend_src)
 
+# Load .env file before importing Settings
+from pathlib import Path
+env_path = Path(__file__).resolve().parents[2] / "backend" / ".env"
+if env_path.exists():
+    from dotenv import load_dotenv
+    load_dotenv(env_path)
+    print(f"DEBUG: Loaded .env from {env_path}", flush=True, file=sys.stderr)
+
 print("DEBUG: Importing modules...", flush=True, file=sys.stderr)
 
 try:
@@ -29,7 +37,12 @@ try:
     from soft_skills_backend.modules.evaluation.use_cases.marking_benchmark import MarkingBenchmarkRunner
     from soft_skills_backend.platform.observability.stageflow_logging import DatabaseProviderCallLogger
     from soft_skills_backend.shared.auth import Actor
-    from soft_skills_backend.platform.db.models import RubricRecord, RubricVersionRecord
+    from soft_skills_backend.platform.db.repositories import SqlAlchemyProviderCallRepository
+    from soft_skills_backend.platform.providers.llm.openai_compatible import build_llm_provider
+    
+    # Wrapper to convert positional args to keyword args
+    def provider_factory(settings, provider_call_logger):
+        return build_llm_provider(settings=settings, provider_call_logger=provider_call_logger)
     
     print("DEBUG: All imports successful", flush=True, file=sys.stderr)
 except Exception as e:
@@ -67,7 +80,20 @@ class SimpleSnapshot:
 
 
 async def main():
-    settings = Settings()
+    # Load base settings first
+    base_settings = Settings()
+    
+    # Override settings to use OpenRouter for gpt-oss-20b
+    settings = Settings(
+        provider_name="openrouter",
+        provider_api_key=base_settings.openrouter_api_key,
+        provider_base_url=base_settings.openrouter_base_url,
+        database_url=base_settings.database_url,
+        llm_marking_per_skill_model="openai/gpt-oss-20b",
+        llm_marking_aggregation_model="openai/gpt-oss-20b",
+    )
+    
+    print(f"DEBUG: Using provider: {settings.provider_name}", flush=True, file=sys.stderr)
     
     # Setup database
     print(f"DEBUG: Connecting to {settings.database_url}", flush=True, file=sys.stderr)
@@ -93,12 +119,14 @@ async def main():
     selected_cases = select_cases(dataset=dataset, case_ids=command.case_ids)
     print(f"DEBUG: Selected {len(selected_cases)} cases", flush=True, file=sys.stderr)
     
-    # Create runner
-    provider_logger = DatabaseProviderCallLogger(session_factory)
+    # Create runner with proper provider factory
+    provider_repository = SqlAlchemyProviderCallRepository(session_factory)
+    provider_logger = DatabaseProviderCallLogger(provider_repository)
     runner = MarkingBenchmarkRunner(
         settings=settings,
         session_factory=session_factory,
         provider_call_logger=provider_logger,
+        provider_factory=provider_factory,
     )
     
     # Create actor
@@ -147,8 +175,15 @@ async def main():
                 print(f"  Latency: {result.metrics.get('latency_ms', 0)}ms")
                 print(f"  Tokens: {result.metrics.get('total_tokens', 0)}")
                 print(f"  Score Error: {result.metrics.get('overall_score_abs_error', 'N/A')}")
+            if result.error_code:
+                print(f"  Error Code: {result.error_code}")
+            if result.detail_payload:
+                err_msg = result.detail_payload.get('error_message')
+                if err_msg:
+                    print(f"  Error Message: {err_msg[:200]}")
         except Exception as e:
             print(f"  ERROR: {e}")
+            import traceback
             traceback.print_exc()
     
     # Build computation

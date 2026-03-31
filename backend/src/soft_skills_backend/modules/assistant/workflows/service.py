@@ -606,6 +606,24 @@ class AssistantWorkflowService:
         for _ in range(MAX_TOOL_ITERATIONS):
             if active.cancel_reason is not None:
                 return _AssistantLoopResult(cancelled=True, reason=active.cancel_reason)
+            ctx.try_emit_event(
+                "assistant.provider_tool_request",
+                {
+                    "tool_count": len(tool_definitions),
+                    "tool_names": [tool.name for tool in tool_definitions],
+                    "tool_schema_bytes": {
+                        tool.name: len(
+                            json.dumps(tool.parameters, separators=(",", ":"), sort_keys=True)
+                        )
+                        for tool in tool_definitions
+                    },
+                    "message_count": len(messages),
+                    "pipeline_run_id": str(ctx.pipeline_run_id) if ctx.pipeline_run_id else None,
+                    "request_id": execution.request_id,
+                    "trace_id": execution.trace_id,
+                    "workflow_id": execution.workflow_id,
+                },
+            )
             completion = await self._llm_provider.complete_with_tools(
                 messages=messages,
                 tools=tool_definitions,

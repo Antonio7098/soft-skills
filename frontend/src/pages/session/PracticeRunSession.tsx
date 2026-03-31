@@ -402,13 +402,13 @@ export function PracticeRunSession() {
     return <ErrorState message="No sessions found" onRetry={loadSession} />;
   }
 
-  const currentItem = run.items[currentSessionIndex];
-  const isLastItem = currentSessionIndex >= sessions.length - 1;
-  const isScenario = currentItem?.item_type === 'scenario' && currentScenario;
+   const currentItem = run.items[currentSessionIndex] ?? { item_type: '', prompt_text: '' };
+   const isLastItem = currentSessionIndex >= sessions.length - 1;
+   const isScenario = currentItem.item_type === 'scenario' && currentScenario;
 
-  const scenarioPromptText = isScenario
-    ? extractScenarioQuestion(currentItem.prompt_text ?? '')
-    : currentItem.prompt_text ?? '';
+   const scenarioPromptText = isScenario
+     ? extractScenarioQuestion(currentItem.prompt_text ?? '')
+     : currentItem.prompt_text ?? '';
 
   if (phase === 'complete' && isLastItem) {
     return (

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from abc import abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -37,6 +38,8 @@ RETRYABLE_STRUCTURED_OUTPUT_FAILURE_MARKERS = (
     "failed to validate json",
     "failed to generate json",
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _add_llm_span_attributes(
@@ -423,11 +426,12 @@ class OpenAICompatibleLLMProvider(LLMProvider):
 
         for attempt in range(max_retries + 1):
             active_model_slug = self._model_slug_for_attempt(attempt)
+            provider_tools = [_build_provider_tool_definition(tool) for tool in tools]
             payload: dict[str, Any] = {
                 "model": active_model_slug,
                 "messages": messages,
                 "temperature": 0,
-                "tools": [_build_provider_tool_definition(tool) for tool in tools],
+                "tools": provider_tools,
                 "parallel_tool_calls": True,
             }
             if tool_choice is not None:
@@ -447,6 +451,12 @@ class OpenAICompatibleLLMProvider(LLMProvider):
             )
             start = perf_counter()
             response_payload: dict[str, Any] | None = None
+            tool_payload_diagnostics = _build_tool_payload_diagnostics(
+                tools=tools,
+                provider_tools=provider_tools,
+                messages=messages,
+                tool_choice=tool_choice,
+            )
             try:
                 async with asyncio.timeout(resolved_timeout_seconds):
                     async with httpx.AsyncClient(timeout=resolved_timeout_seconds) as client:
@@ -470,6 +480,22 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                         user_id=call_context.user_id,
                         http_status=response.status_code,
                         timeout_seconds=resolved_timeout_seconds,
+                        tool_payload_diagnostics=tool_payload_diagnostics,
+                        provider_response_diagnostics=_build_response_diagnostics(response_payload),
+                    )
+                    logger.warning(
+                        "Provider tool request failed",
+                        extra={
+                            "provider": self._resolved.provider_name,
+                            "model": active_model_slug,
+                            "status_code": response.status_code,
+                            "operation": call_context.operation,
+                            "tool_payload_diagnostics": tool_payload_diagnostics,
+                            "provider_response_diagnostics": _build_response_diagnostics(
+                                response_payload
+                            ),
+                            "error_message": error_message,
+                        },
                     )
                     if (
                         response.status_code in TRANSIENT_PROVIDER_STATUS_CODES
@@ -485,6 +511,10 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                         details={
                             "status_code": response.status_code,
                             "reason": error_message,
+                            "tool_payload_diagnostics": tool_payload_diagnostics,
+                            "provider_response_diagnostics": _build_response_diagnostics(
+                                response_payload
+                            ),
                         },
                     )
                 message = _extract_provider_message(response_payload)
@@ -507,6 +537,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                     usage=usage,
                     finish_reason=finish_reason,
                     timeout_seconds=resolved_timeout_seconds,
+                    tool_payload_diagnostics=tool_payload_diagnostics,
                 )
                 _add_llm_span_attributes(
                     operation=call_context.operation,
@@ -949,6 +980,63 @@ def _build_provider_tool_definition(tool: ProviderToolDefinition) -> dict[str, A
             "parameters": tool.parameters,
         },
     }
+
+
+def _build_tool_payload_diagnostics(
+    *,
+    tools: list[ProviderToolDefinition],
+    provider_tools: list[dict[str, Any]],
+    messages: list[dict[str, object]],
+    tool_choice: str | None,
+) -> dict[str, Any]:
+    payload = {
+        "messages": messages,
+        "tools": provider_tools,
+        "parallel_tool_calls": True,
+    }
+    if tool_choice is not None:
+        payload["tool_choice"] = {"type": "function", "function": {"name": tool_choice}}
+    try:
+        payload_size_bytes = len(json.dumps(payload, separators=(",", ":"), sort_keys=True))
+    except TypeError:
+        payload_size_bytes = None
+    return {
+        "tool_count": len(tools),
+        "tool_choice": tool_choice,
+        "message_count": len(messages),
+        "payload_size_bytes": payload_size_bytes,
+        "tool_names": [tool.name for tool in tools],
+        "tools": [_build_single_tool_diagnostics(tool) for tool in tools],
+    }
+
+
+def _build_single_tool_diagnostics(tool: ProviderToolDefinition) -> dict[str, Any]:
+    schema = tool.parameters
+    properties = schema.get("properties")
+    required = schema.get("required")
+    return {
+        "name": tool.name,
+        "description_length": len(tool.description),
+        "schema_size_bytes": len(json.dumps(schema, separators=(",", ":"), sort_keys=True)),
+        "top_level_property_count": len(properties) if isinstance(properties, dict) else 0,
+        "required_count": len(required) if isinstance(required, list) else 0,
+        "max_schema_depth": _schema_max_depth(schema),
+        "schema_keys": sorted(str(key) for key in schema.keys()),
+    }
+
+
+def _schema_max_depth(node: Any, *, _depth: int = 1) -> int:
+    if isinstance(node, dict):
+        child_depth = _depth
+        for value in node.values():
+            child_depth = max(child_depth, _schema_max_depth(value, _depth=_depth + 1))
+        return child_depth
+    if isinstance(node, list):
+        child_depth = _depth
+        for value in node:
+            child_depth = max(child_depth, _schema_max_depth(value, _depth=_depth + 1))
+        return child_depth
+    return _depth
 
 
 def _build_response_diagnostics(response_payload: dict[str, Any] | None) -> dict[str, Any] | None:
