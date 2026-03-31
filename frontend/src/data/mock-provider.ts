@@ -2544,10 +2544,15 @@ export const mockDataProvider: DataProvider = {
     });
 
     const run: PracticeRunView = {
-      id: runId,
-      user_id: _user.id,
-      title: cmd.title,
+      run_id: runId,
+      workflow_id: '',
       status: 'active',
+      total_items: items.length,
+      completed_items: 0,
+      validated_items: 0,
+      failed_items: 0,
+      current_attempt_id: null,
+      started_at: now,
       items,
       summary: {
         total_items: items.length,
@@ -2557,9 +2562,12 @@ export const mockDataProvider: DataProvider = {
         skill_breakdown: {},
         practice_type_breakdown: {},
       },
+      completed_at: null,
+      id: runId,
+      user_id: _user.id,
+      title: cmd.title,
       created_at: now,
       updated_at: now,
-      completed_at: null,
     };
 
     _practiceRuns.set(runId, run);
@@ -2569,7 +2577,7 @@ export const mockDataProvider: DataProvider = {
   async listPracticeRuns(): Promise<PracticeRunView[]> {
     await delay(150);
     return Array.from(_practiceRuns.values()).sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      (a, b) => new Date(b.created_at ?? '').getTime() - new Date(a.created_at ?? '').getTime(),
     );
   },
 

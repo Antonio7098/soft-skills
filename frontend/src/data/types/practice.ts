@@ -212,6 +212,7 @@ export interface PracticeRunView {
   readonly title?: string;
   readonly created_at?: string;
   readonly updated_at?: string;
+  readonly overall_score?: number | null;
 }
 
 export interface PracticeSessionView {

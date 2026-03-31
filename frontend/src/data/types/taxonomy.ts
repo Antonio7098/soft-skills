@@ -9,7 +9,7 @@ export interface CompetencyView {
   readonly name: string;
   readonly description: string;
   readonly skill_slugs: string[];
-  readonly skills: SkillView[];
+  readonly skills?: SkillView[];
 }
 
 export interface RubricView {

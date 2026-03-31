@@ -25,14 +25,14 @@ export const SEED_SKILLS: SkillView[] = [
 ];
 
 export const SEED_COMPETENCIES: CompetencyView[] = [
-  { slug: 'stakeholder-management', name: 'Stakeholder Management', description: 'Managing relationships with stakeholders effectively.', skill_slugs: ['active-listening', 'empathy', 'expectation-setting', 'negotiation'] },
-  { slug: 'communication', name: 'Communication', description: 'Conveying information clearly and effectively.', skill_slugs: ['structured-communication', 'concise-explanation', 'executive-summary'] },
-  { slug: 'teamwork', name: 'Teamwork', description: 'Collaborating effectively with others.', skill_slugs: ['active-listening', 'empathy', 'conflict-handling'] },
-  { slug: 'prioritization', name: 'Prioritization', description: 'Identifying and focusing on the most important work.', skill_slugs: ['prioritization-under-pressure', 'decision-justification', 'executive-summary'] },
-  { slug: 'professionalism', name: 'Professionalism', description: 'Conducting oneself with competence and integrity.', skill_slugs: ['expectation-setting', 'concise-explanation', 'conflict-handling'] },
-  { slug: 'problem-solving', name: 'Problem Solving', description: 'Analyzing issues and developing effective solutions.', skill_slugs: ['structured-communication', 'decision-justification', 'executive-summary'] },
-  { slug: 'adaptability', name: 'Adaptability', description: 'Adjusting approach based on changing circumstances.', skill_slugs: ['active-listening', 'prioritization-under-pressure', 'decision-justification'] },
-  { slug: 'managing-ambiguity', name: 'Managing Ambiguity', description: 'Making progress when information is incomplete.', skill_slugs: ['expectation-setting', 'prioritization-under-pressure', 'negotiation'] },
+  { slug: 'stakeholder-management', name: 'Stakeholder Management', description: 'Managing relationships with stakeholders effectively.', skill_slugs: ['active-listening', 'empathy', 'expectation-setting', 'negotiation'], skills: [] },
+  { slug: 'communication', name: 'Communication', description: 'Conveying information clearly and effectively.', skill_slugs: ['structured-communication', 'concise-explanation', 'executive-summary'], skills: [] },
+  { slug: 'teamwork', name: 'Teamwork', description: 'Collaborating effectively with others.', skill_slugs: ['active-listening', 'empathy', 'conflict-handling'], skills: [] },
+  { slug: 'prioritization', name: 'Prioritization', description: 'Identifying and focusing on the most important work.', skill_slugs: ['prioritization-under-pressure', 'decision-justification', 'executive-summary'], skills: [] },
+  { slug: 'professionalism', name: 'Professionalism', description: 'Conducting oneself with competence and integrity.', skill_slugs: ['expectation-setting', 'concise-explanation', 'conflict-handling'], skills: [] },
+  { slug: 'problem-solving', name: 'Problem Solving', description: 'Analyzing issues and developing effective solutions.', skill_slugs: ['structured-communication', 'decision-justification', 'executive-summary'], skills: [] },
+  { slug: 'adaptability', name: 'Adaptability', description: 'Adjusting approach based on changing circumstances.', skill_slugs: ['active-listening', 'prioritization-under-pressure', 'decision-justification'], skills: [] },
+  { slug: 'managing-ambiguity', name: 'Managing Ambiguity', description: 'Making progress when information is incomplete.', skill_slugs: ['expectation-setting', 'prioritization-under-pressure', 'negotiation'], skills: [] },
 ];
 
 export const SEED_RUBRICS: RubricView[] = [

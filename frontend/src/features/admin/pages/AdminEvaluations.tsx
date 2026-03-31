@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { 
+import {
   FlaskConical,
   Play,
   CheckCircle,
@@ -7,7 +7,6 @@ import {
   Zap,
   X,
   GitCompare,
-  ChevronDown,
 } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
@@ -255,7 +254,7 @@ function ComparisonModal({ runs, onClose }: ComparisonModalProps) {
       if (!groups[key]) {
         groups[key] = [];
       }
-      groups[key].push(run);
+      groups[key]!.push(run);
     }
     
     return groups;

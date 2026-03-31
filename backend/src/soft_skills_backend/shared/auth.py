@@ -69,7 +69,7 @@ class HeaderAuthProvider:
         self,
         event_type: str,
         *,
-        user_id: str,
+        user_id: str | None = None,
         error_code: str | None = None,
         details: dict[str, Any] | None = None,
     ) -> None:

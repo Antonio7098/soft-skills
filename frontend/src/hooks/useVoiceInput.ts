@@ -42,7 +42,7 @@ export function useVoiceInput({ onTranscript, language = 'en-US' }: UseVoiceInpu
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<InstanceType<typeof SpeechRecognition> | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
@@ -76,7 +76,7 @@ export function useVoiceInput({ onTranscript, language = 'en-US' }: UseVoiceInpu
     setError(null);
 
     if (browserSupportsWebSpeech() && CHROME_OR_EDGE) {
-      const SpeechRecognition = window.SpeechRecognition || (window as typeof window & { webkitSpeechRecognition: typeof SpeechRecognition }).webkitSpeechRecognition;
+      const SpeechRecognition = window.SpeechRecognition || (window as typeof window & { webkitSpeechRecognition: typeof window.SpeechRecognition }).webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
 
       recognition.continuous = true;
@@ -88,8 +88,8 @@ export function useVoiceInput({ onTranscript, language = 'en-US' }: UseVoiceInpu
         let finalTranscript = '';
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
+          const transcript = event.results[i][0]?.transcript;
+          if (event.results[i]?.isFinal) {
             finalTranscript += transcript;
           } else {
             interimTranscript += transcript;
@@ -188,7 +188,7 @@ export function useVoiceInput({ onTranscript, language = 'en-US' }: UseVoiceInpu
         };
 
         mediaRecorder.onerror = (event) => {
-          setError(`Recording error: ${(event as Error).message || 'Unknown error'}`);
+          setError(`Recording error: ${(event as unknown as Error).message || 'Unknown error'}`);
           stop();
         };
 

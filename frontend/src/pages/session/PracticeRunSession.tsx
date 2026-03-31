@@ -407,8 +407,8 @@ export function PracticeRunSession() {
   const isScenario = currentItem?.item_type === 'scenario' && currentScenario;
 
   const scenarioPromptText = isScenario
-    ? extractScenarioQuestion(currentItem.prompt_text)
-    : currentItem.prompt_text;
+    ? extractScenarioQuestion(currentItem.prompt_text ?? '')
+    : currentItem.prompt_text ?? '';
 
   if (phase === 'complete' && isLastItem) {
     return (
@@ -430,7 +430,7 @@ export function PracticeRunSession() {
 
   return (
     <SessionShell
-      title={run.title}
+      title={run.title ?? ''}
       timer={timer.formatted}
       currentStep={currentSessionIndex + 1}
       totalSteps={sessions.length}
@@ -450,7 +450,7 @@ export function PracticeRunSession() {
                 <div className="w-full max-w-2xl flex flex-col gap-6">
                   <PromptDisplay
                     title={currentItem.title}
-                    promptText={scenarioPromptText}
+                    promptText={scenarioPromptText ?? ''}
                     difficulty={currentItem.difficulty}
                     skillSlugs={currentItem.target_skill_slugs}
                   />
@@ -467,7 +467,7 @@ export function PracticeRunSession() {
             <div className="flex flex-col gap-6">
               <PromptDisplay
                 title={currentItem.title}
-                promptText={currentItem.prompt_text}
+                promptText={currentItem.prompt_text ?? ''}
                 difficulty={currentItem.difficulty}
                 skillSlugs={currentItem.target_skill_slugs}
               />

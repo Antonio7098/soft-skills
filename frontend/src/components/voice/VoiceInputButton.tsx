@@ -16,7 +16,6 @@ interface VoiceInputButtonProps {
 
 export function VoiceInputButton({ onTranscript, disabled = false, className }: VoiceInputButtonProps) {
   const [showError, setShowError] = useState<string | null>(null);
-  const [isPulsing, setIsPulsing] = useState(false);
 
   const { isListening, error, start, stop, browserSupportsWebSpeech } = useVoiceInput({
     onTranscript: (text, isFinal) => {

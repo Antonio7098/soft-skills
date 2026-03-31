@@ -42,6 +42,7 @@ export function AdminOrgCompetencies() {
         .map((c) => ({ ...c, scope: 'global' }));
       const mergedOrgCompetencies: CompetencyWithScope[] = orgCompetencies.map((c) => ({
         ...c,
+        skills: c.skills ?? [],
         scope: 'org',
         organisation_id: orgId,
       }));
