@@ -42,49 +42,79 @@ export function PracticeRunListItem({ run }: PracticeRunListItemProps) {
     }
   };
 
-  return (
-    <Card padding="none" className="overflow-hidden">
-      <div
-        className="flex items-center gap-4 p-4 cursor-pointer hover:bg-surface-secondary/50 transition-colors"
-        onClick={() => setExpanded(!expanded)}
-      >
-        {run.overall_score !== null && run.overall_score !== undefined ? (
-          <ScoreRing score={run.overall_score} size="sm" />
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-surface-secondary flex items-center justify-center">
-            <Play className="w-5 h-5 text-content-tertiary" />
-          </div>
-        )}
+   return (
+     <Card padding="none" className="overflow-hidden">
+       <div
+         className="flex items-center gap-4 p-4 cursor-pointer hover:bg-surface-secondary/50 transition-colors"
+         onClick={() => setExpanded(!expanded)}
+       >
+         {run.overall_score !== null && run.overall_score !== undefined ? (
+           <ScoreRing score={run.overall_score} size="sm" />
+         ) : (
+           <div className="w-12 h-12 rounded-full bg-surface-secondary flex items-center justify-center">
+             <Play className="w-5 h-5 text-content-tertiary" />
+           </div>
+         )}
 
-        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-          <div className="flex items-center gap-2">
-            <h4 className="text-body-sm font-medium text-content-primary">
-              Practice Session
-            </h4>
-            {run.overall_score !== null && run.overall_score !== undefined ? (
-              <Badge variant={run.overall_score >= 4 ? 'success' : run.overall_score >= 3 ? 'accent' : 'warning'} size="sm">
-                {run.overall_score}/5
-              </Badge>
-            ) : (
-            items.map((item, idx) => (
-              <div
-                key={`${item.id}-${idx}`}
-                className="flex items-center gap-3 p-3 px-4 hover:bg-surface-secondary/50 cursor-pointer border-b border-line last:border-b-0"
-                onClick={() => handleQuestionClick(item)}
-              >
-                <MessageSquare className="w-4 h-4 text-content-tertiary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-body-sm text-content-primary truncate">{item.title}</p>
-                  <p className="text-body-xs text-content-tertiary truncate">{item.prompt_text}</p>
-                </div>
-                <Badge variant={item.status === 'completed' ? 'success' : 'default'} size="sm" className="capitalize">
-                  {item.status}
-                </Badge>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </Card>
-  );
+         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+           <div className="flex items-center gap-2">
+             <h4 className="text-body-sm font-medium text-content-primary">
+               Practice Session
+             </h4>
+             {run.overall_score !== null && run.overall_score !== undefined ? (
+               <Badge variant={run.overall_score >= 4 ? 'success' : run.overall_score >= 3 ? 'accent' : 'warning'} size="sm">
+                 {run.overall_score}/5
+               </Badge>
+             ) : (
+               <div>
+                 {items.map((item, idx) => (
+                   <div
+                     key={`${item.id}-${idx}`}
+                     className="flex items-center gap-3 p-3 px-4 hover:bg-surface-secondary/50 cursor-pointer border-b border-line last:border-b-0"
+                     onClick={() => handleQuestionClick(item)}
+                   >
+                     <MessageSquare className="w-4 h-4 text-content-tertiary shrink-0" />
+                     <div className="flex-1 min-w-0">
+                       <p className="text-body-sm text-content-primary truncate">{item.title}</p>
+                       <p className="text-body-xs text-content-tertiary truncate">{item.prompt_text}</p>
+                     </div>
+                     <Badge variant={item.status === 'completed' ? 'success' : 'default'} size="sm" className="capitalize">
+                       {item.status}
+                     </Badge>
+                   </div>
+                 ))}
+               </div>
+             )}
+           </div>
+         </div>
+       </div>
+
+       {expanded && (
+         <div className="border-t border-line bg-surface-secondary/30">
+           {!itemsLoaded ? (
+             <div className="p-4 text-center text-body-xs text-content-tertiary">Loading questions...</div>
+           ) : items.length === 0 ? (
+             <div className="p-4 text-center text-body-xs text-content-tertiary">No assessed questions yet</div>
+           ) : (
+             items.map((item, idx) => (
+               <div
+                 key={`${item.id}-${idx}`}
+                 className="flex items-center gap-3 p-3 px-4 hover:bg-surface-secondary/50 cursor-pointer border-b border-line last:border-b-0"
+                 onClick={() => handleQuestionClick(item)}
+               >
+                 <MessageSquare className="w-4 h-4 text-content-tertiary shrink-0" />
+                 <div className="flex-1 min-w-0">
+                   <p className="text-body-sm text-content-primary truncate">{item.title}</p>
+                   <p className="text-body-xs text-content-tertiary truncate">{item.prompt_text}</p>
+                 </div>
+                 <Badge variant={item.status === 'completed' ? 'success' : 'default'} size="sm" className="capitalize">
+                   {item.status}
+                 </Badge>
+               </div>
+             ))
+           )}
+         </div>
+       )}
+     </Card>
+   );
 }
