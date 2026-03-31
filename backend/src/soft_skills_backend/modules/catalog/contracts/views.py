@@ -83,6 +83,7 @@ def build_collection_view(
                 learner_objective=scenario.learner_objective,
                 constraints=list(scenario.constraints),
                 stakeholder_tensions=list(scenario.stakeholder_tensions),
+                questions=list(scenario.questions),
                 lifecycle_state=scenario.lifecycle_state,
                 target_skill_slugs=list(scenario.target_skill_slugs),
                 rubric_id=scenario.rubric_id,

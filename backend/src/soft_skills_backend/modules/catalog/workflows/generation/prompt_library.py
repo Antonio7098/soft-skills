@@ -12,7 +12,8 @@ from soft_skills_backend.platform.providers.llm.prompts import (
     CREATOR_CHAT_COLLECTION_BLUEPRINT_PROMPT,
     CREATOR_CHAT_PROMPT_ITEM_PLAN_PROMPT,
     CREATOR_PROMPT_ITEM_WORKER_PROMPT,
-    CREATOR_SCENARIO_WORKER_PROMPT,
+    CREATOR_SCENARIO_QUESTION_WORKER_PROMPT,
+    CREATOR_SCENARIO_SHELL_WORKER_PROMPT,
     CREATOR_STRUCTURED_COLLECTION_BLUEPRINT_PROMPT,
     CREATOR_STRUCTURED_PROMPT_ITEM_PLAN_PROMPT,
 )
@@ -59,8 +60,13 @@ def catalog_generation_prompt_templates(settings: Settings) -> list[PromptTempla
             template=CREATOR_PROMPT_ITEM_WORKER_PROMPT,
         ),
         PromptTemplate(
-            name=config.scenario_worker_prompt_name,
-            version=config.scenario_worker_prompt_version,
-            template=CREATOR_SCENARIO_WORKER_PROMPT,
+            name=config.scenario_shell_worker_prompt_name,
+            version=config.scenario_shell_worker_prompt_version,
+            template=CREATOR_SCENARIO_SHELL_WORKER_PROMPT,
+        ),
+        PromptTemplate(
+            name=config.scenario_question_worker_prompt_name,
+            version=config.scenario_question_worker_prompt_version,
+            template=CREATOR_SCENARIO_QUESTION_WORKER_PROMPT,
         ),
     ]

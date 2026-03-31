@@ -292,7 +292,7 @@ class AssistantPracticeCoordinator:
 
         scenarios = self._select_scenarios(collection=collection, args=args)
         for scenario in scenarios:
-            items.append(_scenario_to_run_item(scenario))
+            items.extend(_scenario_to_run_items(scenario))
 
         if not items:
             raise validation_error(
@@ -424,6 +424,29 @@ def _scenario_to_run_item(scenario: ScenarioView) -> StartScenarioRunItemCommand
             for artifact in scenario.supporting_artifacts
         ],
     )
+
+
+def _scenario_to_run_items(scenario: ScenarioView) -> list[StartScenarioRunItemCommand]:
+    if not scenario.questions:
+        return [_scenario_to_run_item(scenario)]
+    return [
+        StartScenarioRunItemCommand(
+            practice_type=PracticeType.SCENARIO.value,
+            scenario_id=scenario.id,
+            artifacts=[
+                {
+                    "artifact_type": artifact.artifact_type,
+                    "title": artifact.title,
+                    "body": artifact.body,
+                }
+                for artifact in scenario.supporting_artifacts
+            ],
+            question_text=question,
+            question_index=index,
+            question_count=len(scenario.questions),
+        )
+        for index, question in enumerate(scenario.questions, start=1)
+    ]
 
 
 def _current_question_from_run(run: PracticeRunView) -> AssistantPracticeQuestionView | None:

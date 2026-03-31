@@ -16,6 +16,7 @@ from soft_skills_backend.modules.catalog.domain.validators import (
     validate_collection_filters,
     validate_generated_prompt_item_uniqueness,
     validate_mock_world,
+    validate_scenario_questions,
     validate_supporting_artifacts,
 )
 from soft_skills_backend.platform.db.models import CollectionRecord, PromptItemRecord
@@ -78,6 +79,14 @@ def test_validate_mock_world_requires_company_when_people_exist() -> None:
         validate_mock_world(command)
 
     assert "SS-VALIDATION-045" in str(exc_info.value)
+
+
+def test_validate_scenario_questions_rejects_blank_or_duplicate_items() -> None:
+    with pytest.raises(Exception) as exc_info:
+        validate_scenario_questions(["First response", "   ", "first   response"])
+
+    message = str(exc_info.value)
+    assert "SS-VALIDATION-087" in message or "SS-VALIDATION-088" in message
 
 
 def test_discovery_tier_and_filter_validation_are_explicit() -> None:

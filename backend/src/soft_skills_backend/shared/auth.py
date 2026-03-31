@@ -150,6 +150,7 @@ class HeaderAuthProvider:
         if not user_id:
             self._record_auth_event(
                 "auth.login.failed.v1",
+                user_id=None,
                 error_code="SS-AUTH-001",
                 details={"reason": "missing_header"},
             )

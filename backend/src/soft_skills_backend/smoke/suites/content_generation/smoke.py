@@ -240,6 +240,15 @@ class _ContentGenerationSmoke(SmokeCase, ABC):
             collection_id = str(collection["id"])
             prompt_items = cast(list[object], collection.get("prompt_items", []))
             scenarios = cast(list[object], collection.get("scenarios", []))
+            for scenario in scenarios:
+                scenario_payload = cast(JsonObject, scenario)
+                questions = cast(list[object], scenario_payload.get("questions", []))
+                if not questions:
+                    raise provider_error(
+                        "Generated scenario was missing authored questions",
+                        code="SS-PROVIDER-013",
+                        details={"scenario_id": scenario_payload.get("id"), "collection_id": collection_id},
+                    )
             prompt_items_count = len(prompt_items)
             scenarios_count = len(scenarios)
             artifact = cast(JsonObject | None, collection.get("last_generation_artifact"))

@@ -164,6 +164,11 @@ async def _seed_scenario(client, learner_id: str) -> dict[str, object]:
             "learner_objective": "Re-align the executive sponsor without hiding the delivery risk.",
             "constraints": ["The launch date is on the board agenda tomorrow."],
             "stakeholder_tensions": ["Legal wants a delay, sales wants the current date."],
+            "questions": [
+                "What do you say to the executive sponsor first?",
+                "How do you address the conflict between sales and legal?",
+                "What concrete next step do you commit to before the board briefing?",
+            ],
             "target_skill_slugs": [
                 "expectation-setting",
                 "prioritization-under-pressure",
@@ -194,6 +199,54 @@ async def _seed_scenario(client, learner_id: str) -> dict[str, object]:
     )
     assert response.status_code == 200
     return response.json()["data"]
+
+
+async def _seed_multi_question_scenario(client, learner_id: str) -> dict[str, object]:
+    collection = await _create_collection(
+        client,
+        learner_id=learner_id,
+        title="Scenario Multi Question Pack",
+        content_format_mix=["scenario_step"],
+        rubric_ids=["scenario_text@v1"],
+        target_skill_slugs=["expectation-setting", "prioritization-under-pressure"],
+        target_competency_slugs=["managing-ambiguity"],
+    )
+    response = await client.post(
+        f"/api/collections/{collection['id']}/scenarios",
+        headers={"X-User-ID": learner_id},
+        json={
+            "title": "Board-risk launch reset",
+            "business_context": "A launch date is at risk after legal escalated new concerns.",
+            "learner_objective": "Re-align sponsors while preserving trust.",
+            "constraints": ["Board briefing starts in two hours."],
+            "stakeholder_tensions": ["Sales wants the current date, legal wants a delay."],
+            "questions": [
+                "What do you say to the executive sponsor first?",
+                "How do you address the conflict between sales and legal?",
+                "What concrete next step do you commit to before the board briefing?",
+            ],
+            "target_skill_slugs": ["expectation-setting", "prioritization-under-pressure"],
+            "rubric_id": "scenario_text@v1",
+            "mock_company": {
+                "name": "Northstar AI",
+                "industry": "Enterprise SaaS",
+                "operating_context": "Scaling quickly under heavy board scrutiny.",
+            },
+            "mock_people": [
+                {
+                    "name": "Ava Patel",
+                    "role": "Executive Sponsor",
+                    "goals": ["Protect credibility with the board"],
+                    "communication_style": "Direct and time-pressed",
+                    "relationship_to_scenario": "Primary decision-maker",
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    payload["collection_id"] = collection["id"]
+    return payload
 
 
 class FakeSuccessMarker:
@@ -304,21 +357,23 @@ async def test_practice_run_start_submit_review_and_history(app, client, test_se
     items = run_payload["items"]
 
     assert run_payload["status"] == "active"
-    assert run_payload["total_items"] == 3
+    assert run_payload["total_items"] == 5
     assert run_payload["completed_items"] == 0
     assert run_payload["validated_items"] == 0
     assert run_payload["failed_items"] == 0
     assert run_payload["summary"]["validated_attempt_count"] == 0
     assert run_payload["summary"]["overall_score_average"] is None
-    assert len(items) == 3
+    assert len(items) == 5
     assert items[0]["attempt"]["prompt"]["practice_type"] == "quick_practice"
     assert items[1]["attempt"]["prompt"]["practice_type"] == "interview"
     assert items[2]["attempt"]["prompt"]["practice_type"] == "scenario"
+    assert items[3]["attempt"]["prompt"]["practice_type"] == "scenario"
+    assert items[4]["attempt"]["prompt"]["practice_type"] == "scenario"
     assert run_payload["current_attempt_id"] == items[0]["attempt"]["id"]
 
     first_attempt_id = items[0]["attempt"]["id"]
     second_attempt_id = items[1]["attempt"]["id"]
-    third_attempt_id = items[2]["attempt"]["id"]
+    scenario_attempt_ids = [items[i]["attempt"]["id"] for i in range(2, 5)]
 
     first_submit = await client.post(
         f"/api/attempts/{first_attempt_id}/submit",
@@ -358,17 +413,18 @@ async def test_practice_run_start_submit_review_and_history(app, client, test_se
     )
     assert second_submit.status_code == 200
 
-    third_submit = await client.post(
-        f"/api/attempts/{third_attempt_id}/submit",
-        headers={"X-User-ID": learner_id},
-        json={
-            "response_text": (
-                "I would recommend a one-day delay, explain the legal risk directly, "
-                "and propose a 7am checkpoint with sales and legal before the board discussion."
-            )
-        },
-    )
-    assert third_submit.status_code == 200
+    for attempt_id in scenario_attempt_ids:
+        submit_response = await client.post(
+            f"/api/attempts/{attempt_id}/submit",
+            headers={"X-User-ID": learner_id},
+            json={
+                "response_text": (
+                    "I would recommend a one-day delay, explain the legal risk directly, "
+                    "and propose a 7am checkpoint with sales and legal before the board discussion."
+                )
+            },
+        )
+        assert submit_response.status_code == 200
 
     complete_run_response = await client.get(
         f"/api/practice-runs/{run_id}",
@@ -377,30 +433,30 @@ async def test_practice_run_start_submit_review_and_history(app, client, test_se
     assert complete_run_response.status_code == 200
     complete_run_payload = complete_run_response.json()["data"]
     assert complete_run_payload["status"] == "completed"
-    assert complete_run_payload["completed_items"] == 3
-    assert complete_run_payload["validated_items"] == 3
+    assert complete_run_payload["completed_items"] == 5
+    assert complete_run_payload["validated_items"] == 5
     assert complete_run_payload["failed_items"] == 0
     assert complete_run_payload["current_attempt_id"] is None
-    assert complete_run_payload["summary"]["validated_attempt_count"] == 3
+    assert complete_run_payload["summary"]["validated_attempt_count"] == 5
     assert complete_run_payload["summary"]["failed_attempt_count"] == 0
-    assert complete_run_payload["summary"]["overall_score_average"] == 3.33
+    assert complete_run_payload["summary"]["overall_score_average"] == 3.6
     assert complete_run_payload["summary"]["score_distribution"] == {
         "1": 0,
         "2": 1,
         "3": 0,
-        "4": 2,
+        "4": 4,
         "5": 0,
     }
     assert complete_run_payload["summary"]["practice_type_breakdown"] == [
         {"practice_type": "interview", "average_score": 4.0, "count": 1},
         {"practice_type": "quick_practice", "average_score": 2.0, "count": 1},
-        {"practice_type": "scenario", "average_score": 4.0, "count": 1},
+        {"practice_type": "scenario", "average_score": 4.0, "count": 3},
     ]
     assert complete_run_payload["summary"]["skill_breakdown"] == [
         {"skill_slug": "active-listening", "average_score": 3.0, "count": 2},
         {"skill_slug": "decision-justification", "average_score": 4.0, "count": 1},
-        {"skill_slug": "expectation-setting", "average_score": 3.0, "count": 2},
-        {"skill_slug": "prioritization-under-pressure", "average_score": 4.0, "count": 1},
+        {"skill_slug": "expectation-setting", "average_score": 3.5, "count": 4},
+        {"skill_slug": "prioritization-under-pressure", "average_score": 4.0, "count": 3},
     ]
 
     history_response = await client.get(
@@ -412,7 +468,7 @@ async def test_practice_run_start_submit_review_and_history(app, client, test_se
     assert len(history_payload) == 1
     assert history_payload[0]["run_id"] == run_id
     assert history_payload[0]["status"] == "completed"
-    assert history_payload[0]["overall_score_average"] == 3.33
+    assert history_payload[0]["overall_score_average"] == 3.6
     assert history_payload[0]["practice_types"] == [
         "quick_practice",
         "interview",
@@ -457,15 +513,15 @@ async def test_practice_run_start_submit_review_and_history(app, client, test_se
         event_types = {record.event_type for record in session.query(WorkflowEventRecord).all()}
 
     assert run_record is not None and run_record.status == "completed"
-    assert run_record.completed_items == 3
-    assert run_record.validated_items == 3
+    assert run_record.completed_items == 5
+    assert run_record.validated_items == 5
     assert run_record.failed_items == 0
-    assert [record.sequence_index for record in session_records] == [1, 2, 3]
+    assert [record.sequence_index for record in session_records] == [1, 2, 3, 4, 5]
     assert all(record.status == "completed" for record in session_records)
-    assert len(attempt_records) == 3 and all(
+    assert len(attempt_records) == 5 and all(
         record.status == "assessed" for record in attempt_records
     )
-    assert len(assessment_records) == 3
+    assert len(assessment_records) == 5
     assert "practice.run_started.v1" in event_types
     assert "practice.session_started.v1" in event_types
     assert "assessment.validated.v1" in event_types
@@ -590,3 +646,79 @@ async def test_practice_run_start_is_idempotent_per_request_id(app, client, test
     assert [item["attempt"]["id"] for item in first_payload["items"]] == [
         item["attempt"]["id"] for item in second_payload["items"]
     ]
+
+
+@pytest.mark.asyncio
+async def test_multi_question_scenario_expands_into_multiple_run_items(
+    app, client, test_settings
+) -> None:
+    _migrate(test_settings)
+    _, learner = await _bootstrap_admin_and_learner(
+        client, learner_email="learner-multi-question@example.com"
+    )
+    learner_id = str(learner["id"])
+    scenario = await _seed_multi_question_scenario(client, learner_id)
+    app.state.container.practice_service._assessment_marker = FakeSuccessMarker()
+
+    collection_response = await client.get(
+        f"/api/collections/{scenario['collection_id']}",
+        headers={"X-User-ID": learner_id},
+    )
+    assert collection_response.status_code == 200
+    fetched_scenario = collection_response.json()["data"]["scenarios"][0]
+    assert fetched_scenario["questions"] == [
+        "What do you say to the executive sponsor first?",
+        "How do you address the conflict between sales and legal?",
+        "What concrete next step do you commit to before the board briefing?",
+    ]
+
+    start_response = await client.post(
+        "/api/practice-runs",
+        headers={"X-User-ID": learner_id},
+        json={
+            "items": [
+                {
+                    "practice_type": "scenario",
+                    "scenario_id": scenario["id"],
+                    "artifacts": [
+                        {
+                            "artifact_type": "email",
+                            "title": "Board note",
+                            "body": "The board expects a clear recommendation in the briefing.",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    assert start_response.status_code == 200
+    run_payload = start_response.json()["data"]
+    assert run_payload["total_items"] == 3
+    prompts = [item["attempt"]["prompt"] for item in run_payload["items"]]
+    assert [prompt["scenario_context"]["active_question_index"] for prompt in prompts] == [1, 2, 3]
+    assert [prompt["scenario_context"]["question_count"] for prompt in prompts] == [3, 3, 3]
+    assert prompts[0]["prompt_text"].startswith(
+        "Work through the following workplace scenario in a single written response.\n"
+        "Question 1 of 3: What do you say to the executive sponsor first?"
+    )
+    assert prompts[1]["prompt_text"].startswith(
+        "Work through the following workplace scenario in a single written response.\n"
+        "Question 2 of 3: How do you address the conflict between sales and legal?"
+    )
+
+    for item in run_payload["items"]:
+        submit_response = await client.post(
+            f"/api/attempts/{item['attempt']['id']}/submit",
+            headers={"X-User-ID": learner_id},
+            json={
+                "response_text": "I would reset expectations clearly and commit to a timed follow-up."
+            },
+        )
+        assert submit_response.status_code == 200
+
+    complete_run = await client.get(
+        f"/api/practice-runs/{run_payload['run_id']}",
+        headers={"X-User-ID": learner_id},
+    )
+    assert complete_run.status_code == 200
+    assert complete_run.json()["data"]["validated_items"] == 3
