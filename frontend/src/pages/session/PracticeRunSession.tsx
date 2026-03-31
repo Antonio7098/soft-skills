@@ -402,7 +402,15 @@ export function PracticeRunSession() {
     return <ErrorState message="No sessions found" onRetry={loadSession} />;
   }
 
-   const currentItem = run.items[currentSessionIndex] ?? { item_type: '', prompt_text: '' };
+   const currentItem = run.items[currentSessionIndex] ?? { 
+     id: '', 
+     item_type: '', 
+     title: '', 
+     prompt_text: '', 
+     difficulty: 'introductory', 
+     target_skill_slugs: [], 
+     status: 'pending' 
+   };
    const isLastItem = currentSessionIndex >= sessions.length - 1;
    const isScenario = currentItem.item_type === 'scenario' && currentScenario;
 

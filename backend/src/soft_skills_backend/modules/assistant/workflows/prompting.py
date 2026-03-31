@@ -121,31 +121,27 @@ def build_assistant_tool_definitions() -> list[ProviderToolDefinition]:
                 "data like collections, progress, attempts, or profiles. Look things up yourself "
                 "before asking the user."
             ),
-            parameters=normalize_strict_json_schema(QueryUserContextToolArgs.model_json_schema()),
+            parameters=QueryUserContextToolArgs.model_json_schema(),
         ),
         ProviderToolDefinition(
             name="start_collection_practice",
             description="Start a practice run from an existing collection.",
-            parameters=normalize_strict_json_schema(
-                StartCollectionPracticeToolArgs.model_json_schema()
-            ),
+            parameters=StartCollectionPracticeToolArgs.model_json_schema(),
         ),
         ProviderToolDefinition(
             name="get_active_practice",
             description="Fetch the learner's current active practice question, if any.",
-            parameters=normalize_strict_json_schema(GetActivePracticeToolArgs.model_json_schema()),
+            parameters=GetActivePracticeToolArgs.model_json_schema(),
         ),
         ProviderToolDefinition(
             name="submit_active_practice_response",
             description="Submit the learner's answer for the current active practice question.",
-            parameters=normalize_strict_json_schema(
-                SubmitActivePracticeResponseToolArgs.model_json_schema()
-            ),
+            parameters=SubmitActivePracticeResponseToolArgs.model_json_schema(),
         ),
         ProviderToolDefinition(
             name="end_active_practice",
             description="End the learner's active practice session.",
-            parameters=normalize_strict_json_schema(EndActivePracticeToolArgs.model_json_schema()),
+            parameters=EndActivePracticeToolArgs.model_json_schema(),
         ),
         ProviderToolDefinition(
             name="generate_collection",
@@ -153,9 +149,7 @@ def build_assistant_tool_definitions() -> list[ProviderToolDefinition]:
                 "Generate a new collection. If key details are missing, ask a short "
                 "clarifying question or use your best judgment to fill gaps."
             ),
-            parameters=normalize_strict_json_schema(
-                ChatCollectionGenerationCommand.model_json_schema()
-            ),
+            parameters=ChatCollectionGenerationCommand.model_json_schema(),
         ),
         ProviderToolDefinition(
             name="generate_prompt_items",
@@ -163,9 +157,7 @@ def build_assistant_tool_definitions() -> list[ProviderToolDefinition]:
                 "Generate prompt items in an existing collection. If key details are missing, "
                 "ask a short clarifying question or use your best judgment to fill gaps."
             ),
-            parameters=normalize_strict_json_schema(
-                ChatPromptItemGenerationCommand.model_json_schema()
-            ),
+            parameters=ChatPromptItemGenerationCommand.model_json_schema(),
         ),
     ]
 

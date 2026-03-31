@@ -181,18 +181,19 @@ async def main():
                 err_msg = result.detail_payload.get('error_message')
                 if err_msg:
                     print(f"  Error Message: {err_msg}")
-                # Print full detail_payload for debugging
+                # Write full detail_payload to file for analysis
                 import json
-                detail_str = json.dumps(result.detail_payload, indent=2, default=str)
-                if len(detail_str) > 500:
-                    print(f"  Detail Payload (truncated): {detail_str[:500]}...")
-                else:
-                    print(f"  Detail Payload: {detail_str}")
-            # Also print raw scores if available
-            if hasattr(result, 'actual_overall_score') and result.actual_overall_score is not None:
-                print(f"  Actual Overall Score: {result.actual_overall_score}")
-            if hasattr(result, 'expected_overall_score') and result.expected_overall_score:
-                print(f"  Expected Overall Score: {result.expected_overall_score}")
+                detail_file = f"/tmp/eval_detail_{case.case_id}.json"
+                with open(detail_file, 'w') as f:
+                    json.dump(result.detail_payload, f, indent=2, default=str)
+                print(f"  Full details written to: {detail_file}")
+            # Also print key score info
+            actual = result.detail_payload.get('actual_overall_score') if result.detail_payload else None
+            expected = result.detail_payload.get('expected_overall_score') if result.detail_payload else None
+            if actual:
+                print(f"  Actual Overall Score: {actual}")
+            if expected:
+                print(f"  Expected Overall Score: {expected}")
         except Exception as e:
             print(f"  ERROR: {e}")
             import traceback
