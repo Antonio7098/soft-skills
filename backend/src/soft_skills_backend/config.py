@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     )
 
     llm_assistant_model: str = Field(default="openai/gpt-oss-20b")
-    llm_assistant_prompt_version: str = Field(default="assistant.chat.v1")
+    llm_assistant_prompt_version: str = Field(default="assistant_orchestrator@v6")
     llm_admin_agent_model: str | None = Field(default=None)
     llm_admin_agent_planning_prompt_version: str = Field(default="admin-agent.plan.v1")
     admin_agent_runtime_config_version: str = Field(default="admin-agent.runtime.v1")
