@@ -237,6 +237,8 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
   const data = useData();
   const [state, dispatch] = useReducer(reducer, initialState);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const GENERATION_TIMEOUT_MS = 600_000;
 
   const startGeneration = useCallback(
     async (command: StructuredCollectionGenerationCommand | ChatCollectionGenerationCommand) => {
@@ -254,8 +256,26 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
           : await data.generateChatCollection(command as ChatCollectionGenerationCommand);
         dispatch({ type: 'START', generation_id: started.generation_id, stream_token: started.stream_token });
 
+        timeoutRef.current = setTimeout(() => {
+          const errorMessage = 'Generation timed out';
+          dispatch({ type: 'FAIL', error: errorMessage });
+          options.onError?.(errorMessage);
+          cleanupRef.current?.();
+          cleanupRef.current = null;
+        }, GENERATION_TIMEOUT_MS);
+
         cleanupRef.current = data.streamGeneration(started.stream_token, {
           onEvent: (event) => {
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = setTimeout(() => {
+                const errorMessage = 'Generation timed out';
+                dispatch({ type: 'FAIL', error: errorMessage });
+                options.onError?.(errorMessage);
+                cleanupRef.current?.();
+                cleanupRef.current = null;
+              }, GENERATION_TIMEOUT_MS);
+            }
             dispatch({ type: 'EVENT', event });
             const activity = buildActivityFromEvent(event);
             if (activity) {
@@ -287,6 +307,10 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
             }
           },
           onCompleted: async (payload) => {
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
             cleanupRef.current?.();
             cleanupRef.current = null;
             try {
@@ -304,6 +328,10 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
             }
           },
           onFailed: (payload) => {
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
             cleanupRef.current?.();
             cleanupRef.current = null;
             const errorMessage =
@@ -314,14 +342,31 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
             options.onError?.(errorMessage);
           },
           onError: (errorMessage) => {
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
             dispatch({ type: 'FAIL', error: errorMessage });
             options.onError?.(errorMessage);
           },
           onClose: () => {
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
             cleanupRef.current = null;
+            if (state.status !== 'completed' && state.status !== 'failed' && state.status !== 'cancelled') {
+              const errorMessage = 'Generation stream closed unexpectedly';
+              dispatch({ type: 'FAIL', error: errorMessage });
+              options.onError?.(errorMessage);
+            }
           },
         });
       } catch (err) {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
         const errorMessage = err instanceof Error ? err.message : 'Generation failed';
         dispatch({ type: 'FAIL', error: errorMessage });
         options.onError?.(errorMessage);
@@ -331,12 +376,20 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
   );
 
   const cancelGeneration = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     cleanupRef.current?.();
     cleanupRef.current = null;
     dispatch({ type: 'CANCEL' });
   }, []);
 
   const reset = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     cleanupRef.current?.();
     cleanupRef.current = null;
     dispatch({ type: 'RESET' });

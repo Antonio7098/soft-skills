@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from soft_skills_backend.modules.catalog.domain.constants import resolve_rubric_id
 from soft_skills_backend.modules.practice.domain.practice import (
     PRACTICE_DELIVERY_VERSIONS,
     AttemptStatus,
@@ -98,12 +99,13 @@ def _load_prompt_item_context(
             details={"prompt_item_id": prompt.id},
         )
 
-    rubric = session.get(RubricRecord, prompt.rubric_id)
+    rubric_id = resolve_rubric_id(prompt.prompt_type, prompt.rubric_id)
+    rubric = session.get(RubricRecord, rubric_id)
     if rubric is None:
         raise validation_error(
             "Prompt item rubric was not found",
             code="SS-VALIDATION-022",
-            details={"rubric_id": prompt.rubric_id},
+            details={"rubric_id": rubric_id},
         )
     if rubric.content_type != prompt.prompt_type:
         raise validation_error(
@@ -178,12 +180,13 @@ def _load_scenario_context(
             details={"scenario_id": scenario.id},
         )
 
-    rubric = session.get(RubricRecord, scenario.rubric_id)
+    rubric_id = resolve_rubric_id("scenario_step", scenario.rubric_id)
+    rubric = session.get(RubricRecord, rubric_id)
     if rubric is None:
         raise validation_error(
             "Scenario rubric was not found",
             code="SS-VALIDATION-026",
-            details={"rubric_id": scenario.rubric_id},
+            details={"rubric_id": rubric_id},
         )
     if rubric.content_type != "scenario_step":
         raise validation_error(

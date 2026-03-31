@@ -33,6 +33,17 @@ import { cn } from '@/lib/cn';
 
 type Phase = 'loading' | 'practicing' | 'assessing' | 'complete' | 'error';
 
+function extractScenarioQuestion(promptText: string): string {
+  const lines = promptText.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return promptText;
+  const firstLine = lines[0]!;
+  const lastLine = lines[lines.length - 1]!;
+  if (firstLine !== lastLine) {
+    return `${firstLine}\n\n${lastLine}`;
+  }
+  return lastLine;
+}
+
 function RunProgressSidebar({ run, currentIndex }: { run: PracticeRunView; currentIndex: number }) {
   return (
     <div className="flex flex-col gap-4">
@@ -393,6 +404,11 @@ export function PracticeRunSession() {
 
   const currentItem = run.items[currentSessionIndex];
   const isLastItem = currentSessionIndex >= sessions.length - 1;
+  const isScenario = currentItem?.item_type === 'scenario' && currentScenario;
+
+  const scenarioPromptText = isScenario
+    ? extractScenarioQuestion(currentItem.prompt_text)
+    : currentItem.prompt_text;
 
   if (phase === 'complete' && isLastItem) {
     return (
@@ -411,8 +427,6 @@ export function PracticeRunSession() {
       </div>
     );
   }
-
-  const isScenario = currentItem?.item_type === 'scenario' && currentScenario;
 
   return (
     <SessionShell
@@ -436,7 +450,7 @@ export function PracticeRunSession() {
                 <div className="w-full max-w-2xl flex flex-col gap-6">
                   <PromptDisplay
                     title={currentItem.title}
-                    promptText="This is a multi-step scenario. Navigate through the situation and respond to each prompt thoughtfully."
+                    promptText={scenarioPromptText}
                     difficulty={currentItem.difficulty}
                     skillSlugs={currentItem.target_skill_slugs}
                   />
@@ -453,7 +467,7 @@ export function PracticeRunSession() {
             <div className="flex flex-col gap-6">
               <PromptDisplay
                 title={currentItem.title}
-                promptText="Write your response to the question above. Consider the skills being assessed and provide a structured, detailed answer."
+                promptText={currentItem.prompt_text}
                 difficulty={currentItem.difficulty}
                 skillSlugs={currentItem.target_skill_slugs}
               />

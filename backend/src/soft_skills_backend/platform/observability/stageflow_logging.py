@@ -255,6 +255,7 @@ class DatabasePipelineRunLogger:
                     workflow_id=str(pipeline_run_id),
                     error_code=summary.error_code,
                     payload=summary.model_dump(),
+                    organisation_id=request_id,
                 )
             )
 

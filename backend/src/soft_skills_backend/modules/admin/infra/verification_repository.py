@@ -181,6 +181,7 @@ class AdminVerificationRepository:
                     "next_verification_state": command.verification_state,
                     "note": command.note,
                 },
+                organisation_id=actor.organisation_id,
             )
         )
         return self.get_collection_verification(collection_id)

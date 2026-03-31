@@ -68,7 +68,8 @@ class HeaderAuthProvider:
     def _record_auth_event(
         self,
         event_type: str,
-        user_id: str | None = None,
+        *,
+        user_id: str,
         error_code: str | None = None,
         details: dict[str, Any] | None = None,
     ) -> None:
@@ -84,6 +85,7 @@ class HeaderAuthProvider:
             workflow_id=None,
             error_code=error_code,
             payload={"user_id": user_id, **(details or {})},
+            organisation_id=user_id,
         )
         self._workflow_events.record(event)
 

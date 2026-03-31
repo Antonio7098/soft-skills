@@ -30,3 +30,20 @@ ALLOWED_COLLECTION_TRANSITIONS: dict[str, set[str]] = {
     "published_public": {"review", "archived"},
     "archived": set(),
 }
+
+DETERMINISTIC_RUBRIC_BY_CONTENT_TYPE: dict[str, str] = {
+    "interview_prompt": "interview_text@v1",
+    "scenario_step": "scenario_text@v1",
+}
+
+
+def resolve_rubric_id(content_type: str, rubric_id: str | None) -> str:
+    if rubric_id is not None:
+        return rubric_id
+    resolved = DETERMINISTIC_RUBRIC_BY_CONTENT_TYPE.get(content_type)
+    if resolved is None:
+        raise ValueError(
+            f"Cannot resolve rubric_id for content_type '{content_type}': "
+            "no deterministic mapping and no rubric_id provided"
+        )
+    return resolved

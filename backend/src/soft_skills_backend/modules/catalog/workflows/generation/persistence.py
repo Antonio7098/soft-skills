@@ -17,6 +17,7 @@ from soft_skills_backend.modules.catalog.contracts.prompt_item_commands import (
 from soft_skills_backend.modules.catalog.contracts.prompt_item_views import PromptItemGenerationView
 from soft_skills_backend.modules.catalog.contracts.scenario_commands import ScenarioCreateCommand
 from soft_skills_backend.modules.catalog.contracts.views import build_collection_view
+from soft_skills_backend.modules.catalog.domain.constants import resolve_rubric_id
 from soft_skills_backend.modules.catalog.domain.models import (
     GeneratedCollectionDraft,
     GeneratedPromptItemDraft,
@@ -82,7 +83,7 @@ def persist_generated_collection(
         session.flush()
         generated_rubric_ids: list[str] = []
         for prompt_item in draft.prompt_items:
-            rubric_id = prompt_item.rubric_id
+            rubric_id = resolve_rubric_id(prompt_item.prompt_type, prompt_item.rubric_id)
             if (
                 prompt_item.prompt_type == "quick_practice_prompt"
                 and prompt_item.generated_rubric is not None
@@ -109,6 +110,7 @@ def persist_generated_collection(
                 )
             )
         for scenario in draft.scenarios:
+            scenario_rubric_id = resolve_rubric_id("scenario_step", scenario.rubric_id)
             scenario_record = ScenarioRecord(
                 id=uuid4().hex,
                 collection_id=collection.id,
@@ -120,7 +122,7 @@ def persist_generated_collection(
                 stakeholder_tensions=list(scenario.stakeholder_tensions),
                 lifecycle_state="draft",
                 target_skill_slugs=list(scenario.target_skill_slugs),
-                rubric_id=scenario.rubric_id,
+                rubric_id=scenario_rubric_id,
                 created_at=now,
                 updated_at=now,
             )
@@ -225,7 +227,7 @@ def persist_generated_prompt_items(
         for command in commands:
             command_payload = command.model_dump(mode="json")
             generated_rubric_payload = command_payload.pop("generated_rubric", None)
-            rubric_id = command.rubric_id
+            rubric_id = resolve_rubric_id(command.prompt_type, command.rubric_id)
             if (
                 command.prompt_type == "quick_practice_prompt"
                 and generated_rubric_payload is not None

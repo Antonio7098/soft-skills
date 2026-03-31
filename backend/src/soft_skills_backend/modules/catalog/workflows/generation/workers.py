@@ -17,7 +17,10 @@ from soft_skills_backend.modules.admin.workflows.prompt_render_stage import (
     PromptRenderRequest,
     create_prompt_render_stage,
 )
-from soft_skills_backend.modules.catalog.domain.constants import ALLOWED_SCENARIO_ARTIFACT_TYPES
+from soft_skills_backend.modules.catalog.domain.constants import (
+    ALLOWED_SCENARIO_ARTIFACT_TYPES,
+    DETERMINISTIC_RUBRIC_BY_CONTENT_TYPE,
+)
 from soft_skills_backend.modules.catalog.domain.models import (
     GeneratedPromptItemDraft,
     GeneratedPromptItemPlan,
@@ -78,8 +81,16 @@ def _validate_generated_scenario_draft(
     draft: GeneratedScenarioDraft,
     plan: GeneratedScenarioPlan,
 ) -> None:
-    if draft.rubric_id != plan.rubric_id or list(draft.target_skill_slugs) != list(
-        plan.target_skill_slugs
+    if list(draft.target_skill_slugs) != list(plan.target_skill_slugs):
+        raise validation_error(
+            "Generated scenario drifted from the worker plan metadata",
+            code="SS-VALIDATION-069",
+            details={"expected_rubric_id": plan.rubric_id},
+        )
+    if (
+        draft.rubric_id is not None
+        and plan.rubric_id is not None
+        and draft.rubric_id != plan.rubric_id
     ):
         raise validation_error(
             "Generated scenario drifted from the worker plan metadata",
@@ -106,7 +117,20 @@ def _validate_generated_prompt_item_draft(
     draft.target_skill_slugs = _normalize_prompt_item_skills(
         draft.prompt_type, draft.target_skill_slugs
     )
-    if draft.prompt_type != plan.prompt_type or draft.rubric_id != plan.rubric_id:
+    if draft.prompt_type != plan.prompt_type:
+        raise validation_error(
+            "Generated prompt item drifted from the worker plan metadata",
+            code="SS-VALIDATION-067",
+            details={
+                "expected_prompt_type": plan.prompt_type,
+                "expected_rubric_id": plan.rubric_id,
+            },
+        )
+    if (
+        draft.rubric_id is not None
+        and plan.rubric_id is not None
+        and draft.rubric_id != plan.rubric_id
+    ):
         raise validation_error(
             "Generated prompt item drifted from the worker plan metadata",
             code="SS-VALIDATION-067",
@@ -270,7 +294,10 @@ async def _run_prompt_item_worker(
         return ok_output(
             StageflowStageResult(
                 payload=prompt_request,
-                summary={"prompt_name": prompt_request.name, "prompt_version": prompt_request.version},
+                summary={
+                    "prompt_name": prompt_request.name,
+                    "prompt_version": prompt_request.version,
+                },
             )
         )
 
@@ -444,7 +471,10 @@ async def _run_scenario_worker(
         return ok_output(
             StageflowStageResult(
                 payload=prompt_request,
-                summary={"prompt_name": prompt_request.name, "prompt_version": prompt_request.version},
+                summary={
+                    "prompt_name": prompt_request.name,
+                    "prompt_version": prompt_request.version,
+                },
             )
         )
 

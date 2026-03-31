@@ -315,6 +315,7 @@ class AdminService:
                         "old_role": old_role,
                         "new_role": command.role,
                     },
+                    organisation_id=actor.organisation_id,
                 )
             )
 
@@ -362,6 +363,7 @@ class AdminService:
                         "organisation_id": actor.organisation_id,
                         "is_active": command.is_active,
                     },
+                    organisation_id=actor.organisation_id,
                 )
             )
 
@@ -427,6 +429,7 @@ class AdminService:
                 registration_event = WorkflowEvent(
                     event_type="identity.user_registered.v1",
                     payload={"user_id": user.id, "email": user.email},
+                    organisation_id=actor.organisation_id,
                 )
 
             existing_membership = (
@@ -469,6 +472,7 @@ class AdminService:
                         "organisation_id": actor.organisation_id,
                         "role": command.role,
                     },
+                    organisation_id=actor.organisation_id,
                 )
             )
 

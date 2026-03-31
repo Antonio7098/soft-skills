@@ -456,9 +456,52 @@ export const apiDataProvider: DataProvider = {
   listPracticeRuns: () =>
     request<PracticeRunView[]>('/practice-runs'),
   getPracticeRun: (runId) =>
-    request<PracticeRunView>(`/practice-runs/${runId}`),
+    request<any>(`/practice-runs/${runId}`).then((raw) => {
+      return {
+        run_id: raw.run_id,
+        workflow_id: raw.workflow_id,
+        status: raw.status,
+        total_items: raw.total_items,
+        completed_items: raw.completed_items,
+        validated_items: raw.validated_items,
+        failed_items: raw.failed_items,
+        current_attempt_id: raw.current_attempt_id,
+        started_at: raw.started_at,
+        completed_at: raw.completed_at,
+        items: (raw.items ?? []).map((item: any) => ({
+          id: item.attempt?.prompt?.content_item_id ?? '',
+          item_type: item.attempt?.prompt?.content_item_type === 'quick_practice_prompt' || item.attempt?.prompt?.content_item_type === 'interview_prompt' ? 'prompt_item' : 'scenario',
+          title: item.attempt?.prompt?.title ?? '',
+          prompt_text: item.attempt?.prompt?.prompt_text ?? '',
+          difficulty: item.attempt?.prompt?.difficulty ?? 'intermediate',
+          target_skill_slugs: item.attempt?.prompt?.target_skill_slugs ?? [],
+          status: item.attempt?.status ?? 'pending',
+        })),
+        summary: {
+          total_items: raw.total_items,
+          completed_items: raw.completed_items,
+          overall_score: raw.summary?.overall_score_average ?? null,
+          score_distribution: raw.summary?.score_distribution ?? {},
+          skill_breakdown: raw.summary?.skill_breakdown ?? {},
+          practice_type_breakdown: raw.summary?.practice_type_breakdown ?? {},
+        },
+      } as PracticeRunView;
+    }),
   getPracticeSessions: (runId) =>
-    request<PracticeSessionView[]>(`/practice-runs/${runId}/sessions`),
+    request<any[]>(`/practice-runs/${runId}/sessions`).then((raw) =>
+      raw.map((s: any) => ({
+        id: s.id,
+        practice_run_id: s.practice_run_id,
+        sequence_index: s.sequence_index,
+        content_item_id: s.content_item_id,
+        content_item_type: s.content_item_type === 'scenario_step' ? 'scenario' : 'prompt_item',
+        attempt_id: s.last_attempt_id,
+        status: s.status,
+        score: null,
+        started_at: s.created_at,
+        completed_at: s.completed_at,
+      })),
+    ),
 
   // --- Progress -----------------------------------------------------------
   getCompetencyProgress: async () => {

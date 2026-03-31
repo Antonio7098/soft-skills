@@ -497,6 +497,7 @@ class TaxonomyService:
                     "competencies": len(COMPETENCY_SEEDS),
                     "rubrics": len(RUBRIC_SEEDS),
                 },
+                organisation_id="system",
             )
         )
         return self.snapshot()

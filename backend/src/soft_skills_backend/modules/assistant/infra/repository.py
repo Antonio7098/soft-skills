@@ -81,6 +81,7 @@ class AssistantRepository:
             trace_id=trace_id,
             workflow_id=record.id,
             payload={"session_id": record.id, "user_id": actor.user_id},
+            organisation_id=actor.organisation_id,
         )
         return self.get_session(actor, record.id)
 
@@ -161,6 +162,7 @@ class AssistantRepository:
             trace_id=trace_id,
             workflow_id=workflow_id,
             payload={"session_id": session_id, "turn_id": turn_id, "user_id": actor.user_id},
+            organisation_id=actor.organisation_id,
         )
         return self.get_turn(actor, turn_id)
 
@@ -561,6 +563,7 @@ class AssistantRepository:
                 "tool_name": record.tool_name,
                 "status": record.status,
             },
+            organisation_id=record.user_id,
         )
         return self._build_approval_view(record)
 
@@ -592,13 +595,10 @@ class AssistantRepository:
                 query = query.filter(AssistantApprovalRequestRecord.session_id == session_id)
             if turn_id is not None:
                 query = query.filter(AssistantApprovalRequestRecord.turn_id == turn_id)
-            records = (
-                query.order_by(
-                    AssistantApprovalRequestRecord.requested_at.desc(),
-                    AssistantApprovalRequestRecord.id.desc(),
-                )
-                .all()
-            )
+            records = query.order_by(
+                AssistantApprovalRequestRecord.requested_at.desc(),
+                AssistantApprovalRequestRecord.id.desc(),
+            ).all()
             return [self._build_approval_view(record) for record in records]
 
     def resolve_approval_request(
@@ -646,6 +646,7 @@ class AssistantRepository:
                 "decided_by_user_id": record.decided_by_user_id,
                 "reason": reason,
             },
+            organisation_id=record.user_id,
         )
         return self._build_approval_view(record)
 
@@ -705,9 +706,7 @@ class AssistantRepository:
             )
         return record
 
-    def _load_approval(
-        self, session: Session, request_id: str
-    ) -> AssistantApprovalRequestRecord:
+    def _load_approval(self, session: Session, request_id: str) -> AssistantApprovalRequestRecord:
         record = session.get(AssistantApprovalRequestRecord, request_id)
         if record is None:
             raise domain_error(
@@ -834,14 +833,10 @@ class AssistantRepository:
             child_run_id=record.child_run_id,
             started_at=record.started_at,
             completed_at=record.completed_at,
-            current_approval=(
-                None if approval is None else self._build_approval_view(approval)
-            ),
+            current_approval=(None if approval is None else self._build_approval_view(approval)),
         )
 
-    def _build_approval_view(
-        self, record: AssistantApprovalRequestRecord
-    ) -> AssistantApprovalView:
+    def _build_approval_view(self, record: AssistantApprovalRequestRecord) -> AssistantApprovalView:
         return AssistantApprovalView(
             id=record.id,
             session_id=record.session_id,
@@ -866,6 +861,7 @@ class AssistantRepository:
         trace_id: str | None,
         workflow_id: str | None,
         payload: dict[str, Any],
+        organisation_id: str | None = None,
     ) -> None:
         self._workflow_events.record(
             WorkflowEvent(
@@ -874,5 +870,6 @@ class AssistantRepository:
                 trace_id=trace_id,
                 workflow_id=workflow_id,
                 payload=payload,
+                organisation_id=organisation_id,
             )
         )

@@ -106,6 +106,7 @@ class IdentityService:
                 payload={"user_id": user.id},
                 request_id=user.id,
                 workflow_id=user.id,
+                organisation_id=user.id,
             )
         )
         return self.get_user(user.id)
@@ -142,6 +143,7 @@ class IdentityService:
                 payload={"user_id": user_id},
                 request_id=user_id,
                 workflow_id=user_id,
+                organisation_id=user_id,
             )
         )
         return self.get_user(user_id)
@@ -225,6 +227,7 @@ class IdentityService:
                 payload={"user_id": user_id},
                 request_id=user_id,
                 workflow_id=user_id,
+                organisation_id=user_id,
             )
         )
         return self.get_user(user_id)
@@ -250,6 +253,7 @@ class IdentityService:
                 payload={"user_id": user_id},
                 request_id=user_id,
                 workflow_id=user_id,
+                organisation_id=user_id,
             )
         )
         return DeleteAccountResult(deleted_user_id=user_id, status="deleted")

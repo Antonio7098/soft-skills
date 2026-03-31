@@ -103,7 +103,7 @@ class PromptItemCreateCommand(BaseModel):
     prompt_text: str
     difficulty: DifficultyLevel
     target_skill_slugs: list[str]
-    rubric_id: str
+    rubric_id: str | None = None
     organisation_id: str | None = None
 
 
@@ -272,14 +272,14 @@ class GeneratedPromptItemPlan(BaseModel):
     generation_brief: str
     difficulty: DifficultyLevel
     target_skill_slugs: list[str]
-    rubric_id: str
+    rubric_id: str | None = None
 
 
 class GeneratedScenarioPlan(BaseModel):
     title_hint: str
     generation_brief: str
     target_skill_slugs: list[str]
-    rubric_id: str
+    rubric_id: str | None = None
     supporting_artifact_count: int = Field(default=0, ge=0, le=3)
 
 
@@ -325,7 +325,7 @@ class GeneratedPromptItemDraft(BaseModel):
     prompt_text: str
     difficulty: DifficultyLevel
     target_skill_slugs: list[str]
-    rubric_id: str
+    rubric_id: str | None = None
     generated_rubric: GeneratedQuickPracticeRubric | None = None
 
 
@@ -336,7 +336,7 @@ class GeneratedScenarioDraft(BaseModel):
     constraints: list[str] = Field(default_factory=list)
     stakeholder_tensions: list[str] = Field(default_factory=list)
     target_skill_slugs: list[str]
-    rubric_id: str
+    rubric_id: str | None = None
     mock_company: MockCompanyInput | None = None
     mock_people: list[MockPersonInput] = Field(default_factory=list)
     supporting_artifacts: list[ScenarioSupportingArtifactInput] = Field(default_factory=list)

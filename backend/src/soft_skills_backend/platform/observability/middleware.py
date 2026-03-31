@@ -60,6 +60,8 @@ class RequestContextMiddleware:
         client_ip = self._extract_client_ip(scope)
         query_params = dict(self._parse_query_params(scope.get("query_string", b"")))
         user_agent = headers.get("user-agent", "")[:256] if headers.get("user-agent") else None
+        user_id = headers.get("x-user-id") or None
+        org_id = headers.get("x-organisation-id") or None
 
         if self._workflow_events is not None:
             received_event = WorkflowEvent(
@@ -74,6 +76,7 @@ class RequestContextMiddleware:
                     "user_agent": user_agent,
                     "client_ip": client_ip,
                 },
+                organisation_id=org_id or user_id,
             )
             self._workflow_events.record(received_event)
 
@@ -125,6 +128,7 @@ class RequestContextMiddleware:
                         "latency_ms": duration_ms,
                         "error_code": error_code,
                     },
+                    organisation_id=org_id or user_id,
                 )
                 self._workflow_events.record(completed_event)
             clear_request_context()

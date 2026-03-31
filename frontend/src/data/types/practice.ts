@@ -179,6 +179,7 @@ export interface PracticeRunItemSummary {
   readonly id: string;
   readonly item_type: 'prompt_item' | 'scenario';
   readonly title: string;
+  readonly prompt_text: string;
   readonly difficulty: Difficulty;
   readonly target_skill_slugs: string[];
   readonly status: 'pending' | 'active' | 'completed' | 'skipped';

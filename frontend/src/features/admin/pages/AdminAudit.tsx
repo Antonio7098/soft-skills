@@ -41,8 +41,11 @@ export function AdminAudit() {
       event_type: eventTypeFilter || undefined,
       trace_id: search || undefined,
     })
-      .then(setEvents)
-      .catch(console.error)
+      .then((result) => {
+        console.log('[AdminAudit] Received events:', result);
+        setEvents(result);
+      })
+      .catch((error) => console.error('[AdminAudit] Error loading events:', error))
       .finally(() => setLoading(false));
   }, [dataProvider, page, eventTypeFilter, search]);
 
