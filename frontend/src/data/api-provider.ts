@@ -65,6 +65,9 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
 const USER_ID_STORAGE_KEY = 'ss_user_id';
 const ACTIVE_ORG_STORAGE_KEY = 'ss_active_organisation_id';
 
+const COLLECTIONS_CACHE_TTL_MS = 5_000;
+let collectionsCache: { key: string; promise: Promise<CollectionView[]>; expiresAt: number } | null = null;
+
 export class ApiRequestError extends Error {
   readonly status: number | null;
   readonly isNetworkError: boolean;
@@ -92,6 +95,10 @@ function getAuthHeaders(): Record<string, string> {
 
 function getStoredActiveOrganisation(): string | null {
   return sessionStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
+}
+
+function invalidateCollectionsCache(): void {
+  collectionsCache = null;
 }
 
 export function getStoredActiveOrganisationId(): string | null {
@@ -276,7 +283,7 @@ function mapCompetencyProgress(
         const linkedCompetency = taxonomy.competencies.find(
           (item) => item.slug === competencyState.competency_slug,
         );
-        return linkedCompetency?.skills.some((skill) => skill.slug === skillState.skill_slug) ?? false;
+        return linkedCompetency?.skills?.some((skill) => skill.slug === skillState.skill_slug) ?? false;
       })
       .map((skillState) => {
         const skill = taxonomy.skills.find((item) => item.slug === skillState.skill_slug);
@@ -368,14 +375,30 @@ export const apiDataProvider: DataProvider = {
     if (filters?.author_user_id) params.set('author_user_id', filters.author_user_id);
     if (filters?.organisation_id) params.set('organisation_id', filters.organisation_id);
     const qs = params.toString();
-    return request<CollectionView[]>(`/collections${qs ? `?${qs}` : ''}`);
+    const cacheKey = `/collections${qs ? `?${qs}` : ''}`;
+
+    const now = Date.now();
+    if (collectionsCache && collectionsCache.key === cacheKey && now < collectionsCache.expiresAt) {
+      return collectionsCache.promise;
+    }
+
+    const promise = request<CollectionView[]>(cacheKey);
+    collectionsCache = { key: cacheKey, promise, expiresAt: now + COLLECTIONS_CACHE_TTL_MS };
+    return promise;
   },
   getCollection: (id) => request<CollectionView>(`/collections/${id}`),
-  createCollection: (cmd) => request<CollectionView>('/collections', { method: 'POST', body: JSON.stringify(cmd) }),
-  addPromptItem: (collectionId, cmd) =>
-    request<CollectionView>(`/collections/${collectionId}/prompt-items`, { method: 'POST', body: JSON.stringify(cmd) }),
-  addScenario: (collectionId, cmd) =>
-    request<CollectionView>(`/collections/${collectionId}/scenarios`, { method: 'POST', body: JSON.stringify(cmd) }),
+  createCollection: (cmd) => {
+    invalidateCollectionsCache();
+    return request<CollectionView>('/collections', { method: 'POST', body: JSON.stringify(cmd) });
+  },
+  addPromptItem: (collectionId, cmd) => {
+    invalidateCollectionsCache();
+    return request<CollectionView>(`/collections/${collectionId}/prompt-items`, { method: 'POST', body: JSON.stringify(cmd) });
+  },
+  addScenario: (collectionId, cmd) => {
+    invalidateCollectionsCache();
+    return request<CollectionView>(`/collections/${collectionId}/scenarios`, { method: 'POST', body: JSON.stringify(cmd) });
+  },
 
   // --- Content Generation --------------------------------------------------
   generateStructuredCollection: (cmd) =>

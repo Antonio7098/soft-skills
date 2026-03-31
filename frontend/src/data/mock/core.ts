@@ -563,6 +563,11 @@ const SCENARIOS: ScenarioView[] = [
     learner_objective: 'De-escalate the sponsor\'s frustration, acknowledge the gaps, and present a credible recovery plan.',
     constraints: ['Cannot extend the deadline', 'Cannot add more engineers mid-sprint', 'Client contract has a penalty clause'],
     stakeholder_tensions: ['Sponsor wants immediate fixes', 'Engineering team is already stretched', 'Contractual obligations create pressure'],
+    questions: [
+      'What would you say to the sponsor at the start of your meeting to acknowledge their concerns?',
+      'How would you explain the reporting module gaps to the sponsor without making excuses?',
+      'What recovery plan would you propose that respects the deadline and team constraints?',
+    ],
     lifecycle_state: 'published_public',
     target_skill_slugs: ['empathy', 'expectation-setting', 'negotiation', 'conflict-handling'],
     rubric_id: 'scenario_text',
@@ -576,6 +581,11 @@ const SCENARIOS: ScenarioView[] = [
     learner_objective: 'Present the model\'s capabilities and limitations transparently while building confidence in the compliance posture.',
     constraints: ['Regulatory approval pending', 'Must address bias concerns', 'Limited clinical trial data'],
     stakeholder_tensions: ['CMO is risk-averse', 'Engineering wants to ship', 'Legal has outstanding questions'],
+    questions: [
+      'How would you open the compliance review meeting with the CMO?',
+      'How would you explain the model\'s limitations and bias concerns in terms the CMO can understand?',
+      'What recommendation would you make about the go-live decision given the pending regulatory approval?',
+    ],
     lifecycle_state: 'published_public',
     target_skill_slugs: ['structured-communication', 'concise-explanation', 'expectation-setting', 'empathy'],
     rubric_id: 'scenario_text',

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
@@ -16,8 +16,11 @@ export function PracticeModeCard({ mode }: PracticeModeCardProps) {
   const navigate = useNavigate();
   const data = useData();
   const [targetId, setTargetId] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     data.listCollections().then((cols) => {
       if (mode.id === 'quick' || mode.id === 'interview') {
         const promptType = mode.id === 'interview' ? 'interview_prompt' : 'quick_practice_prompt';
@@ -28,7 +31,7 @@ export function PracticeModeCard({ mode }: PracticeModeCardProps) {
         if (scenario) setTargetId(scenario.id);
       }
     });
-  }, [data, mode.id]);
+  }, [mode.id]);
 
   function handleStart() {
     if (!targetId) return;

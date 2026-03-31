@@ -195,7 +195,7 @@ export function AdminAudit() {
       {/* Event Detail Modal */}
       {showDetailModal && selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-lg flex flex-col gap-4">
+          <Card className="w-full max-w-2xl flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h3 className="font-display text-display-xs text-content-primary">Event Details</h3>
               <button onClick={() => { setShowDetailModal(false); setSelectedEvent(null); }} className="p-1 rounded hover:bg-surface-secondary">
@@ -218,6 +218,12 @@ export function AdminAudit() {
                   <p className="text-body-xs text-content-tertiary">Occurred At</p>
                   <p className="text-body-sm text-content-primary">{new Date(selectedEvent.occurred_at).toLocaleString()}</p>
                 </div>
+                {selectedEvent.request_id && (
+                  <div className="p-3 rounded-lg bg-surface-secondary/50">
+                    <p className="text-body-xs text-content-tertiary">Request ID</p>
+                    <p className="text-body-sm font-mono text-content-primary truncate">{selectedEvent.request_id}</p>
+                  </div>
+                )}
                 {selectedEvent.trace_id && (
                   <div className="p-3 rounded-lg bg-surface-secondary/50">
                     <p className="text-body-xs text-content-tertiary">Trace ID</p>
@@ -247,6 +253,13 @@ export function AdminAudit() {
                   </pre>
                 </div>
               )}
+
+              <div className="flex flex-col gap-2">
+                <p className="text-body-sm font-medium text-content-secondary">Raw Event JSON</p>
+                <pre className="p-3 rounded-lg bg-surface-secondary/50 text-body-xs font-mono text-content-primary overflow-auto max-h-60">
+                  {JSON.stringify(selectedEvent, null, 2)}
+                </pre>
+              </div>
             </div>
 
             <div className="flex justify-end pt-2 border-t border-line">

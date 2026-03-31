@@ -25,6 +25,7 @@ import { useSessionTimer } from '@/hooks/useSessionTimer';
 import type {
   PracticeRunView,
   PracticeSessionView,
+  PracticeRunItemSummary,
   AttemptView,
   ScenarioView,
 } from '@/data';
@@ -42,6 +43,17 @@ function extractScenarioQuestion(promptText: string): string {
     return `${firstLine}\n\n${lastLine}`;
   }
   return lastLine;
+}
+
+function getScenarioPromptText(scenario: ScenarioView | null, item: PracticeRunItemSummary, questionIndex?: number): string {
+  if (scenario && scenario.questions.length > 0) {
+    const idx = questionIndex ?? 0;
+    const q = scenario.questions[idx];
+    if (q) {
+      return `Question ${idx + 1} of ${scenario.questions.length}: ${q}`;
+    }
+  }
+  return extractScenarioQuestion(item.prompt_text);
 }
 
 function RunProgressSidebar({ run, currentIndex }: { run: PracticeRunView; currentIndex: number }) {
@@ -407,7 +419,7 @@ export function PracticeRunSession() {
   const isScenario = currentItem?.item_type === 'scenario' && currentScenario;
 
   const scenarioPromptText = isScenario
-    ? extractScenarioQuestion(currentItem.prompt_text)
+    ? getScenarioPromptText(currentScenario, currentItem)
     : currentItem.prompt_text;
 
   if (phase === 'complete' && isLastItem) {
@@ -455,6 +467,7 @@ export function PracticeRunSession() {
                     skillSlugs={currentItem.target_skill_slugs}
                   />
                   <ResponseInput
+                    key={`${currentItem.id}-${currentSessionIndex}`}
                     onSubmit={handleSubmit}
                     placeholder="Write your response here..."
                     submitLabel="Submit Response"
