@@ -1,0 +1,493 @@
+{
+  "dataset_id": "consultancy_fundamentals",
+  "dataset_version": "consultancy_fundamentals.v1",
+  "schema_version": "evaluation.schema.v1",
+  "rubrics": [
+    {
+      "rubric_id": "quick_practice_reset_timeline@v1",
+      "family": "quick_practice_reset_timeline",
+      "version": "v1",
+      "content_type": "quick_practice_prompt",
+      "schema_version": "v1",
+      "name": "Quick Practice: Reset Timeline (Binary)",
+      "criteria": [
+        {
+          "criterion_ref": "expectation-setting",
+          "skill_slug": "expectation-setting",
+          "title": "Uses 'yes, with conditions'",
+          "description": "Negotiates realistically without overcommitting or refusing outright.",
+          "weight": 1.0,
+          "required": true,
+          "position": 1,
+          "levels": [
+            {
+              "level": 1,
+              "description": "Does not negotiate; either says 'yes' unconditionally or says 'no' without alternatives.",
+              "examples": [
+                "Sure, I'll get it done.",
+                "I can't do that."
+              ]
+            },
+            {
+              "level": 2,
+              "description": "Uses 'yes, with conditions': acknowledges request, offers realistic deliverable, sets timeline, asks for confirmation.",
+              "examples": [
+                "Hi Elena, I'm happy to support. To give you something robust, I can prepare a high-level summary of top three campaign metrics by Monday 9am. For the full dashboard, I'd need until Wednesday – would that work?"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rubric_id": "quick_practice_text@v1",
+      "family": "quick_practice_text",
+      "version": "v1",
+      "content_type": "quick_practice_prompt",
+      "schema_version": "v1",
+      "name": "Quick Practice: Clarifying Questions (Binary)",
+      "criteria": [
+        {
+          "criterion_ref": "asking-the-right-questions",
+          "skill_slug": "asking-the-right-questions",
+          "title": "Asks targeted clarifying questions",
+          "description": "Uses 5Ws/1H to reduce ambiguity.",
+          "weight": 1.0,
+          "required": true,
+          "position": 1,
+          "levels": [
+            {
+              "level": 1,
+              "description": "Does not ask clarifying questions or asks vague/leading ones.",
+              "examples": [
+                "What exactly do you need?",
+                "Don't you want last quarter's numbers?"
+              ]
+            },
+            {
+              "level": 2,
+              "description": "Asks at least three targeted questions covering purpose, scope, format, deadline.",
+              "examples": [
+                "Hi Sarah, to give you something useful for the steering meeting, could you clarify: (1) What metrics matter most? (2) Is a one-page summary enough or would you prefer a slide? (3) What time tomorrow do you need it?"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rubric_id": "interview_text@v1",
+      "family": "interview_text",
+      "version": "v1",
+      "content_type": "interview_prompt",
+      "schema_version": "v1",
+      "name": "Competency Interview Rubric (5-level)",
+      "criteria": [
+        {
+          "criterion_ref": "situation-task-clarity",
+          "skill_slug": "starr-framework",
+          "title": "Situation & Task Clarity",
+          "description": "Sets context and defines the problem clearly.",
+          "weight": 0.2,
+          "required": true,
+          "position": 1,
+          "levels": [
+            {"level": 1, "description": "No context; unclear what needed to be done.", "examples": ["I had a stakeholder issue."]},
+            {"level": 2, "description": "Basic context but missing key details.", "examples": ["I was working on a project and a stakeholder was unhappy."]},
+            {"level": 3, "description": "Clear situation and task, but could be more concise.", "examples": ["I was leading the data migration project. The head of marketing, Elena, gave an unrealistic deadline that would compromise quality."]},
+            {"level": 4, "description": "Concise, well-structured situation and task.", "examples": ["As lead BA on Project Insight, I was asked by the CEO to centralise data teams. The challenge was that department heads resisted losing their specialists."]},
+            {"level": 5, "description": "Exemplary: sets the scene with impact and clarity.", "examples": ["In Q2, we had 80 data specialists across eight departments, each using different tools, causing knowledge silos. The CEO set a goal to centralise within six months, but department heads feared disruption to their pipelines. My role was to design a transition plan that balanced speed with trust."]}
+          ]
+        },
+        {
+          "criterion_ref": "action-communication",
+          "skill_slug": "active-listening",
+          "title": "Action: Communication & Empathy",
+          "description": "Describes how they listened, empathised, and engaged.",
+          "weight": 0.2,
+          "required": true,
+          "position": 2,
+          "levels": [
+            {"level": 1, "description": "No mention of listening or empathy.", "examples": ["I told them to accept the change."]},
+            {"level": 2, "description": "Mentions listening but no specifics.", "examples": ["I listened to their concerns."]},
+            {"level": 3, "description": "Describes specific listening actions or empathy.", "examples": ["I scheduled 1:1s with each department head to understand their fears. I paraphrased their concerns to confirm understanding."]},
+            {"level": 4, "description": "Strong examples of empathy and adapting communication.", "examples": ["I used active listening techniques: reflecting emotions ('it sounds like you're worried about losing your best talent'), and summarised key points to show I heard them."]},
+            {"level": 5, "description": "Exemplary: shows deep empathy and tailored communication to multiple stakeholders.", "examples": ["I mapped stakeholders on power/interest, then tailored engagement: for the CEO, I provided executive summaries; for department heads, I held workshops to co-create the transition plan; for data specialists, I listened to relocation concerns and advocated for flexible working."]}
+          ]
+        },
+        {
+          "criterion_ref": "action-negotiation",
+          "skill_slug": "negotiation",
+          "title": "Action: Negotiation & Expectation Setting",
+          "description": "Shows how they set boundaries or found common ground.",
+          "weight": 0.2,
+          "required": true,
+          "position": 3,
+          "levels": [
+            {"level": 1, "description": "No negotiation; accepted all demands or avoided conflict.", "examples": ["I just said yes."]},
+            {"level": 2, "description": "Mentions negotiation but no concrete steps.", "examples": ["I tried to negotiate the deadline."]},
+            {"level": 3, "description": "Describes a specific negotiation tactic or outcome.", "examples": ["I used the 'yes, with conditions' framework: I agreed to deliver a high-level summary by Monday, and the full dashboard by Wednesday."]},
+            {"level": 4, "description": "Clear, effective negotiation with positive outcome.", "examples": ["I presented two options: a quick summary by Monday or a full report by Wednesday, and let the stakeholder choose based on board priorities. They chose the summary, which I delivered on time."]},
+            {"level": 5, "description": "Exemplary: negotiated trade-offs, documented agreements, and managed expectations proactively.", "examples": ["I drafted a memo with clear assumptions, deliverables, and timelines, shared it with the stakeholder, and asked for sign-off. When new requests came, I revisited priorities using a shared priority matrix."]}
+          ]
+        },
+        {
+          "criterion_ref": "result",
+          "skill_slug": "decision-justification",
+          "title": "Result",
+          "description": "States a measurable or observable outcome.",
+          "weight": 0.2,
+          "required": true,
+          "position": 4,
+          "levels": [
+            {"level": 1, "description": "No outcome stated.", "examples": ["It went okay."]},
+            {"level": 2, "description": "Vague outcome without metrics.", "examples": ["The stakeholder was happy."]},
+            {"level": 3, "description": "Specific but non-quantified outcome.", "examples": ["We met the deadline and the stakeholder gave positive feedback."]},
+            {"level": 4, "description": "Quantifiable or well-described outcome.", "examples": ["We delivered the dashboard on time, and the board used it to approve the £10M budget."]},
+            {"level": 5, "description": "Exemplary: ties outcome to business impact and stakeholder satisfaction.", "examples": ["The board approved the investment, and six months later, retention of data specialists improved by 25%. The stakeholder later requested me for another project."]}
+          ]
+        },
+        {
+          "criterion_ref": "reflection",
+          "skill_slug": "self-reflection",
+          "title": "Reflection",
+          "description": "Demonstrates learning and growth.",
+          "weight": 0.2,
+          "required": true,
+          "position": 5,
+          "levels": [
+            {"level": 1, "description": "No reflection.", "examples": [""]},
+            {"level": 2, "description": "Acknowledges learning but vague.", "examples": ["I learned that communication is important."]},
+            {"level": 3, "description": "Specific learning but no application to future.", "examples": ["I realised I should have escalated sooner when the data team delayed."]},
+            {"level": 4, "description": "Clear learning and how it would change future behaviour.", "examples": ["Next time, I'll document assumptions earlier and escalate at the first sign of delay to avoid last-minute pressure."]},
+            {"level": 5, "description": "Exemplary: connects learning to professional development and provides actionable improvements.", "examples": ["This experience taught me that proactive stakeholder communication prevents surprises. Now, I always start with a stakeholder map, agree on engagement cadence, and send weekly status updates. I've also coached junior consultants on this approach."]}
+          ]
+        }
+      ]
+    },
+    {
+      "rubric_id": "scenario_text@v1",
+      "family": "scenario_text",
+      "version": "v1",
+      "content_type": "scenario_step",
+      "schema_version": "v1",
+      "name": "Scenario Rubric (5-level)",
+      "criteria": [
+        {
+          "criterion_ref": "stakeholder-analysis-engagement",
+          "skill_slug": "stakeholder-analysis",
+          "title": "Stakeholder Analysis & Engagement",
+          "description": "Correct identification, power/interest mapping, tailored engagement strategies, evidence of empathy.",
+          "weight": 0.35,
+          "required": true,
+          "position": 1,
+          "levels": [
+            {"level": 1, "description": "Misses key stakeholders; mapping superficial.", "examples": ["Only listed the CEO and said 'keep happy'."]},
+            {"level": 2, "description": "Identifies some stakeholders but mapping incomplete.", "examples": ["CEO (high/high), department heads (high/high) – but no strategy for others."]},
+            {"level": 3, "description": "Adequate analysis with reasonable grid placements.", "examples": ["Mapped six groups correctly and described basic engagement."]},
+            {"level": 4, "description": "Good analysis with nuanced mapping and tailored strategies.", "examples": ["Used Mendelow grid, explained why each group belongs, and proposed communication plans (e.g., weekly for CEO, monthly updates for monitors)."]},
+            {"level": 5, "description": "Excellent: anticipates stakeholder movement, addresses hidden needs, shows empathy.", "examples": ["Mapped all eight groups, noted that data specialists might move from low to high interest during relocation, and proposed listening sessions to address relocation concerns."]}
+          ]
+        },
+        {
+          "criterion_ref": "interviewing-questioning",
+          "skill_slug": "asking-the-right-questions",
+          "title": "Interviewing & Questioning",
+          "description": "Use of open/probing questions, active listening signals, ability to uncover hidden concerns.",
+          "weight": 0.35,
+          "required": true,
+          "position": 2,
+          "levels": [
+            {"level": 1, "description": "Questions are leading or irrelevant.", "examples": ["Don't you think centralisation is good?"]},
+            {"level": 2, "description": "Mostly closed questions; little probing.", "examples": ["What do you think? How does it affect your team?"]},
+            {"level": 3, "description": "Mix of open and closed; some probing.", "examples": ["Tell me about your current data team. You mentioned handoffs are slow – can you give an example?"]},
+            {"level": 4, "description": "Effective sequence of open, probing, and closed; shows active listening.", "examples": ["Open: 'Describe a typical data request.' Probe: 'You said it takes three days – what's the bottleneck?' Summarised: 'So compliance is the blocker?'"]},
+            {"level": 5, "description": "Exemplary: uses silence, picks up on emotional cues, uncovers hidden needs.", "examples": ["After Samir expressed frustration, I paused, then reflected: 'It sounds like this feels out of your control. What would make it feel more collaborative?' This led him to admit he wanted a seat at the design table."]}
+          ]
+        },
+        {
+          "criterion_ref": "structured-communication",
+          "skill_slug": "structured-thinking",
+          "title": "Structured Communication & Recommendation",
+          "description": "Clear use of As-Is / Gap / To-Be framework, logical options, concise executive summary, actionable next steps.",
+          "weight": 0.30,
+          "required": true,
+          "position": 3,
+          "levels": [
+            {"level": 1, "description": "No structure; recommendation is vague.", "examples": ["We should centralise quickly."]},
+            {"level": 2, "description": "Attempts structure but missing key components.", "examples": ["As-is: scattered teams. To-be: centralised hub. Gap: need to move people."]},
+            {"level": 3, "description": "Clear framework, but recommendation lacks depth.", "examples": ["Used As-Is/Gap/To-Be. Presented two options but didn't weigh pros/cons thoroughly."]},
+            {"level": 4, "description": "Well-structured with clear options and justified recommendation.", "examples": ["One-page summary: As-Is (fragmented), To-Be (central hub), Gap (people, tools, culture). Two transition approaches: phased vs big-bang. Recommendation: phased with pilot department."]},
+            {"level": 5, "description": "Exemplary: persuasive, business-focused, with measurable next steps.", "examples": ["The memo used the As-Is/Gap/To-Be model, included a cost-benefit table, addressed risks, and proposed a 6-month phased rollout with clear milestones and success metrics."]}
+          ]
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "qp_impossible_deadline_pass_001",
+      "label": "Quick Practice: 'Yes, with conditions' – pass",
+      "prompt": {
+        "practice_type": "quick_practice",
+        "prompt_type": "quick_practice_prompt",
+        "title": "Client Asks for Impossible Deadline",
+        "prompt_text": "You are a consultant working on a data migration project. A senior stakeholder, Elena (Head of Marketing), sends you an email at 4:30pm on Friday: 'I need a full dashboard of last quarter's campaign performance by Monday 9am for the board meeting. I know it's tight, but you can pull it together, right?' You estimate the task would normally take two days, and you already have planned work for the weekend. You cannot deliver a complete dashboard by Monday without sacrificing quality or your personal commitments. Write a short reply (3–5 sentences) to Elena. Use the 'yes, with conditions' framework.",
+        "difficulty": "intermediate",
+        "target_skill_slugs": ["expectation-setting", "yes-with-conditions", "professionalism-under-pressure"],
+        "rubric_id": "quick_practice_reset_timeline@v1",
+        "rubric_version": "v1"
+      },
+      "response_text": "Hi Elena, thank you for reaching out. I'm happy to support the board meeting. To give you something robust, I can prepare a high-level summary of the top three campaign metrics by Monday 9am. For the full dashboard, I'd need until Wednesday – would that work? If you'd prefer the full version, I could prioritise it if we shift my current tasks; let me know your preference.",
+      "learner_context": {
+        "target_role": "Business Analyst",
+        "goals": ["Demonstrate professional negotiation"],
+        "prior_assessed_attempts": 0
+      },
+      "expected_overall_score": {"minimum": 2, "maximum": 2},
+      "expected_skill_scores": {
+        "expectation-setting": {"minimum": 2, "maximum": 2}
+      },
+      "minimum_evidence_coverage": 1.0,
+      "tags": ["quick-practice", "expectation-setting", "pass"]
+    },
+    {
+      "case_id": "qp_impossible_deadline_fail_002",
+      "label": "Quick Practice: 'Yes, with conditions' – fail",
+      "prompt": {
+        "practice_type": "quick_practice",
+        "prompt_type": "quick_practice_prompt",
+        "title": "Client Asks for Impossible Deadline",
+        "prompt_text": "You are a consultant working on a data migration project. A senior stakeholder, Elena (Head of Marketing), sends you an email at 4:30pm on Friday: 'I need a full dashboard of last quarter's campaign performance by Monday 9am for the board meeting. I know it's tight, but you can pull it together, right?' You estimate the task would normally take two days, and you already have planned work for the weekend. You cannot deliver a complete dashboard by Monday without sacrificing quality or your personal commitments. Write a short reply (3–5 sentences) to Elena. Use the 'yes, with conditions' framework.",
+        "difficulty": "intermediate",
+        "target_skill_slugs": ["expectation-setting", "yes-with-conditions", "professionalism-under-pressure"],
+        "rubric_id": "quick_practice_reset_timeline@v1",
+        "rubric_version": "v1"
+      },
+      "response_text": "Sure, I'll get it done by Monday. Don't worry.",
+      "learner_context": {
+        "target_role": "Business Analyst",
+        "goals": ["Show willingness"],
+        "prior_assessed_attempts": 0
+      },
+      "expected_overall_score": {"minimum": 1, "maximum": 1},
+      "expected_skill_scores": {
+        "expectation-setting": {"minimum": 1, "maximum": 1}
+      },
+      "minimum_evidence_coverage": 1.0,
+      "tags": ["quick-practice", "expectation-setting", "fail"]
+    },
+    {
+      "case_id": "qp_ambiguous_request_pass_003",
+      "label": "Quick Practice: Clarifying Questions – pass",
+      "prompt": {
+        "practice_type": "quick_practice",
+        "prompt_type": "quick_practice_prompt",
+        "title": "Clarifying an Ambiguous Request",
+        "prompt_text": "It's your second week on client site. Your manager, Sarah, sends you a Teams message: 'Can you pull some numbers on our digital sales performance and send me something before tomorrow's steering meeting? Just something I can talk to.' You have no clear brief, and you're not sure what 'digital sales performance' means or what format is expected. Write a short Teams reply (3–6 sentences) that acknowledges the request and asks specific clarifying questions.",
+        "difficulty": "intermediate",
+        "target_skill_slugs": ["asking-the-right-questions", "ambiguity-navigation"],
+        "rubric_id": "quick_practice_text@v1",
+        "rubric_version": "v1"
+      },
+      "response_text": "Hi Sarah, happy to help. To give you something useful for the steering meeting, could you clarify: (1) What metrics matter most – conversion rates, revenue, or channel breakdown? (2) Is a one-page summary enough, or would you prefer a slide deck? (3) What time tomorrow do you need it? I'll prepare a draft and share it by 10am if that works.",
+      "learner_context": {
+        "target_role": "Junior Consultant",
+        "goals": ["Demonstrate proactive clarifying"],
+        "prior_assessed_attempts": 0
+      },
+      "expected_overall_score": {"minimum": 2, "maximum": 2},
+      "expected_skill_scores": {
+        "asking-the-right-questions": {"minimum": 2, "maximum": 2}
+      },
+      "minimum_evidence_coverage": 1.0,
+      "tags": ["quick-practice", "clarifying-questions", "pass"]
+    },
+    {
+      "case_id": "qp_ambiguous_request_fail_004",
+      "label": "Quick Practice: Clarifying Questions – fail",
+      "prompt": {
+        "practice_type": "quick_practice",
+        "prompt_type": "quick_practice_prompt",
+        "title": "Clarifying an Ambiguous Request",
+        "prompt_text": "It's your second week on client site. Your manager, Sarah, sends you a Teams message: 'Can you pull some numbers on our digital sales performance and send me something before tomorrow's steering meeting? Just something I can talk to.' You have no clear brief, and you're not sure what 'digital sales performance' means or what format is expected. Write a short Teams reply (3–6 sentences) that acknowledges the request and asks specific clarifying questions.",
+        "difficulty": "intermediate",
+        "target_skill_slugs": ["asking-the-right-questions", "ambiguity-navigation"],
+        "rubric_id": "quick_practice_text@v1",
+        "rubric_version": "v1"
+      },
+      "response_text": "Okay, I'll get you something.",
+      "learner_context": {
+        "target_role": "Junior Consultant",
+        "goals": ["Show responsiveness"],
+        "prior_assessed_attempts": 0
+      },
+      "expected_overall_score": {"minimum": 1, "maximum": 1},
+      "expected_skill_scores": {
+        "asking-the-right-questions": {"minimum": 1, "maximum": 1}
+      },
+      "minimum_evidence_coverage": 1.0,
+      "tags": ["quick-practice", "clarifying-questions", "fail"]
+    },
+    {
+      "case_id": "interview_difficult_stakeholder_level5_005",
+      "label": "Interview: Managing a Difficult Stakeholder – Level 5 response",
+      "prompt": {
+        "practice_type": "interview",
+        "prompt_type": "interview_prompt",
+        "title": "Managing a Difficult Stakeholder",
+        "prompt_text": "Tell me about a time when you had to manage a difficult stakeholder. What was the situation, what actions did you take, and what was the result?",
+        "difficulty": "intermediate",
+        "target_skill_slugs": ["empathy", "conflict-facilitation", "expectation-setting", "active-listening"],
+        "rubric_id": "interview_text@v1",
+        "rubric_version": "v1",
+        "interview_context": {
+          "competency_context": "This question assesses stakeholder management, communication, and conflict resolution skills.",
+          "interviewer_perspective": "Look for STARR structure, specific actions, and reflection on growth."
+        }
+      },
+      "response_text": "In my previous role as a business analyst at a fintech, I was part of a project to centralise our data teams. The head of lending, Samir, was extremely resistant because he feared losing his dedicated analysts and control over model updates. I scheduled a 1:1 to understand his concerns. I used active listening: I paraphrased his worries ('So it sounds like you're concerned that centralisation might slow down your lending pipeline'), and I reflected his frustration ('I can see this feels like losing a part of your team'). After he calmed down, I asked open questions to uncover his real needs: 'What would make you feel confident that your team's expertise is valued?' He admitted he wanted a seat at the design table. I then proposed a solution: we would create a cross-departmental working group where he could co-design the transition plan. I documented our agreement and shared it with him for sign-off. As a result, he became a champion of the project, and we delivered the centralisation three weeks ahead of schedule. This taught me that resistance often masks fear of losing influence, and proactive listening can turn a blocker into an ally. Now, I always start with a stakeholder map and prioritise one-on-one listening sessions early in any project.",
+      "learner_context": {
+        "target_role": "Business Analyst",
+        "goals": ["Demonstrate advanced stakeholder management"],
+        "prior_assessed_attempts": 2
+      },
+      "expected_overall_score": {"minimum": 4, "maximum": 5},
+      "expected_skill_scores": {
+        "empathy": {"minimum": 4, "maximum": 5},
+        "conflict-facilitation": {"minimum": 4, "maximum": 5},
+        "expectation-setting": {"minimum": 4, "maximum": 5},
+        "active-listening": {"minimum": 4, "maximum": 5}
+      },
+      "minimum_evidence_coverage": 0.8,
+      "tags": ["interview", "stakeholder", "level5"]
+    },
+    {
+      "case_id": "interview_difficult_stakeholder_level3_006",
+      "label": "Interview: Managing a Difficult Stakeholder – Level 3 response",
+      "prompt": {
+        "practice_type": "interview",
+        "prompt_type": "interview_prompt",
+        "title": "Managing a Difficult Stakeholder",
+        "prompt_text": "Tell me about a time when you had to manage a difficult stakeholder. What was the situation, what actions did you take, and what was the result?",
+        "difficulty": "intermediate",
+        "target_skill_slugs": ["empathy", "conflict-facilitation", "expectation-setting", "active-listening"],
+        "rubric_id": "interview_text@v1",
+        "rubric_version": "v1",
+        "interview_context": {
+          "competency_context": "This question assesses stakeholder management, communication, and conflict resolution skills.",
+          "interviewer_perspective": "Look for STARR structure, specific actions, and reflection on growth."
+        }
+      },
+      "response_text": "We had a stakeholder who was unhappy with the timeline for a data migration. I met with him to discuss his concerns. I listened and explained why the timeline was necessary. He seemed to accept it, and we moved forward. The project finished on time, but he was still a bit unhappy. I learned that I should have involved him earlier.",
+      "learner_context": {
+        "target_role": "Junior Consultant",
+        "goals": ["Show basic stakeholder management"],
+        "prior_assessed_attempts": 1
+      },
+      "expected_overall_score": {"minimum": 3, "maximum": 3},
+      "expected_skill_scores": {
+        "empathy": {"minimum": 2, "maximum": 3},
+        "conflict-facilitation": {"minimum": 2, "maximum": 3},
+        "expectation-setting": {"minimum": 3, "maximum": 3},
+        "active-listening": {"minimum": 3, "maximum": 3}
+      },
+      "minimum_evidence_coverage": 0.5,
+      "tags": ["interview", "stakeholder", "level3"]
+    },
+    {
+      "case_id": "scenario_moneycraft_level5_007",
+      "label": "Scenario: MoneyCraft Data Centralisation – Level 5 performance",
+      "prompt": {
+        "practice_type": "scenario",
+        "prompt_type": "scenario_step",
+        "title": "MoneyCraft Data Centralisation",
+        "prompt_text": "You are a business analyst on Project Insight 2025. Complete the following tasks:\n\n1. Stakeholder Analysis: Identify at least six stakeholder groups. Map them onto Mendelow's Power/Interest grid and propose an engagement strategy.\n\n2. Interview Questions: Draft 5-8 questions for Samir Hicks, Head of Lending, who is resistant to centralisation. Use open, probing, and closed questions.\n\n3. Executive Summary: Write a one-page memo to the steering committee that uses the As-Is/Gap/To-Be framework, presents two transition options with pros/cons, and gives a clear recommendation with next steps.",
+        "difficulty": "advanced",
+        "target_skill_slugs": ["stakeholder-analysis", "stakeholder-engagement", "asking-the-right-questions", "structured-thinking", "executive-summary"],
+        "rubric_id": "scenario_text@v1",
+        "rubric_version": "v1",
+        "scenario_context": {
+          "business_context": "MoneyCraft Bank has 80 data specialists across 8 departments with different tools and practices. CEO wants to centralise into a new hub in Canary Wharf.",
+          "learner_objective": "Produce a stakeholder analysis, interview plan, and executive summary that facilitates a smooth transition.",
+          "constraints": ["Budget £10M", "Timeline 6 months", "No layoffs"],
+          "stakeholder_tensions": ["Department heads fear losing resources", "Data specialists worry about relocation", "HR needs to manage change"],
+          "mock_company": {
+            "name": "MoneyCraft Bank",
+            "industry": "Fintech",
+            "operating_context": "Rapid growth through acquisitions, leading to fragmented data teams."
+          },
+          "mock_people": [
+            {"name": "Cristina Yang", "role": "CEO", "goals": ["Centralise data", "Retain talent"], "communication_style": "Visionary, impatient", "relationship_to_scenario": "Project sponsor"},
+            {"name": "Samir Hicks", "role": "Head of Lending", "goals": ["Keep his data team", "Maintain model updates"], "communication_style": "Defensive, technical", "relationship_to_scenario": "Resistant stakeholder"},
+            {"name": "Sarah Chen", "role": "Senior Data Specialist", "goals": ["Career growth", "Modern tools"], "communication_style": "Analytical, reserved", "relationship_to_scenario": "Affected team member"},
+            {"name": "James Okonkwo", "role": "Head of HR", "goals": ["Smooth transition", "Logistics"], "communication_style": "Process-oriented, collaborative", "relationship_to_scenario": "Cross-functional partner"}
+          ]
+        }
+      },
+      "response_text": "**Task 1: Stakeholder Analysis**\n\n- **Cristina Yang (CEO)**: High Power, High Interest → Manage Closely. Weekly 1:1s, concise updates.\n- **Department Heads (e.g., Samir)**: High Power, High Interest → Manage Closely. Co-create transition plans, involve in design.\n- **Data Specialists**: Low Power, High Interest → Keep Informed. Regular town halls, Q&A sessions, relocation support.\n- **HR (James)**: High Power, Medium Interest → Keep Satisfied. Monthly check-ins on logistics and legal.\n- **Banking Technology Team**: Low Power, Low Interest → Monitor. Light-touch updates.\n- **FCA**: High Power, Low Interest → Keep Satisfied. Ensure compliance documentation.\n\nI anticipate that Data Specialists may move to High Interest during relocation, so I'll increase communication then.\n\n**Task 2: Interview Questions for Samir**\n\n1. Open: Tell me about your team's current data processes – what works well?\n2. Open: What challenges do you foresee if data were centralised?\n3. Probing: You mentioned the lending pipeline – can you walk me through how data flows through it today?\n4. Empathetic: It sounds like you've built a strong team. What would make you confident that their expertise won't be lost?\n5. Probing: In the slack thread, you mentioned disruption – what would a successful transition look like for your department?\n6. Closed: Would a phased approach, where your team moves last, help you plan?\n7. Open: What's one thing we could do right now to build trust?\n\n**Task 3: Executive Summary**\n\n**Subject: Recommendation for Project Insight 2025 – Phased Centralisation**\n\n**As-Is:** 80 data specialists in 8 departments, using SAS, Python, R, Tableau, etc. Siloed knowledge, high attrition, no career path.\n\n**To-Be:** Centralised Data Hub in Canary Wharf with standardised tools (Python/Tableau), cross-functional teams, and clear career progression.\n\n**Gap:** People relocation, technology migration, cultural shift, governance.\n\n**Options:**\n1. **Big Bang**: Move all at once in month 1. Pros: Fast, single change. Cons: High disruption, high risk of service outage.\n2. **Phased**: Move one department per month, starting with Digital Banking as pilot. Pros: Lower risk, learn as we go, allows gradual cultural change. Cons: Longer timeline (6 months).\n\n**Recommendation:** Phased approach. Pilot with Digital Banking (willing department). Use lessons to refine before moving Lending (most resistant).\n\n**Next Steps:**\n- Form pilot team by Week 2\n- Develop detailed transition plan with HR by Week 4\n- Announce pilot at next all-hands\n\nI'm happy to elaborate on any section.",
+      "learner_context": {
+        "target_role": "Business Analyst",
+        "goals": ["Demonstrate consulting mindset"],
+        "prior_assessed_attempts": 1
+      },
+      "expected_overall_score": {"minimum": 4, "maximum": 5},
+      "expected_skill_scores": {
+        "stakeholder-analysis": {"minimum": 4, "maximum": 5},
+        "stakeholder-engagement": {"minimum": 4, "maximum": 5},
+        "asking-the-right-questions": {"minimum": 4, "maximum": 5},
+        "structured-thinking": {"minimum": 4, "maximum": 5},
+        "executive-summary": {"minimum": 4, "maximum": 5}
+      },
+      "minimum_evidence_coverage": 0.9,
+      "tags": ["scenario", "moneycraft", "level5"]
+    },
+    {
+      "case_id": "scenario_moneycraft_level2_008",
+      "label": "Scenario: MoneyCraft Data Centralisation – Level 2 performance",
+      "prompt": {
+        "practice_type": "scenario",
+        "prompt_type": "scenario_step",
+        "title": "MoneyCraft Data Centralisation",
+        "prompt_text": "You are a business analyst on Project Insight 2025. Complete the following tasks:\n\n1. Stakeholder Analysis: Identify at least six stakeholder groups. Map them onto Mendelow's Power/Interest grid and propose an engagement strategy.\n\n2. Interview Questions: Draft 5-8 questions for Samir Hicks, Head of Lending, who is resistant to centralisation. Use open, probing, and closed questions.\n\n3. Executive Summary: Write a one-page memo to the steering committee that uses the As-Is/Gap/To-Be framework, presents two transition options with pros/cons, and gives a clear recommendation with next steps.",
+        "difficulty": "advanced",
+        "target_skill_slugs": ["stakeholder-analysis", "stakeholder-engagement", "asking-the-right-questions", "structured-thinking", "executive-summary"],
+        "rubric_id": "scenario_text@v1",
+        "rubric_version": "v1",
+        "scenario_context": {
+          "business_context": "MoneyCraft Bank has 80 data specialists across 8 departments with different tools and practices. CEO wants to centralise into a new hub in Canary Wharf.",
+          "learner_objective": "Produce a stakeholder analysis, interview plan, and executive summary that facilitates a smooth transition.",
+          "constraints": ["Budget £10M", "Timeline 6 months", "No layoffs"],
+          "stakeholder_tensions": ["Department heads fear losing resources", "Data specialists worry about relocation", "HR needs to manage change"],
+          "mock_company": {
+            "name": "MoneyCraft Bank",
+            "industry": "Fintech",
+            "operating_context": "Rapid growth through acquisitions, leading to fragmented data teams."
+          },
+          "mock_people": [
+            {"name": "Cristina Yang", "role": "CEO", "goals": ["Centralise data", "Retain talent"], "communication_style": "Visionary, impatient", "relationship_to_scenario": "Project sponsor"},
+            {"name": "Samir Hicks", "role": "Head of Lending", "goals": ["Keep his data team", "Maintain model updates"], "communication_style": "Defensive, technical", "relationship_to_scenario": "Resistant stakeholder"},
+            {"name": "Sarah Chen", "role": "Senior Data Specialist", "goals": ["Career growth", "Modern tools"], "communication_style": "Analytical, reserved", "relationship_to_scenario": "Affected team member"},
+            {"name": "James Okonkwo", "role": "Head of HR", "goals": ["Smooth transition", "Logistics"], "communication_style": "Process-oriented, collaborative", "relationship_to_scenario": "Cross-functional partner"}
+          ]
+        }
+      },
+      "response_text": "Task 1: Stakeholders: CEO, department heads, data specialists, HR. CEO high power high interest, department heads high power high interest, data specialists low power high interest, HR high power low interest.\n\nTask 2: Interview questions for Samir: What do you think about centralisation? Are you worried about losing your team? What would make you happy?\n\nTask 3: As-is: data is scattered. To-be: centralised. Gap: we need to move people. Options: move all at once or slowly. Recommendation: move all at once.",
+      "learner_context": {
+        "target_role": "Junior Consultant",
+        "goals": ["Complete the tasks"],
+        "prior_assessed_attempts": 0
+      },
+      "expected_overall_score": {"minimum": 2, "maximum": 2},
+      "expected_skill_scores": {
+        "stakeholder-analysis": {"minimum": 2, "maximum": 2},
+        "stakeholder-engagement": {"minimum": 1, "maximum": 2},
+        "asking-the-right-questions": {"minimum": 1, "maximum": 2},
+        "structured-thinking": {"minimum": 2, "maximum": 2},
+        "executive-summary": {"minimum": 1, "maximum": 2}
+      },
+      "minimum_evidence_coverage": 0.3,
+      "tags": ["scenario", "moneycraft", "level2"]
+    }
+  ]
+}

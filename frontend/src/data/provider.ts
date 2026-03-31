@@ -24,6 +24,7 @@ import type {
   StartPracticeRunCommand,
   CompetencyProgressView,
   GenerationStartedView,
+  GenerationStreamCallbacks,
   StructuredCollectionGenerationCommand,
   ChatCollectionGenerationCommand,
   AdminUserView,

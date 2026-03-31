@@ -75,29 +75,6 @@ class _Message:
         self.content = content
 
 
-def test_required_tool_name_requires_generation_tool_for_generation_request() -> None:
-    tool_name = _required_tool_name(
-        [
-            _Message(
-                "user",
-                "Generate a collection for early-career consultants with difficulty intermediate and target_skill_slugs decision-justification.",
-            )
-        ],
-        AssistantPracticeState(),
-    )
-
-    assert tool_name == "generate_collection"
-
-
-def test_required_tool_name_allows_clarifying_question_for_vague_generation_request() -> None:
-    tool_name = _required_tool_name(
-        [_Message("user", "cna you generate me a collection please")],
-        AssistantPracticeState(),
-    )
-
-    assert tool_name is None
-
-
 def test_invalid_generation_tool_request_returns_clarification() -> None:
     tool_calls = [
         ProviderToolCall(
@@ -161,34 +138,13 @@ def test_generation_tool_orchestration_validation_error_returns_clarification() 
     assert "pick from your weak skills" in clarification
 
 
-def test_required_tool_name_requires_practice_submission_when_active() -> None:
+def test_required_tool_name_always_returns_none() -> None:
+    """required_tool_name should always return None to let the LLM decide."""
     tool_name = _required_tool_name(
-        [_Message("user", "Here is my answer to the question.")],
-        AssistantPracticeState(
-            practice_run_id="run-1",
-            current_attempt_id="attempt-1",
-            current_position=1,
-            total_items=2,
-            awaiting_user_answer=True,
-        ),
+        [_Message("user", "generate a collection for me")],
+        AssistantPracticeState(),
     )
-
-    assert tool_name == "submit_active_practice_response"
-
-
-def test_required_tool_name_prefers_active_practice_recall_tool() -> None:
-    tool_name = _required_tool_name(
-        [_Message("user", "Can you repeat the question again?")],
-        AssistantPracticeState(
-            practice_run_id="run-1",
-            current_attempt_id="attempt-1",
-            current_position=1,
-            total_items=2,
-            awaiting_user_answer=True,
-        ),
-    )
-
-    assert tool_name == "get_active_practice"
+    assert tool_name is None
 
 
 def test_required_tool_name_does_not_force_submission_for_stop_message() -> None:
@@ -213,17 +169,6 @@ def test_start_collection_practice_args_require_a_selection_source() -> None:
             include_prompt_items=False,
             include_scenarios=False,
         )
-
-
-def test_build_compact_learner_context_omits_heavy_read_data_for_generation_request() -> None:
-    context = _build_compact_learner_context(
-        latest_user_message="generate a collection for me",
-        profile={"display_name": "Antonio", "email": "a@test.com", "unused": "x"},
-        progress={"available": True, "dashboard": {"competencies": [{"slug": "one"}]}},
-        attempts=[{"practice_type": "quick_practice", "overall_score": 4}],
-    )
-
-    assert context == {"profile": {"display_name": "Antonio", "email": "a@test.com"}}
 
 
 def test_chat_collection_generation_command_content_formats_are_strict() -> None:

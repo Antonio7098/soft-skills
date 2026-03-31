@@ -74,20 +74,6 @@ from soft_skills_backend.shared.ports.llm import LLMProvider
 from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
 MAX_TOOL_ITERATIONS = 6
-_GENERATION_REQUEST_PATTERN = re.compile(
-    r"\b(generate|create|draft|make|add|build|generate_collection|generate_prompt_items)\b",
-    re.IGNORECASE,
-)
-_PRACTICE_STOP_PATTERN = re.compile(
-    r"\b(stop|end|cancel|quit|leave|exit)\b",
-    re.IGNORECASE,
-)
-_PRACTICE_RECALL_PATTERN = re.compile(
-    r"\b(repeat|restate|remind)\b|"
-    r"\bwhat (?:is|was)\b.*\b(question|prompt)\b|"
-    r"\bshow\b.*\b(question|prompt)\b",
-    re.IGNORECASE,
-)
 
 
 @dataclass(slots=True)
@@ -602,7 +588,6 @@ class AssistantWorkflowService:
     ) -> _AssistantLoopResult:
         messages: list[dict[str, Any]] = [{"role": "system", "content": rendered_prompt.content}]
         tool_definitions = build_assistant_tool_definitions()
-        required_tool_name = _required_tool_name(history, practice_state)
         has_executed_tool = False
         for message in history:
             if message.role.value == "assistant":
@@ -633,17 +618,8 @@ class AssistantWorkflowService:
                     user_id=execution.actor.user_id,
                 ),
                 timeout_seconds=self._settings.llm_assistant_timeout_seconds,
-                tool_choice=required_tool_name
-                if required_tool_name and not has_executed_tool
-                else None,
             )
             if not completion.tool_calls:
-                if required_tool_name is not None and not has_executed_tool:
-                    raise validation_error(
-                        "Assistant ignored a required generation tool request",
-                        code="SS-VALIDATION-206",
-                        details={"required_tool_name": required_tool_name},
-                    )
                 final_response = (completion.content or "").strip()
                 if not final_response:
                     raise orchestration_error(
@@ -1031,15 +1007,12 @@ def _build_compact_learner_context(
     progress: dict[str, Any],
     attempts: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    generation_focused = _GENERATION_REQUEST_PATTERN.search(latest_user_message) is not None
     compact_profile = {
         key: profile.get(key)
         for key in ("display_name", "email", "organisation_id")
         if profile.get(key) is not None
     }
     context: dict[str, Any] = {"profile": compact_profile}
-    if generation_focused:
-        return context
     context["progress"] = _compact_progress_context(progress)
     context["recent_attempts"] = [
         {
@@ -1087,64 +1060,25 @@ def _compact_progress_context(progress: dict[str, Any]) -> dict[str, Any]:
 
 
 def _required_tool_name(history: list[Any], practice_state: AssistantPracticeState) -> str | None:
-    latest_user_message = _latest_user_message(history)
-    if practice_state.is_active() and _is_practice_recall_message(latest_user_message):
-        return "get_active_practice"
-    if practice_state.is_active() and not _is_practice_control_message(latest_user_message):
-        return "submit_active_practice_response"
-    return _required_generation_tool_name(latest_user_message)
+    return None
 
 
-def _required_generation_tool_name(latest_user_message: str) -> str | None:
-    if not latest_user_message or _GENERATION_REQUEST_PATTERN.search(latest_user_message) is None:
+def _should_rewrite_final_response(
+    *,
+    raw_tool_calls: list[Any],
+    error: ValidationError,
+) -> str | None:
+    generation_tool_names = {
+        str(getattr(tool_call, "tool_name", "")) for tool_call in raw_tool_calls
+    } & {"generate_collection", "generate_prompt_items"}
+    if not generation_tool_names:
         return None
-    lowered = latest_user_message.lower()
-    if "generate_prompt_items" in lowered:
-        return (
-            "generate_prompt_items"
-            if _has_sufficient_generation_detail(lowered, tool_name="generate_prompt_items")
-            else None
-        )
-    if "generate_collection" in lowered:
-        return (
-            "generate_collection"
-            if _has_sufficient_generation_detail(lowered, tool_name="generate_collection")
-            else None
-        )
-    if "prompt item" in lowered or "prompt-item" in lowered:
-        return (
-            "generate_prompt_items"
-            if _has_sufficient_generation_detail(lowered, tool_name="generate_prompt_items")
-            else None
-        )
     return (
-        "generate_collection"
-        if _has_sufficient_generation_detail(lowered, tool_name="generate_collection")
-        else None
+        "I can generate that, but I need valid platform-ready generation inputs first. "
+        "Please give me at least one real skill or competency to target, or ask me to pick from "
+        "your weak skills. Use platform content formats only: "
+        "`quick_practice_prompt`, `interview_prompt`, or `scenario_step`."
     )
-
-
-def _has_sufficient_generation_detail(message: str, *, tool_name: str) -> bool:
-    if "generate_collection" in message or "generate_prompt_items" in message:
-        return True
-
-    detail_signals = 0
-    signal_groups = (
-        ("difficulty", "introductory", "intermediate", "advanced"),
-        ("target audience", "audience", "for ", "for early-career", "for managers"),
-        ("skill", "skills", "competency", "competencies"),
-        ("rubric", "rubrics"),
-        ("count", "counts", "one ", "two ", "three ", "4 ", "5 "),
-        ("interview_prompt", "quick_practice_prompt", "scenario", "content_format_mix"),
-    )
-    for group in signal_groups:
-        if any(token in message for token in group):
-            detail_signals += 1
-
-    if tool_name == "generate_prompt_items" and "collection" in message:
-        detail_signals += 1
-
-    return detail_signals >= 2
 
 
 def _generation_clarification_for_invalid_tool_request(
@@ -1198,23 +1132,12 @@ def _should_rewrite_final_response(
     return any(message.get("role") == "tool" for message in planning_messages)
 
 
-def _is_practice_control_message(message: str) -> bool:
-    return bool(message and _PRACTICE_STOP_PATTERN.search(message))
-
-
-def _is_practice_recall_message(message: str) -> bool:
-    return bool(message and _PRACTICE_RECALL_PATTERN.search(message))
-
-
 def _latest_user_message(history: list[Any]) -> str:
-    return next(
-        (
-            str(message.content)
-            for message in reversed(history)
-            if getattr(getattr(message, "role", None), "value", None) == "user"
-        ),
-        "",
-    )
+    for entry in reversed(history):
+        content = getattr(entry, "content", None)
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+    return ""
 
 
 def _utcnow() -> datetime:

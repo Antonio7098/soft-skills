@@ -273,7 +273,7 @@ function mapCompetencyProgress(
         const linkedCompetency = taxonomy.competencies.find(
           (item) => item.slug === competencyState.competency_slug,
         );
-        return linkedCompetency?.skills.some((skill) => skill.slug === skillState.skill_slug) ?? false;
+        return linkedCompetency?.skills?.some((skill) => skill.slug === skillState.skill_slug) ?? false;
       })
       .map((skillState) => {
         const skill = taxonomy.skills.find((item) => item.slug === skillState.skill_slug);
@@ -476,6 +476,7 @@ export const apiDataProvider: DataProvider = {
         current_attempt_id: null,
         started_at: raw.started_at,
         completed_at: raw.completed_at,
+        overall_score: raw.overall_score_average ?? null,
         items: [], // Items loaded separately via getPracticeRun
         summary: {
           total_items: raw.total_items,

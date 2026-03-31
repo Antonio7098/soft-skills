@@ -31,10 +31,6 @@ export function VoiceInputButton({ onTranscript, disabled = false, className }: 
     }
   }, [error]);
 
-  useEffect(() => {
-    setIsPulsing(isListening);
-  }, [isListening]);
-
   const handleClick = useCallback(async () => {
     if (isListening) {
       stop();

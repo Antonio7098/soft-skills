@@ -193,6 +193,17 @@ _BUILTIN_SUITES: tuple[BuiltinEvaluationSuite, ...] = (
         ),
         dataset_artifact="quick_practice_golden_dataset.v1.json",
     ),
+    BuiltinEvaluationSuite(
+        suite_id="consultancy_fundamentals_v1",
+        suite_type=EvaluationSuiteType.MARKING_GOLDEN_DATASET,
+        suite_version="evaluation-suite.consultancy-fundamentals.v1",
+        benchmark_set_version="consultancy_fundamentals.v1",
+        description=(
+            "Consultancy fundamentals golden dataset with quick practice, interview, "
+            "and scenario cases."
+        ),
+        dataset_artifact="consultancy_fundamentals.v1.json",
+    ),
 )
 
 

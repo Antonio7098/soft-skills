@@ -265,7 +265,7 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
         }, GENERATION_TIMEOUT_MS);
 
         cleanupRef.current = data.streamGeneration(started.stream_token, {
-          onEvent: (event) => {
+           onEvent: (event: GenerationStreamEvent) => {
             if (timeoutRef.current) {
               clearTimeout(timeoutRef.current);
               timeoutRef.current = setTimeout(() => {
@@ -306,7 +306,7 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
               }
             }
           },
-          onCompleted: async (payload) => {
+           onCompleted: async (payload: unknown) => {
             if (timeoutRef.current) {
               clearTimeout(timeoutRef.current);
               timeoutRef.current = null;
@@ -327,7 +327,7 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
               options.onError?.(errorMessage);
             }
           },
-          onFailed: (payload) => {
+           onFailed: (payload: unknown) => {
             if (timeoutRef.current) {
               clearTimeout(timeoutRef.current);
               timeoutRef.current = null;
@@ -341,7 +341,7 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
             dispatch({ type: 'FAIL', error: errorMessage });
             options.onError?.(errorMessage);
           },
-          onError: (errorMessage) => {
+           onError: (errorMessage: string) => {
             if (timeoutRef.current) {
               clearTimeout(timeoutRef.current);
               timeoutRef.current = null;

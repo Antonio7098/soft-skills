@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   ScrollText,
   Filter,
@@ -6,6 +6,8 @@ import {
   Clock,
   ChevronRight,
   X,
+  ChevronDown,
+  Layers,
 } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
@@ -32,6 +34,8 @@ export function AdminAudit() {
   const pageSize = 20;
   const [selectedEvent, setSelectedEvent] = useState<WorkflowEventView | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [wideEvents, setWideEvents] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setLoading(true);
@@ -120,6 +124,37 @@ export function AdminAudit() {
   const totalPages = events ? Math.ceil(events.total / pageSize) : 1;
   const errorCount = events?.items.filter((e) => e.error_code).length || 0;
 
+  const groupedEvents = useMemo(() => {
+    if (!events?.items) return [];
+    const groups = new Map<string, WorkflowEventView[]>();
+    for (const event of events.items) {
+      const key = event.trace_id || event.workflow_id || event.event_id;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(event);
+    }
+    return Array.from(groups.entries()).map(([key, items]) => {
+      const sorted = [...items].sort((a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime());
+      return {
+        key,
+        items: sorted,
+        count: items.length,
+        hasError: items.some((e) => e.error_code),
+        firstAt: sorted[0].occurred_at,
+        lastAt: sorted[sorted.length - 1].occurred_at,
+        eventTypes: [...new Set(items.map((e) => e.event_type))],
+      };
+    });
+  }, [events]);
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   if (loading && !events) {
     return (
       <AdminPageShell title="Audit Logs" subtitle="System event tracking">
@@ -173,18 +208,138 @@ export function AdminAudit() {
             className="w-48"
           />
           <div className="flex-1" />
+          <button
+            onClick={() => setWideEvents((prev) => !prev)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-body-xs font-medium transition-colors ${
+              wideEvents
+                ? 'bg-accent/10 text-accent border border-accent/20'
+                : 'bg-surface-secondary text-content-secondary border border-line hover:border-line-strong'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Wide Events
+          </button>
           <span className="text-body-xs text-content-tertiary">
             {events?.total || 0} total events
           </span>
         </div>
       </Card>
 
-      <DataTable
-        columns={columns}
-        data={events?.items || []}
-        keyExtractor={(event) => event.event_id}
-        emptyMessage="No events found"
-      />
+      {wideEvents ? (
+        <Card className="overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-line">
+                <th className="text-left px-4 py-3 text-body-xs font-medium text-content-tertiary">Event Types</th>
+                <th className="text-left px-4 py-3 text-body-xs font-medium text-content-tertiary">Trace ID</th>
+                <th className="text-left px-4 py-3 text-body-xs font-medium text-content-tertiary w-20">Events</th>
+                <th className="text-left px-4 py-3 text-body-xs font-medium text-content-tertiary w-24">Error</th>
+                <th className="text-left px-4 py-3 text-body-xs font-medium text-content-tertiary w-40">Time Range</th>
+                <th className="w-10" />
+              </tr>
+            </thead>
+            <tbody>
+              {groupedEvents.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-content-tertiary">No events found</td>
+                </tr>
+              ) : (
+                groupedEvents.map((group) => (
+                  <React.Fragment key={group.key}>
+                    <tr
+                      className="border-b border-line hover:bg-surface-secondary/50 cursor-pointer"
+                      onClick={() => toggleGroup(group.key)}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {group.eventTypes.map((type) => (
+                            <div key={type} className="flex items-center gap-1.5">
+                              <div className={`w-2 h-2 rounded-full ${group.hasError ? 'bg-status-error' : 'bg-status-success'}`} />
+                              <span className="text-body-sm font-medium">{type}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-body-xs text-content-secondary">
+                          {group.key.slice(0, 16)}...
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="default" size="sm">{group.count}</Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        {group.hasError ? (
+                          <Badge variant="error" size="sm">Error</Badge>
+                        ) : (
+                          <span className="text-content-tertiary">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-body-xs text-content-secondary">
+                          {new Date(group.firstAt).toLocaleTimeString()} — {new Date(group.lastAt).toLocaleTimeString()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button className="p-1 rounded hover:bg-surface-secondary">
+                          {expandedGroups.has(group.key) ? (
+                            <ChevronDown className="w-4 h-4 text-content-tertiary" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-content-tertiary" />
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedGroups.has(group.key) && group.items.map((event) => (
+                      <tr key={event.event_id} className="bg-surface-secondary/30 border-b border-line/50">
+                        <td className="px-4 py-2 pl-10">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${event.error_code ? 'bg-status-error' : 'bg-status-success'}`} />
+                            <span className="text-body-sm">{event.event_type}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className="font-mono text-body-xs text-content-tertiary">
+                            {event.trace_id?.slice(0, 16) || '—'}...
+                          </span>
+                        </td>
+                        <td className="px-4 py-2" />
+                        <td className="px-4 py-2">
+                          {event.error_code ? (
+                            <Badge variant="error" size="sm">{event.error_code}</Badge>
+                          ) : (
+                            <span className="text-content-tertiary">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className="text-body-xs text-content-tertiary">
+                            {new Date(event.occurred_at).toLocaleTimeString()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedEvent(event); setShowDetailModal(true); }}
+                            className="p-1 rounded hover:bg-surface-secondary"
+                          >
+                            <ChevronRight className="w-4 h-4 text-content-tertiary" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))
+              )}
+            </tbody>
+          </table>
+        </Card>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={events?.items || []}
+          keyExtractor={(event) => event.event_id}
+          emptyMessage="No events found"
+        />
+      )}
 
       <Pagination
         currentPage={page}

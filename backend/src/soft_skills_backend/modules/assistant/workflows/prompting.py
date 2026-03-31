@@ -117,14 +117,9 @@ def build_assistant_tool_definitions() -> list[ProviderToolDefinition]:
         ProviderToolDefinition(
             name="query_user_context",
             description=(
-                "Run one read-only SELECT query against assistant_safe_* views to fetch learner "
-                "history, progress, attempts, collections, skills, or any platform data. "
-                "ALWAYS use this tool proactively instead of asking the user for information. "
-                "Examples: list collections (SELECT title, difficulty, rating_count FROM "
-                "assistant_safe_collections_v), find recent attempts (SELECT attempt_id, "
-                "practice_type, overall_score FROM assistant_safe_attempt_summaries_v ORDER BY "
-                "created_at DESC LIMIT 5), check scores, browse available content. "
-                "Never ask the user for an ID or name — look it up yourself first."
+                "Run a read-only SELECT query against assistant_safe_* views to fetch learner "
+                "data like collections, progress, attempts, or profiles. Look things up yourself "
+                "before asking the user."
             ),
             parameters=normalize_strict_json_schema(QueryUserContextToolArgs.model_json_schema()),
         ),
@@ -155,8 +150,8 @@ def build_assistant_tool_definitions() -> list[ProviderToolDefinition]:
         ProviderToolDefinition(
             name="generate_collection",
             description=(
-                "Generate a new collection when the learner has supplied enough concrete generation "
-                "inputs to execute."
+                "Generate a new collection. If key details are missing, ask a short "
+                "clarifying question or use your best judgment to fill gaps."
             ),
             parameters=normalize_strict_json_schema(
                 ChatCollectionGenerationCommand.model_json_schema()
@@ -165,8 +160,8 @@ def build_assistant_tool_definitions() -> list[ProviderToolDefinition]:
         ProviderToolDefinition(
             name="generate_prompt_items",
             description=(
-                "Generate prompt items inside an existing collection when the learner has supplied "
-                "enough concrete generation inputs to execute."
+                "Generate prompt items in an existing collection. If key details are missing, "
+                "ask a short clarifying question or use your best judgment to fill gaps."
             ),
             parameters=normalize_strict_json_schema(
                 ChatPromptItemGenerationCommand.model_json_schema()

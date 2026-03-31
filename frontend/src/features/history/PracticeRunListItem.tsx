@@ -61,42 +61,11 @@ export function PracticeRunListItem({ run }: PracticeRunListItemProps) {
             <h4 className="text-body-sm font-medium text-content-primary">
               Practice Session
             </h4>
-            {run.overall_score !== null && (
+            {run.overall_score !== null && run.overall_score !== undefined ? (
               <Badge variant={run.overall_score >= 4 ? 'success' : run.overall_score >= 3 ? 'accent' : 'warning'} size="sm">
                 {run.overall_score}/5
               </Badge>
-            )}
-          </div>
-          <div className="flex items-center gap-3 text-body-xs text-content-tertiary">
-            <span>{formatted}</span>
-            <div className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              <span>{time}</span>
-            </div>
-            <span>{run.completed_items}/{run.total_items} completed</span>
-          </div>
-        </div>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          onClick={(e) => {
-            e.stopPropagation();
-            setExpanded(!expanded);
-          }}
-        >
-          {run.validated_items} {run.validated_items === 1 ? 'question' : 'questions'}
-        </Button>
-      </div>
-
-        {expanded && (
-        <div className="border-t border-line bg-surface-secondary/30">
-          {!itemsLoaded ? (
-            <div className="p-4 text-center text-body-xs text-content-tertiary">Loading questions...</div>
-          ) : items.length === 0 ? (
-            <div className="p-4 text-center text-body-xs text-content-tertiary">No assessed questions yet</div>
-          ) : (
+            ) : (
             items.map((item, idx) => (
               <div
                 key={`${item.id}-${idx}`}
