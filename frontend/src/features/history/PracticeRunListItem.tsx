@@ -19,8 +19,6 @@ export function PracticeRunListItem({ run }: PracticeRunListItemProps) {
   const [itemsLoaded, setItemsLoaded] = useState(false);
 
   const date = new Date(run.started_at);
-  const formatted = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  const time = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
   useEffect(() => {
     if (expanded && !itemsLoaded && items.length === 0) {

@@ -247,10 +247,13 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                             cast(dict[str, object], payload["response_format"])["type"]
                         ),
                     )
-                    if _is_retryable_structured_output_failure(
-                        status_code=response.status_code,
-                        error_message=error_message,
-                    ) and attempt < max_retries:
+                    if (
+                        _is_retryable_structured_output_failure(
+                            status_code=response.status_code,
+                            error_message=error_message,
+                        )
+                        and attempt < max_retries
+                    ):
                         await asyncio.sleep(
                             self._settings.provider_retry_backoff_seconds * (attempt + 1)
                         )
