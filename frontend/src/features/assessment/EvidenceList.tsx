@@ -9,6 +9,7 @@ interface EvidenceListProps {
 }
 
 export function EvidenceList({ perSkillAssessments }: EvidenceListProps) {
+  if (!perSkillAssessments) return null;
   const allEvidence = perSkillAssessments.flatMap((psa) =>
     psa.evidence.map((e) => ({ ...e, skill_slug: psa.skill_slug })),
   );

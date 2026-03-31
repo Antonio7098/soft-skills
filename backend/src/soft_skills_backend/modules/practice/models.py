@@ -227,6 +227,15 @@ class PracticeRunListItemView(BaseModel):
     completed_at: str | None = None
 
 
+class AttemptQuestionSummaryView(BaseModel):
+    """Per-question summary within an attempt."""
+
+    question_index: int
+    question_text: str
+    score: float | None = None
+    skill_slugs: list[str] = Field(default_factory=list)
+
+
 class AttemptHistoryItemView(BaseModel):
     """Compact learner history row."""
 
@@ -238,6 +247,7 @@ class AttemptHistoryItemView(BaseModel):
     skill_slugs: list[str] = Field(default_factory=list)
     created_at: str
     status: AttemptStatus
+    questions: list[AttemptQuestionSummaryView] = Field(default_factory=list)
 
 
 class StartPracticeSessionCommand(BaseModel):
@@ -377,9 +387,7 @@ class StartScenarioRunItemCommand(BaseModel):
 
 
 PracticeRunItemCommand = Annotated[
-    StartQuickPracticeRunItemCommand
-    | StartInterviewRunItemCommand
-    | StartScenarioRunItemCommand,
+    StartQuickPracticeRunItemCommand | StartInterviewRunItemCommand | StartScenarioRunItemCommand,
     Field(discriminator="practice_type"),
 ]
 
@@ -402,5 +410,6 @@ class SubmitAttemptCommand(BaseModel):
         if not cleaned:
             raise ValueError("response_text must not be blank")
         return cleaned
+
 
 AttemptView = PracticeAttemptView

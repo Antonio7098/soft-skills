@@ -19,18 +19,26 @@ interface GenerationMeta {
 function extractGenerationMeta(toolCall: AssistantToolCallView): GenerationMeta {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result: Record<string, any> = toolCall.result ?? {};
+  // Server wraps generation data under result.generation; mock puts it at result level
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const generation: Record<string, any> = result['generation'] ?? {};
 
   const blueprint: BlueprintInfo | null =
     (result['blueprint'] as BlueprintInfo | undefined) ??
+    (generation['blueprint'] as BlueprintInfo | undefined) ??
     (result['collection']?.['blueprint'] as BlueprintInfo | undefined) ??
     null;
   const promptItems: PromptItemDraft[] =
-    (result['prompt_items'] as PromptItemDraft[] | undefined) ?? [];
+    (result['prompt_items'] as PromptItemDraft[] | undefined) ??
+    (generation['prompt_items'] as PromptItemDraft[] | undefined) ??
+    [];
   const progress: number =
     (result['progress_percent'] as number | undefined) ??
+    (generation['progress_percent'] as number | undefined) ??
     (toolCall.status === 'completed' ? 100 : toolCall.status === 'running' ? 35 : 0);
   const currentStage: GenerationStage | null =
     (result['current_stage'] as GenerationStage | undefined) ??
+    (generation['current_stage'] as GenerationStage | undefined) ??
     (toolCall.status === 'running' ? 'prompt_items_work' : null);
 
   return { blueprint, promptItems, currentStage, progress };

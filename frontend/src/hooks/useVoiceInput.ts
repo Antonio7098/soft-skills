@@ -3,6 +3,7 @@
  *
  * Architecture:
  * - Chrome/Edge: Uses native Web Speech API (continuous, interim results)
+ * - On 'network' error from Web Speech API: Falls back to Deepgram WebSocket
  * - Other browsers: Uses WebSocket to backend which streams to Deepgram
  *
  * WebSocket protocol:
@@ -46,6 +47,8 @@ export function useVoiceInput({ onTranscript, language = 'en-US' }: UseVoiceInpu
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
+  const onTranscriptRef = useRef(onTranscript);
+  onTranscriptRef.current = onTranscript;
 
   const stop = useCallback(() => {
     if (recognitionRef.current) {
@@ -71,6 +74,78 @@ export function useVoiceInput({ onTranscript, language = 'en-US' }: UseVoiceInpu
 
     setIsListening(false);
   }, []);
+
+  const startDeepgramFallback = useCallback(async (existingStream?: MediaStream) => {
+    let stream = existingStream;
+    if (!stream) {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+    streamRef.current = stream;
+
+    const userId = sessionStorage.getItem('ss_user_id');
+    const orgId = sessionStorage.getItem('ss_active_organisation_id');
+    const params = new URLSearchParams();
+    if (userId) params.set('user_id', userId);
+    if (orgId) params.set('organisation_id', orgId);
+
+    const wsUrl = `${API_BASE.replace(/^http/, 'ws')}/voice/transcribe-ws?${params.toString()}`;
+    const ws = new WebSocket(wsUrl);
+    websocketRef.current = ws;
+
+    const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    mediaRecorderRef.current = mediaRecorder;
+
+    ws.onopen = () => {
+      mediaRecorder.start(100);
+      setIsListening(true);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'close') {
+          stop();
+          return;
+        }
+
+        if (data.error) {
+          setError(data.error);
+          stop();
+          return;
+        }
+
+        if (data.text) {
+          onTranscriptRef.current(data.text, data.is_final);
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    ws.onerror = () => {
+      setError('WebSocket connection error');
+      stop();
+    };
+
+    ws.onclose = () => {
+      if (mediaRecorderRef.current?.state !== 'inactive') {
+        mediaRecorderRef.current?.stop();
+      }
+      setIsListening(false);
+    };
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+        ws.send(event.data);
+      }
+    };
+
+    mediaRecorder.onerror = (event) => {
+      setError(`Recording error: ${(event as Error).message || 'Unknown error'}`);
+      stop();
+    };
+  }, [stop]);
 
   const start = useCallback(async () => {
     setError(null);
@@ -104,11 +179,30 @@ export function useVoiceInput({ onTranscript, language = 'en-US' }: UseVoiceInpu
         }
       };
 
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        if (event.error !== 'no-speech') {
+      recognition.onerror = async (event: SpeechRecognitionErrorEvent) => {
+        if (event.error === 'no-speech') {
+          setError(null);
+          setIsListening(false);
+        } else if (event.error === 'network') {
+          // Fall back to Deepgram WebSocket transcription
+          recognitionRef.current = null;
+          try {
+            await startDeepgramFallback();
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            if (message.includes('Permission denied') || message.includes('NotAllowedError')) {
+              setError('Microphone permission denied. Please allow microphone access.');
+            } else if (message.includes('NotFoundError')) {
+              setError('No microphone found. Please connect a microphone.');
+            } else {
+              setError(message);
+            }
+            setIsListening(false);
+          }
+        } else {
           setError(event.error);
+          setIsListening(false);
         }
-        setIsListening(false);
       };
 
       recognition.onend = () => {
@@ -131,67 +225,7 @@ export function useVoiceInput({ onTranscript, language = 'en-US' }: UseVoiceInpu
       }
     } else {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        streamRef.current = stream;
-
-        const wsUrl = `${API_BASE.replace(/^http/, 'ws')}/voice/transcribe-ws`;
-        const ws = new WebSocket(wsUrl);
-        websocketRef.current = ws;
-
-        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-        mediaRecorderRef.current = mediaRecorder;
-
-        ws.onopen = () => {
-          mediaRecorder.start(100);
-          setIsListening(true);
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-
-            if (data.type === 'close') {
-              stop();
-              return;
-            }
-
-            if (data.error) {
-              setError(data.error);
-              stop();
-              return;
-            }
-
-            if (data.text) {
-              onTranscript(data.text, data.is_final);
-            }
-          } catch {
-            // Ignore parse errors
-          }
-        };
-
-        ws.onerror = () => {
-          setError('WebSocket connection error');
-          stop();
-        };
-
-        ws.onclose = () => {
-          if (mediaRecorderRef.current?.state !== 'inactive') {
-            mediaRecorderRef.current?.stop();
-          }
-          setIsListening(false);
-        };
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-            ws.send(event.data);
-          }
-        };
-
-        mediaRecorder.onerror = (event) => {
-          setError(`Recording error: ${(event as Error).message || 'Unknown error'}`);
-          stop();
-        };
-
+        await startDeepgramFallback();
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         if (message.includes('Permission denied') || message.includes('NotAllowedError')) {
@@ -204,7 +238,7 @@ export function useVoiceInput({ onTranscript, language = 'en-US' }: UseVoiceInpu
         stop();
       }
     }
-  }, [language, onTranscript, stop, isListening]);
+  }, [language, onTranscript, stop, isListening, startDeepgramFallback]);
 
   return {
     isListening,

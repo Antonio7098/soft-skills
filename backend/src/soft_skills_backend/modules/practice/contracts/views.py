@@ -18,6 +18,7 @@ from soft_skills_backend.modules.practice.domain.practice import (
 )
 from soft_skills_backend.modules.practice.models import (
     AttemptHistoryItemView,
+    AttemptQuestionSummaryView,
     AttemptView,
     PracticeAssessmentView,
     PracticeRunItemView,
@@ -85,20 +86,40 @@ def build_attempt_history_item(session: Session, attempt: AttemptRecord) -> Atte
         )
     prompt = PracticePromptView.model_validate(practice_session.prompt_payload)
     assessment = (
-        None if attempt.assessment_id is None else session.get(AssessmentRecord, attempt.assessment_id)
+        None
+        if attempt.assessment_id is None
+        else session.get(AssessmentRecord, attempt.assessment_id)
     )
     skill_slugs = list(prompt.target_skill_slugs)
+    questions: list[AttemptQuestionSummaryView] = []
     if assessment is not None and assessment.skill_scores:
-        skill_slugs = [str(item.get("skill_slug")) for item in assessment.skill_scores if item.get("skill_slug")]
+        skill_slugs = [
+            str(item.get("skill_slug"))
+            for item in assessment.skill_scores
+            if item.get("skill_slug")
+        ]
+        questions = [
+            AttemptQuestionSummaryView(
+                question_index=idx,
+                question_text=prompt.prompt_text,
+                score=float(item.get("score", 0)) if item.get("score") is not None else None,
+                skill_slugs=[str(item.get("skill_slug"))] if item.get("skill_slug") else [],
+            )
+            for idx, item in enumerate(assessment.skill_scores)
+            if item.get("skill_slug")
+        ]
     return AttemptHistoryItemView(
         id=attempt.id,
         session_id=attempt.session_id,
         title=prompt.title,
         practice_type=PracticeType(attempt.practice_type),
-        score=0.0 if assessment is None or assessment.overall_score is None else float(assessment.overall_score),
+        score=0.0
+        if assessment is None or assessment.overall_score is None
+        else float(assessment.overall_score),
         skill_slugs=skill_slugs,
         created_at=attempt.created_at.isoformat(),
         status=AttemptStatus(attempt.status),
+        questions=questions,
     )
 
 

@@ -76,6 +76,7 @@ export {
   type CompetencyProgressView,
   type SkillProgressView,
   type AttemptHistoryItem,
+  type AttemptQuestionSummary,
   type PracticeRunItemSummary,
   type PracticeRunSummary,
   type PracticeRunView,

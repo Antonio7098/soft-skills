@@ -353,6 +353,38 @@ export interface DataProvider {
     offset?: number;
     limit?: number;
   }): Promise<PaginatedWorkflowEventsView>;
+  listUnifiedAuditLog(params?: {
+    source?: string;
+    event_type?: string;
+    user_id?: string;
+    trace_id?: string;
+    workflow_id?: string;
+    request_id?: string;
+    error_code?: string;
+    search?: string;
+    from_date?: string;
+    to_date?: string;
+    sort_by?: string;
+    sort_order?: string;
+    offset?: number;
+    limit?: number;
+  }): Promise<PaginatedUnifiedAuditView>;
+  listUnifiedAuditLog(params?: {
+    source?: string;
+    event_type?: string;
+    user_id?: string;
+    trace_id?: string;
+    workflow_id?: string;
+    request_id?: string;
+    error_code?: string;
+    search?: string;
+    from_date?: string;
+    to_date?: string;
+    sort_by?: string;
+    sort_order?: string;
+    offset?: number;
+    limit?: number;
+  }): Promise<PaginatedUnifiedAuditView>;
   getWorkflowEvent(eventId: string): Promise<WorkflowEventView>;
   updateWorkflowEvent(
     eventId: string,

@@ -173,6 +173,14 @@ export interface AttemptHistoryItem {
   readonly skill_slugs: string[];
   readonly created_at: string;
   readonly status: AttemptStatus;
+  readonly questions?: AttemptQuestionSummary[];
+}
+
+export interface AttemptQuestionSummary {
+  readonly question_index: number;
+  readonly question_text: string;
+  readonly score: number | null;
+  readonly skill_slugs: string[];
 }
 
 export interface PracticeRunItemSummary {

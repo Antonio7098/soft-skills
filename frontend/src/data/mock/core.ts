@@ -837,14 +837,33 @@ export const SEED_CURRENT_USER: UserView = {
 };
 
 export const SEED_ATTEMPT_HISTORY: AttemptHistoryItem[] = [
-  { id: 'att-001', session_id: 'sess-001', title: 'Executive Summary: Project Status', practice_type: 'quick_practice', score: 4, skill_slugs: ['executive-summary', 'concise-explanation', 'structured-communication'], created_at: '2026-03-24T14:30:00Z', status: 'assessed' },
-  { id: 'att-002', session_id: 'sess-002', title: 'Saying No to Scope Creep', practice_type: 'quick_practice', score: 3, skill_slugs: ['expectation-setting', 'negotiation', 'conflict-handling'], created_at: '2026-03-23T10:15:00Z', status: 'assessed' },
-  { id: 'att-003', session_id: 'sess-003', title: 'Active Listening: Team Standup', practice_type: 'quick_practice', score: 5, skill_slugs: ['active-listening', 'empathy', 'structured-communication'], created_at: '2026-03-22T16:45:00Z', status: 'assessed' },
-  { id: 'att-004', session_id: 'sess-004', title: 'Tell me about a time you handled conflict', practice_type: 'quick_practice', score: 4, skill_slugs: ['conflict-handling', 'negotiation', 'structured-communication'], created_at: '2026-03-21T09:00:00Z', status: 'assessed' },
-  { id: 'att-005', session_id: 'sess-005', title: 'Prioritization Under Pressure', practice_type: 'quick_practice', score: 3, skill_slugs: ['prioritization-under-pressure', 'decision-justification', 'concise-explanation'], created_at: '2026-03-20T11:30:00Z', status: 'assessed' },
-  { id: 'att-006', session_id: 'sess-006', title: 'Executive Summary: Project Status', practice_type: 'quick_practice', score: 3, skill_slugs: ['executive-summary', 'concise-explanation', 'structured-communication'], created_at: '2026-03-19T15:00:00Z', status: 'assessed' },
-  { id: 'att-007', session_id: 'sess-007', title: 'Active Listening: Team Standup', practice_type: 'quick_practice', score: 4, skill_slugs: ['active-listening', 'empathy', 'structured-communication'], created_at: '2026-03-18T13:20:00Z', status: 'assessed' },
-  { id: 'att-008', session_id: 'sess-008', title: 'Saying No to Scope Creep', practice_type: 'quick_practice', score: 2, skill_slugs: ['expectation-setting', 'negotiation', 'conflict-handling'], created_at: '2026-03-17T10:00:00Z', status: 'assessed' },
+  { id: 'att-001', session_id: 'sess-001', title: 'Executive Summary: Project Status', practice_type: 'quick_practice', score: 4, skill_slugs: ['executive-summary', 'concise-explanation', 'structured-communication'], created_at: '2026-03-24T14:30:00Z', status: 'assessed', questions: [
+    { question_index: 0, question_text: 'Give me a brief status update on your project.', score: 4, skill_slugs: ['executive-summary', 'concise-explanation'] },
+    { question_index: 1, question_text: 'What are the main risks you are facing?', score: 4, skill_slugs: ['structured-communication', 'risk-communication'] },
+  ]},
+  { id: 'att-002', session_id: 'sess-002', title: 'Saying No to Scope Creep', practice_type: 'quick_practice', score: 3, skill_slugs: ['expectation-setting', 'negotiation', 'conflict-handling'], created_at: '2026-03-23T10:15:00Z', status: 'assessed', questions: [
+    { question_index: 0, question_text: 'Your stakeholder is asking for an extra feature. How do you respond?', score: 3, skill_slugs: ['expectation-setting', 'negotiation'] },
+  ]},
+  { id: 'att-003', session_id: 'sess-003', title: 'Active Listening: Team Standup', practice_type: 'quick_practice', score: 5, skill_slugs: ['active-listening', 'empathy', 'structured-communication'], created_at: '2026-03-22T16:45:00Z', status: 'assessed', questions: [
+    { question_index: 0, question_text: 'A team member is struggling with their task. How do you respond?', score: 5, skill_slugs: ['active-listening', 'empathy'] },
+    { question_index: 1, question_text: 'Summarize what you heard from your team member.', score: 5, skill_slugs: ['active-listening', 'structured-communication'] },
+  ]},
+  { id: 'att-004', session_id: 'sess-004', title: 'Tell me about a time you handled conflict', practice_type: 'quick_practice', score: 4, skill_slugs: ['conflict-handling', 'negotiation', 'structured-communication'], created_at: '2026-03-21T09:00:00Z', status: 'assessed', questions: [
+    { question_index: 0, question_text: 'Describe a time you handled a conflict with a colleague.', score: 4, skill_slugs: ['conflict-handling', 'structured-communication'] },
+  ]},
+  { id: 'att-005', session_id: 'sess-005', title: 'Prioritization Under Pressure', practice_type: 'quick_practice', score: 3, skill_slugs: ['prioritization-under-pressure', 'decision-justification', 'concise-explanation'], created_at: '2026-03-20T11:30:00Z', status: 'assessed', questions: [
+    { question_index: 0, question_text: 'You have five urgent tasks. How do you prioritize?', score: 3, skill_slugs: ['prioritization-under-pressure', 'decision-justification'] },
+    { question_index: 1, question_text: 'Explain your reasoning for the prioritization.', score: 3, skill_slugs: ['concise-explanation', 'decision-justification'] },
+  ]},
+  { id: 'att-006', session_id: 'sess-006', title: 'Executive Summary: Project Status', practice_type: 'quick_practice', score: 3, skill_slugs: ['executive-summary', 'concise-explanation', 'structured-communication'], created_at: '2026-03-19T15:00:00Z', status: 'assessed', questions: [
+    { question_index: 0, question_text: 'Give me a brief status update on your project.', score: 3, skill_slugs: ['executive-summary', 'concise-explanation'] },
+  ]},
+  { id: 'att-007', session_id: 'sess-007', title: 'Active Listening: Team Standup', practice_type: 'quick_practice', score: 4, skill_slugs: ['active-listening', 'empathy', 'structured-communication'], created_at: '2026-03-18T13:20:00Z', status: 'assessed', questions: [
+    { question_index: 0, question_text: 'A team member is struggling with their task. How do you respond?', score: 4, skill_slugs: ['active-listening', 'empathy'] },
+  ]},
+  { id: 'att-008', session_id: 'sess-008', title: 'Saying No to Scope Creep', practice_type: 'quick_practice', score: 2, skill_slugs: ['expectation-setting', 'negotiation', 'conflict-handling'], created_at: '2026-03-17T10:00:00Z', status: 'assessed', questions: [
+    { question_index: 0, question_text: 'Your stakeholder is asking for an extra feature. How do you respond?', score: 2, skill_slugs: ['expectation-setting', 'negotiation'] },
+  ]},
 ];
 
 export const SEED_COMPETENCY_PROGRESS: CompetencyProgressView[] = SEED_COMPETENCIES.map((comp) => {

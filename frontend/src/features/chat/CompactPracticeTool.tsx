@@ -37,10 +37,30 @@ function extractPracticeMeta(toolCall: AssistantToolCallView): PracticeMeta {
   const phase = mapPhase(status, toolCall);
   const sessionType = (practice['session_type'] as string | undefined) ?? null;
   const collectionTitle = (practice['collection_title'] as string | undefined) ?? null;
-  const currentStep = (practice['current_step'] as number | undefined) ?? 1;
-  const totalSteps = (practice['total_steps'] as number | undefined) ?? 1;
+
+  // Support both flat (mock) and nested (server) current_question shapes
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const currentQuestion: Record<string, any> = (practice['current_question'] as Record<string, any> | undefined) ?? {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const state: Record<string, any> = (practice['state'] as Record<string, any> | undefined) ?? {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prompt: Record<string, any> = (currentQuestion['prompt'] as Record<string, any> | undefined) ?? {};
+
+  const currentStep =
+    (practice['current_step'] as number | undefined) ??
+    (currentQuestion['position'] as number | undefined) ??
+    (state['current_position'] as number | undefined) ??
+    1;
+  const totalSteps =
+    (practice['total_steps'] as number | undefined) ??
+    (currentQuestion['total_items'] as number | undefined) ??
+    (state['total_items'] as number | undefined) ??
+    1;
   const score = (practice['overall_score'] as number | undefined) ?? null;
-  const promptTitle = (practice['current_prompt_title'] as string | undefined) ?? null;
+  const promptTitle =
+    (practice['current_prompt_title'] as string | undefined) ??
+    (prompt['title'] as string | undefined) ??
+    null;
 
   return { phase, sessionType, collectionTitle, currentStep, totalSteps, score, promptTitle };
 }

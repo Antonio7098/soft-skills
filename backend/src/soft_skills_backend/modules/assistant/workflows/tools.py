@@ -148,6 +148,7 @@ class AssistantToolExecutor:
                 tool_request=tool_request,
                 tool_call_id=tool_call.id,
                 emitted_at=tool_call.started_at,
+                args_payload=arguments_payload,
             )
             result_payload, child_run_id = await self._dispatch_tool(
                 stage_ctx=stage_ctx,
@@ -159,19 +160,30 @@ class AssistantToolExecutor:
                 result_payload=result_payload,
                 child_run_id=child_run_id,
             )
+            completed_at = completed.completed_at or completed.started_at
             await self._broker.publish(
                 execution.stream_token,
                 self._repository.create_stream_event(
                     turn_id=execution.turn_id,
                     event_type="tool.completed",
                     payload={
+                        "id": completed.id,
                         "tool_call_id": completed.id,
+                        "turn_id": completed.turn_id,
                         "call_id": tool_request.call_id,
                         "tool_name": completed.tool_name,
-                        "result": result_payload,
-                        "child_run_id": child_run_id,
+                        "status": "completed",
+                        "args": completed.args,
+                        "result": completed.result,
+                        "error_code": None,
+                        "error_message": None,
+                        "child_run_id": completed.child_run_id,
+                        "started_at": completed.started_at.isoformat()
+                        if completed.started_at
+                        else None,
+                        "completed_at": completed_at.isoformat() if completed_at else None,
                     },
-                    emitted_at=completed.completed_at or completed.started_at,
+                    emitted_at=completed_at,
                 ),
             )
             return ToolPromptResult(
@@ -195,6 +207,7 @@ class AssistantToolExecutor:
                 tool_request=tool_request,
                 tool_call_id=failed.id,
                 error=app_error,
+                tool_call=failed,
             )
             raise app_error from exc
         except AppError as exc:
@@ -208,6 +221,7 @@ class AssistantToolExecutor:
                 tool_request=tool_request,
                 tool_call_id=failed.id,
                 error=exc,
+                tool_call=failed,
             )
             raise exc
         except Exception as exc:  # pragma: no cover - defensive wrapper
@@ -226,6 +240,7 @@ class AssistantToolExecutor:
                 tool_request=tool_request,
                 tool_call_id=failed.id,
                 error=app_error,
+                tool_call=failed,
             )
             raise app_error from exc
 
@@ -362,7 +377,9 @@ class AssistantToolExecutor:
             return {"practice": practice_result.model_dump(mode="json")}, None
         if tool_request.tool_name == "generate_collection":
             command = ChatCollectionGenerationCommand.model_validate(arguments)
-            taxonomy_service = getattr(getattr(self._catalog, "_generation", None), "_taxonomy_service", None)
+            taxonomy_service = getattr(
+                getattr(self._catalog, "_generation", None), "_taxonomy_service", None
+            )
             if taxonomy_service is not None:
                 command = _normalize_collection_generation_command(
                     command,
@@ -500,17 +517,31 @@ class AssistantToolExecutor:
         tool_request: AssistantToolRequest,
         tool_call_id: str,
         emitted_at: Any,
+        args_payload: dict[str, Any] | None = None,
     ) -> None:
+        emitted_at_str = (
+            emitted_at.isoformat() if hasattr(emitted_at, "isoformat") else str(emitted_at)
+        )
         await self._broker.publish(
             execution.stream_token,
             self._repository.create_stream_event(
                 turn_id=execution.turn_id,
                 event_type="tool.started",
                 payload={
+                    "id": tool_call_id,
                     "tool_call_id": tool_call_id,
+                    "turn_id": execution.turn_id,
                     "call_id": tool_request.call_id,
                     "tool_name": tool_request.tool_name,
+                    "status": "running",
+                    "args": args_payload or tool_request.arguments_payload(),
                     "arguments": tool_request.arguments_payload(),
+                    "result": None,
+                    "error_code": None,
+                    "error_message": None,
+                    "child_run_id": None,
+                    "started_at": emitted_at_str,
+                    "completed_at": None,
                 },
                 emitted_at=emitted_at,
             ),
@@ -523,20 +554,37 @@ class AssistantToolExecutor:
         tool_request: AssistantToolRequest,
         tool_call_id: str,
         error: AppError,
+        tool_call: "AssistantToolCallView | None" = None,
     ) -> None:
+        now = stage_now()
+        now_str = now.isoformat() if hasattr(now, "isoformat") else str(now)
+        started_at = tool_call.started_at if tool_call else None
+        started_at_str = (
+            started_at.isoformat()
+            if started_at and hasattr(started_at, "isoformat")
+            else (str(started_at) if started_at else now_str)
+        )
         await self._broker.publish(
             execution.stream_token,
             self._repository.create_stream_event(
                 turn_id=execution.turn_id,
                 event_type="tool.failed",
                 payload={
+                    "id": tool_call_id,
                     "tool_call_id": tool_call_id,
+                    "turn_id": (tool_call.turn_id if tool_call else execution.turn_id),
                     "call_id": tool_request.call_id,
                     "tool_name": tool_request.tool_name,
+                    "status": "failed",
+                    "args": (tool_call.args if tool_call else tool_request.arguments_payload()),
+                    "result": None,
                     "error_code": error.code,
-                    "message": error.message,
+                    "error_message": error.message,
+                    "child_run_id": tool_call.child_run_id if tool_call else None,
+                    "started_at": started_at_str,
+                    "completed_at": now_str,
                 },
-                emitted_at=stage_now(),
+                emitted_at=now,
             ),
         )
 
@@ -575,17 +623,40 @@ def _summarize_generation_payload(payload: dict[str, Any]) -> dict[str, Any]:
     collection = payload.get("collection", {})
     prompt_items = collection.get("prompt_items", [])
     scenarios = collection.get("scenarios", [])
+    prompt_item_count = len(prompt_items) if isinstance(prompt_items, list) else 0
+    scenario_count = len(scenarios) if isinstance(scenarios, list) else 0
+    model_slug = payload.get("model_slug", "")
+    title = collection.get("title", "")
+
     return {
         "collection_id": collection.get("id"),
-        "title": collection.get("title"),
+        "title": title,
         "difficulty": collection.get("difficulty"),
         "content_format_mix": collection.get("content_format_mix", []),
-        "prompt_item_count": len(prompt_items) if isinstance(prompt_items, list) else 0,
-        "scenario_count": len(scenarios) if isinstance(scenarios, list) else 0,
+        "prompt_item_count": prompt_item_count,
+        "scenario_count": scenario_count,
         "generation_artifact_id": payload.get("generation_artifact_id"),
         "generation_mode": payload.get("generation_mode"),
         "provider": payload.get("provider"),
-        "model_slug": payload.get("model_slug"),
+        "model_slug": model_slug,
+        "blueprint": {
+            "title": title,
+            "summary": collection.get("summary", ""),
+            "prompt_items_count": prompt_item_count,
+            "scenarios_count": scenario_count,
+            "model_slug": model_slug,
+        },
+        "prompt_items": [
+            {
+                "title": item.get("title", ""),
+                "prompt_type": item.get("prompt_type", ""),
+                "difficulty": item.get("difficulty", ""),
+            }
+            for item in prompt_items
+            if isinstance(item, dict)
+        ],
+        "progress_percent": 100,
+        "current_stage": "completed",
     }
 
 
@@ -623,7 +694,10 @@ def _normalize_collection_generation_command(
             skill_slugs = aligned
 
     content_format_mix = list(dict.fromkeys(command.content_format_mix))
-    if command.counts.quick_practice_prompt_count > 0 and "quick_practice_prompt" not in content_format_mix:
+    if (
+        command.counts.quick_practice_prompt_count > 0
+        and "quick_practice_prompt" not in content_format_mix
+    ):
         content_format_mix.append("quick_practice_prompt")
     if command.counts.interview_prompt_count > 0 and "interview_prompt" not in content_format_mix:
         content_format_mix.append("interview_prompt")

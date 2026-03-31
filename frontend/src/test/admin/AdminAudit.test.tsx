@@ -21,7 +21,7 @@ vi.mock('@/features/admin/components', () => ({
   DataTable: ({ data, columns }: { data: any[]; columns: any[] }) => (
     <div data-testid="data-table">
       {data.map((item) => (
-        <div key={item.event_id} data-testid="event-row">
+        <div key={`${item.source}:${item.id}`} data-testid="audit-row">
           {item.event_type}
         </div>
       ))}
@@ -55,31 +55,43 @@ vi.mock('@/features/admin/components', () => ({
   ),
 }));
 
-const mockEvents = {
+const mockAuditData = {
   items: [
     {
-      event_id: 'evt-001',
+      id: 'evt-001',
+      source: 'workflow_event' as const,
       event_type: 'session.started',
+      user_id: 'user-001',
       trace_id: 'trace-aaa',
       workflow_id: 'wf-001',
+      request_id: null,
       error_code: null,
       occurred_at: '2026-03-31T10:00:00Z',
+      payload: {},
     },
     {
-      event_id: 'evt-002',
-      event_type: 'attempt.submitted',
+      id: 'pr-001',
+      source: 'pipeline_run' as const,
+      event_type: 'assessment_pipeline',
+      user_id: 'user-002',
       trace_id: 'trace-bbb',
-      workflow_id: 'wf-002',
-      error_code: 'SS-ERR-001',
+      workflow_id: null,
+      request_id: null,
+      error_code: null,
       occurred_at: '2026-03-31T11:00:00Z',
+      payload: { status: 'completed' },
     },
     {
-      event_id: 'evt-003',
-      event_type: 'pipeline.failed',
+      id: 'pc-001',
+      source: 'provider_call' as const,
+      event_type: 'chat.completion',
+      user_id: null,
       trace_id: 'trace-ccc',
-      workflow_id: 'wf-003',
-      error_code: 'SS-PIPE-002',
+      workflow_id: null,
+      request_id: null,
+      error_code: 'rate_limit',
       occurred_at: '2026-03-31T12:00:00Z',
+      payload: { provider: 'openai', model_id: 'gpt-4' },
     },
   ],
   total: 3,
@@ -87,7 +99,7 @@ const mockEvents = {
   limit: 20,
 };
 
-describe('AdminAudit Filtering', () => {
+describe('AdminAudit Unified Log', () => {
   const createAdminSession = () => createMockSession({
     status: 'authenticated',
     platform_role: 'admin',
@@ -98,11 +110,11 @@ describe('AdminAudit Filtering', () => {
     active_organisation_id: 'org-001',
   });
 
-  it('renders audit page with filter controls', async () => {
+  it('renders audit page with source filter and search', async () => {
     const mockSession = createAdminSession();
     const mockData = createMockDataProvider({
       getAuthSession: vi.fn().mockResolvedValue(mockSession),
-      listWorkflowEvents: vi.fn().mockResolvedValue(mockEvents),
+      listUnifiedAuditLog: vi.fn().mockResolvedValue(mockAuditData),
     });
 
     renderWithRouter(<AdminAudit />, { dataProvider: mockData, initialEntries: ['/admin/audit'] });
@@ -112,15 +124,39 @@ describe('AdminAudit Filtering', () => {
     });
 
     expect(screen.getAllByTestId('search-input')).toHaveLength(2);
-    expect(screen.getAllByTestId('filter-select')).toHaveLength(2);
+    expect(screen.getAllByTestId('filter-select')).toHaveLength(3);
   });
 
-  it('calls listWorkflowEvents with search param', async () => {
+  it('calls listUnifiedAuditLog with source filter', async () => {
     const mockSession = createAdminSession();
-    const listWorkflowEvents = vi.fn().mockResolvedValue(mockEvents);
+    const listUnifiedAuditLog = vi.fn().mockResolvedValue(mockAuditData);
     const mockData = createMockDataProvider({
       getAuthSession: vi.fn().mockResolvedValue(mockSession),
-      listWorkflowEvents,
+      listUnifiedAuditLog,
+    });
+
+    renderWithRouter(<AdminAudit />, { dataProvider: mockData, initialEntries: ['/admin/audit'] });
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('filter-select')).toHaveLength(3);
+    });
+
+    const filterSelects = screen.getAllByTestId('filter-select');
+    fireEvent.change(filterSelects[0], { target: { value: 'workflow_event' } });
+
+    await waitFor(() => {
+      expect(listUnifiedAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'workflow_event' })
+      );
+    });
+  });
+
+  it('calls listUnifiedAuditLog with search param', async () => {
+    const mockSession = createAdminSession();
+    const listUnifiedAuditLog = vi.fn().mockResolvedValue(mockAuditData);
+    const mockData = createMockDataProvider({
+      getAuthSession: vi.fn().mockResolvedValue(mockSession),
+      listUnifiedAuditLog,
     });
 
     renderWithRouter(<AdminAudit />, { dataProvider: mockData, initialEntries: ['/admin/audit'] });
@@ -133,78 +169,35 @@ describe('AdminAudit Filtering', () => {
     fireEvent.change(searchInputs[0], { target: { value: 'session' } });
 
     await waitFor(() => {
-      expect(listWorkflowEvents).toHaveBeenCalledWith(
+      expect(listUnifiedAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({ search: 'session' })
       );
     });
   });
 
-  it('calls listWorkflowEvents with event_type filter', async () => {
+  it('displays entries from multiple sources', async () => {
     const mockSession = createAdminSession();
-    const listWorkflowEvents = vi.fn().mockResolvedValue(mockEvents);
     const mockData = createMockDataProvider({
       getAuthSession: vi.fn().mockResolvedValue(mockSession),
-      listWorkflowEvents,
+      listUnifiedAuditLog: vi.fn().mockResolvedValue(mockAuditData),
     });
 
     renderWithRouter(<AdminAudit />, { dataProvider: mockData, initialEntries: ['/admin/audit'] });
 
     await waitFor(() => {
-      expect(screen.getAllByTestId('filter-select')).toHaveLength(2);
-    });
-
-    const filterSelects = screen.getAllByTestId('filter-select');
-    fireEvent.change(filterSelects[0], { target: { value: 'session.started' } });
-
-    await waitFor(() => {
-      expect(listWorkflowEvents).toHaveBeenCalledWith(
-        expect.objectContaining({ event_type: 'session.started' })
-      );
-    });
-  });
-
-  it('calls listWorkflowEvents with sort params', async () => {
-    const mockSession = createAdminSession();
-    const listWorkflowEvents = vi.fn().mockResolvedValue(mockEvents);
-    const mockData = createMockDataProvider({
-      getAuthSession: vi.fn().mockResolvedValue(mockSession),
-      listWorkflowEvents,
-    });
-
-    renderWithRouter(<AdminAudit />, { dataProvider: mockData, initialEntries: ['/admin/audit'] });
-
-    await waitFor(() => {
-      expect(listWorkflowEvents).toHaveBeenCalled();
-    });
-
-    const lastCall = listWorkflowEvents.mock.calls[listWorkflowEvents.mock.calls.length - 1][0];
-    expect(lastCall).toHaveProperty('sort_by');
-    expect(lastCall).toHaveProperty('sort_order');
-  });
-
-  it('displays events in data table', async () => {
-    const mockSession = createAdminSession();
-    const mockData = createMockDataProvider({
-      getAuthSession: vi.fn().mockResolvedValue(mockSession),
-      listWorkflowEvents: vi.fn().mockResolvedValue(mockEvents),
-    });
-
-    renderWithRouter(<AdminAudit />, { dataProvider: mockData, initialEntries: ['/admin/audit'] });
-
-    await waitFor(() => {
-      expect(screen.getAllByTestId('event-row')).toHaveLength(3);
+      expect(screen.getAllByTestId('audit-row')).toHaveLength(3);
     });
 
     expect(screen.getByText('session.started')).toBeInTheDocument();
-    expect(screen.getByText('attempt.submitted')).toBeInTheDocument();
-    expect(screen.getByText('pipeline.failed')).toBeInTheDocument();
+    expect(screen.getByText('assessment_pipeline')).toBeInTheDocument();
+    expect(screen.getByText('chat.completion')).toBeInTheDocument();
   });
 
   it('shows error count in metrics', async () => {
     const mockSession = createAdminSession();
     const mockData = createMockDataProvider({
       getAuthSession: vi.fn().mockResolvedValue(mockSession),
-      listWorkflowEvents: vi.fn().mockResolvedValue(mockEvents),
+      listUnifiedAuditLog: vi.fn().mockResolvedValue(mockAuditData),
     });
 
     renderWithRouter(<AdminAudit />, { dataProvider: mockData, initialEntries: ['/admin/audit'] });
