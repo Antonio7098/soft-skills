@@ -83,14 +83,14 @@ async def main():
     # Load base settings first
     base_settings = Settings()
     
-    # Override settings to use OpenRouter for gpt-oss-20b
+    # Override settings to use Groq with llama-3.3-70b-versatile
     settings = Settings(
-        provider_name="openrouter",
-        provider_api_key=base_settings.openrouter_api_key,
-        provider_base_url=base_settings.openrouter_base_url,
+        provider_name="groq",
+        provider_api_key=base_settings.groq_api_key,
+        provider_base_url=base_settings.groq_base_url,
         database_url=base_settings.database_url,
-        llm_marking_per_skill_model="openai/gpt-oss-20b",
-        llm_marking_aggregation_model="openai/gpt-oss-20b",
+        llm_marking_per_skill_model="llama-3.3-70b-versatile",
+        llm_marking_aggregation_model="llama-3.3-70b-versatile",
     )
     
     print(f"DEBUG: Using provider: {settings.provider_name}", flush=True, file=sys.stderr)
@@ -111,7 +111,7 @@ async def main():
     # Build command
     command = EvaluationRunCommand(
         suite_id="consultancy_fundamentals_v1",
-        model_slugs=["gpt-oss-20b"],
+        model_slugs=["llama-3.3-70b-versatile"],
         case_ids=[],
     )
     
@@ -148,7 +148,7 @@ async def main():
     print("DEBUG: Rubrics materialized", flush=True, file=sys.stderr)
     
     # Evaluate each case
-    model_slug = "gpt-oss-20b"
+    model_slug = "llama-3.3-70b-versatile"
     marker = runner._build_marker(model_slug)
     case_results = []
     

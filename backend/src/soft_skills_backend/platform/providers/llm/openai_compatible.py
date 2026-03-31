@@ -188,6 +188,16 @@ class OpenAICompatibleLLMProvider(LLMProvider):
 
         url = f"{self._resolved.base_url.rstrip('/')}/chat/completions"
         resolved_timeout_seconds = timeout_seconds or self._settings.smoke_timeout_seconds
+        
+        # DEBUG: Log timeout values
+        import sys
+        print(
+            f"DEBUG complete_json: operation={call_context.operation}, "
+            f"timeout_input={timeout_seconds}, resolved={resolved_timeout_seconds}, "
+            f"smoke_default={self._settings.smoke_timeout_seconds}",
+            file=sys.stderr, flush=True
+        )
+        
         headers = {
             "Authorization": f"Bearer {self._resolved.api_key}",
             "Content-Type": "application/json",
@@ -221,8 +231,16 @@ class OpenAICompatibleLLMProvider(LLMProvider):
             start = perf_counter()
             response_payload: dict[str, Any] | None = None
             try:
+                # Use explicit httpx timeout configuration to ensure proper timeout handling
+                from httpx import Timeout
+                timeout_config = Timeout(
+                    resolved_timeout_seconds,
+                    connect=min(5.0, resolved_timeout_seconds),
+                    read=resolved_timeout_seconds,
+                    write=min(5.0, resolved_timeout_seconds),
+                )
                 async with asyncio.timeout(resolved_timeout_seconds):
-                    async with httpx.AsyncClient(timeout=resolved_timeout_seconds) as client:
+                    async with httpx.AsyncClient(timeout=timeout_config) as client:
                         response = await client.post(url, headers=headers, json=payload)
                 latency_ms = int((perf_counter() - start) * 1000)
                 response_payload = response.json()
@@ -461,8 +479,16 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                 tool_choice=tool_choice,
             )
             try:
+                # Use explicit httpx timeout configuration to ensure proper timeout handling
+                from httpx import Timeout
+                timeout_config = Timeout(
+                    resolved_timeout_seconds,
+                    connect=min(5.0, resolved_timeout_seconds),
+                    read=resolved_timeout_seconds,
+                    write=min(5.0, resolved_timeout_seconds),
+                )
                 async with asyncio.timeout(resolved_timeout_seconds):
-                    async with httpx.AsyncClient(timeout=resolved_timeout_seconds) as client:
+                    async with httpx.AsyncClient(timeout=timeout_config) as client:
                         response = await client.post(url, headers=headers, json=payload)
                 latency_ms = int((perf_counter() - start) * 1000)
                 response_payload = response.json()

@@ -394,6 +394,7 @@ def build_per_skill_typed_output(settings: Settings) -> TypedLLMOutput:
         PerSkillAssessment,
         schema_version=config.per_skill_output_schema_version,
         max_validation_retries=settings.assessment_validation_retries,
+        timeout_seconds=settings.llm_marking_timeout_seconds,
     )
 
 
@@ -405,6 +406,7 @@ def build_aggregation_typed_output(settings: Settings) -> TypedLLMOutput:
         AssessmentAggregationOutput,
         schema_version=config.aggregation_output_schema_version,
         max_validation_retries=settings.assessment_validation_retries,
+        timeout_seconds=settings.llm_marking_timeout_seconds,
     )
 
 
