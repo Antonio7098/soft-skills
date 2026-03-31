@@ -199,6 +199,26 @@ class AssistantWorkflowService:
                     emitted_at=failed.completed_at or _utcnow(),
                 ),
             )
+        except Exception as exc:
+            failed = self._repository.mark_turn_failed(
+                turn_id=execution.turn_id,
+                error_code="SS-ORCHESTRATION-206",
+                reason="Assistant turn failed unexpectedly",
+            )
+            await self._broker.publish(
+                execution.stream_token,
+                self._repository.create_stream_event(
+                    turn_id=execution.turn_id,
+                    event_type="turn.failed",
+                    payload={
+                        "error_code": "SS-ORCHESTRATION-206",
+                        "message": "Assistant turn failed unexpectedly",
+                        "reason": str(exc),
+                    },
+                    emitted_at=failed.completed_at or _utcnow(),
+                ),
+            )
+            raise
         finally:
             self._broker.remove_execution(execution.turn_id)
 
@@ -603,8 +623,7 @@ class AssistantWorkflowService:
                     ) from exc
                 messages.append(hardened)
 
-        for iteration in range(MAX_TOOL_ITERATIONS):
-            print(f"[DEBUG] Loop iteration {iteration}")
+        for _ in range(MAX_TOOL_ITERATIONS):
             if active.cancel_reason is not None:
                 return _AssistantLoopResult(cancelled=True, reason=active.cancel_reason)
             ctx.try_emit_event(
@@ -639,16 +658,12 @@ class AssistantWorkflowService:
                 timeout_seconds=self._settings.llm_assistant_timeout_seconds,
             )
             if not completion.tool_calls:
-                print(
-                    f"[DEBUG] Provider returned no tool calls, content: {completion.content[:100] if completion.content else None}"
-                )
                 final_response = (completion.content or "").strip()
                 if not final_response:
                     raise orchestration_error(
                         "Assistant returned neither tool calls nor a final response",
                         code="SS-ORCHESTRATION-205",
                     )
-                print(f"[DEBUG] Returning final response: {final_response[:100]}")
                 return _AssistantLoopResult(
                     cancelled=False,
                     reason=None,
@@ -659,7 +674,6 @@ class AssistantWorkflowService:
                     used_tools=has_executed_tool,
                 )
             try:
-                print(f"[DEBUG] Provider returned {len(completion.tool_calls)} tool calls")
                 tool_requests = parse_assistant_tool_requests(completion.tool_calls)
             except ValidationError as exc:
                 clarification = _generation_clarification_for_invalid_tool_request(
@@ -698,11 +712,6 @@ class AssistantWorkflowService:
                         "workflow_id": execution.workflow_id,
                     },
                 )
-            print(f"[DEBUG] Executing {len(tool_requests)} tools with execute_many")
-            import traceback
-            print(f"[DEBUG] Before execute_many call stack:")
-            for line in traceback.format_stack()[-5:-1]:
-                print(f"  {line.strip()}")
             try:
                 tool_results = await self._tools.execute_many(
                     stage_ctx=ctx,
@@ -717,7 +726,6 @@ class AssistantWorkflowService:
                     ),
                     tool_requests=tool_requests,
                 )
-                print(f"[DEBUG] execute_many returned {len(tool_results)} results")
             except AppError as exc:
                 clarification = _generation_clarification_for_tool_error(
                     tool_requests=tool_requests,
@@ -735,15 +743,7 @@ class AssistantWorkflowService:
                     )
                 raise
             has_executed_tool = has_executed_tool or bool(tool_results)
-            print(
-                f"[DEBUG] has_executed_tool={has_executed_tool}, tool_results_count={len(tool_results)}"
-            )
-            with open("/tmp/debug.log", "a") as f:
-                f.write(
-                    f"After tool execution: has_executed_tool={has_executed_tool}, results={len(tool_results)}\n"
-                )
             if active.cancel_reason is not None:
-                print(f"[DEBUG] Cancel reason set, returning cancelled")
                 return _AssistantLoopResult(cancelled=True, reason=active.cancel_reason)
             for tool_result in tool_results:
                 try:
@@ -762,8 +762,6 @@ class AssistantWorkflowService:
                         },
                     ) from exc
                 messages.append(hardened_tool)
-        print(f"[DEBUG] About to check iteration limit, loop has finished")
-        print(f"[DEBUG] End of loop, raising max iterations error")
         raise orchestration_error(
             "Assistant exceeded the tool iteration budget",
             code="SS-ORCHESTRATION-203",
@@ -1020,6 +1018,32 @@ class _AssistantLoopResult:
     model_slug: str | None = None
     planning_messages: list[dict[str, Any]] | None = None
     used_tools: bool = False
+
+
+def _provider_tool_call_message(
+    *,
+    content: str | None,
+    tool_requests: list[Any],
+) -> dict[str, Any]:
+    return {
+        "role": "assistant",
+        "content": content or "",
+        "tool_calls": [
+            {
+                "id": tool_request.call_id,
+                "type": "function",
+                "function": {
+                    "name": tool_request.tool_name,
+                    "arguments": json.dumps(
+                        tool_request.arguments_payload(),
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                },
+            }
+            for tool_request in tool_requests
+        ],
+    }
 
 
 def _chunk_text(text: str, *, chunk_size: int = 80) -> list[str]:
