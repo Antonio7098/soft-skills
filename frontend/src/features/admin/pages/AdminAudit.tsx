@@ -139,8 +139,8 @@ export function AdminAudit() {
         items: sorted,
         count: items.length,
         hasError: items.some((e) => e.error_code),
-        firstAt: sorted.length > 0 ? sorted[0].occurred_at : null,
-        lastAt: sorted.length > 0 ? sorted[sorted.length - 1].occurred_at : null,
+        firstAt: sorted.length > 0 ? sorted[0].occurred_at ?? null : null,
+        lastAt: sorted.length > 0 ? sorted[sorted.length - 1].occurred_at ?? null : null,
         eventTypes: [...new Set(items.map((e) => e.event_type))],
       };
     });
@@ -275,11 +275,11 @@ export function AdminAudit() {
                           <span className="text-content-tertiary">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-body-xs text-content-secondary">
-                          {new Date(group.firstAt).toLocaleTimeString()} — {new Date(group.lastAt).toLocaleTimeString()}
-                        </span>
-                      </td>
+                       <td className="px-4 py-3">
+                         <span className="text-body-xs text-content-secondary">
+                           {group.firstAt ? new Date(group.firstAt).toLocaleTimeString() : ' — '} — {group.lastAt ? new Date(group.lastAt).toLocaleTimeString() : ' — '}
+                         </span>
+                       </td>
                       <td className="px-4 py-3">
                         <button className="p-1 rounded hover:bg-surface-secondary">
                           {expandedGroups.has(group.key) ? (
