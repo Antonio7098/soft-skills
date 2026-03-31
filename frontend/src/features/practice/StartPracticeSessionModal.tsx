@@ -37,6 +37,7 @@ interface SelectedItem {
   readonly difficulty: string;
   readonly skill_slugs: string[];
   readonly collection_title: string;
+  readonly prompt_type?: string;
 }
 
 export function StartPracticeSessionModal({ isOpen, onClose }: StartPracticeSessionModalProps) {
@@ -89,13 +90,14 @@ export function StartPracticeSessionModal({ isOpen, onClose }: StartPracticeSess
     difficulty: string,
     skillSlugs: string[],
     collectionTitle: string,
+    promptType?: string,
   ) {
     if (isSelected(itemId)) {
       setSelectedItems((prev) => prev.filter((s) => s.item_id !== itemId));
     } else {
       setSelectedItems((prev) => [
         ...prev,
-        { item_id: itemId, item_type: itemType, title, difficulty, skill_slugs: skillSlugs, collection_title: collectionTitle },
+        { item_id: itemId, item_type: itemType, title, difficulty, skill_slugs: skillSlugs, collection_title: collectionTitle, prompt_type: promptType },
       ]);
     }
   }
@@ -112,9 +114,9 @@ export function StartPracticeSessionModal({ isOpen, onClose }: StartPracticeSess
         selected_items: selectedItems.map((s) => ({ item_id: s.item_id, item_type: s.item_type })),
       });
 
-      const sessions = await data.getPracticeSessions(run.id);
+      const sessions = await data.getPracticeSessions(run.run_id);
       if (sessions.length > 0) {
-        navigate(`/session/practice-run/${run.id}`, { replace: true });
+        navigate(`/session/practice-run/${run.run_id}`, { replace: true });
         onClose();
       } else {
         setError('Failed to create practice sessions');
@@ -309,6 +311,7 @@ interface CollectionCardProps {
     difficulty: string,
     skillSlugs: string[],
     collectionTitle: string,
+    promptType?: string,
   ) => void;
   readonly searchQuery: string;
 }
@@ -387,6 +390,7 @@ function CollectionCard({ collection, selectedItems, isSelected, onToggleItem, s
                   collectionTitle={collection.title}
                   selected={isSelected(prompt.id)}
                   onToggle={onToggleItem}
+                  promptType={prompt.prompt_type}
                 />
               ))}
             </div>
@@ -427,6 +431,7 @@ interface ItemRowProps {
   readonly skillSlugs: string[];
   readonly collectionTitle: string;
   readonly selected: boolean;
+  readonly promptType?: string;
   readonly onToggle: (
     id: string,
     itemType: PracticeRunItemType,
@@ -434,14 +439,15 @@ interface ItemRowProps {
     difficulty: string,
     skillSlugs: string[],
     collectionTitle: string,
+    promptType?: string,
   ) => void;
 }
 
-function ItemRow({ id, itemType, title, difficulty, skillSlugs, collectionTitle, selected, onToggle }: ItemRowProps) {
+function ItemRow({ id, itemType, title, difficulty, skillSlugs, collectionTitle, selected, onToggle, promptType }: ItemRowProps) {
   return (
     <button
       type="button"
-      onClick={() => onToggle(id, itemType, title, difficulty, skillSlugs, collectionTitle)}
+      onClick={() => onToggle(id, itemType, title, difficulty, skillSlugs, collectionTitle, promptType)}
       className={cn(
         'flex items-center gap-3 p-2 rounded-button text-left transition-colors',
         selected

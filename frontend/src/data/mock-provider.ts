@@ -28,7 +28,8 @@ import type {
   StartPracticeRunCommand,
   StructuredCollectionGenerationCommand,
   ChatCollectionGenerationCommand,
-  CollectionGenerationView,
+  GenerationStartedView,
+  GenerationStreamCallbacks,
   PromptItemView,
   ScenarioView,
   MockCompanyView,
@@ -201,6 +202,7 @@ export function buildMockAttemptView(opts: {
 }
 
 let _collections = [...SEED_COLLECTIONS];
+const _mockGenerationCollections = new Map<string, CollectionView>();
 let _user = { ...SEED_CURRENT_USER };
 let _attempts = [...SEED_ATTEMPT_HISTORY];
 const _interviewSessions = new Map<string, InterviewSessionView>();
@@ -234,8 +236,8 @@ const DEFAULT_ORG_ADMIN_PERMISSIONS = ['collections:read', 'practice:run', 'admi
 function createMembership(
   organisation_id: string,
   organisation_name: string,
-  role: 'member' | 'org_admin',
-  permissions = role === 'org_admin' ? DEFAULT_ORG_ADMIN_PERMISSIONS : DEFAULT_MEMBER_PERMISSIONS,
+  role: 'member' | 'admin',
+  permissions = role === 'admin' ? DEFAULT_ORG_ADMIN_PERMISSIONS : DEFAULT_MEMBER_PERMISSIONS,
 ): OrganisationMembershipView {
   return { organisation_id, organisation_name, role, permissions };
 }
@@ -261,9 +263,9 @@ const MOCK_AUTH_PROFILES: AuthProfileView[] = [
     description: 'Org admin for Acme Sales',
     session: {
       status: 'authenticated',
-      actor: { ...SEED_CURRENT_USER, role: 'admin', org_memberships: [createMembership('org-001', 'Acme Sales', 'org_admin')] },
+      actor: { ...SEED_CURRENT_USER, role: 'admin', org_memberships: [createMembership('org-001', 'Acme Sales', 'admin')] },
       platform_role: 'admin',
-      org_memberships: [createMembership('org-001', 'Acme Sales', 'org_admin')],
+      org_memberships: [createMembership('org-001', 'Acme Sales', 'admin')],
       active_organisation_id: 'org-001',
       capabilities: ['app:access', 'admin:access'],
       data_mode: 'mock',
@@ -288,14 +290,14 @@ const MOCK_AUTH_PROFILES: AuthProfileView[] = [
           practice_preferences: {},
         },
         org_memberships: [
-          createMembership('org-001', 'Acme Sales', 'org_admin'),
-          createMembership('org-002', 'Acme Support', 'org_admin'),
+          createMembership('org-001', 'Acme Sales', 'admin'),
+          createMembership('org-002', 'Acme Support', 'admin'),
         ],
       },
       platform_role: 'superadmin',
       org_memberships: [
-        createMembership('org-001', 'Acme Sales', 'org_admin'),
-        createMembership('org-002', 'Acme Support', 'org_admin'),
+        createMembership('org-001', 'Acme Sales', 'admin'),
+        createMembership('org-002', 'Acme Support', 'admin'),
       ],
       active_organisation_id: 'org-001',
       capabilities: ['app:access', 'admin:access', 'platform:superadmin'],
@@ -596,26 +598,363 @@ const SEED_EVAL_RUNS: EvaluationRunView[] = [
 ];
 
 const SEED_PROMPTS: PromptSummaryView[] = [
-  { name: 'quick_practice_prompt', prompt_type: 'quick_practice_prompt', latest_version: 'v1.2.0', status: 'published', created_at: '2025-01-10T00:00:00Z' },
-  { name: 'interview_turn_prompt', prompt_type: 'interview_prompt', latest_version: 'v2.0.0', status: 'published', created_at: '2025-02-15T00:00:00Z' },
-  { name: 'scenario_step_prompt', prompt_type: 'scenario_step', latest_version: 'v1.1.0', status: 'published', created_at: '2025-03-01T00:00:00Z' },
-  { name: 'assessment_summary_prompt', prompt_type: 'assessment_summary', latest_version: 'v1.0.0', status: 'draft', created_at: '2025-06-01T00:00:00Z' },
-  { name: 'feedback_generation_prompt', prompt_type: 'feedback_generation', latest_version: 'v1.3.0', status: 'archived', created_at: '2025-04-01T00:00:00Z' },
+  { name: 'assessment_quick_practice', prompt_type: 'assessment', latest_version: 'v2.1.0', status: 'published', created_at: '2025-01-10T00:00:00Z' },
+  { name: 'generation_collection_blueprint', prompt_type: 'generation', latest_version: 'v1.5.0', status: 'published', created_at: '2025-02-15T00:00:00Z' },
+  { name: 'feedback_competency_summary', prompt_type: 'feedback', latest_version: 'v1.3.0', status: 'published', created_at: '2025-03-01T00:00:00Z' },
+  { name: 'interview_turn_generation', prompt_type: 'interview', latest_version: 'v2.0.0', status: 'published', created_at: '2025-02-15T00:00:00Z' },
+  { name: 'scenario_step_assessment', prompt_type: 'scenario', latest_version: 'v1.2.0', status: 'published', created_at: '2025-03-01T00:00:00Z' },
+  { name: 'system_guard_input', prompt_type: 'system', latest_version: 'v1.0.0', status: 'draft', created_at: '2025-06-01T00:00:00Z' },
 ];
 
 const SEED_PROMPT_VERSIONS: Record<string, PromptVersionView[]> = {
-  'quick_practice_prompt': [
-    { id: 1, name: 'quick_practice_prompt', version: 'v1.0.0', prompt_type: 'quick_practice_prompt', template: 'You are a practice session assistant. Present the following scenario to the learner...', variables_schema: { type: 'object', properties: { scenario_text: { type: 'string' } } }, output_schema: null, status: 'archived', parent_version_id: null, created_at: '2025-01-10T00:00:00Z', updated_at: '2025-02-01T00:00:00Z' },
-    { id: 2, name: 'quick_practice_prompt', version: 'v1.1.0', prompt_type: 'quick_practice_prompt', template: 'You are a professional practice coach. Guide the learner through the scenario...', variables_schema: { type: 'object', properties: { scenario_text: { type: 'string' }, difficulty: { type: 'string' } } }, output_schema: null, status: 'archived', parent_version_id: 1, created_at: '2025-02-01T00:00:00Z', updated_at: '2025-03-15T00:00:00Z' },
-    { id: 3, name: 'quick_practice_prompt', version: 'v1.2.0', prompt_type: 'quick_practice_prompt', template: 'You are an expert soft skills coach. Engage the learner with: {{scenario_text}}. Difficulty: {{difficulty}}. Focus on: {{skill_focus}}', variables_schema: { type: 'object', properties: { scenario_text: { type: 'string' }, difficulty: { type: 'string' }, skill_focus: { type: 'string' } } }, output_schema: { type: 'object', properties: { response: { type: 'string' } } }, status: 'published', parent_version_id: 2, created_at: '2025-03-15T00:00:00Z', updated_at: '2025-06-01T00:00:00Z' },
+  'assessment_quick_practice': [
+    { 
+      id: 1, 
+      name: 'assessment_quick_practice', 
+      version: 'v1.0.0', 
+      prompt_type: 'assessment', 
+      template: `You are an expert assessor evaluating soft skills practice responses.
+
+PRACTICE CONTEXT:
+Title: {{title}}
+Difficulty: {{difficulty}}
+Target Skills: {{target_skills}}
+
+LEARNER RESPONSE:
+{{response_text}}
+
+Evaluate the response against the target skills. Provide specific, actionable feedback.`, 
+      variables_schema: { type: 'object', properties: { title: { type: 'string' }, difficulty: { type: 'string' }, target_skills: { type: 'string' }, response_text: { type: 'string' } } }, 
+      output_schema: { type: 'object', properties: { score: { type: 'number' }, feedback: { type: 'string' } } }, 
+      status: 'archived', 
+      parent_version_id: null, 
+      created_at: '2025-01-10T00:00:00Z', 
+      updated_at: '2025-02-01T00:00:00Z' 
+    },
+    { 
+      id: 2, 
+      name: 'assessment_quick_practice', 
+      version: 'v2.0.0', 
+      prompt_type: 'assessment', 
+      template: `You are a professional soft skills coach assessing a practice response.
+
+## Context
+- **Scenario**: {{title}}
+- **Difficulty Level**: {{difficulty}}
+- **Skills Being Assessed**: {{target_skills}}
+- **Rubric**: {{rubric_id}}
+
+## Learner's Response
+{{response_text}}
+
+## Assessment Instructions
+1. Evaluate the response against each target skill
+2. Provide a score (1-5) for each skill
+3. Include specific evidence from the response
+4. Offer 2-3 concrete next actions
+
+Output valid JSON with the assessment results.`, 
+      variables_schema: { type: 'object', properties: { title: { type: 'string' }, difficulty: { type: 'string' }, target_skills: { type: 'string' }, rubric_id: { type: 'string' }, response_text: { type: 'string' } } }, 
+      output_schema: { type: 'object', properties: { overall_score: { type: 'number' }, skill_scores: { type: 'array' }, feedback: { type: 'string' }, next_actions: { type: 'array' } } }, 
+      status: 'archived', 
+      parent_version_id: 1, 
+      created_at: '2025-02-01T00:00:00Z', 
+      updated_at: '2025-04-15T00:00:00Z' 
+    },
+    { 
+      id: 3, 
+      name: 'assessment_quick_practice', 
+      version: 'v2.1.0', 
+      prompt_type: 'assessment', 
+      template: `You are an expert soft skills assessor. Evaluate the following practice response comprehensively.
+
+## Practice Details
+- **Content Title**: {{title}}
+- **Difficulty**: {{difficulty}}
+- **Target Skills**: {{target_skills}}
+- **Rubric ID**: {{rubric_id}}
+- **Schema Version**: {{schema_version}}
+
+## Learner Response to Evaluate
+{{response_text}}
+
+## Your Task
+1. Analyze the response for each target skill
+2. Assign scores (1-5 scale with 0.5 increments)
+3. Quote specific evidence supporting each score
+4. Identify 2-3 strengths demonstrated
+5. Identify 2-3 areas for improvement
+6. Provide 3 actionable next steps
+
+## Output Format
+Return a valid JSON object with:
+- overall_score (number)
+- per_skill_assessments (array)
+- summary (string)
+- strengths (array)
+- weaknesses (array)
+- next_actions (array)`, 
+      variables_schema: { type: 'object', properties: { title: { type: 'string' }, difficulty: { type: 'string' }, target_skills: { type: 'string' }, rubric_id: { type: 'string' }, schema_version: { type: 'string' }, response_text: { type: 'string' } } }, 
+      output_schema: { type: 'object', properties: { overall_score: { type: 'number' }, per_skill_assessments: { type: 'array' }, summary: { type: 'string' }, strengths: { type: 'array' }, weaknesses: { type: 'array' }, next_actions: { type: 'array' } } }, 
+      status: 'published', 
+      parent_version_id: 2, 
+      created_at: '2025-04-15T00:00:00Z', 
+      updated_at: '2025-06-01T00:00:00Z' 
+    },
   ],
-  'interview_turn_prompt': [
-    { id: 10, name: 'interview_turn_prompt', version: 'v1.0.0', prompt_type: 'interview_prompt', template: 'Present an interview question based on: {{topic}}', variables_schema: { type: 'object', properties: { topic: { type: 'string' } } }, output_schema: null, status: 'archived', parent_version_id: null, created_at: '2025-02-15T00:00:00Z', updated_at: '2025-04-01T00:00:00Z' },
-    { id: 11, name: 'interview_turn_prompt', version: 'v2.0.0', prompt_type: 'interview_prompt', template: 'You are conducting a structured interview. Ask a question about {{topic}} that assesses {{skill}}. Follow up naturally on the response.', variables_schema: { type: 'object', properties: { topic: { type: 'string' }, skill: { type: 'string' } } }, output_schema: { type: 'object', properties: { question: { type: 'string' }, follow_up: { type: 'string' } } }, status: 'published', parent_version_id: 10, created_at: '2025-04-01T00:00:00Z', updated_at: '2025-08-01T00:00:00Z' },
+  'generation_collection_blueprint': [
+    { 
+      id: 10, 
+      name: 'generation_collection_blueprint', 
+      version: 'v1.0.0', 
+      prompt_type: 'generation', 
+      template: `Generate a soft skills training collection based on the following parameters:
+
+Target Audience: {{target_audience}}
+Topic: {{topic}}
+Number of Items: {{item_count}}
+Difficulty: {{difficulty}}
+
+Create a structured collection with prompt items and scenarios.`, 
+      variables_schema: { type: 'object', properties: { target_audience: { type: 'string' }, topic: { type: 'string' }, item_count: { type: 'number' }, difficulty: { type: 'string' } } }, 
+      output_schema: { type: 'object', properties: { collection_title: { type: 'string' }, items: { type: 'array' } } }, 
+      status: 'archived', 
+      parent_version_id: null, 
+      created_at: '2025-02-15T00:00:00Z', 
+      updated_at: '2025-03-20T00:00:00Z' 
+    },
+    { 
+      id: 11, 
+      name: 'generation_collection_blueprint', 
+      version: 'v1.5.0', 
+      prompt_type: 'generation', 
+      template: `You are an expert instructional designer creating soft skills training content.
+
+## Generation Request
+- **Target Audience**: {{target_audience}}
+- **Learning Topic**: {{topic}}
+- **Content Mix**: {{content_format_mix}}
+- **Desired Count**: {{item_count}} items
+- **Difficulty Level**: {{difficulty}}
+- **Target Skills**: {{target_skill_slugs}}
+
+## Output Requirements
+Generate a complete collection blueprint including:
+1. Collection title and summary
+2. Learning objectives
+3. {{item_count}} practice items (mix of quick practice prompts, interview questions, and scenarios)
+4. Each item should target the specified skills
+5. Difficulty progression should match the specified level
+
+Return the blueprint as structured JSON that can be used to generate the full collection.`, 
+      variables_schema: { type: 'object', properties: { target_audience: { type: 'string' }, topic: { type: 'string' }, content_format_mix: { type: 'array' }, item_count: { type: 'number' }, difficulty: { type: 'string' }, target_skill_slugs: { type: 'array' } } }, 
+      output_schema: { type: 'object', properties: { title: { type: 'string' }, summary: { type: 'string' }, prompt_items: { type: 'array' }, scenarios: { type: 'array' } } }, 
+      status: 'published', 
+      parent_version_id: 10, 
+      created_at: '2025-03-20T00:00:00Z', 
+      updated_at: '2025-06-01T00:00:00Z' 
+    },
   ],
-  'scenario_step_prompt': [
-    { id: 20, name: 'scenario_step_prompt', version: 'v1.0.0', prompt_type: 'scenario_step', template: 'Set up the scenario: {{scenario_context}}', variables_schema: { type: 'object', properties: { scenario_context: { type: 'string' } } }, output_schema: null, status: 'archived', parent_version_id: null, created_at: '2025-03-01T00:00:00Z', updated_at: '2025-05-01T00:00:00Z' },
-    { id: 21, name: 'scenario_step_prompt', version: 'v1.1.0', prompt_type: 'scenario_step', template: 'Present the scenario step: {{step_description}}. Stakeholder: {{stakeholder_name}}, Role: {{stakeholder_role}}. Guide the learner through this step.', variables_schema: { type: 'object', properties: { step_description: { type: 'string' }, stakeholder_name: { type: 'string' }, stakeholder_role: { type: 'string' } } }, output_schema: { type: 'object', properties: { prompt: { type: 'string' } } }, status: 'published', parent_version_id: 20, created_at: '2025-05-01T00:00:00Z', updated_at: '2025-07-01T00:00:00Z' },
+  'feedback_competency_summary': [
+    { 
+      id: 20, 
+      name: 'feedback_competency_summary', 
+      version: 'v1.0.0', 
+      prompt_type: 'feedback', 
+      template: `Summarize the learner's competency progress based on their recent attempts.
+
+Learner: {{learner_name}}
+Recent Attempts: {{attempt_count}}
+Focus Skills: {{focus_skills}}
+
+Provide encouraging feedback highlighting progress.`, 
+      variables_schema: { type: 'object', properties: { learner_name: { type: 'string' }, attempt_count: { type: 'number' }, focus_skills: { type: 'string' } } }, 
+      output_schema: { type: 'object', properties: { summary: { type: 'string' }, recommendations: { type: 'array' } } }, 
+      status: 'archived', 
+      parent_version_id: null, 
+      created_at: '2025-03-01T00:00:00Z', 
+      updated_at: '2025-04-01T00:00:00Z' 
+    },
+    { 
+      id: 21, 
+      name: 'feedback_competency_summary', 
+      version: 'v1.3.0', 
+      prompt_type: 'feedback', 
+      template: `You are a supportive learning coach providing a competency progress summary.
+
+## Learner Information
+- **Name**: {{learner_name}}
+- **Practice Period**: {{date_range}}
+- **Total Attempts**: {{attempt_count}}
+- **Focus Competencies**: {{focus_skills}}
+
+## Performance Data
+{{performance_data}}
+
+## Your Task
+Create a personalized progress summary that:
+1. Celebrates specific improvements (cite examples from {{performance_data}})
+2. Acknowledges effort and consistency ({{attempt_count}} attempts shows dedication)
+3. Identifies the strongest competency areas
+4. Gently highlights 1-2 growth opportunities
+5. Suggests specific next steps aligned with {{focus_skills}}
+
+Tone: Encouraging, specific, actionable. Avoid generic praise.`, 
+      variables_schema: { type: 'object', properties: { learner_name: { type: 'string' }, date_range: { type: 'string' }, attempt_count: { type: 'number' }, focus_skills: { type: 'string' }, performance_data: { type: 'object' } } }, 
+      output_schema: { type: 'object', properties: { summary: { type: 'string' }, key_improvements: { type: 'array' }, strongest_areas: { type: 'array' }, growth_opportunities: { type: 'array' }, next_steps: { type: 'array' } } }, 
+      status: 'published', 
+      parent_version_id: 20, 
+      created_at: '2025-04-01T00:00:00Z', 
+      updated_at: '2025-06-01T00:00:00Z' 
+    },
+  ],
+  'interview_turn_generation': [
+    { 
+      id: 30, 
+      name: 'interview_turn_generation', 
+      version: 'v1.0.0', 
+      prompt_type: 'interview', 
+      template: `Generate the next interview turn for an ongoing interview session.
+
+Previous Turns: {{turn_history}}
+Current Question: {{current_question}}
+Interview Topic: {{topic}}
+
+Generate a natural follow-up question or response.`, 
+      variables_schema: { type: 'object', properties: { turn_history: { type: 'array' }, current_question: { type: 'string' }, topic: { type: 'string' } } }, 
+      output_schema: { type: 'object', properties: { next_turn: { type: 'string' }, turn_type: { type: 'string' } } }, 
+      status: 'archived', 
+      parent_version_id: null, 
+      created_at: '2025-02-15T00:00:00Z', 
+      updated_at: '2025-03-01T00:00:00Z' 
+    },
+    { 
+      id: 31, 
+      name: 'interview_turn_generation', 
+      version: 'v2.0.0', 
+      prompt_type: 'interview', 
+      template: `You are conducting a professional interview simulation. Continue the interview naturally.
+
+## Interview Context
+- **Role**: {{interview_role}}
+- **Interview Type**: {{interview_type}}
+- **Current Stage**: {{stage_number}} of {{total_stages}}
+- **Topics to Cover**: {{topics}}
+
+## Conversation History
+{{turn_history}}
+
+## Most Recent Exchange
+**Interviewer**: {{last_interviewer_message}}
+**Candidate**: {{last_candidate_response}}
+
+## Your Task
+Generate the next interviewer turn. Consider:
+1. Maintain professional, engaging tone
+2. Probe deeper on relevant skills from {{topics}}
+3. Ask natural follow-up questions based on {{last_candidate_response}}
+4. Progress toward uncovered topics if appropriate
+5. Keep the conversation flowing naturally
+
+Output the next message and indicate if this is the final turn (stage {{total_stages}}).`, 
+      variables_schema: { type: 'object', properties: { interview_role: { type: 'string' }, interview_type: { type: 'string' }, stage_number: { type: 'number' }, total_stages: { type: 'number' }, topics: { type: 'string' }, turn_history: { type: 'array' }, last_interviewer_message: { type: 'string' }, last_candidate_response: { type: 'string' } } }, 
+      output_schema: { type: 'object', properties: { next_message: { type: 'string' }, is_final: { type: 'boolean' }, next_stage: { type: 'number' } } }, 
+      status: 'published', 
+      parent_version_id: 30, 
+      created_at: '2025-03-01T00:00:00Z', 
+      updated_at: '2025-06-01T00:00:00Z' 
+    },
+  ],
+  'scenario_step_assessment': [
+    { 
+      id: 40, 
+      name: 'scenario_step_assessment', 
+      version: 'v1.0.0', 
+      prompt_type: 'scenario', 
+      template: `Assess a scenario step response.
+
+Scenario: {{scenario_title}}
+Step: {{step_number}}
+Stakes: {{stakeholder_tensions}}
+
+Learner Response: {{response_text}}
+
+Evaluate the response in context of the scenario stakes.`, 
+      variables_schema: { type: 'object', properties: { scenario_title: { type: 'string' }, step_number: { type: 'number' }, stakeholder_tensions: { type: 'string' }, response_text: { type: 'string' } } }, 
+      output_schema: { type: 'object', properties: { score: { type: 'number' }, feedback: { type: 'string' } } }, 
+      status: 'archived', 
+      parent_version_id: null, 
+      created_at: '2025-03-01T00:00:00Z', 
+      updated_at: '2025-04-01T00:00:00Z' 
+    },
+    { 
+      id: 41, 
+      name: 'scenario_step_assessment', 
+      version: 'v1.2.0', 
+      prompt_type: 'scenario', 
+      template: `You are evaluating a learner's response during an immersive scenario simulation.
+
+## Scenario Context
+- **Title**: {{scenario_title}}
+- **Business Context**: {{business_context}}
+- **Mock Company**: {{company_name}} ({{company_industry}})
+
+## Current Step
+- **Step Number**: {{step_number}} of {{total_steps}}
+- **Stakeholder**: {{stakeholder_name}} ({{stakeholder_role}})
+- **Stakes/Tensions**: {{stakeholder_tensions}}
+- **Constraints**: {{constraints}}
+
+## Learner's Response
+{{response_text}}
+
+## Assessment Criteria
+Evaluate the response considering:
+1. Appropriateness to the stakeholder ({{stakeholder_role}})
+2. Effectiveness given the stakes ({{stakeholder_tensions}})
+3. Awareness of constraints ({{constraints}})
+4. Progress toward learner objective: {{learner_objective}}
+
+## Output
+Provide:
+- Step score (1-5)
+- Specific feedback about handling {{stakeholder_name}}
+- Assessment of situational awareness
+- Guidance for next step`, 
+      variables_schema: { type: 'object', properties: { scenario_title: { type: 'string' }, business_context: { type: 'string' }, company_name: { type: 'string' }, company_industry: { type: 'string' }, step_number: { type: 'number' }, total_steps: { type: 'number' }, stakeholder_name: { type: 'string' }, stakeholder_role: { type: 'string' }, stakeholder_tensions: { type: 'string' }, constraints: { type: 'array' }, response_text: { type: 'string' }, learner_objective: { type: 'string' } } }, 
+      output_schema: { type: 'object', properties: { score: { type: 'number' }, feedback: { type: 'string' }, situational_awareness: { type: 'string' }, next_step_guidance: { type: 'string' } } }, 
+      status: 'published', 
+      parent_version_id: 40, 
+      created_at: '2025-04-01T00:00:00Z', 
+      updated_at: '2025-06-01T00:00:00Z' 
+    },
+  ],
+  'system_guard_input': [
+    { 
+      id: 50, 
+      name: 'system_guard_input', 
+      version: 'v1.0.0', 
+      prompt_type: 'system', 
+      template: `You are a content safety guard. Evaluate the following input for policy violations.
+
+Input Text: {{input_text}}
+Operation Type: {{operation_type}}
+User Context: {{user_context}}
+
+Check for:
+- PII leakage
+- Harmful content
+- Policy violations
+- Inappropriate requests
+
+Return a safety assessment with pass/fail status and any warnings.`, 
+      variables_schema: { type: 'object', properties: { input_text: { type: 'string' }, operation_type: { type: 'string' }, user_context: { type: 'object' } } }, 
+      output_schema: { type: 'object', properties: { passed: { type: 'boolean' }, violations: { type: 'array' }, warnings: { type: 'array' } } }, 
+      status: 'draft', 
+      parent_version_id: null, 
+      created_at: '2025-06-01T00:00:00Z', 
+      updated_at: '2025-06-01T00:00:00Z' 
+    },
   ],
 };
 
@@ -1388,10 +1727,11 @@ export const mockDataProvider: DataProvider = {
 
   async generateStructuredCollection(
     cmd: StructuredCollectionGenerationCommand,
-  ): Promise<CollectionGenerationView> {
-    await delay(2500); // simulate LLM generation latency
+  ): Promise<GenerationStartedView> {
     const collectionId = `col-${uid()}`;
-    const artifactId = `gen-${uid()}`;
+    const generationId = `gen-${uid()}`;
+    const streamToken = `stream-${uid()}`;
+    const artifactId = generationId;
 
     const promptItems: PromptItemView[] = [];
     const totalPrompts = (cmd.counts.quick_practice_prompt_count ?? 0) + (cmd.counts.interview_prompt_count ?? 0);
@@ -1481,21 +1821,15 @@ export const mockDataProvider: DataProvider = {
     };
 
     _collections = [..._collections, col];
-
-    return {
-      collection: col,
-      generation_artifact_id: artifactId,
-      generation_mode: 'structured',
-      prompt_version: 'creator.structured-draft.v1',
-      provider: 'mock',
-      model_slug: 'mock-v1',
-    };
+    _mockGenerationCollections.set(streamToken, col);
+    return { generation_id: generationId, stream_token: streamToken, mode: 'structured' };
   },
 
-  async generateChatCollection(cmd: ChatCollectionGenerationCommand): Promise<CollectionGenerationView> {
-    await delay(2500); // simulate LLM generation latency
+  async generateChatCollection(cmd: ChatCollectionGenerationCommand): Promise<GenerationStartedView> {
     const collectionId = `col-${uid()}`;
-    const artifactId = `gen-${uid()}`;
+    const generationId = `gen-${uid()}`;
+    const streamToken = `stream-${uid()}`;
+    const artifactId = generationId;
 
     const promptItems: PromptItemView[] = [];
     const totalPrompts = (cmd.counts.quick_practice_prompt_count ?? 0) + (cmd.counts.interview_prompt_count ?? 0);
@@ -1576,14 +1910,95 @@ export const mockDataProvider: DataProvider = {
     };
 
     _collections = [..._collections, col];
+    _mockGenerationCollections.set(streamToken, col);
+    return { generation_id: generationId, stream_token: streamToken, mode: 'chat' };
+  },
 
-    return {
-      collection: col,
-      generation_artifact_id: artifactId,
-      generation_mode: 'chat',
-      prompt_version: 'creator.chat-draft.v1',
-      provider: 'mock',
-      model_slug: 'mock-v1',
+  streamGeneration(streamToken: string, callbacks: GenerationStreamCallbacks) {
+    const collection = _mockGenerationCollections.get(streamToken);
+    let cancelled = false;
+    const timers: number[] = [];
+    const push = (delayMs: number, fn: () => void) => {
+      const timer = window.setTimeout(() => {
+        if (!cancelled) fn();
+      }, delayMs);
+      timers.push(timer);
+    };
+
+    push(50, () => callbacks.onEvent?.({
+      event_id: `evt-${uid()}`,
+      generation_id: streamToken,
+      type: 'started',
+      stage: 'pending',
+      sequence_number: 0,
+      emitted_at: new Date().toISOString(),
+      progress_percent: 0,
+      payload: {},
+    }));
+    push(180, () => callbacks.onEvent?.({
+      event_id: `evt-${uid()}`,
+      generation_id: streamToken,
+      type: 'progress',
+      stage: 'blueprint_llm_transform',
+      sequence_number: 1,
+      emitted_at: new Date().toISOString(),
+      progress_percent: 20,
+      payload: {
+        title: collection?.title ?? 'Generated Collection',
+        summary: collection?.summary ?? 'Generated summary',
+        prompt_items_count: collection?.prompt_items.length ?? 0,
+        scenarios_count: collection?.scenarios.length ?? 0,
+        model_slug: 'mock-v1',
+      },
+    }));
+    push(320, () => callbacks.onEvent?.({
+      event_id: `evt-${uid()}`,
+      generation_id: streamToken,
+      type: 'progress',
+      stage: 'prompt_items_work',
+      sequence_number: 2,
+      emitted_at: new Date().toISOString(),
+      progress_percent: 55,
+      payload: {
+        prompt_items: (collection?.prompt_items ?? []).map((item) => ({
+          title: item.title,
+          prompt_type: item.prompt_type,
+          difficulty: item.difficulty,
+        })),
+      },
+    }));
+    push(500, () => callbacks.onEvent?.({
+      event_id: `evt-${uid()}`,
+      generation_id: streamToken,
+      type: 'progress',
+      stage: 'scenarios_work',
+      sequence_number: 3,
+      emitted_at: new Date().toISOString(),
+      progress_percent: 75,
+      payload: {},
+    }));
+    push(700, () => {
+      if (!collection) {
+        callbacks.onFailed?.({ error: 'Mock generation collection not found' });
+      } else {
+        callbacks.onEvent?.({
+          event_id: `evt-${uid()}`,
+          generation_id: streamToken,
+          type: 'completed',
+          stage: 'completed',
+          sequence_number: 4,
+          emitted_at: new Date().toISOString(),
+          progress_percent: 100,
+          payload: { collection_id: collection.id, generation_artifact_id: collection.last_generation_artifact_id },
+        });
+        callbacks.onCompleted?.({ collection_id: collection.id, generation_artifact_id: collection.last_generation_artifact_id });
+      }
+      callbacks.onClose?.();
+    });
+
+    return () => {
+      cancelled = true;
+      for (const timer of timers) window.clearTimeout(timer);
     };
   },
 

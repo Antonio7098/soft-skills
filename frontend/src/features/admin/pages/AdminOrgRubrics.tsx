@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Edit, Trash2, X, Check, Scale } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Check, Scale, Globe } from 'lucide-react';
 import { useAdminScope } from '@/auth';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
@@ -8,13 +8,15 @@ import { LoadingState } from '@/design-system/patterns/LoadingState';
 import { EmptyState } from '@/design-system/patterns/EmptyState';
 import { useData } from '@/data';
 import { AdminPageShell, MetricCard, SearchInput } from '../components';
-import type { OrgRubricView } from '@/data/types';
+import type { OrgRubricView, RubricView } from '@/data/types';
+
+type RubricWithScope = (OrgRubricView | (RubricView & { criteria?: string[] })) & { scope: 'global' | 'org' };
 
 export function AdminOrgRubrics() {
   const { organisationId } = useAdminScope();
   const dataProvider = useData();
-  const [rubrics, setRubrics] = useState<OrgRubricView[]>([]);
-  const [selectedRubric, setSelectedRubric] = useState<OrgRubricView | null>(null);
+  const [rubrics, setRubrics] = useState<RubricWithScope[]>([]);
+  const [selectedRubric, setSelectedRubric] = useState<RubricWithScope | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -27,13 +29,31 @@ export function AdminOrgRubrics() {
     content_type: 'prompt_item',
   });
 
-  const refreshRubrics = () => {
+  const refreshRubrics = async () => {
     if (!organisationId) return;
     setLoading(true);
-    dataProvider.listOrgRubrics(organisationId)
-      .then(setRubrics)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    try {
+      const [taxonomy, orgRubrics] = await Promise.all([
+        dataProvider.getTaxonomy(),
+        dataProvider.listOrgRubrics(organisationId),
+      ]);
+
+      // Merge global and org rubrics - org rubrics take precedence
+      const orgRubricIds = new Set(orgRubrics.map((r) => r.rubric_id));
+      const globalRubrics: RubricWithScope[] = taxonomy.rubrics
+        .filter((r) => !orgRubricIds.has(r.rubric_id))
+        .map((r) => ({ ...r, scope: 'global', criteria: [] }));
+      const mergedOrgRubrics: RubricWithScope[] = orgRubrics.map((r) => ({
+        ...r,
+        scope: 'org',
+      }));
+
+      setRubrics([...globalRubrics, ...mergedOrgRubrics]);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -80,6 +100,11 @@ export function AdminOrgRubrics() {
 
   const handleDeleteRubric = async (rubricId: string) => {
     if (!organisationId) return;
+    const rubric = rubrics.find((r) => r.rubric_id === rubricId);
+    if (rubric?.scope === 'global') {
+      alert('Global rubrics cannot be deleted');
+      return;
+    }
     if (!confirm('Are you sure you want to delete this rubric?')) return;
     try {
       await dataProvider.deleteOrgRubric(organisationId, rubricId);
@@ -114,13 +139,18 @@ export function AdminOrgRubrics() {
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard
-          label="Total Rubrics"
-          value={rubrics.length}
+          label="Global Rubrics"
+          value={rubrics.filter((r) => r.scope === 'global').length}
+          icon={<Globe className="w-4 h-4" />}
+        />
+        <MetricCard
+          label="Org Rubrics"
+          value={rubrics.filter((r) => r.scope === 'org').length}
           icon={<Scale className="w-4 h-4" />}
         />
         <MetricCard
-          label="Families"
-          value={new Set(rubrics.map((r) => r.family)).size}
+          label="Total Rubrics"
+          value={rubrics.length}
           icon={<Scale className="w-4 h-4" />}
         />
       </div>
@@ -143,13 +173,18 @@ export function AdminOrgRubrics() {
                     : 'hover:bg-surface-secondary/50'
                 }`}
               >
-                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-                  <Scale className="w-4 h-4 text-accent" />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${rubric.scope === 'global' ? 'bg-surface-secondary' : 'bg-accent/10'}`}>
+                  {rubric.scope === 'global' ? <Globe className="w-4 h-4 text-content-secondary" /> : <Scale className="w-4 h-4 text-accent" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-body-sm font-medium text-content-primary truncate">
-                    {rubric.name}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-body-sm font-medium text-content-primary truncate">
+                      {rubric.name}
+                    </p>
+                    <Badge variant={rubric.scope === 'global' ? 'default' : 'accent'} size="sm">
+                      {rubric.scope === 'global' ? 'Global' : 'Org'}
+                    </Badge>
+                  </div>
                   <p className="text-body-xs text-content-tertiary truncate">
                     {rubric.family} · v{rubric.version}
                   </p>
@@ -184,6 +219,8 @@ export function AdminOrgRubrics() {
                     size="sm"
                     icon={<Edit className="w-4 h-4" />}
                     onClick={() => setShowEditModal(true)}
+                    disabled={selectedRubric?.scope === 'global'}
+                    title={selectedRubric?.scope === 'global' ? 'Global rubrics cannot be edited' : undefined}
                   >
                     Edit
                   </Button>
@@ -192,6 +229,8 @@ export function AdminOrgRubrics() {
                     size="sm"
                     icon={<Trash2 className="w-4 h-4" />}
                     onClick={() => handleDeleteRubric(selectedRubric.rubric_id)}
+                    disabled={selectedRubric?.scope === 'global'}
+                    title={selectedRubric?.scope === 'global' ? 'Global rubrics cannot be deleted' : undefined}
                   >
                     Delete
                   </Button>

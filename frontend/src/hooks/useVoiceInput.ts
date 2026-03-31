@@ -1,16 +1,17 @@
-"""useVoiceInput hook - hybrid Web Speech API + backend Deepgram proxy.
-
-Architecture:
-- Chrome/Edge: Uses native Web Speech API (continuous, interim results)
-- Other browsers: Uses WebSocket to backend which streams to Deepgram
-
-WebSocket protocol:
-- Client sends binary audio chunks
-- Client sends {"type": "stop"} to end
-- Server sends {"text": "...", "is_final": bool, "speech_final": bool}
-- Server sends {"error": "...", "code": "..."} on error
-- Server sends {"type": "close"} when done
-"""
+/**
+ * useVoiceInput hook - hybrid Web Speech API + backend Deepgram proxy.
+ *
+ * Architecture:
+ * - Chrome/Edge: Uses native Web Speech API (continuous, interim results)
+ * - Other browsers: Uses WebSocket to backend which streams to Deepgram
+ *
+ * WebSocket protocol:
+ * - Client sends binary audio chunks
+ * - Client sends {"type": "stop"} to end
+ * - Server sends {"text": "...", "is_final": bool, "speech_final": bool}
+ * - Server sends {"error": "...", "code": "..."} on error
+ * - Server sends {"type": "close"} when done
+ */
 
 import { useCallback, useRef, useState } from 'react';
 

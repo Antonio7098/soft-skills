@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, X, Check, Users } from 'lucide-react';
+import { Plus, Trash2, X, Check, Users, Globe } from 'lucide-react';
 import { useAdminScope } from '@/auth';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
@@ -8,13 +8,15 @@ import { LoadingState } from '@/design-system/patterns/LoadingState';
 import { EmptyState } from '@/design-system/patterns/EmptyState';
 import { useData } from '@/data';
 import { AdminPageShell, MetricCard, SearchInput } from '../components';
-import type { ScenarioView } from '@/data/types';
+import type { ScenarioView, CollectionView } from '@/data/types';
+
+type ScenarioWithScope = ScenarioView & { scope: 'global' | 'org' };
 
 export function AdminOrgScenarios() {
   const { organisationId } = useAdminScope();
   const dataProvider = useData();
-  const [scenarios, setScenarios] = useState<ScenarioView[]>([]);
-  const [selectedScenario, setSelectedScenario] = useState<ScenarioView | null>(null);
+  const [scenarios, setScenarios] = useState<ScenarioWithScope[]>([]);
+  const [selectedScenario, setSelectedScenario] = useState<ScenarioWithScope | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -29,13 +31,37 @@ export function AdminOrgScenarios() {
     stakeholder_tensions: '',
   });
 
-  const refreshScenarios = () => {
+  const refreshScenarios = async () => {
     if (!organisationId) return;
     setLoading(true);
-    dataProvider.listOrgScenarios(organisationId)
-      .then(setScenarios)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    try {
+      const [globalCollections, orgScenarios] = await Promise.all([
+        dataProvider.listCollections(),
+        dataProvider.listOrgScenarios(organisationId),
+      ]);
+
+      // Extract global scenarios from collections
+      const orgScenarioIds = new Set(orgScenarios.map((s) => s.id));
+      const globalScenarios: ScenarioWithScope[] = [];
+      globalCollections.forEach((collection: CollectionView) => {
+        collection.scenarios?.forEach((scenario: ScenarioView) => {
+          if (!orgScenarioIds.has(scenario.id)) {
+            globalScenarios.push({ ...scenario, scope: 'global' });
+          }
+        });
+      });
+
+      const mergedOrgScenarios: ScenarioWithScope[] = orgScenarios.map((s) => ({
+        ...s,
+        scope: 'org',
+      }));
+
+      setScenarios([...globalScenarios, ...mergedOrgScenarios]);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -75,6 +101,11 @@ export function AdminOrgScenarios() {
 
   const handleDeleteScenario = async (id: string) => {
     if (!organisationId) return;
+    const scenario = scenarios.find((s) => s.id === id);
+    if (scenario?.scope === 'global') {
+      alert('Global scenarios cannot be deleted');
+      return;
+    }
     if (!confirm('Are you sure you want to delete this scenario?')) return;
     try {
       await dataProvider.deleteOrgScenario(organisationId, id);
@@ -109,6 +140,16 @@ export function AdminOrgScenarios() {
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard
+          label="Global Scenarios"
+          value={scenarios.filter((s) => s.scope === 'global').length}
+          icon={<Globe className="w-4 h-4" />}
+        />
+        <MetricCard
+          label="Org Scenarios"
+          value={scenarios.filter((s) => s.scope === 'org').length}
+          icon={<Users className="w-4 h-4" />}
+        />
+        <MetricCard
           label="Total Scenarios"
           value={scenarios.length}
           icon={<Users className="w-4 h-4" />}
@@ -133,13 +174,18 @@ export function AdminOrgScenarios() {
                     : 'hover:bg-surface-secondary/50'
                 }`}
               >
-                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-                  <Users className="w-4 h-4 text-accent" />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${scenario.scope === 'global' ? 'bg-surface-secondary' : 'bg-accent/10'}`}>
+                  {scenario.scope === 'global' ? <Globe className="w-4 h-4 text-content-secondary" /> : <Users className="w-4 h-4 text-accent" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-body-sm font-medium text-content-primary truncate">
-                    {scenario.title}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-body-sm font-medium text-content-primary truncate">
+                      {scenario.title}
+                    </p>
+                    <Badge variant={scenario.scope === 'global' ? 'default' : 'accent'} size="sm">
+                      {scenario.scope === 'global' ? 'Global' : 'Org'}
+                    </Badge>
+                  </div>
                   <p className="text-body-xs text-content-tertiary truncate">
                     {scenario.lifecycle_state}
                   </p>
@@ -173,6 +219,8 @@ export function AdminOrgScenarios() {
                   size="sm"
                   icon={<Trash2 className="w-4 h-4" />}
                   onClick={() => handleDeleteScenario(selectedScenario.id)}
+                  disabled={selectedScenario?.scope === 'global'}
+                  title={selectedScenario?.scope === 'global' ? 'Global scenarios cannot be deleted' : undefined}
                 >
                   Delete
                 </Button>

@@ -33,6 +33,10 @@ RETRYABLE_PROVIDER_PAYLOAD_CODES = {
     "SS-PROVIDER-008",
     "SS-PROVIDER-009",
 }
+RETRYABLE_STRUCTURED_OUTPUT_FAILURE_MARKERS = (
+    "failed to validate json",
+    "failed to generate json",
+)
 
 
 def _add_llm_span_attributes(
@@ -61,6 +65,17 @@ def _add_llm_span_attributes(
                 span.set_attribute("llm.tokens.total", usage["total_tokens"])
     except ImportError:
         pass
+
+
+def _is_retryable_structured_output_failure(
+    *,
+    status_code: int,
+    error_message: str,
+) -> bool:
+    if status_code != 400:
+        return False
+    lowered = error_message.lower()
+    return any(marker in lowered for marker in RETRYABLE_STRUCTURED_OUTPUT_FAILURE_MARKERS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,6 +244,14 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                             cast(dict[str, object], payload["response_format"])["type"]
                         ),
                     )
+                    if _is_retryable_structured_output_failure(
+                        status_code=response.status_code,
+                        error_message=error_message,
+                    ) and attempt < max_retries:
+                        await asyncio.sleep(
+                            self._settings.provider_retry_backoff_seconds * (attempt + 1)
+                        )
+                        continue
                     if (
                         response.status_code in TRANSIENT_PROVIDER_STATUS_CODES
                         and attempt < max_retries
@@ -281,11 +304,16 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                 )
             except AppError as exc:
                 latency_ms = int((perf_counter() - start) * 1000)
+                persisted_error = (
+                    str(exc.details.get("reason"))
+                    if exc.details and isinstance(exc.details.get("reason"), str)
+                    else str(exc)
+                )
                 await self._provider_call_logger.log_call_end(
                     call_id,
                     success=False,
                     latency_ms=latency_ms,
-                    error=str(exc),
+                    error=persisted_error,
                     operation=call_context.operation,
                     provider=self._resolved.provider_name,
                     model_id=active_model_slug,
@@ -495,11 +523,16 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                 )
             except AppError as exc:
                 latency_ms = int((perf_counter() - start) * 1000)
+                persisted_error = (
+                    str(exc.details.get("reason"))
+                    if exc.details and isinstance(exc.details.get("reason"), str)
+                    else str(exc)
+                )
                 await self._provider_call_logger.log_call_end(
                     call_id,
                     success=False,
                     latency_ms=latency_ms,
-                    error=str(exc),
+                    error=persisted_error,
                     operation=call_context.operation,
                     provider=self._resolved.provider_name,
                     model_id=active_model_slug,

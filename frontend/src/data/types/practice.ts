@@ -194,15 +194,18 @@ export interface PracticeRunSummary {
 }
 
 export interface PracticeRunView {
-  readonly id: string;
-  readonly user_id: string;
-  readonly title: string;
+  readonly run_id: string;
+  readonly workflow_id: string;
   readonly status: 'active' | 'completed' | 'abandoned';
+  readonly total_items: number;
+  readonly completed_items: number;
+  readonly validated_items: number;
+  readonly failed_items: number;
+  readonly current_attempt_id: string | null;
+  readonly started_at: string;
+  readonly completed_at: string | null;
   readonly items: PracticeRunItemSummary[];
   readonly summary: PracticeRunSummary;
-  readonly created_at: string;
-  readonly updated_at: string;
-  readonly completed_at: string | null;
 }
 
 export interface PracticeSessionView {
@@ -223,5 +226,6 @@ export interface StartPracticeRunCommand {
   readonly selected_items: readonly {
     readonly item_id: string;
     readonly item_type: 'prompt_item' | 'scenario';
+    readonly prompt_type?: string;
   }[];
 }

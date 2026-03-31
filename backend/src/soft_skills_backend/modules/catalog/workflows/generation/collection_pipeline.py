@@ -93,6 +93,9 @@ async def generate_collection(
     workplace_context_for_commands: Callable[
         [StructuredCollectionGenerationCommand | None, ChatCollectionGenerationCommand | None], str
     ],
+    taxonomy_context_for_commands: Callable[
+        [Actor, StructuredCollectionGenerationCommand | None, ChatCollectionGenerationCommand | None], str
+    ],
     progress_callback: Callable[[str, float, dict[str, object]], None] | None = None,
     execution: GenerationExecution | None = None,
 ) -> CollectionGenerationView:
@@ -143,6 +146,7 @@ async def generate_collection(
             prompt_security_policy=prompt_security_policy,
             structured_command=structured_command,
             chat_command=chat_command,
+            taxonomy_context=taxonomy_context_for_commands(actor, structured_command, chat_command),
             sanitize_text=sanitize_text,
         )
         return ok_output(

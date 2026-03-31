@@ -18,6 +18,7 @@ from soft_skills_backend.modules.catalog import (
     StructuredCollectionGenerationCommand,
 )
 from soft_skills_backend.modules.catalog.contracts.stream import GenerationControlMessage
+from soft_skills_backend.modules.catalog.domain.validators import validate_generation_request
 from soft_skills_backend.modules.catalog.infra.realtime import GenerationRealtimeBroker
 from soft_skills_backend.modules.catalog.workflows.generation.service import (
     CatalogGenerationService,
@@ -55,7 +56,12 @@ async def start_structured_generation(
     catalog_service: CatalogGenerationService = container.catalog_service._generation
     broker: GenerationRealtimeBroker = container.generation_broker
     background_tasks: BackgroundTaskRunner = container.background_tasks
+    session_factory = container.session_factory
     correlation = _correlation_from_request(request)
+
+    # Validate input synchronously before returning 200
+    with session_factory() as session:
+        validate_generation_request(session, command)
 
     started_view, cmd = catalog_service.prepare_structured_draft_stream(
         actor,
@@ -104,7 +110,12 @@ async def start_chat_generation(
     catalog_service: CatalogGenerationService = container.catalog_service._generation
     broker: GenerationRealtimeBroker = container.generation_broker
     background_tasks: BackgroundTaskRunner = container.background_tasks
+    session_factory = container.session_factory
     correlation = _correlation_from_request(request)
+
+    # Validate input synchronously before returning 200
+    with session_factory() as session:
+        validate_generation_request(session, command)
 
     started_view, cmd = catalog_service.prepare_chat_draft_stream(
         actor,

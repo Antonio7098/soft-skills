@@ -1,4 +1,6 @@
-"""Voice input toggle button with recording indicator."""
+/**
+ * Voice input toggle button with recording indicator.
+ */
 
 import { Mic, MicOff, Waves } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';

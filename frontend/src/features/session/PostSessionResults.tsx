@@ -245,14 +245,14 @@ function PerSkillResultCard({
           </p>
         )}
 
-        {assessment.evidence.length > 0 && (
+        {(assessment.evidence?.length ?? 0) > 0 && (
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
             className="flex items-center gap-1 text-body-xs text-accent hover:text-accent/80 transition-colors"
           >
             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            {expanded ? 'Hide' : 'Show'} evidence ({assessment.evidence.length})
+            {expanded ? 'Hide' : 'Show'} evidence ({assessment.evidence?.length ?? 0})
           </button>
         )}
 
@@ -266,7 +266,7 @@ function PerSkillResultCard({
               className="overflow-hidden"
             >
               <div className="flex flex-col gap-2 pt-2 border-t border-line">
-                {assessment.evidence.map((ev, i) => (
+                {(assessment.evidence ?? []).map((ev, i) => (
                   <div key={i} className="flex flex-col gap-1">
                     <p className="text-body-xs text-content-primary italic">"{ev.quote}"</p>
                     <p className="text-body-xs text-content-secondary">{ev.explanation}</p>
@@ -286,10 +286,12 @@ function SkillScoresSection({
   rubricId,
   rubricCriteria,
 }: {
-  perSkillAssessments: readonly PerSkillAssessment[];
+  perSkillAssessments: readonly PerSkillAssessment[] | undefined;
   rubricId: string;
   rubricCriteria: RubricCriterionView[];
 }) {
+  if (!perSkillAssessments || perSkillAssessments.length === 0) return null;
+
   const rubricType = getRubricType(rubricId);
 
   return (
@@ -326,11 +328,13 @@ function CompetencySection({
   rubricId,
   rubricCriteria,
 }: {
-  perSkillAssessments: readonly PerSkillAssessment[];
+  perSkillAssessments: readonly PerSkillAssessment[] | undefined;
   competencies: readonly CompetencyView[];
   rubricId: string;
   rubricCriteria: RubricCriterionView[];
 }) {
+  if (!perSkillAssessments || perSkillAssessments.length === 0) return null;
+
   const skillScoreMap = new Map(perSkillAssessments.map((s) => [s.skill_slug, s.score]));
   const relevant = competencies.filter((c) =>
     c.skill_slugs.some((slug) => skillScoreMap.has(slug)),
@@ -383,10 +387,10 @@ function CompetencySection({
   );
 }
 
-function EvidenceSection({ perSkillAssessments }: { perSkillAssessments: readonly PerSkillAssessment[] }) {
-  const allEvidence = perSkillAssessments.flatMap((psa) =>
-    psa.evidence.map((e) => ({ ...e, skill_slug: psa.skill_slug })),
-  );
+function EvidenceSection({ perSkillAssessments }: { perSkillAssessments: readonly PerSkillAssessment[] | undefined }) {
+  const allEvidence = perSkillAssessments?.flatMap((psa) =>
+    psa.evidence?.map((e) => ({ ...e, skill_slug: psa.skill_slug })) ?? [],
+  ) ?? [];
 
   if (allEvidence.length === 0) return null;
 
@@ -436,13 +440,17 @@ function FeedbackGrid({
   weaknesses,
   nextActions,
 }: {
-  strengths: readonly string[];
-  weaknesses: readonly string[];
-  nextActions: readonly string[];
+  strengths: readonly string[] | undefined;
+  weaknesses: readonly string[] | undefined;
+  nextActions: readonly string[] | undefined;
 }) {
+  const safeStrengths = strengths ?? [];
+  const safeWeaknesses = weaknesses ?? [];
+  const safeNextActions = nextActions ?? [];
+
   return (
     <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {strengths.length > 0 && (
+      {safeStrengths.length > 0 && (
         <Card padding="md" className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-full bg-status-success/10 flex items-center justify-center">
@@ -451,7 +459,7 @@ function FeedbackGrid({
             <span className="text-body-sm font-semibold text-status-success">Strengths</span>
           </div>
           <ul className="flex flex-col gap-2 pl-9">
-            {strengths.map((item, i) => (
+            {safeStrengths.map((item, i) => (
               <li key={i} className="text-body-sm text-content-primary leading-relaxed list-disc">
                 {item}
               </li>
@@ -460,7 +468,7 @@ function FeedbackGrid({
         </Card>
       )}
 
-      {weaknesses.length > 0 && (
+      {safeWeaknesses.length > 0 && (
         <Card padding="md" className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-full bg-status-warning/10 flex items-center justify-center">
@@ -469,7 +477,7 @@ function FeedbackGrid({
             <span className="text-body-sm font-semibold text-status-warning">Areas to Improve</span>
           </div>
           <ul className="flex flex-col gap-2 pl-9">
-            {weaknesses.map((item, i) => (
+            {safeWeaknesses.map((item, i) => (
               <li key={i} className="text-body-sm text-content-primary leading-relaxed list-disc">
                 {item}
               </li>
@@ -478,7 +486,7 @@ function FeedbackGrid({
         </Card>
       )}
 
-      {nextActions.length > 0 && (
+      {safeNextActions.length > 0 && (
         <Card padding="md" className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-full bg-accent-muted flex items-center justify-center">
@@ -487,7 +495,7 @@ function FeedbackGrid({
             <span className="text-body-sm font-semibold text-accent-text">Next Steps</span>
           </div>
           <ul className="flex flex-col gap-2 pl-9">
-            {nextActions.map((item, i) => (
+            {safeNextActions.map((item, i) => (
               <li key={i} className="text-body-sm text-content-primary leading-relaxed list-disc">
                 {item}
               </li>

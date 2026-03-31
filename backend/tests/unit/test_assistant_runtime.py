@@ -17,8 +17,17 @@ from soft_skills_backend.modules.assistant.workflows.service import (
     _should_include_read_schema_context,
     _should_rewrite_final_response,
 )
+from soft_skills_backend.modules.assistant.workflows.tools import (
+    _normalize_collection_generation_command,
+)
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
     ChatCollectionGenerationCommand,
+)
+from soft_skills_backend.modules.taxonomy.models import (
+    CompetencyView,
+    RubricView,
+    SkillView,
+    TaxonomySnapshot,
 )
 from soft_skills_backend.shared.errors import orchestration_error
 from soft_skills_backend.shared.ports.models import ProviderToolCall
@@ -233,6 +242,118 @@ def test_chat_collection_generation_command_content_formats_are_strict() -> None
                 "scenario_artifact_count": 0,
             },
         )
+
+
+def test_normalize_collection_generation_command_adds_default_rubrics_and_repairs_counts() -> None:
+    command = ChatCollectionGenerationCommand(
+        prompt="Generate a collection on negotiating in remote teams for junior consultants.",
+        target_audience="junior consultants",
+        difficulty="intermediate",
+        content_format_mix=["quick_practice_prompt", "interview_prompt", "scenario_step"],
+        target_skill_slugs=["negotiation", "empathy", "expectation-setting"],
+        target_competency_slugs=["stakeholder-management"],
+        rubric_ids=[],
+        counts={
+            "quick_practice_prompt_count": 1,
+            "interview_prompt_count": 1,
+            "scenario_count": 0,
+            "scenario_artifact_count": 1,
+        },
+    )
+    snapshot = TaxonomySnapshot(
+        skills=[
+            SkillView(slug="negotiation", name="Negotiation", description=""),
+            SkillView(slug="empathy", name="Empathy", description=""),
+            SkillView(slug="expectation-setting", name="Expectation Setting", description=""),
+        ],
+        competencies=[
+            CompetencyView(
+                slug="stakeholder-management",
+                name="Stakeholder Management",
+                description="",
+                skill_slugs=["negotiation", "empathy", "expectation-setting"],
+            )
+        ],
+        rubrics=[
+            RubricView(
+                rubric_id="quick_practice_text@v1",
+                skill_slug="general",
+                content_type="quick_practice_prompt",
+                schema_version="v1",
+                name="Quick Practice",
+            ),
+            RubricView(
+                rubric_id="interview_text@v1",
+                skill_slug="general",
+                content_type="interview_prompt",
+                schema_version="v1",
+                name="Interview",
+            ),
+            RubricView(
+                rubric_id="scenario_text@v1",
+                skill_slug="general",
+                content_type="scenario_step",
+                schema_version="v1",
+                name="Scenario",
+            ),
+        ],
+    )
+
+    normalized = _normalize_collection_generation_command(command, snapshot)
+
+    assert normalized.rubric_ids == [
+        "quick_practice_text@v1",
+        "interview_text@v1",
+        "scenario_text@v1",
+    ]
+    assert normalized.counts.scenario_artifact_count == 0
+
+
+def test_normalize_collection_generation_command_can_infer_taxonomy_targets_from_prompt() -> None:
+    command = ChatCollectionGenerationCommand(
+        prompt="Generate a negotiation collection for junior consultants in remote teams.",
+        target_audience="junior consultants",
+        difficulty="intermediate",
+        content_format_mix=["interview_prompt"],
+        target_skill_slugs=[],
+        target_competency_slugs=[],
+        rubric_ids=[],
+        counts={
+            "quick_practice_prompt_count": 0,
+            "interview_prompt_count": 1,
+            "scenario_count": 0,
+            "scenario_artifact_count": 0,
+        },
+    )
+    snapshot = TaxonomySnapshot(
+        skills=[
+            SkillView(slug="negotiation", name="Negotiation", description=""),
+            SkillView(slug="active-listening", name="Active Listening", description=""),
+        ],
+        competencies=[
+            CompetencyView(
+                slug="stakeholder-management",
+                name="Stakeholder Management",
+                description="",
+                skill_slugs=["negotiation", "active-listening"],
+            )
+        ],
+        rubrics=[
+            RubricView(
+                rubric_id="interview_text@v1",
+                skill_slug="general",
+                content_type="interview_prompt",
+                schema_version="v1",
+                name="Interview",
+            )
+        ],
+    )
+
+    normalized = _normalize_collection_generation_command(command, snapshot)
+
+    assert normalized.target_skill_slugs == ["negotiation"]
+    assert normalized.target_competency_slugs == ["stakeholder-management"]
+    assert normalized.rubric_ids == ["interview_text@v1"]
 
 
 def test_should_include_read_schema_context_only_for_read_like_requests() -> None:

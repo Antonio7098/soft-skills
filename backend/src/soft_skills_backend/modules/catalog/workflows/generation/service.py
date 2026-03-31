@@ -44,6 +44,7 @@ from soft_skills_backend.modules.catalog.workflows.generation.collection_pipelin
 from soft_skills_backend.modules.catalog.workflows.generation.prompt_item_pipeline import (
     generate_prompt_items_for_collection,
 )
+from soft_skills_backend.modules.taxonomy import TaxonomyService
 from soft_skills_backend.modules.practice.workflows.assessment import TypedLLMOutput
 from soft_skills_backend.platform.db.models import RubricRecord
 from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
@@ -73,6 +74,7 @@ class CatalogGenerationService:
         llm_provider: LLMProvider,
         prompt_security_policy: PromptSecurityPolicy,
         prompt_registry: PromptRegistry,
+        taxonomy_service: TaxonomyService,
         stageflow_runtime: StageflowRuntime,
         broker: GenerationRealtimeBroker | None = None,
     ) -> None:
@@ -82,6 +84,7 @@ class CatalogGenerationService:
         self._llm_provider = llm_provider
         self._prompt_security_policy = prompt_security_policy
         self._prompt_registry = prompt_registry
+        self._taxonomy_service = taxonomy_service
         self._stageflow = StageflowPipelineSupport.from_runtime(stageflow_runtime)
         self._config = load_catalog_generation_runtime_config()
         self._blueprint_output = TypedLLMOutput(
@@ -156,6 +159,7 @@ class CatalogGenerationService:
             timeout_ms=self._generation_timeout_ms,
             sanitize_text=self._sanitize_generation_text,
             workplace_context_for_commands=self._collection_workplace_context,
+            taxonomy_context_for_commands=self._collection_taxonomy_context,
         )
 
     async def generate_chat_draft(
@@ -188,6 +192,7 @@ class CatalogGenerationService:
             timeout_ms=self._generation_timeout_ms,
             sanitize_text=self._sanitize_generation_text,
             workplace_context_for_commands=self._collection_workplace_context,
+            taxonomy_context_for_commands=self._collection_taxonomy_context,
         )
 
     async def generate_prompt_items_structured(
@@ -329,6 +334,7 @@ class CatalogGenerationService:
                 timeout_ms=self._generation_timeout_ms,
                 sanitize_text=self._sanitize_generation_text,
                 workplace_context_for_commands=self._collection_workplace_context,
+                taxonomy_context_for_commands=self._collection_taxonomy_context,
                 progress_callback=progress_callback,
                 execution=execution,
             )
@@ -451,6 +457,7 @@ class CatalogGenerationService:
                 timeout_ms=self._generation_timeout_ms,
                 sanitize_text=self._sanitize_generation_text,
                 workplace_context_for_commands=self._collection_workplace_context,
+                taxonomy_context_for_commands=self._collection_taxonomy_context,
                 progress_callback=progress_callback,
                 execution=execution,
             )
@@ -523,6 +530,20 @@ class CatalogGenerationService:
             return structured_command.workplace_context
         assert chat_command is not None
         return chat_command.prompt
+
+    def _collection_taxonomy_context(
+        self,
+        actor: Actor,
+        structured_command: StructuredCollectionGenerationCommand | None,
+        chat_command: ChatCollectionGenerationCommand | None,
+    ) -> str:
+        command = structured_command or chat_command
+        organisation_id = (
+            command.organisation_id
+            if command is not None and command.organisation_id is not None
+            else actor.organisation_id
+        )
+        return self._taxonomy_service.render_prompt_context(organisation_id)
 
     def _sanitize_generation_text(self, text: str) -> str:
         try:

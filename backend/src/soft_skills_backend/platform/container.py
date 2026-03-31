@@ -220,6 +220,7 @@ def build_container(settings: Settings) -> AppContainer:
         workflow_events=workflow_events,
         llm_provider=llm_provider,
         prompt_registry=prompt_registry,
+        taxonomy_service=taxonomy_service,
         stageflow_runtime=stageflow_runtime,
         generation_broker=generation_broker,
     )

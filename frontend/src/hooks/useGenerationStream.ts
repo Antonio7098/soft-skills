@@ -1,4 +1,4 @@
-import { useCallback, useReducer } from 'react';
+import { useCallback, useReducer, useRef } from 'react';
 import type {
   GenerationProgressState,
   GenerationStage,
@@ -7,6 +7,7 @@ import type {
   ChatCollectionGenerationCommand,
   BlueprintInfo,
   PromptItemDraft,
+  GenerationActivityItem,
 } from '@/data/types';
 import { useData } from '@/data';
 
@@ -16,6 +17,7 @@ type GenerationAction =
   | { type: 'SET_BLUEPRINT'; blueprint: BlueprintInfo }
   | { type: 'SET_PROMPT_ITEMS'; prompt_items: PromptItemDraft[] }
   | { type: 'ADD_PROMPT_ITEM'; prompt_item: PromptItemDraft }
+  | { type: 'ADD_ACTIVITY'; item: GenerationActivityItem }
   | { type: 'COMPLETE'; collection: GenerationProgressState['collection'] }
   | { type: 'FAIL'; error: string }
   | { type: 'CANCEL' }
@@ -25,6 +27,7 @@ const STAGE_ORDER: GenerationStage[] = [
   'pending',
   'input_guard',
   'blueprint_transform',
+  'blueprint_llm_transform',
   'blueprint_guard',
   'prompt_items_work',
   'scenarios_work',
@@ -38,6 +41,7 @@ const STAGE_LABELS: Record<GenerationStage, string> = {
   pending: 'Initializing',
   input_guard: 'Validating input',
   blueprint_transform: 'Creating blueprint',
+  blueprint_llm_transform: 'Planning blueprint',
   blueprint_guard: 'Validating blueprint',
   prompt_items_work: 'Generating prompts',
   scenarios_work: 'Generating scenarios',
@@ -53,6 +57,7 @@ const STAGE_ICONS: Record<GenerationStage, string> = {
   pending: '⚡',
   input_guard: '🔍',
   blueprint_transform: '📋',
+  blueprint_llm_transform: '🧠',
   blueprint_guard: '✅',
   prompt_items_work: '💬',
   scenarios_work: '🎭',
@@ -72,6 +77,17 @@ function reducer(state: GenerationProgressState, action: GenerationAction): Gene
         status: 'started',
         generation_id: action.generation_id,
         stream_token: action.stream_token,
+        current_stage: 'pending',
+        progress_percent: 2,
+        error: null,
+        activity: [
+          {
+            id: `start:${action.generation_id}`,
+            stage: 'pending',
+            message: 'Starting generation and connecting to live updates.',
+            timestamp: new Date().toISOString(),
+          },
+        ],
       };
     case 'EVENT': {
       const event = action.event;
@@ -103,6 +119,11 @@ function reducer(state: GenerationProgressState, action: GenerationAction): Gene
       return {
         ...state,
         prompt_items: [...state.prompt_items, action.prompt_item],
+      };
+    case 'ADD_ACTIVITY':
+      return {
+        ...state,
+        activity: [action.item, ...state.activity].slice(0, 8),
       };
     case 'COMPLETE':
       return {
@@ -142,9 +163,70 @@ const initialState: GenerationProgressState = {
   progress_percent: 0,
   blueprint: null,
   prompt_items: [],
+  activity: [],
   collection: null,
   error: null,
 };
+
+function buildActivityFromEvent(event: GenerationStreamEvent): GenerationActivityItem | null {
+  const payload = event.payload as Record<string, unknown>;
+  let message: string | null = null;
+  switch (event.stage) {
+    case 'input_guard':
+      message = 'Validated generation request.';
+      break;
+    case 'blueprint_transform':
+      message = 'Prepared blueprint planning request.';
+      break;
+    case 'blueprint_llm_transform':
+      message = typeof payload.title === 'string'
+        ? `Planned blueprint: ${payload.title}`
+        : 'Blueprint plan generated.';
+      break;
+    case 'blueprint_guard':
+      message = 'Validated the blueprint contract.';
+      break;
+    case 'prompt_items_work':
+      if (Array.isArray(payload.prompt_items) && payload.prompt_items.length > 0) {
+        message = `Generated ${payload.prompt_items.length} prompt item${payload.prompt_items.length === 1 ? '' : 's'}.`;
+      } else if (typeof payload.generated_prompt_items === 'number') {
+        message = `Prompt item workers finished ${payload.generated_prompt_items} item${payload.generated_prompt_items === 1 ? '' : 's'}.`;
+      } else {
+        message = 'Prompt item workers are running.';
+      }
+      break;
+    case 'scenarios_work':
+      message = 'Scenario workers are running.';
+      break;
+    case 'assemble_transform':
+      message = 'Assembling final collection draft.';
+      break;
+    case 'output_guard':
+      message = 'Running final validation.';
+      break;
+    case 'persistence_work':
+      message = 'Saving generated collection.';
+      break;
+    case 'completed':
+      message = 'Generation completed.';
+      break;
+    case 'failed':
+      message = typeof payload.error === 'string' ? payload.error : 'Generation failed.';
+      break;
+    case 'cancelled':
+      message = 'Generation was cancelled.';
+      break;
+    default:
+      message = null;
+  }
+  if (!message) return null;
+  return {
+    id: event.event_id,
+    stage: event.stage,
+    message,
+    timestamp: event.emitted_at,
+  };
+}
 
 interface UseGenerationStreamOptions {
   onComplete?: (collection: GenerationProgressState['collection']) => void;
@@ -154,121 +236,91 @@ interface UseGenerationStreamOptions {
 export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
   const data = useData();
   const [state, dispatch] = useReducer(reducer, initialState);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   const startGeneration = useCallback(
     async (command: StructuredCollectionGenerationCommand | ChatCollectionGenerationCommand) => {
       const isStructured = 'title_hint' in command;
-
-      // Simulate WebSocket streaming with mock events
-      const mockStreamToken = `mock_${Date.now()}`;
-      const mockGenerationId = `gen_${Date.now()}`;
-
-      dispatch({ type: 'START', generation_id: mockGenerationId, stream_token: mockStreamToken });
-
-      // Simulate blueprint from command
-      const mockBlueprint: BlueprintInfo = {
-        title: isStructured && 'title_hint' in command ? (command.title_hint || 'Generated Collection') : 'Generated from prompt',
-        summary: 'AI-generated content for practice.',
-        prompt_items_count: command.counts.quick_practice_prompt_count + command.counts.interview_prompt_count,
-        scenarios_count: command.counts.scenario_count,
-        model_slug: 'gpt-4',
-      };
-
-      // Simulate mock prompts
-      const mockPrompts: PromptItemDraft[] = Array.from(
-        { length: command.counts.quick_practice_prompt_count + command.counts.interview_prompt_count },
-        (_, i) => ({
-          title: `Practice Question ${i + 1}`,
-          prompt_type: i < command.counts.quick_practice_prompt_count ? 'quick_practice_prompt' : 'interview_prompt',
-          difficulty: 'intermediate',
-        })
-      );
-
-      // Simulate the streaming pipeline stages
-      const stagesToSimulate: {
-        stage: GenerationStage;
-        progress: number;
-        delay: number;
-        blueprintPayload?: Record<string, unknown>;
-      }[] = [
-        { stage: 'input_guard', progress: 5, delay: 200 },
-        { stage: 'blueprint_transform', progress: 15, delay: 800, blueprintPayload: mockBlueprint as unknown as Record<string, unknown> },
-        { stage: 'blueprint_guard', progress: 20, delay: 300 },
-      ];
-
-      for (const stageInfo of stagesToSimulate) {
-        await new Promise((resolve) => setTimeout(resolve, stageInfo.delay));
-        const event: GenerationStreamEvent = {
-          event_id: `evt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-          generation_id: mockGenerationId,
-          type: 'progress',
-          stage: stageInfo.stage,
-          sequence_number: stagesToSimulate.indexOf(stageInfo),
-          emitted_at: new Date().toISOString(),
-          progress_percent: stageInfo.progress,
-          payload: stageInfo.blueprintPayload || {},
-        };
-        dispatch({ type: 'EVENT', event });
-        if (stageInfo.blueprintPayload) {
-          dispatch({ type: 'SET_BLUEPRINT', blueprint: mockBlueprint });
-        }
-      }
-
-      // Simulate prompt items one by one
-      for (let i = 0; i < mockPrompts.length; i++) {
-        const progress = 35 + (i / mockPrompts.length) * 20;
-        await new Promise((resolve) => setTimeout(resolve, 400));
-        const mockPrompt = mockPrompts[i] as PromptItemDraft;
-        const event: GenerationStreamEvent = {
-          event_id: `evt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-          generation_id: mockGenerationId,
-          type: 'progress',
-          stage: 'prompt_items_work' as GenerationStage,
-          sequence_number: stagesToSimulate.length + i,
-          emitted_at: new Date().toISOString(),
-          progress_percent: progress,
-          payload: { title: mockPrompt.title, prompt_type: mockPrompt.prompt_type, difficulty: mockPrompt.difficulty },
-        };
-        dispatch({ type: 'EVENT', event });
-        dispatch({ type: 'ADD_PROMPT_ITEM', prompt_item: mockPrompt });
-      }
-
-      const remainingStages: {
-        stage: GenerationStage;
-        progress: number;
-        delay: number;
-      }[] = [
-        { stage: 'scenarios_work', progress: 60, delay: 500 },
-        { stage: 'scenarios_work', progress: 70, delay: 300 },
-        { stage: 'assemble_transform', progress: 80, delay: 400 },
-        { stage: 'output_guard', progress: 90, delay: 300 },
-        { stage: 'persistence_work', progress: 95, delay: 500 },
-        { stage: 'persistence_work', progress: 100, delay: 400 },
-      ];
-
-      for (const stageInfo of remainingStages) {
-        await new Promise((resolve) => setTimeout(resolve, stageInfo.delay));
-        const event: GenerationStreamEvent = {
-          event_id: `evt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-          generation_id: mockGenerationId,
-          type: 'progress',
-          stage: stageInfo.stage,
-          sequence_number: stagesToSimulate.length + mockPrompts.length + remainingStages.indexOf(stageInfo),
-          emitted_at: new Date().toISOString(),
-          progress_percent: stageInfo.progress,
-          payload: {},
-        };
-        dispatch({ type: 'EVENT', event });
-      }
-
-      // Now call the actual generation
       try {
-        const result = isStructured
+        cleanupRef.current?.();
+        dispatch({ type: 'RESET' });
+        dispatch({
+          type: 'START',
+          generation_id: 'pending',
+          stream_token: 'pending',
+        });
+        const started = isStructured
           ? await data.generateStructuredCollection(command as StructuredCollectionGenerationCommand)
           : await data.generateChatCollection(command as ChatCollectionGenerationCommand);
+        dispatch({ type: 'START', generation_id: started.generation_id, stream_token: started.stream_token });
 
-        dispatch({ type: 'COMPLETE', collection: result.collection });
-        options.onComplete?.(result.collection);
+        cleanupRef.current = data.streamGeneration(started.stream_token, {
+          onEvent: (event) => {
+            dispatch({ type: 'EVENT', event });
+            const activity = buildActivityFromEvent(event);
+            if (activity) {
+              dispatch({ type: 'ADD_ACTIVITY', item: activity });
+            }
+            if (event.stage === 'blueprint_llm_transform') {
+              const payload = event.payload as Partial<BlueprintInfo>;
+              if (payload.title && payload.summary) {
+                dispatch({
+                  type: 'SET_BLUEPRINT',
+                  blueprint: {
+                    title: payload.title,
+                    summary: payload.summary,
+                    prompt_items_count: Number(payload.prompt_items_count ?? 0),
+                    scenarios_count: Number(payload.scenarios_count ?? 0),
+                    model_slug: String(payload.model_slug ?? ''),
+                  },
+                });
+              }
+            }
+            if (event.stage === 'prompt_items_work') {
+              const promptItems = Array.isArray(event.payload.prompt_items) ? event.payload.prompt_items : [];
+              for (const item of promptItems) {
+                const promptItem = item as PromptItemDraft;
+                if (promptItem?.title && promptItem?.prompt_type) {
+                  dispatch({ type: 'ADD_PROMPT_ITEM', prompt_item: promptItem });
+                }
+              }
+            }
+          },
+          onCompleted: async (payload) => {
+            cleanupRef.current?.();
+            cleanupRef.current = null;
+            try {
+              const collectionId = typeof payload.collection_id === 'string' ? payload.collection_id : null;
+              if (!collectionId) {
+                throw new Error('Generation completed without a collection id.');
+              }
+              const collection = await data.getCollection(collectionId);
+              dispatch({ type: 'COMPLETE', collection });
+              options.onComplete?.(collection);
+            } catch (err) {
+              const errorMessage = err instanceof Error ? err.message : 'Failed to load generated collection';
+              dispatch({ type: 'FAIL', error: errorMessage });
+              options.onError?.(errorMessage);
+            }
+          },
+          onFailed: (payload) => {
+            cleanupRef.current?.();
+            cleanupRef.current = null;
+            const errorMessage =
+              (typeof payload.error === 'string' && payload.error)
+              || (typeof payload.reason === 'string' && payload.reason)
+              || 'Generation failed';
+            dispatch({ type: 'FAIL', error: errorMessage });
+            options.onError?.(errorMessage);
+          },
+          onError: (errorMessage) => {
+            dispatch({ type: 'FAIL', error: errorMessage });
+            options.onError?.(errorMessage);
+          },
+          onClose: () => {
+            cleanupRef.current = null;
+          },
+        });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Generation failed';
         dispatch({ type: 'FAIL', error: errorMessage });
@@ -279,10 +331,14 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
   );
 
   const cancelGeneration = useCallback(() => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
     dispatch({ type: 'CANCEL' });
   }, []);
 
   const reset = useCallback(() => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
     dispatch({ type: 'RESET' });
   }, []);
 

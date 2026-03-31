@@ -14,7 +14,7 @@ interface TurnHistoryProps {
 }
 
 export function TurnHistory({ turns, className }: TurnHistoryProps) {
-  if (turns.length === 0) return null;
+  if (!turns || turns.length === 0) return null;
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>

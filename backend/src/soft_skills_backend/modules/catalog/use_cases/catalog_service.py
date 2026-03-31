@@ -42,6 +42,7 @@ from soft_skills_backend.modules.catalog.workflows.generation.service import (
 )
 from soft_skills_backend.modules.catalog.workflows.prompt_items.service import PromptItemService
 from soft_skills_backend.modules.catalog.workflows.scenarios.service import ScenarioService
+from soft_skills_backend.modules.taxonomy import TaxonomyService
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
 from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.workflows.stageflow_runtime import StageflowRuntime
@@ -60,6 +61,7 @@ class CatalogService:
         workflow_events: SqlAlchemyWorkflowEventRepository,
         llm_provider: LLMProvider,
         prompt_registry: PromptRegistry,
+        taxonomy_service: TaxonomyService,
         stageflow_runtime: StageflowRuntime,
         generation_broker: GenerationRealtimeBroker | None = None,
     ) -> None:
@@ -88,6 +90,7 @@ class CatalogService:
             llm_provider=llm_provider,
             prompt_security_policy=PromptSecurityPolicy(),
             prompt_registry=prompt_registry,
+            taxonomy_service=taxonomy_service,
             stageflow_runtime=stageflow_runtime,
             broker=generation_broker,
         )

@@ -25,7 +25,8 @@ import type {
   StartPracticeRunCommand,
   StructuredCollectionGenerationCommand,
   ChatCollectionGenerationCommand,
-  CollectionGenerationView,
+  GenerationStartedView,
+  GenerationStreamCallbacks,
   AdminUserView,
   AdminUserListView,
   BulkOperationResultView,
@@ -109,8 +110,9 @@ export interface DataProvider {
   addScenario(collectionId: string, cmd: ScenarioCreateCommand): Promise<CollectionView>;
 
   // --- Content Generation --------------------------------------------------
-  generateStructuredCollection(cmd: StructuredCollectionGenerationCommand): Promise<CollectionGenerationView>;
-  generateChatCollection(cmd: ChatCollectionGenerationCommand): Promise<CollectionGenerationView>;
+  generateStructuredCollection(cmd: StructuredCollectionGenerationCommand): Promise<GenerationStartedView>;
+  generateChatCollection(cmd: ChatCollectionGenerationCommand): Promise<GenerationStartedView>;
+  streamGeneration(streamToken: string, callbacks: GenerationStreamCallbacks): () => void;
 
   // --- Practice ------------------------------------------------------------
   startQuickPracticeSession(cmd: StartQuickPracticeSessionCommand): Promise<QuickPracticeSessionView>;

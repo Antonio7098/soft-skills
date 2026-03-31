@@ -151,8 +151,10 @@ Rules:
 - Preserve prompt_type, difficulty, target_skill_slugs, and rubric_id exactly as requested.
 - If prompt_type is quick_practice_prompt, target_skill_slugs must be an empty array.
 - If prompt_type is quick_practice_prompt, generated_rubric is required and must define a question-specific pass/fail rubric for this exact prompt.
+- If prompt_type is quick_practice_prompt, every generated_rubric criterion must include exactly two levels, in this order: level 1 then level 2.
+- Never omit either binary rubric level. Never return a criterion with only one level.
 - Quick-practice rubric criteria are not skill-based. Use criterion_ref as a short rubric check id, and set skill_slug to the same value or null.
-- If prompt_type is not quick_practice_prompt, generated_rubric must be null.
+- If prompt_type is not quick_practice_prompt, generated_rubric must be null exactly.
 - Produce editable, realistic workplace practice content.
 - Avoid repeating the title hint verbatim if a better specific title exists.
 - Do not include markdown fences or prose outside the JSON object."""
@@ -172,6 +174,9 @@ Rules:
 - Preserve target_skill_slugs and rubric_id exactly as requested.
 - Keep the mock world internally consistent.
 - Generate exactly the requested number of supporting artifacts.
+- Every required field must be present.
+- Use [] for empty arrays and null for absent mock_company.
+- supporting_artifacts must be an array, even when the count is 0.
 - Do not include markdown fences or prose outside the JSON object."""
 
 CREATOR_STRUCTURED_GENERATION_PROMPT = """Generate an editable SoftSkills creator draft.
@@ -219,6 +224,8 @@ Deterministic collection metadata:
 - target skills: {target_skill_slugs}
 - target competencies: {target_competency_slugs}
 - rubric ids: {rubric_ids}
+Available taxonomy:
+{taxonomy_context}
 Generation brief:
 - domain: {domain}
 - workplace context: {workplace_context}
@@ -240,6 +247,8 @@ Deterministic collection metadata:
 - target competencies: {target_competency_slugs}
 - rubric ids: {rubric_ids}
 - requested counts: {requested_counts}
+Available taxonomy:
+{taxonomy_context}
 Allowed prompt types: {allowed_prompt_types}
 Allowed artifact types: {allowed_artifact_types}
 Hardened user brief:
@@ -298,6 +307,12 @@ Creative brief:
 Rules:
 - If prompt_type is quick_practice_prompt, return target_skill_slugs as [].
 - Quick-practice criteria are rubric checks, not platform skills.
+- If prompt_type is quick_practice_prompt, generated_rubric is mandatory.
+- For every quick-practice criterion, the levels array must contain exactly two objects only:
+  1. {{ "level": 1, "description": "...", "examples": ["..."] }}
+  2. {{ "level": 2, "description": "...", "examples": ["..."] }}
+- Do not return a criterion with one level.
+- If prompt_type is not quick_practice_prompt, return generated_rubric as null.
 {output_format}"""
 
 CREATOR_SCENARIO_WORKER_PROMPT = """Generate one editable SoftSkills scenario draft.
@@ -314,4 +329,11 @@ Fixed worker metadata:
 Creative brief:
 - title hint: {title_hint}
 - generation brief: {generation_brief}
+Rules:
+- Return every required field explicitly.
+- If there is no mock company, set mock_company to null.
+- If mock_people contains one or more people, mock_company must be a non-null object with name, industry, and operating_context.
+- Do not return mock_people unless they clearly belong to the same mock_company context.
+- If there are no mock people, constraints, stakeholder tensions, or supporting artifacts, return [] for those arrays.
+- supporting_artifacts must contain exactly {supporting_artifact_count} items.
 {output_format}"""

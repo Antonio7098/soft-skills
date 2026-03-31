@@ -42,14 +42,14 @@ export function ScenarioSession() {
       if (updated.status === 'completed') {
         setPhase('assessing');
         timer.pause();
-        const allResponses = updated.history.map((h) => h.response).join('\n\n');
+        const allResponses = updated.history?.map((h) => h.response).join('\n\n') ?? '';
         const mockResult = buildMockAttemptView({
           attemptId: updated.attempt_id,
           sessionId: updated.session_id,
-          title: updated.scenario.title,
-          promptText: updated.scenario.business_context,
+          title: updated.scenario?.title ?? 'Scenario Practice',
+          promptText: updated.scenario?.business_context ?? '',
           difficulty: 'intermediate',
-          skillSlugs: updated.scenario.target_skill_slugs,
+          skillSlugs: updated.scenario?.target_skill_slugs ?? [],
           responseText: allResponses,
         });
         setResult(mockResult);
@@ -66,19 +66,19 @@ export function ScenarioSession() {
   if (phase === 'loading') return <LoadingState message="Setting up the scenario..." />;
   if (phase === 'error') return <ErrorState message={error} onRetry={() => navigate('/practice')} />;
 
-  const previousTurns = session?.history.map((h) => ({
+  const previousTurns = session?.history?.map((h) => ({
     question: h.prompt,
     response: h.response,
   })) ?? [];
 
   return (
     <SessionShell
-      title={session?.scenario.title ?? 'Scenario Practice'}
+      title={session?.scenario?.title ?? 'Scenario Practice'}
       timer={timer.formatted}
       currentStep={session?.current_step ?? 1}
       totalSteps={session?.total_steps ?? 3}
       stepLabel="Step"
-      sidebar={session ? <ContextPanel scenario={session.scenario} /> : undefined}
+      sidebar={session?.scenario ? <ContextPanel scenario={session.scenario} /> : undefined}
     >
       {(phase === 'responding' || phase === 'submitting') && session && (
         <>

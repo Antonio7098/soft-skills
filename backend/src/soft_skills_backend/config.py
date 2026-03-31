@@ -97,7 +97,7 @@ class Settings(BaseSettings):
 
     llm_creator_blueprint_model: str | None = Field(default=None)
     llm_creator_blueprint_prompt_version: str = Field(
-        default="creator.collection.structured-blueprint.v2",
+        default="creator.collection.structured-blueprint.v3",
     )
     llm_creator_prompt_item_model: str | None = Field(default=None)
     llm_creator_prompt_item_prompt_version: str = Field(

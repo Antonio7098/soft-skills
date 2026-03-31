@@ -265,6 +265,32 @@ class PracticeRepository:
             )
             return [build_practice_run_list_item(session, run) for run in runs]
 
+    def get_practice_run_sessions(self, actor: Actor, run_id: str) -> list[dict]:
+        with self._session_factory() as session:
+            from soft_skills_backend.platform.db.models import PracticeSessionRecord
+
+            sessions = (
+                session.query(PracticeSessionRecord)
+                .filter(PracticeSessionRecord.practice_run_id == run_id)
+                .filter(PracticeSessionRecord.user_id == actor.user_id)
+                .order_by(PracticeSessionRecord.sequence_index.asc())
+                .all()
+            )
+            return [
+                {
+                    "id": s.id,
+                    "practice_run_id": s.practice_run_id,
+                    "sequence_index": s.sequence_index,
+                    "content_item_id": s.content_item_id,
+                    "content_item_type": s.content_item_type,
+                    "status": s.status,
+                    "last_attempt_id": s.last_attempt_id,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                    "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+                }
+                for s in sessions
+            ]
+
     def record_event(
         self,
         *,

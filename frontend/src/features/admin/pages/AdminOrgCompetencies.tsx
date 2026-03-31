@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Edit, Trash2, X, Check, Target } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Check, Target, Globe } from 'lucide-react';
 import { useAdminScope } from '@/auth';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
@@ -8,13 +8,15 @@ import { LoadingState } from '@/design-system/patterns/LoadingState';
 import { EmptyState } from '@/design-system/patterns/EmptyState';
 import { useData } from '@/data';
 import { AdminPageShell, MetricCard, SearchInput } from '../components';
-import type { OrgCompetencyView } from '@/data/types';
+import type { CompetencyView } from '@/data/types';
+
+type CompetencyWithScope = CompetencyView & { scope: 'global' | 'org'; organisation_id?: string };
 
 export function AdminOrgCompetencies() {
   const { organisationId } = useAdminScope();
   const dataProvider = useData();
-  const [competencies, setCompetencies] = useState<OrgCompetencyView[]>([]);
-  const [selectedCompetency, setSelectedCompetency] = useState<OrgCompetencyView | null>(null);
+  const [competencies, setCompetencies] = useState<CompetencyWithScope[]>([]);
+  const [selectedCompetency, setSelectedCompetency] = useState<CompetencyWithScope | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -24,13 +26,32 @@ export function AdminOrgCompetencies() {
 
   const orgId = organisationId;
 
-  const refreshCompetencies = () => {
+  const refreshCompetencies = async () => {
     if (!orgId) return;
     setLoading(true);
-    dataProvider.listOrgCompetencies(orgId)
-      .then(setCompetencies)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    try {
+      const [taxonomy, orgCompetencies] = await Promise.all([
+        dataProvider.getTaxonomy(),
+        dataProvider.listOrgCompetencies(orgId),
+      ]);
+
+      // Merge global and org competencies - org competencies take precedence
+      const orgCompetencySlugs = new Set(orgCompetencies.map((c) => c.slug));
+      const globalCompetencies: CompetencyWithScope[] = taxonomy.competencies
+        .filter((c) => !orgCompetencySlugs.has(c.slug))
+        .map((c) => ({ ...c, scope: 'global' }));
+      const mergedOrgCompetencies: CompetencyWithScope[] = orgCompetencies.map((c) => ({
+        ...c,
+        scope: 'org',
+        organisation_id: orgId,
+      }));
+
+      setCompetencies([...globalCompetencies, ...mergedOrgCompetencies]);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -77,6 +98,11 @@ export function AdminOrgCompetencies() {
 
   const handleDeleteCompetency = async (slug: string) => {
     if (!organisationId) return;
+    const competency = competencies.find((c) => c.slug === slug);
+    if (competency?.scope === 'global') {
+      alert('Global competencies cannot be deleted');
+      return;
+    }
     if (!confirm('Are you sure you want to delete this competency?')) return;
     try {
       await dataProvider.deleteOrgCompetency(organisationId, slug);
@@ -111,6 +137,16 @@ export function AdminOrgCompetencies() {
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard
+          label="Global Competencies"
+          value={competencies.filter((c) => c.scope === 'global').length}
+          icon={<Globe className="w-4 h-4" />}
+        />
+        <MetricCard
+          label="Org Competencies"
+          value={competencies.filter((c) => c.scope === 'org').length}
+          icon={<Target className="w-4 h-4" />}
+        />
+        <MetricCard
           label="Total Competencies"
           value={competencies.length}
           icon={<Target className="w-4 h-4" />}
@@ -135,13 +171,18 @@ export function AdminOrgCompetencies() {
                     : 'hover:bg-surface-secondary/50'
                 }`}
               >
-                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-                  <Target className="w-4 h-4 text-accent" />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${competency.scope === 'global' ? 'bg-surface-secondary' : 'bg-accent/10'}`}>
+                  {competency.scope === 'global' ? <Globe className="w-4 h-4 text-content-secondary" /> : <Target className="w-4 h-4 text-accent" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-body-sm font-medium text-content-primary truncate">
-                    {competency.name}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-body-sm font-medium text-content-primary truncate">
+                      {competency.name}
+                    </p>
+                    <Badge variant={competency.scope === 'global' ? 'default' : 'accent'} size="sm">
+                      {competency.scope === 'global' ? 'Global' : 'Org'}
+                    </Badge>
+                  </div>
                   <p className="text-body-xs text-content-tertiary truncate">
                     {competency.slug}
                   </p>
@@ -176,6 +217,8 @@ export function AdminOrgCompetencies() {
                     size="sm"
                     icon={<Edit className="w-4 h-4" />}
                     onClick={() => setShowEditModal(true)}
+                    disabled={selectedCompetency?.scope === 'global'}
+                    title={selectedCompetency?.scope === 'global' ? 'Global competencies cannot be edited' : undefined}
                   >
                     Edit
                   </Button>
@@ -184,6 +227,8 @@ export function AdminOrgCompetencies() {
                     size="sm"
                     icon={<Trash2 className="w-4 h-4" />}
                     onClick={() => handleDeleteCompetency(selectedCompetency.slug)}
+                    disabled={selectedCompetency?.scope === 'global'}
+                    title={selectedCompetency?.scope === 'global' ? 'Global competencies cannot be deleted' : undefined}
                   >
                     Delete
                   </Button>

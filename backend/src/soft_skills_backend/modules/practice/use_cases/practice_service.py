@@ -586,6 +586,9 @@ class PracticeService:
     def list_practice_runs(self, actor: Actor) -> list[PracticeRunListItemView]:
         return self._store.list_practice_runs(actor)
 
+    def get_practice_run_sessions(self, actor: Actor, run_id: str) -> list[dict]:
+        return self._store.get_practice_run_sessions(actor, run_id)
+
     @staticmethod
     def _start_input_from_run_item(
         item: StartQuickPracticeRunItemCommand

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, X, Check, FileText } from 'lucide-react';
+import { Plus, Trash2, X, Check, FileText, Globe } from 'lucide-react';
 import { useAdminScope } from '@/auth';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
@@ -8,14 +8,16 @@ import { LoadingState } from '@/design-system/patterns/LoadingState';
 import { EmptyState } from '@/design-system/patterns/EmptyState';
 import { useData } from '@/data';
 import { AdminPageShell, MetricCard, SearchInput } from '../components';
-import type { PromptItemView } from '@/data/types';
+import type { PromptItemView, CollectionView } from '@/data/types';
 import type { Difficulty } from '@/data/types/shared';
+
+type PromptItemWithScope = PromptItemView & { scope: 'global' | 'org' };
 
 export function AdminOrgPromptItems() {
   const { organisationId } = useAdminScope();
   const dataProvider = useData();
-  const [promptItems, setPromptItems] = useState<PromptItemView[]>([]);
-  const [selectedItem, setSelectedItem] = useState<PromptItemView | null>(null);
+  const [promptItems, setPromptItems] = useState<PromptItemWithScope[]>([]);
+  const [selectedItem, setSelectedItem] = useState<PromptItemWithScope | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -29,13 +31,37 @@ export function AdminOrgPromptItems() {
     target_skill_slugs: '',
   });
 
-  const refreshPromptItems = () => {
+  const refreshPromptItems = async () => {
     if (!organisationId) return;
     setLoading(true);
-    dataProvider.listOrgPromptItems(organisationId)
-      .then(setPromptItems)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    try {
+      const [globalCollections, orgPromptItems] = await Promise.all([
+        dataProvider.listCollections(),
+        dataProvider.listOrgPromptItems(organisationId),
+      ]);
+
+      // Extract global prompt items from collections
+      const orgItemIds = new Set(orgPromptItems.map((p) => p.id));
+      const globalPromptItems: PromptItemWithScope[] = [];
+      globalCollections.forEach((collection: CollectionView) => {
+        collection.prompt_items?.forEach((item: PromptItemView) => {
+          if (!orgItemIds.has(item.id)) {
+            globalPromptItems.push({ ...item, scope: 'global' });
+          }
+        });
+      });
+
+      const mergedOrgItems: PromptItemWithScope[] = orgPromptItems.map((p) => ({
+        ...p,
+        scope: 'org',
+      }));
+
+      setPromptItems([...globalPromptItems, ...mergedOrgItems]);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -73,6 +99,11 @@ export function AdminOrgPromptItems() {
 
   const handleDeletePromptItem = async (id: string) => {
     if (!organisationId) return;
+    const item = promptItems.find((p) => p.id === id);
+    if (item?.scope === 'global') {
+      alert('Global prompt items cannot be deleted');
+      return;
+    }
     if (!confirm('Are you sure you want to delete this prompt item?')) return;
     try {
       await dataProvider.deleteOrgPromptItem(organisationId, id);
@@ -107,13 +138,19 @@ export function AdminOrgPromptItems() {
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard
-          label="Total Prompt Items"
-          value={promptItems.length}
+          label="Global Items"
+          value={promptItems.filter((p) => p.scope === 'global').length}
+          icon={<Globe className="w-4 h-4" />}
+        />
+        <MetricCard
+          label="Org Items"
+          value={promptItems.filter((p) => p.scope === 'org').length}
           icon={<FileText className="w-4 h-4" />}
         />
         <MetricCard
-          label="By Type"
-          value={new Set(promptItems.map((p) => p.prompt_type)).size}
+          label="Total Items"
+          value={promptItems.length}
+          icon={<FileText className="w-4 h-4" />}
         />
       </div>
 
@@ -135,13 +172,18 @@ export function AdminOrgPromptItems() {
                     : 'hover:bg-surface-secondary/50'
                 }`}
               >
-                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-                  <FileText className="w-4 h-4 text-accent" />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.scope === 'global' ? 'bg-surface-secondary' : 'bg-accent/10'}`}>
+                  {item.scope === 'global' ? <Globe className="w-4 h-4 text-content-secondary" /> : <FileText className="w-4 h-4 text-accent" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-body-sm font-medium text-content-primary truncate">
-                    {item.title}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-body-sm font-medium text-content-primary truncate">
+                      {item.title}
+                    </p>
+                    <Badge variant={item.scope === 'global' ? 'default' : 'accent'} size="sm">
+                      {item.scope === 'global' ? 'Global' : 'Org'}
+                    </Badge>
+                  </div>
                   <p className="text-body-xs text-content-tertiary truncate">
                     {item.prompt_type} · {item.difficulty}
                   </p>
@@ -175,6 +217,8 @@ export function AdminOrgPromptItems() {
                   size="sm"
                   icon={<Trash2 className="w-4 h-4" />}
                   onClick={() => handleDeletePromptItem(selectedItem.id)}
+                  disabled={selectedItem?.scope === 'global'}
+                  title={selectedItem?.scope === 'global' ? 'Global prompt items cannot be deleted' : undefined}
                 >
                   Delete
                 </Button>

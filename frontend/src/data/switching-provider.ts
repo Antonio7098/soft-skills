@@ -214,6 +214,13 @@ class SwitchingDataProvider implements DataProvider {
     );
   }
 
+  streamGeneration(streamToken, callbacks) {
+    if (this._resolvedMode === 'mock') {
+      return mockDataProvider.streamGeneration(streamToken, callbacks);
+    }
+    return apiDataProvider.streamGeneration(streamToken, callbacks);
+  }
+
   // --- Practice ------------------------------------------------------------
   startQuickPracticeSession(cmd) {
     return this.withMode(

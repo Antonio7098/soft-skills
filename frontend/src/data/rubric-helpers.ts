@@ -7,7 +7,8 @@ export function getRubricType(rubricId: string): RubricType {
   return 'quick_practice';
 }
 
-export function isBinaryRubric(rubricId: string, rubricCriteria: RubricCriterionView[]): boolean {
+export function isBinaryRubric(rubricId: string, rubricCriteria: RubricCriterionView[] | undefined): boolean {
+  if (!rubricCriteria) return false;
   const criteria = rubricCriteria.filter((c) => c.rubric_id === rubricId);
   if (criteria.length === 0) return false;
   const levels = Object.keys(criteria[0]!.levels);
@@ -17,8 +18,9 @@ export function isBinaryRubric(rubricId: string, rubricCriteria: RubricCriterion
 export function getRubricCriteriaForSkill(
   rubricId: string,
   skillSlug: string,
-  rubricCriteria: RubricCriterionView[],
+  rubricCriteria: RubricCriterionView[] | undefined,
 ): RubricCriterionView | undefined {
+  if (!rubricCriteria) return undefined;
   return rubricCriteria.find((c) => c.rubric_id === rubricId && c.skill_slug === skillSlug);
 }
 
@@ -34,7 +36,8 @@ export function getLevelDescription(
   return criterion.levels[levelKey]?.description ?? `Score ${score}`;
 }
 
-export function getRubricMaxScore(rubricId: string, rubricCriteria: RubricCriterionView[]): number {
+export function getRubricMaxScore(rubricId: string, rubricCriteria: RubricCriterionView[] | undefined): number {
+  if (!rubricCriteria) return 5;
   const criteria = rubricCriteria.filter((c) => c.rubric_id === rubricId);
   if (criteria.length === 0) return 5;
   const levels = Object.keys(criteria[0]!.levels);

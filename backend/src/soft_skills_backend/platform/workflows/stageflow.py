@@ -270,7 +270,7 @@ async def run_logged_pipeline(
         await support.pipeline_run_logger.log_run_failed(
             pipeline_run_id=pipeline_run_id,
             pipeline_name=pipeline.name,
-            error=str(exc.original),
+            error=exc.original,
             stage=exc.stage,
             request_id=request_id,
             trace_id=trace_id,
@@ -384,7 +384,7 @@ async def run_logged_subpipeline(
             await support.pipeline_run_logger.log_run_failed(
                 pipeline_run_id=child_run_id,
                 pipeline_name=pipeline.name,
-                error=str(exc.original),
+                error=exc.original,
                 stage=exc.stage,
                 request_id=request_id,
                 trace_id=trace_id,

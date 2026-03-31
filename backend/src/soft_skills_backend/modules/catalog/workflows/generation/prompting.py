@@ -51,6 +51,7 @@ def build_collection_blueprint_prompt_request(
     prompt_security_policy: PromptSecurityPolicy,
     structured_command: StructuredCollectionGenerationCommand | None,
     chat_command: ChatCollectionGenerationCommand | None,
+    taxonomy_context: str,
     sanitize_text: Callable[[str], str],
 ) -> PromptRenderRequest:
     """Build the prompt render request for collection blueprint planning."""
@@ -67,6 +68,7 @@ def build_collection_blueprint_prompt_request(
                 "target_skill_slugs": ", ".join(structured_command.target_skill_slugs),
                 "target_competency_slugs": ", ".join(structured_command.target_competency_slugs),
                 "rubric_ids": ", ".join(structured_command.rubric_ids),
+                "taxonomy_context": taxonomy_context,
                 "domain": structured_command.domain,
                 "workplace_context": structured_command.workplace_context,
                 "scenario_theme": structured_command.scenario_theme,
@@ -109,6 +111,7 @@ def build_collection_blueprint_prompt_request(
             "target_skill_slugs": ", ".join(chat_command.target_skill_slugs),
             "target_competency_slugs": ", ".join(chat_command.target_competency_slugs),
             "rubric_ids": ", ".join(chat_command.rubric_ids),
+            "taxonomy_context": taxonomy_context,
             "requested_counts": json.dumps(chat_command.counts.model_dump(mode="json"), sort_keys=True),
             "allowed_prompt_types": ", ".join(sorted(ALLOWED_PROMPT_TYPES)),
             "allowed_artifact_types": ", ".join(sorted(ALLOWED_SCENARIO_ARTIFACT_TYPES)),

@@ -251,6 +251,23 @@ def validate_generation_request(
     session: Session,
     command: StructuredCollectionGenerationCommand | ChatCollectionGenerationCommand,
 ) -> None:
+    skill_count = session.query(SkillRecord).filter(SkillRecord.organisation_id.is_(None)).count()
+    competency_count = (
+        session.query(CompetencyRecord)
+        .filter(CompetencyRecord.organisation_id.is_(None))
+        .count()
+    )
+    rubric_count = session.query(RubricRecord).filter(RubricRecord.organisation_id.is_(None)).count()
+    if skill_count == 0 or competency_count == 0 or rubric_count == 0:
+        raise validation_error(
+            "Generation cannot start because the taxonomy catalog is empty. Seed skills, competencies, and rubrics before generating a collection.",
+            code="SS-VALIDATION-071",
+            details={
+                "skills": skill_count,
+                "competencies": competency_count,
+                "rubrics": rubric_count,
+            },
+        )
     validate_collection_command(
         session,
         CollectionCreateCommand(

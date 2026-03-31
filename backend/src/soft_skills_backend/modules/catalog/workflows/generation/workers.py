@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass
 from typing import Any, cast
 from uuid import uuid4
@@ -23,6 +24,7 @@ from soft_skills_backend.modules.catalog.domain.models import (
     GeneratedScenarioDraft,
     GeneratedScenarioPlan,
 )
+from soft_skills_backend.modules.catalog.domain.validators import validate_mock_world
 from soft_skills_backend.modules.practice.workflows.assessment import (
     TypedLLMOutput,
     TypedLLMResult,
@@ -42,7 +44,7 @@ from soft_skills_backend.platform.workflows.stageflow import (
     run_logged_subpipeline,
     user_id_from_context,
 )
-from soft_skills_backend.shared.errors import validation_error
+from soft_skills_backend.shared.errors import AppError, validation_error
 from soft_skills_backend.shared.ports.llm import LLMProvider
 from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
@@ -58,6 +60,85 @@ class WorkerExecutionResult:
     typed_result: TypedLLMResult
     child_run_id: str
     correlation_id: str
+
+
+def _semantic_retry_feedback(error: Exception) -> str:
+    if hasattr(error, "message") and hasattr(error, "code"):
+        details = getattr(error, "details", None)
+        details_suffix = f" Details: {json.dumps(details, sort_keys=True)}" if details else ""
+        return (
+            f"{getattr(error, 'code')}: {getattr(error, 'message')}{details_suffix}. "
+            "Return corrected JSON only."
+        )
+    return f"{error}. Return corrected JSON only."
+
+
+def _validate_generated_scenario_draft(
+    *,
+    draft: GeneratedScenarioDraft,
+    plan: GeneratedScenarioPlan,
+) -> None:
+    if draft.rubric_id != plan.rubric_id or list(draft.target_skill_slugs) != list(
+        plan.target_skill_slugs
+    ):
+        raise validation_error(
+            "Generated scenario drifted from the worker plan metadata",
+            code="SS-VALIDATION-069",
+            details={"expected_rubric_id": plan.rubric_id},
+        )
+    if len(draft.supporting_artifacts) != plan.supporting_artifact_count:
+        raise validation_error(
+            "Generated scenario supporting artifact count did not match the worker plan",
+            code="SS-VALIDATION-070",
+            details={
+                "expected": plan.supporting_artifact_count,
+                "actual": len(draft.supporting_artifacts),
+            },
+        )
+    validate_mock_world(cast(Any, draft))
+
+
+def _validate_generated_prompt_item_draft(
+    *,
+    draft: GeneratedPromptItemDraft,
+    plan: GeneratedPromptItemPlan,
+) -> None:
+    draft.target_skill_slugs = _normalize_prompt_item_skills(
+        draft.prompt_type, draft.target_skill_slugs
+    )
+    if draft.prompt_type != plan.prompt_type or draft.rubric_id != plan.rubric_id:
+        raise validation_error(
+            "Generated prompt item drifted from the worker plan metadata",
+            code="SS-VALIDATION-067",
+            details={
+                "expected_prompt_type": plan.prompt_type,
+                "expected_rubric_id": plan.rubric_id,
+            },
+        )
+    if draft.prompt_type == "quick_practice_prompt":
+        if draft.generated_rubric is None:
+            raise validation_error(
+                "Generated quick-practice prompt item must include a question-specific rubric",
+                code="SS-VALIDATION-078",
+                details={"title": draft.title, "rubric_id": draft.rubric_id},
+            )
+        for criterion in draft.generated_rubric.criteria:
+            if len(criterion.levels) != 2:
+                raise validation_error(
+                    "Generated quick-practice rubric criteria must include exactly two levels",
+                    code="SS-VALIDATION-086",
+                    details={
+                        "title": draft.title,
+                        "criterion_ref": criterion.criterion_ref,
+                        "levels_count": len(criterion.levels),
+                    },
+                )
+    elif draft.generated_rubric is not None:
+        raise validation_error(
+            "Only quick-practice prompt items may include a generated rubric payload",
+            code="SS-VALIDATION-079",
+            details={"prompt_type": draft.prompt_type, "title": draft.title},
+        )
 
 
 async def run_prompt_item_workers(
@@ -202,58 +283,59 @@ async def _run_prompt_item_worker(
 
     async def llm_transform(ctx: StageContext) -> Any:
         rendered_prompt = payload_from_inputs(ctx, "prompt_render_transform")
-        typed_result = await prompt_item_worker_output.generate(
-            llm_provider,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Generate one realistic SoftSkills prompt item. Return JSON only.",
-                },
-                {"role": "user", "content": rendered_prompt.content},
-            ],
-            call_context=ProviderCallContext(
-                operation="catalog_prompt_item_worker_generation",
-                request_id=request_id_from_context(ctx),
-                trace_id=metadata_value(ctx, "trace_id"),
-                pipeline_run_id=pipeline_run_id_from_context(ctx),
-                workflow_id=metadata_value(ctx, "workflow_id"),
-                user_id=user_id_from_context(ctx),
-            ),
-        )
-        return ok_output(
-            StageflowStageResult(
-                payload=typed_result, summary={"model_slug": typed_result.model_slug}
+        base_messages: list[dict[str, object]] = [
+            {
+                "role": "system",
+                "content": "Generate one realistic SoftSkills prompt item. Return JSON only.",
+            },
+            {"role": "user", "content": rendered_prompt.content},
+        ]
+        retry_messages = list(base_messages)
+        last_error: AppError | None = None
+        for _ in range(prompt_item_worker_output._max_validation_retries + 1):
+            typed_result = await prompt_item_worker_output.generate(
+                llm_provider,
+                messages=retry_messages,
+                call_context=ProviderCallContext(
+                    operation="catalog_prompt_item_worker_generation",
+                    request_id=request_id_from_context(ctx),
+                    trace_id=metadata_value(ctx, "trace_id"),
+                    pipeline_run_id=pipeline_run_id_from_context(ctx),
+                    workflow_id=metadata_value(ctx, "workflow_id"),
+                    user_id=user_id_from_context(ctx),
+                ),
             )
-        )
+            draft = cast(GeneratedPromptItemDraft, typed_result.parsed)
+            try:
+                _validate_generated_prompt_item_draft(draft=draft, plan=plan)
+                return ok_output(
+                    StageflowStageResult(
+                        payload=typed_result, summary={"model_slug": typed_result.model_slug}
+                    )
+                )
+            except AppError as exc:
+                last_error = exc
+                retry_messages = [
+                    *base_messages,
+                    {
+                        "role": "assistant",
+                        "content": json.dumps(typed_result.raw_payload, sort_keys=True),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            "The previous prompt item draft was invalid. "
+                            + _semantic_retry_feedback(exc)
+                        ),
+                    },
+                ]
+        assert last_error is not None
+        raise last_error
 
     async def output_guard(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "llm_transform"))
         draft = cast(GeneratedPromptItemDraft, typed_result.parsed)
-        draft.target_skill_slugs = _normalize_prompt_item_skills(
-            draft.prompt_type, draft.target_skill_slugs
-        )
-        if draft.prompt_type != plan.prompt_type or draft.rubric_id != plan.rubric_id:
-            raise validation_error(
-                "Generated prompt item drifted from the worker plan metadata",
-                code="SS-VALIDATION-067",
-                details={
-                    "expected_prompt_type": plan.prompt_type,
-                    "expected_rubric_id": plan.rubric_id,
-                },
-            )
-        if draft.prompt_type == "quick_practice_prompt":
-            if draft.generated_rubric is None:
-                raise validation_error(
-                    "Generated quick-practice prompt item must include a question-specific rubric",
-                    code="SS-VALIDATION-078",
-                    details={"title": draft.title, "rubric_id": draft.rubric_id},
-                )
-        elif draft.generated_rubric is not None:
-            raise validation_error(
-                "Only quick-practice prompt items may include a generated rubric payload",
-                code="SS-VALIDATION-079",
-                details={"prompt_type": draft.prompt_type, "title": draft.title},
-            )
+        _validate_generated_prompt_item_draft(draft=draft, plan=plan)
         return ok_output(
             StageflowStageResult(
                 payload=typed_result,
@@ -306,7 +388,11 @@ async def _run_prompt_item_worker(
         raise validation_error(
             "Prompt-item worker pipeline failed",
             code="SS-VALIDATION-068",
-            details={"worker_index": worker_index, "reason": result.error},
+            details={
+                "worker_index": worker_index,
+                "child_run_id": str(result.child_run_id),
+                "reason": result.error,
+            },
         )
     typed_result = cast(TypedLLMResult, result.data["payload"])
     return WorkerExecutionResult(
@@ -371,50 +457,59 @@ async def _run_scenario_worker(
 
     async def llm_transform(ctx: StageContext) -> Any:
         rendered_prompt = payload_from_inputs(ctx, "prompt_render_transform")
-        typed_result = await scenario_worker_output.generate(
-            llm_provider,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Generate one realistic SoftSkills scenario draft. Return JSON only.",
-                },
-                {"role": "user", "content": rendered_prompt.content},
-            ],
-            call_context=ProviderCallContext(
-                operation="catalog_scenario_worker_generation",
-                request_id=request_id_from_context(ctx),
-                trace_id=metadata_value(ctx, "trace_id"),
-                pipeline_run_id=pipeline_run_id_from_context(ctx),
-                workflow_id=metadata_value(ctx, "workflow_id"),
-                user_id=user_id_from_context(ctx),
-            ),
-        )
-        return ok_output(
-            StageflowStageResult(
-                payload=typed_result, summary={"model_slug": typed_result.model_slug}
+        base_messages: list[dict[str, object]] = [
+            {
+                "role": "system",
+                "content": "Generate one realistic SoftSkills scenario draft. Return JSON only.",
+            },
+            {"role": "user", "content": rendered_prompt.content},
+        ]
+        retry_messages = list(base_messages)
+        last_error: AppError | None = None
+        for _ in range(scenario_worker_output._max_validation_retries + 1):
+            typed_result = await scenario_worker_output.generate(
+                llm_provider,
+                messages=retry_messages,
+                call_context=ProviderCallContext(
+                    operation="catalog_scenario_worker_generation",
+                    request_id=request_id_from_context(ctx),
+                    trace_id=metadata_value(ctx, "trace_id"),
+                    pipeline_run_id=pipeline_run_id_from_context(ctx),
+                    workflow_id=metadata_value(ctx, "workflow_id"),
+                    user_id=user_id_from_context(ctx),
+                ),
             )
-        )
+            draft = cast(GeneratedScenarioDraft, typed_result.parsed)
+            try:
+                _validate_generated_scenario_draft(draft=draft, plan=plan)
+                return ok_output(
+                    StageflowStageResult(
+                        payload=typed_result, summary={"model_slug": typed_result.model_slug}
+                    )
+                )
+            except AppError as exc:
+                last_error = exc
+                retry_messages = [
+                    *base_messages,
+                    {
+                        "role": "assistant",
+                        "content": json.dumps(typed_result.raw_payload, sort_keys=True),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            "The previous scenario draft was invalid. "
+                            + _semantic_retry_feedback(exc)
+                        ),
+                    },
+                ]
+        assert last_error is not None
+        raise last_error
 
     async def output_guard(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "llm_transform"))
         draft = cast(GeneratedScenarioDraft, typed_result.parsed)
-        if draft.rubric_id != plan.rubric_id or list(draft.target_skill_slugs) != list(
-            plan.target_skill_slugs
-        ):
-            raise validation_error(
-                "Generated scenario drifted from the worker plan metadata",
-                code="SS-VALIDATION-069",
-                details={"expected_rubric_id": plan.rubric_id},
-            )
-        if len(draft.supporting_artifacts) != plan.supporting_artifact_count:
-            raise validation_error(
-                "Generated scenario supporting artifact count did not match the worker plan",
-                code="SS-VALIDATION-070",
-                details={
-                    "expected": plan.supporting_artifact_count,
-                    "actual": len(draft.supporting_artifacts),
-                },
-            )
+        _validate_generated_scenario_draft(draft=draft, plan=plan)
         return ok_output(StageflowStageResult(payload=typed_result, summary={"title": draft.title}))
 
     pipeline = Pipeline.from_stages(
@@ -462,7 +557,11 @@ async def _run_scenario_worker(
         raise validation_error(
             "Scenario worker pipeline failed",
             code="SS-VALIDATION-071",
-            details={"worker_index": worker_index, "reason": result.error},
+            details={
+                "worker_index": worker_index,
+                "child_run_id": str(result.child_run_id),
+                "reason": result.error,
+            },
         )
     typed_result = cast(TypedLLMResult, result.data["payload"])
     return WorkerExecutionResult(

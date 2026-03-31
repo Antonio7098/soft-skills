@@ -6,7 +6,7 @@ export interface LearnerProfileView {
 
 export type PlatformRole = 'anonymous' | 'learner' | 'admin' | 'superadmin';
 
-export type OrganisationRole = 'member' | 'org_admin';
+export type OrganisationRole = 'member' | 'admin';
 
 export interface OrganisationMembershipView {
   readonly organisation_id: string;

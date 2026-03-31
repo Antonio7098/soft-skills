@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Plus, Loader2, ChevronRight } from 'lucide-react';
+import { Building2, Plus, Loader2, ChevronRight, Shield } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
 import { Badge } from '@/design-system/primitives/Badge';
@@ -92,13 +92,23 @@ export function OrganisationList({ onCreateClick }: OrganisationListProps) {
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <Badge
-                    variant={membership.role === 'org_admin' ? 'default' : 'default'}
+                    variant={membership.role === 'admin' ? 'default' : 'default'}
                     size="sm"
                   >
-                    {membership.role === 'org_admin' ? 'Admin' : 'Member'}
+                    {membership.role === 'admin' ? 'Admin' : 'Member'}
                   </Badge>
                 </div>
               </div>
+              {isActive && membership.role === 'admin' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<Shield className="w-4 h-4" />}
+                  onClick={() => navigate('/admin')}
+                >
+                  Admin
+                </Button>
+              )}
               {!isActive && (
                 <Button
                   variant="ghost"

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, Loader2, FileText, Zap, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
 import { ProgressBar } from '@/design-system/primitives/ProgressBar';
-import type { GenerationStage, BlueprintInfo, PromptItemDraft } from '@/data/types';
+import type { GenerationStage, BlueprintInfo, PromptItemDraft, GenerationActivityItem } from '@/data/types';
 import { cn } from '@/lib/cn';
 
 interface GenerationStreamPanelProps {
@@ -14,6 +14,7 @@ interface GenerationStreamPanelProps {
   readonly stageLabels: Record<GenerationStage, string>;
   readonly blueprint: BlueprintInfo | null;
   readonly promptItems: PromptItemDraft[];
+  readonly activity: GenerationActivityItem[];
   readonly onCancel?: () => void;
   readonly error?: string | null;
 }
@@ -22,6 +23,7 @@ const STAGE_ICONS: Record<GenerationStage, string> = {
   pending: '⚡',
   input_guard: '🔍',
   blueprint_transform: '📋',
+  blueprint_llm_transform: '🧠',
   blueprint_guard: '✅',
   prompt_items_work: '💬',
   scenarios_work: '🎭',
@@ -41,6 +43,7 @@ export function GenerationStreamPanel({
   stageLabels,
   blueprint,
   promptItems,
+  activity,
   onCancel,
   error,
 }: GenerationStreamPanelProps) {
@@ -333,6 +336,29 @@ export function GenerationStreamPanel({
                 {STAGE_ICONS[stage]} {stageLabels[stage]}
               </span>
             ))}
+          </div>
+        )}
+
+        {activity.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span className="text-body-xs text-content-tertiary uppercase tracking-wider">
+              Live Updates
+            </span>
+            <div className="flex flex-col gap-2">
+              {activity.map((item) => (
+                <div
+                  key={item.id}
+                  className="px-3 py-2 rounded-lg bg-surface-secondary/50 border border-line"
+                >
+                  <div className="text-body-xs font-medium text-content-primary">
+                    {stageLabels[item.stage]}
+                  </div>
+                  <div className="text-body-xs text-content-secondary">
+                    {item.message}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

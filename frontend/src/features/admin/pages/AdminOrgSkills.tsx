@@ -1,19 +1,22 @@
 import { useEffect, useState } from 'react';
-import { Plus, Edit, Trash2, X, Check, Star } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Check, Star, Globe } from 'lucide-react';
 import { useAdminScope } from '@/auth';
 import { Card } from '@/design-system/primitives/Card';
 import { Button } from '@/design-system/primitives/Button';
+import { Badge } from '@/design-system/primitives/Badge';
 import { LoadingState } from '@/design-system/patterns/LoadingState';
 import { EmptyState } from '@/design-system/patterns/EmptyState';
 import { useData } from '@/data';
 import { AdminPageShell, MetricCard, SearchInput } from '../components';
-import type { OrgSkillView } from '@/data/types';
+import type { SkillView } from '@/data/types';
+
+type SkillWithScope = SkillView & { scope: 'global' | 'org'; organisation_id?: string };
 
 export function AdminOrgSkills() {
   const { organisationId } = useAdminScope();
   const dataProvider = useData();
-  const [skills, setSkills] = useState<OrgSkillView[]>([]);
-  const [selectedSkill, setSelectedSkill] = useState<OrgSkillView | null>(null);
+  const [skills, setSkills] = useState<SkillWithScope[]>([]);
+  const [selectedSkill, setSelectedSkill] = useState<SkillWithScope | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -23,13 +26,32 @@ export function AdminOrgSkills() {
 
   const orgId = organisationId;
 
-  const refreshSkills = () => {
+  const refreshSkills = async () => {
     if (!orgId) return;
     setLoading(true);
-    dataProvider.listOrgSkills(orgId)
-      .then(setSkills)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    try {
+      const [taxonomy, orgSkills] = await Promise.all([
+        dataProvider.getTaxonomy(),
+        dataProvider.listOrgSkills(orgId),
+      ]);
+
+      // Merge global and org skills - org skills take precedence
+      const orgSkillSlugs = new Set(orgSkills.map((s) => s.slug));
+      const globalSkills: SkillWithScope[] = taxonomy.skills
+        .filter((s) => !orgSkillSlugs.has(s.slug))
+        .map((s) => ({ ...s, scope: 'global' }));
+      const mergedOrgSkills: SkillWithScope[] = orgSkills.map((s) => ({
+        ...s,
+        scope: 'org',
+        organisation_id: orgId,
+      }));
+
+      setSkills([...globalSkills, ...mergedOrgSkills]);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -74,6 +96,11 @@ export function AdminOrgSkills() {
 
   const handleDeleteSkill = async (slug: string) => {
     if (!orgId) return;
+    const skill = skills.find((s) => s.slug === slug);
+    if (skill?.scope === 'global') {
+      alert('Global skills cannot be deleted');
+      return;
+    }
     if (!confirm('Are you sure you want to delete this skill?')) return;
     try {
       await dataProvider.deleteOrgSkill(orgId, slug);
@@ -108,6 +135,16 @@ export function AdminOrgSkills() {
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard
+          label="Global Skills"
+          value={skills.filter((s) => s.scope === 'global').length}
+          icon={<Globe className="w-4 h-4" />}
+        />
+        <MetricCard
+          label="Org Skills"
+          value={skills.filter((s) => s.scope === 'org').length}
+          icon={<Star className="w-4 h-4" />}
+        />
+        <MetricCard
           label="Total Skills"
           value={skills.length}
           icon={<Star className="w-4 h-4" />}
@@ -132,13 +169,18 @@ export function AdminOrgSkills() {
                     : 'hover:bg-surface-secondary/50'
                 }`}
               >
-                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-                  <Star className="w-4 h-4 text-accent" />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${skill.scope === 'global' ? 'bg-surface-secondary' : 'bg-accent/10'}`}>
+                  {skill.scope === 'global' ? <Globe className="w-4 h-4 text-content-secondary" /> : <Star className="w-4 h-4 text-accent" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-body-sm font-medium text-content-primary truncate">
-                    {skill.name}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-body-sm font-medium text-content-primary truncate">
+                      {skill.name}
+                    </p>
+                    <Badge variant={skill.scope === 'global' ? 'default' : 'accent'} size="sm">
+                      {skill.scope === 'global' ? 'Global' : 'Org'}
+                    </Badge>
+                  </div>
                   <p className="text-body-xs text-content-tertiary truncate">
                     {skill.slug}
                   </p>
@@ -173,6 +215,8 @@ export function AdminOrgSkills() {
                     size="sm"
                     icon={<Edit className="w-4 h-4" />}
                     onClick={() => setShowEditModal(true)}
+                    disabled={selectedSkill?.scope === 'global'}
+                    title={selectedSkill?.scope === 'global' ? 'Global skills cannot be edited' : undefined}
                   >
                     Edit
                   </Button>
@@ -181,6 +225,8 @@ export function AdminOrgSkills() {
                     size="sm"
                     icon={<Trash2 className="w-4 h-4" />}
                     onClick={() => handleDeleteSkill(selectedSkill.slug)}
+                    disabled={selectedSkill?.scope === 'global'}
+                    title={selectedSkill?.scope === 'global' ? 'Global skills cannot be deleted' : undefined}
                   >
                     Delete
                   </Button>

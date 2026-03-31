@@ -39,3 +39,11 @@ async def get_practice_run(request: Request, run_id: str) -> ApiEnvelope[Practic
     actor = await require_actor(request)
     service = get_practice_service(request)
     return ok_response(request, service.get_practice_run(actor, run_id))
+
+
+@router.get("/{run_id}/sessions", response_model=ApiEnvelope[list[dict]])
+async def get_practice_run_sessions(request: Request, run_id: str) -> ApiEnvelope[list[dict]]:
+    actor = await require_actor(request)
+    service = get_practice_service(request)
+    sessions = service.get_practice_run_sessions(actor, run_id)
+    return ok_response(request, sessions)

@@ -15,6 +15,8 @@ import type {
   PracticeSessionView,
   CompetencyProgressView,
   CollectionGenerationView,
+  GenerationStartedView,
+  GenerationStreamCallbacks,
   AdminUserView,
   AdminUserListView,
   BulkOperationResultView,
@@ -154,7 +156,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       throw new ApiRequestError(body?.error?.message ?? 'Session expired', { status: 401 });
     }
     const body = await res.json().catch(() => ({}));
-    throw new ApiRequestError(body?.error?.message ?? `API error ${res.status}`, { status: res.status });
+    const details = body?.error?.details;
+    const validationErrors = Array.isArray(details?.errors) ? details.errors : null;
+    const firstValidationError = validationErrors?.[0];
+    const validationSuffix =
+      firstValidationError && typeof firstValidationError === 'object'
+        ? ` (${String(firstValidationError.loc?.join?.('.') ?? 'request')}: ${String(firstValidationError.msg ?? 'invalid value')})`
+        : '';
+    throw new ApiRequestError(
+      `${body?.error?.message ?? `API error ${res.status}`}${validationSuffix}`,
+      { status: res.status }
+    );
   }
 
   const envelope = await res.json();
@@ -205,7 +217,7 @@ function deriveSessionFromUser(user: UserView): AuthSessionView {
       : 'learner';
   const orgMemberships = user.org_memberships ?? [];
   const activeOrganisationId = storedActiveOrgId ?? orgMemberships[0]?.organisation_id ?? null;
-  const hasOrgAdmin = orgMemberships.some((m) => m.role === 'org_admin');
+  const hasOrgAdmin = orgMemberships.some((m) => m.role === 'admin');
   const capabilities: AuthSessionView['capabilities'] =
     platformRole === 'learner' && !hasOrgAdmin
       ? ['app:access']
@@ -367,9 +379,42 @@ export const apiDataProvider: DataProvider = {
 
   // --- Content Generation --------------------------------------------------
   generateStructuredCollection: (cmd) =>
-    request<CollectionGenerationView>('/collections/generate/structured', { method: 'POST', body: JSON.stringify(cmd) }),
+    request<GenerationStartedView>('/collections/generate/structured', { method: 'POST', body: JSON.stringify(cmd) }),
   generateChatCollection: (cmd) =>
-    request<CollectionGenerationView>('/collections/generate/chat', { method: 'POST', body: JSON.stringify(cmd) }),
+    request<GenerationStartedView>('/collections/generate/chat', { method: 'POST', body: JSON.stringify(cmd) }),
+  streamGeneration: (streamToken, callbacks) => {
+    const wsUrl = buildWebSocketUrl(`/ws/generation/${encodeURIComponent(streamToken)}`);
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'pong') {
+          return;
+        }
+        callbacks.onEvent?.(data);
+        if (data.type === 'completed') {
+          callbacks.onCompleted?.(data.payload ?? {});
+        } else if (data.type === 'failed' || data.type === 'cancelled') {
+          callbacks.onFailed?.(data.payload ?? {});
+        }
+      } catch (error) {
+        callbacks.onError?.(error instanceof Error ? error.message : 'Failed to parse generation stream message');
+      }
+    };
+
+    ws.onerror = () => {
+      callbacks.onError?.('Generation websocket error');
+    };
+
+    ws.onclose = () => {
+      callbacks.onClose?.();
+    };
+
+    return () => {
+      ws.close();
+    };
+  },
 
   // --- Practice ------------------------------------------------------------
   startQuickPracticeSession: (cmd) =>
@@ -395,10 +440,16 @@ export const apiDataProvider: DataProvider = {
   // --- Practice Runs (Aggregate) -------------------------------------------
   createPracticeRun: (cmd) => {
     const adapted = {
-      items: cmd.selected_items.map((item) => ({
-        ...item,
-        practice_type: item.item_type === 'prompt_item' ? 'quick_practice' : item.item_type,
-      })),
+      items: cmd.selected_items.map((item) => {
+        if (item.item_type === 'scenario') {
+          return { practice_type: 'scenario', scenario_id: item.item_id };
+        }
+        if (item.item_type === 'prompt_item' && item.prompt_type) {
+          const practiceType = item.prompt_type === 'interview_prompt' ? 'interview' : 'quick_practice';
+          return { practice_type: practiceType, prompt_item_id: item.item_id };
+        }
+        return { practice_type: 'quick_practice', prompt_item_id: item.item_id };
+      }),
     };
     return request<PracticeRunView>('/practice-runs', { method: 'POST', body: JSON.stringify(adapted) });
   },

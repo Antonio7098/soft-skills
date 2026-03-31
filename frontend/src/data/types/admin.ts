@@ -571,6 +571,7 @@ export type GenerationStage =
   | 'pending'
   | 'input_guard'
   | 'blueprint_transform'
+  | 'blueprint_llm_transform'
   | 'blueprint_guard'
   | 'prompt_items_work'
   | 'scenarios_work'
@@ -598,6 +599,14 @@ export interface GenerationStartedView {
   readonly mode: 'structured' | 'chat';
 }
 
+export interface GenerationStreamCallbacks {
+  readonly onEvent?: (event: GenerationStreamEvent) => void;
+  readonly onCompleted?: (payload: Record<string, unknown>) => void;
+  readonly onFailed?: (payload: Record<string, unknown>) => void;
+  readonly onError?: (error: string) => void;
+  readonly onClose?: () => void;
+}
+
 export interface BlueprintInfo {
   readonly title: string;
   readonly summary: string;
@@ -612,6 +621,13 @@ export interface PromptItemDraft {
   readonly difficulty: string;
 }
 
+export interface GenerationActivityItem {
+  readonly id: string;
+  readonly stage: GenerationStage;
+  readonly message: string;
+  readonly timestamp: string;
+}
+
 export interface GenerationProgressState {
   readonly status: 'idle' | 'started' | 'streaming' | 'completed' | 'failed' | 'cancelled';
   readonly generation_id: string | null;
@@ -621,6 +637,7 @@ export interface GenerationProgressState {
   readonly progress_percent: number;
   readonly blueprint: BlueprintInfo | null;
   readonly prompt_items: PromptItemDraft[];
+  readonly activity: GenerationActivityItem[];
   readonly collection: import('./catalog').CollectionView | null;
   readonly error: string | null;
 }

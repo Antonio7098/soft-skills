@@ -75,6 +75,19 @@ def summarize_pipeline_error(
     )
 
 
+def format_error_for_persistence(error: str | Exception) -> str:
+    """Preserve the actionable message from structured errors when available."""
+
+    if isinstance(error, AppError):
+        reason = error.details.get("reason") if error.details else None
+        if isinstance(reason, str) and reason.strip():
+            return f"{error.code}: {reason}"
+        return str(error)
+    if isinstance(error, Exception):
+        return str(error)
+    return error
+
+
 class DatabasePipelineRunLogger:
     """Persist Stageflow pipeline run lifecycle metadata."""
 
@@ -204,12 +217,13 @@ class DatabasePipelineRunLogger:
         *,
         pipeline_run_id: object,
         pipeline_name: str,
-        error: str,
+        error: str | Exception,
         stage: str | None,
         request_id: str | None = None,
         trace_id: str | None = None,
         **_: object,
     ) -> None:
+        persisted_error = format_error_for_persistence(error)
         self._repository.upsert(
             PipelineRunLog(
                 pipeline_run_id=str(pipeline_run_id),
@@ -217,7 +231,7 @@ class DatabasePipelineRunLogger:
                 status="failed",
                 request_id=request_id,
                 trace_id=trace_id,
-                error=error,
+                error=persisted_error,
                 failed_stage=stage,
                 finished_at=datetime.now(UTC),
             )
