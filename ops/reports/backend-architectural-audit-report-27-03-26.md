@@ -1,6 +1,6 @@
 # Backend Architectural Audit Report
 
-**Date:** 2026-03-27  
+**Date:** 2026-03-27 (Updated: 2026-03-31)
 **Scope:** `/home/antonioborgerees/df/soft-skills/backend/src/`  
 **Approach:** SOLID principles, Clean Architecture, layered architecture boundaries, coupling analysis
 
@@ -8,9 +8,9 @@
 
 ## 1. Executive Summary
 
-The backend implements a **layered architecture with DDD-inspired modules** using FastAPI, SQLAlchemy, and Stageflow. The codebase demonstrates good separation between HTTP entrypoints, application services, domain logic, and infrastructure. However, several **SOLID violations** and architectural concerns require attention, particularly the **monolithic `models.py`** file (31 models), the **God Object `AppContainer`** (22 attributes), and **cross-layer coupling** in configuration.
+The backend implements a **layered architecture with DDD-inspired modules** using FastAPI, SQLAlchemy, and Stageflow. The codebase demonstrates good separation between HTTP entrypoints, application services, domain logic, and infrastructure. However, several **SOLID violations** and architectural concerns require attention, particularly the **monolithic `models.py`** file (52 models, increased from 31), the **God Object `AppContainer`** (26 attributes, expanded from 22), and **cross-layer coupling** in configuration (partially addressed).
 
-**Overall Assessment:** Sound foundations with targeted refactoring needs.
+**Overall Assessment:** Sound foundations with targeted refactoring needs. New `voice` module added for Deepgram transcription.
 
 ---
 
@@ -19,19 +19,20 @@ The backend implements a **layered architecture with DDD-inspired modules** usin
 ```
 src/soft_skills_backend/
 ├── app.py                      # Application factory
-├── config.py                   # Pydantic Settings (HAS ISSUES - see §5.2)
+├── config.py                   # Pydantic Settings (IMPROVED - see §5.2)
 ├── engines/                    # App-agnostic domain engines
 │   ├── config/                 # JSON config loader
 │   ├── progression/            # Progression computation
 │   ├── recommendation/         # Recommendation computation
 │   └── marking/                # LLM-based assessment
 ├── entrypoints/http/           # HTTP API layer
-│   ├── routes/                 # 14 route modules
+│   ├── routes/                 # Route modules
 │   ├── dependencies.py          # DI helpers (HAS ISSUES - see §5.10)
 │   ├── error_handlers.py       # Global error handling
-│   └── schemas.py              # Response envelopes
+│   └── schemas.py              # Response envelopes (HAS ISSUES - see §5.12)
 ├── modules/                    # DDD-style feature modules
 │   ├── admin/
+│   ├── admin_agent/            # (NEW since audit)
 │   ├── assistant/
 │   ├── catalog/
 │   ├── evaluation/
@@ -40,12 +41,13 @@ src/soft_skills_backend/
 │   ├── organisations/
 │   ├── practice/               # (HAS ISSUES - see §5.7)
 │   ├── progression/
-│   └── taxonomy/
+│   ├── taxonomy/               # (NEW since audit)
+│   └── voice/                  # (NEW since audit - Deepgram transcription)
 ├── platform/                   # Infrastructure layer
 │   ├── container.py            # DI container (HAS ISSUES - see §5.3)
 │   ├── db/
 │   │   ├── base.py             # SQLAlchemy declarative base
-│   │   ├── models.py           # 31 models (CRITICAL - see §5.6)
+│   │   ├── models.py           # 52 models (CRITICAL - see §5.6, expanded from 31)
 │   │   └── repositories.py      # Repository implementations
 │   ├── observability/           # structlog, middleware, events
 │   ├── providers/llm/           # OpenAI-compatible LLM adapter
@@ -102,10 +104,10 @@ src/soft_skills_backend/
 
 | Principle | Assessment |
 |-----------|------------|
-| **SRP** | VIOLATION - Lines 68-86 call into `engines.config.loader` (cross-layer dependency) |
-| **DIP** | VIOLATION - Config layer depends on domain engines module |
+| **SRP** | ✅ RESOLVED - Lines 68-86 no longer call into `engines.config.loader` |
+| **DIP** | ✅ RESOLVED - Config layer no longer depends on domain engines module |
 
-**Lines 69-86:** `creator_structured_generation_prompt_version` and `creator_chat_generation_prompt_version` properties import from `soft_skills_backend.engines.config.loader`. **Config depends on domain** - this is a cross-layer coupling violation.
+**Status: FIXED** - The cross-layer dependency violation has been addressed. `creator_structured_generation_prompt_version` and `creator_chat_generation_prompt_version` properties (lines 198-204) now return local values instead of importing from `soft_skills_backend.engines.config.loader`.
 
 ---
 
@@ -113,11 +115,11 @@ src/soft_skills_backend/
 
 | Principle | Assessment |
 |-----------|------------|
-| **SRP** | VIOLATION - 22-attribute dataclass (God Object anti-pattern) |
-| **ISP** | VIOLATION - Any consumer sees all 22 services even if only needing 1 |
+| **SRP** | VIOLATION - 26-attribute dataclass (God Object anti-pattern, expanded from 22) |
+| **ISP** | VIOLATION - Any consumer sees all 26 services even if only needing 1 |
 | **DIP** | VIOLATION - No abstract interfaces for services |
 
-**Lines 56-82:** `AppContainer` bundles unrelated services (settings, session_factory, CatalogService, PracticeService, etc.). All concrete implementations with no interface abstractions.
+**Lines 92-117:** `AppContainer` bundles unrelated services (settings, session_factory, CatalogService, PracticeService, AdminAgentService, TaxonomyService, etc.). All concrete implementations with no interface abstractions. **NEW services added:** `admin_agent_service`, `taxonomy_service`, `assistant_broker`, `generation_broker`, `background_tasks`.
 
 ---
 
@@ -150,14 +152,14 @@ All error factories (`validation_error`, `persistence_error`, `auth_error`, `dom
 
 | Principle | Assessment |
 |-----------|------------|
-| **SRP** | VIOLATION - **31 models in single file** |
-| **Cohesion** | LOW - Observability, identity, catalog, practice, progression, evaluation, assistant, admin models all mixed |
+| **SRP** | VIOLATION - **52 models in single file** (expanded from 31) |
+| **Cohesion** | LOW - Observability, identity, catalog, practice, progression, evaluation, assistant, admin, voice, prompt models all mixed |
 | **Coupling** | HIGH - All models in one file creates high coupling |
 
-**Line 193:** `avg_rating: Mapped[float | None] = mapped_column(Integer, ...)` - **type mismatch** (float mapped to Integer column).  
-**No relationships defined:** Despite FK on line 177, no SQLAlchemy `relationship()` objects exist.
+**Line 285:** `avg_rating: Mapped[float | None] = mapped_column(Integer, ...)` - **type mismatch still exists** (float mapped to Integer column).  
+**No relationships defined:** Despite FKs, no SQLAlchemy `relationship()` objects exist.
 
-**This is the most critical code smell in the codebase.** Should be split by domain/feature.
+**This remains the most critical code smell in the codebase.** Should be split by domain/feature. The file has grown significantly since the original audit.
 
 ---
 
@@ -234,6 +236,18 @@ All error factories (`validation_error`, `persistence_error`, `auth_error`, `dom
 
 ---
 
+### 5.13 `modules/voice/transcription.py` - NEW Voice Module
+
+| Principle | Assessment |
+|-----------|------------|
+| **SRP** | OK - Single responsibility: Deepgram transcription |
+| **DIP** | PARTIAL - Hard dependency on Deepgram SDK with optional import pattern |
+| **OCP** | OK - Graceful degradation when SDK unavailable |
+
+**New module added since original audit** - Provides streaming voice transcription via Deepgram. Uses optional import pattern with `DEEPGRAM_AVAILABLE` flag for graceful fallback.
+
+---
+
 ## 6. Repository Pattern Issues
 
 **`platform/db/repositories.py`:**
@@ -265,11 +279,11 @@ RECOMMENDATION_ENGINE_CONFIG = load_recommendation_engine_config()
 
 | Principle | Most Violated Files |
 |-----------|---------------------|
-| **SRP** | `models.py` (31 models), `container.py` (22 attrs), `practice_service.py` (large methods), `auth.py` (mixed concerns) |
-| **ISP** | `container.py` (22 attributes), `AppError` factories (identical signatures) |
+| **SRP** | `models.py` (52 models, expanded from 31), `container.py` (26 attrs, expanded from 22), `practice_service.py` (large methods), `auth.py` (mixed concerns) |
+| **ISP** | `container.py` (26 attributes), `AppError` factories (identical signatures) |
 | **DIP** | `app.py`, `dependencies.py`, `catalog_service.py`, `practice_service.py` |
 | **DRY** | `errors.py`, `stageflow.py`, `repositories.py`, `auth.py` |
-| **LSP** | `config.py` (properties call engines module) |
+| **LSP** | ✅ RESOLVED - `config.py` no longer calls engines module |
 
 ---
 
@@ -277,22 +291,22 @@ RECOMMENDATION_ENGINE_CONFIG = load_recommendation_engine_config()
 
 ### Critical (Address Immediately)
 
-1. **Split `platform/db/models.py`** into multiple files by domain:
+1. **Split `platform/db/models.py`** into multiple files by domain (now **52 models**, expanded from 31):
    - `models/observability.py` (WorkflowEvent, PipelineRun, ProviderCall)
    - `models/identity.py` (UserAccount, Organisation, Membership)
-   - `models/catalog.py` (Collection, PromptItem, Scenario)
+   - `models/catalog.py` (Collection, PromptItem, Scenario, MockCompany, MockPerson, etc.)
    - `models/practice.py` (PracticeRun, PracticeSession, Attempt, Assessment)
-   - `models/progression.py`, `models/evaluation.py`, `models/assistant.py`, `models/admin.py`
+   - `models/progression.py`, `models/evaluation.py`, `models/assistant.py`, `models/admin.py`, `models/voice.py`, `models/prompt.py`
 
-2. **Fix `avg_rating` type mismatch** (line 193 in models.py): `mapped_column(Float, ...)` not `Integer`
+2. **Fix `avg_rating` type mismatch** (line 285 in models.py): `mapped_column(Float, ...)` not `Integer`
 
 3. **Add SQLAlchemy `relationship()` definitions** for FK keys currently with no relationships
 
 ### High Priority
 
-4. **Extract service interfaces** from `container.py` - define `Protocol` classes for `CatalogService`, `PracticeService`, etc.
+4. **Extract service interfaces** from `container.py` - define `Protocol` classes for `CatalogService`, `PracticeService`, etc. (now 26 attributes, expanded from 22)
 
-5. **Fix config.py cross-layer dependency** - move engine config loading out of Settings class; consider lazy loading or a separate config bootstrap
+5. ~~**Fix config.py cross-layer dependency**~~ ✅ **RESOLVED** - Engine config loading removed from Settings class
 
 6. **Remove auth persistence leak** - extract `HeaderAuthProvider` DB queries into a separate auth repository/service
 
@@ -332,7 +346,34 @@ RECOMMENDATION_ENGINE_CONFIG = load_recommendation_engine_config()
 - **Smoke test framework** is a valuable operational asset
 - **Stageflow integration** provides good pipeline abstraction with interceptors
 - **Swappable LLM provider** enables multi-backend support
+- **Voice transcription module** - New Deepgram integration with graceful fallback
+- **Config cross-layer dependency fixed** - `config.py` no longer depends on engines module
+
+---
+
+## 11. Changelog (2026-03-31 Update)
+
+### Changes Since Original Audit
+
+| Date | Change | Status |
+|------|--------|--------|
+| 2026-03-31 | New `voice` module added (Deepgram transcription) | ✅ Added |
+| 2026-03-31 | New `admin_agent` module added | ✅ Added |
+| 2026-03-31 | New `taxonomy` module added | ✅ Added |
+| 2026-03-31 | `config.py` cross-layer dependency removed | ✅ Fixed |
+| 2026-03-31 | `models.py` expanded from 31 to 52 models | ⚠️ Worsened |
+| 2026-03-31 | `AppContainer` expanded from 22 to 26 attributes | ⚠️ Worsened |
+| 2026-03-31 | Deepgram settings added to config | ✅ Added |
+
+### Issues Addressed
+- **§5.2 config.py** - Cross-layer dependency on `engines.config.loader` has been resolved
+
+### New Issues Identified
+- **§5.13 voice module** - New transcription service added
+- Models file has grown significantly (52 vs 31 models)
+- Container has grown (26 vs 22 attributes)
 
 ---
 
 *Report generated from architectural audit of backend codebase*
+*Updated: 2026-03-31*
