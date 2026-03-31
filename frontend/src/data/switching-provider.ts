@@ -317,6 +317,20 @@ class SwitchingDataProvider implements DataProvider {
     );
   }
 
+  getProgressHistory(params) {
+    return this.withMode(
+      () => apiDataProvider.getProgressHistory(params),
+      () => mockDataProvider.getProgressHistory(params),
+    );
+  }
+
+  getSkillTimeline(skillSlug, params) {
+    return this.withMode(
+      () => apiDataProvider.getSkillTimeline(skillSlug, params),
+      () => mockDataProvider.getSkillTimeline(skillSlug, params),
+    );
+  }
+
   // --- Assistant ------------------------------------------------------------
   createAssistantSession(cmd) {
     return this.withMode(

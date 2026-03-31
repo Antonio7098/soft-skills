@@ -421,7 +421,20 @@ export const apiDataProvider: DataProvider = {
     request<QuickPracticeSessionView>('/attempts/quick-practice/sessions', { method: 'POST', body: JSON.stringify(cmd) }),
   submitAttempt: (attemptId, cmd) =>
     request<AttemptView>(`/attempts/${attemptId}/submit`, { method: 'POST', body: JSON.stringify(cmd) }),
-  getAttempt: (attemptId) => request<AttemptView>(`/attempts/${attemptId}`),
+  getAttempt: (attemptId) => request<any>(`/attempts/${attemptId}`).then((raw) => {
+    const attempt = raw.data ?? raw;
+    if (attempt.assessment) {
+      // Map backend rationale to frontend summary
+      if (attempt.assessment.rationale !== undefined && attempt.assessment.summary === undefined) {
+        attempt.assessment.summary = attempt.assessment.rationale;
+      }
+      // Ensure per_skill_assessments is an array
+      if (!attempt.assessment.per_skill_assessments) {
+        attempt.assessment.per_skill_assessments = [];
+      }
+    }
+    return attempt as AttemptView;
+  }),
 
   // --- Interview (maps to same backend endpoint, returns PracticeSessionView) ---
   startInterviewSession: (promptItemId) =>
@@ -454,7 +467,29 @@ export const apiDataProvider: DataProvider = {
     return request<PracticeRunView>('/practice-runs', { method: 'POST', body: JSON.stringify(adapted) });
   },
   listPracticeRuns: () =>
-    request<PracticeRunView[]>('/practice-runs'),
+    request<any[]>('/practice-runs').then((runs) =>
+      runs.map((raw) => ({
+        run_id: raw.run_id,
+        workflow_id: raw.workflow_id,
+        status: raw.status,
+        total_items: raw.total_items,
+        completed_items: raw.completed_items,
+        validated_items: raw.validated_items,
+        failed_items: raw.failed_items,
+        current_attempt_id: null,
+        started_at: raw.started_at,
+        completed_at: raw.completed_at,
+        items: [], // Items loaded separately via getPracticeRun
+        summary: {
+          total_items: raw.total_items,
+          completed_items: raw.completed_items,
+          overall_score: raw.overall_score_average ?? null,
+          score_distribution: {},
+          skill_breakdown: {},
+          practice_type_breakdown: {},
+        },
+      })) as PracticeRunView[]
+    ),
   getPracticeRun: (runId) =>
     request<any>(`/practice-runs/${runId}`).then((raw) => {
       return {
@@ -469,7 +504,7 @@ export const apiDataProvider: DataProvider = {
         started_at: raw.started_at,
         completed_at: raw.completed_at,
         items: (raw.items ?? []).map((item: any) => ({
-          id: item.attempt?.prompt?.content_item_id ?? '',
+          id: item.attempt?.id ?? item.attempt?.prompt?.content_item_id ?? '',
           item_type: item.attempt?.prompt?.content_item_type === 'quick_practice_prompt' || item.attempt?.prompt?.content_item_type === 'interview_prompt' ? 'prompt_item' : 'scenario',
           title: item.attempt?.prompt?.title ?? '',
           prompt_text: item.attempt?.prompt?.prompt_text ?? '',
@@ -512,6 +547,22 @@ export const apiDataProvider: DataProvider = {
     return mapCompetencyProgress(dashboard, taxonomy);
   },
   getAttemptHistory: () => request<AttemptHistoryItem[]>('/attempts/history'),
+  getProgressHistory: (params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.from_date) searchParams.set('from_date', params.from_date);
+    if (params?.to_date) searchParams.set('to_date', params.to_date);
+    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    const qs = searchParams.toString();
+    return request<import('./types').ProgressHistory>(`/progress/me/history${qs ? `?${qs}` : ''}`);
+  },
+  getSkillTimeline: (skillSlug, params) => {
+    const searchParams = new URLSearchParams();
+    if (params?.from_date) searchParams.set('from_date', params.from_date);
+    if (params?.to_date) searchParams.set('to_date', params.to_date);
+    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    const qs = searchParams.toString();
+    return request<import('./types').SkillTimeline>(`/progress/me/timeline/${encodeURIComponent(skillSlug)}${qs ? `?${qs}` : ''}`);
+  },
 
   // --- Admin: Users & User Management ----------------------------------------
   listAdminUsers: (params) => {

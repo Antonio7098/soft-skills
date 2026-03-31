@@ -1,6 +1,7 @@
 import React, { type ReactNode } from 'react';
 import { render, type RenderOptions } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { vi } from 'vitest';
 import { DataProviderProvider } from '@/data/DataContext';
 import { AuthSessionProvider } from '@/auth/AuthSessionContext';
 import type { DataProvider } from '@/data/provider';
@@ -136,6 +137,21 @@ export const createMockDataProvider = (overrides: Partial<DataProvider> = {}): D
     getPracticeSessions: vi.fn().mockResolvedValue([]),
     getCompetencyProgress: vi.fn().mockResolvedValue([]),
     getAttemptHistory: vi.fn().mockResolvedValue([]),
+    getProgressHistory: vi.fn().mockResolvedValue({
+      learner_id: 'user-001',
+      snapshots: [],
+      from_date: null,
+      to_date: null,
+    }),
+    getSkillTimeline: vi.fn().mockResolvedValue({
+      skill_slug: 'test-skill',
+      skill_name: 'Test Skill',
+      points: [],
+      from_date: null,
+      to_date: null,
+      overall_change: 0,
+      trend: 'stable',
+    }),
     listAdminUsers: vi.fn().mockResolvedValue({ users: [], total: 0 }),
     getAdminUser: vi.fn().mockResolvedValue(null),
     updateAdminUserRole: vi.fn().mockResolvedValue({} as any),

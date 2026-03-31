@@ -34,6 +34,7 @@ from .suites.assistant_edge_cases import (
     AssistantSpecialCharsSmoke,
     AssistantToolSequenceSmoke,
 )
+from .suites.assistant_proactivity import AssistantProactivityAmbiguitySmoke
 from .suites.assistant_runtime import (
     AssistantApprovalWorkflowSmoke,
     AssistantGenerationRuntimeSmoke,
@@ -77,6 +78,7 @@ def build_default_registry() -> SmokeRegistry:
         [
             ProviderBaselineSmoke(),
             AdminAgentSmoke(),
+            AssistantProactivityAmbiguitySmoke(),
             AssistantApprovalWorkflowSmoke(),
             AssistantReadSqlDeniedSmoke(),
             AssistantReadSqlWorkflowSmoke(),

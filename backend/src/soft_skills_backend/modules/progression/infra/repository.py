@@ -12,10 +12,19 @@ from stageflow.core import StageContext
 
 from soft_skills_backend.modules.catalog.domain.validators import can_view_collection
 from soft_skills_backend.modules.progression.contracts.views import (
+    CompetencyHistoryPointView,
+    CompetencyProgressView,
     ProgressDashboardView,
+    ProgressHistorySnapshotView,
+    ProgressHistoryView,
     ProgressRecalculationView,
     ProgressSnapshotView,
     RecommendationView,
+    SkillContributionView,
+    SkillHistoryPointView,
+    SkillProgressView,
+    SkillTimelinePointView,
+    SkillTimelineView,
 )
 from soft_skills_backend.modules.progression.domain.progression import (
     PROGRESSION_CONFIG_VERSION,
@@ -581,6 +590,142 @@ class ProgressionRepository:
             if recommendation_record is None:
                 return self._empty_recommendation(learner_id=learner_id, snapshot_id="")
             return RecommendationView.model_validate(recommendation_record.artifact_payload)
+
+    def get_progress_history(
+        self,
+        actor: Actor,
+        learner_id: str,
+        *,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        limit: int = 100,
+    ) -> ProgressHistoryView:
+        """Fetch historical progress snapshots for a learner."""
+        self._assert_access(actor, learner_id)
+        with self._session_factory() as session:
+            query = (
+                session.query(ProgressionSnapshotRecord)
+                .filter(ProgressionSnapshotRecord.learner_id == learner_id)
+                .order_by(ProgressionSnapshotRecord.created_at.asc())
+            )
+            if from_date is not None:
+                query = query.filter(ProgressionSnapshotRecord.created_at >= from_date)
+            if to_date is not None:
+                query = query.filter(ProgressionSnapshotRecord.created_at <= to_date)
+            records = query.limit(limit).all()
+
+            snapshots: list[ProgressHistorySnapshotView] = []
+            for record in records:
+                payload = record.snapshot_payload
+                skill_states = [
+                    SkillHistoryPointView(
+                        skill_slug=s["skill_slug"],
+                        score=s["score"],
+                        confidence=s["confidence"],
+                        confidence_band=s["confidence_band"],
+                        evidence_count=s["evidence_count"],
+                        delta=s["delta"],
+                        recorded_at=record.created_at.isoformat(),
+                    )
+                    for s in payload.get("skill_states", [])
+                ]
+                competency_states = [
+                    CompetencyHistoryPointView(
+                        competency_slug=c["competency_slug"],
+                        score=c["score"],
+                        confidence=c["confidence"],
+                        confidence_band=c["confidence_band"],
+                        delta=c["delta"],
+                        recorded_at=record.created_at.isoformat(),
+                    )
+                    for c in payload.get("competency_states", [])
+                ]
+                snapshots.append(
+                    ProgressHistorySnapshotView(
+                        snapshot_id=record.id,
+                        recorded_at=record.created_at.isoformat(),
+                        source_assessment_id=record.source_assessment_id,
+                        skill_states=skill_states,
+                        competency_states=competency_states,
+                        weak_skill_slugs=payload.get("weak_skill_slugs", []),
+                        stagnating_skill_slugs=payload.get("stagnating_skill_slugs", []),
+                        coverage_gap_skill_slugs=payload.get("coverage_gap_skill_slugs", []),
+                    )
+                )
+
+            return ProgressHistoryView(
+                learner_id=learner_id,
+                snapshots=snapshots,
+                from_date=from_date.isoformat() if from_date else None,
+                to_date=to_date.isoformat() if to_date else None,
+            )
+
+    def get_skill_timeline(
+        self,
+        actor: Actor,
+        learner_id: str,
+        skill_slug: str,
+        *,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        limit: int = 100,
+    ) -> SkillTimelineView:
+        """Fetch time-series data for a specific skill."""
+        self._assert_access(actor, learner_id)
+        with self._session_factory() as session:
+            # Get skill name from taxonomy
+            skill_record = session.query(SkillRecord).filter(SkillRecord.slug == skill_slug).first()
+            skill_name = skill_record.name if skill_record else skill_slug
+
+            query = (
+                session.query(ProgressionSnapshotRecord)
+                .filter(ProgressionSnapshotRecord.learner_id == learner_id)
+                .order_by(ProgressionSnapshotRecord.created_at.asc())
+            )
+            if from_date is not None:
+                query = query.filter(ProgressionSnapshotRecord.created_at >= from_date)
+            if to_date is not None:
+                query = query.filter(ProgressionSnapshotRecord.created_at <= to_date)
+            records = query.limit(limit).all()
+
+            points: list[SkillTimelinePointView] = []
+            for record in records:
+                payload = record.snapshot_payload
+                for skill_state in payload.get("skill_states", []):
+                    if skill_state["skill_slug"] == skill_slug:
+                        points.append(
+                            SkillTimelinePointView(
+                                recorded_at=record.created_at.isoformat(),
+                                score=skill_state["score"],
+                                confidence=skill_state["confidence"],
+                                evidence_count=skill_state["evidence_count"],
+                                delta=skill_state["delta"],
+                                source_assessment_id=record.source_assessment_id,
+                            )
+                        )
+                        break
+
+            # Calculate trend
+            overall_change = 0.0
+            trend: "improving" | "declining" | "stable" = "stable"
+            if len(points) >= 2:
+                first_score = points[0].score
+                last_score = points[-1].score
+                overall_change = round(last_score - first_score, 3)
+                if overall_change > 0.05:
+                    trend = "improving"
+                elif overall_change < -0.05:
+                    trend = "declining"
+
+            return SkillTimelineView(
+                skill_slug=skill_slug,
+                skill_name=skill_name,
+                points=points,
+                from_date=from_date.isoformat() if from_date else None,
+                to_date=to_date.isoformat() if to_date else None,
+                overall_change=overall_change,
+                trend=trend,
+            )
 
     def _empty_dashboard(self, learner_id: str) -> ProgressDashboardView:
         return ProgressDashboardView(

@@ -7,8 +7,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from soft_skills_backend.modules.progression.contracts.commands import ProgressRecalculationCommand
 from soft_skills_backend.modules.progression.contracts.views import (
     ProgressDashboardView,
+    ProgressHistoryView,
     ProgressRecalculationView,
     RecommendationView,
+    SkillTimelineView,
 )
 from soft_skills_backend.modules.progression.infra.repository import ProgressionRepository
 from soft_skills_backend.modules.progression.workflows.service import ProgressionWorkflowService
@@ -59,6 +61,41 @@ class ProgressionService:
 
     def get_recommendation(self, actor: Actor, learner_id: str) -> RecommendationView:
         return self._repository.get_recommendation(actor, learner_id)
+
+    def get_progress_history(
+        self,
+        actor: Actor,
+        learner_id: str,
+        *,
+        from_date: str | None = None,
+        to_date: str | None = None,
+        limit: int = 100,
+    ) -> ProgressHistoryView:
+        """Fetch historical progress snapshots for visualization."""
+        from datetime import datetime
+        from_date_dt = datetime.fromisoformat(from_date) if from_date else None
+        to_date_dt = datetime.fromisoformat(to_date) if to_date else None
+        return self._repository.get_progress_history(
+            actor, learner_id, from_date=from_date_dt, to_date=to_date_dt, limit=limit
+        )
+
+    def get_skill_timeline(
+        self,
+        actor: Actor,
+        learner_id: str,
+        skill_slug: str,
+        *,
+        from_date: str | None = None,
+        to_date: str | None = None,
+        limit: int = 100,
+    ) -> SkillTimelineView:
+        """Fetch time-series data for a specific skill."""
+        from datetime import datetime
+        from_date_dt = datetime.fromisoformat(from_date) if from_date else None
+        to_date_dt = datetime.fromisoformat(to_date) if to_date else None
+        return self._repository.get_skill_timeline(
+            actor, learner_id, skill_slug, from_date=from_date_dt, to_date=to_date_dt, limit=limit
+        )
 
     async def recalculate(
         self,

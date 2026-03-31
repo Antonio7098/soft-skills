@@ -16,17 +16,18 @@ import type {
   StartQuickPracticeSessionCommand,
   SubmitAttemptCommand,
   AttemptView,
-  CompetencyProgressView,
   AttemptHistoryItem,
   InterviewSessionView,
   ScenarioSessionView,
   PracticeRunView,
   PracticeSessionView,
   StartPracticeRunCommand,
-  StructuredCollectionGenerationCommand,
-  ChatCollectionGenerationCommand,
+  CompetencyProgressView,
+  CollectionGenerationView,
   GenerationStartedView,
   GenerationStreamCallbacks,
+  StructuredCollectionGenerationCommand,
+  ChatCollectionGenerationCommand,
   AdminUserView,
   AdminUserListView,
   BulkOperationResultView,
@@ -76,6 +77,8 @@ import type {
   OrganisationView,
   OrganisationListView,
   CreateOrganisationCommand,
+  ProgressHistory,
+  SkillTimeline,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -133,9 +136,11 @@ export interface DataProvider {
   getPracticeRun(runId: string): Promise<PracticeRunView>;
   getPracticeSessions(runId: string): Promise<PracticeSessionView[]>;
 
-  // --- Progress (derived — no backend endpoint yet) ------------------------
+  // --- Progress ------------------------------------------------------------
   getCompetencyProgress(userId: string): Promise<CompetencyProgressView[]>;
   getAttemptHistory(userId: string): Promise<AttemptHistoryItem[]>;
+  getProgressHistory(params?: { from_date?: string; to_date?: string; limit?: number }): Promise<ProgressHistory>;
+  getSkillTimeline(skillSlug: string, params?: { from_date?: string; to_date?: string; limit?: number }): Promise<SkillTimeline>;
 
   // --- Admin: Users & User Management ----------------------------------------
   listAdminUsers(params?: {

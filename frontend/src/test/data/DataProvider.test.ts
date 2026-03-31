@@ -131,6 +131,43 @@ describe('Mock Data Provider', () => {
       const progress = await dataProvider.getCompetencyProgress('user-001');
       expect(Array.isArray(progress)).toBe(true);
     });
+
+    it('getProgressHistory returns progress history', async () => {
+      const history = await dataProvider.getProgressHistory();
+      expect(history).toBeDefined();
+      expect(history.learner_id).toBeDefined();
+      expect(Array.isArray(history.snapshots)).toBe(true);
+    });
+
+    it('getProgressHistory accepts date range parameters', async () => {
+      const fromDate = '2026-01-01T00:00:00Z';
+      const toDate = '2026-03-31T23:59:59Z';
+      const history = await dataProvider.getProgressHistory({
+        from_date: fromDate,
+        to_date: toDate,
+        limit: 50,
+      });
+      expect(history).toBeDefined();
+    });
+
+    it('getSkillTimeline returns timeline for specific skill', async () => {
+      const timeline = await dataProvider.getSkillTimeline('active-listening');
+      expect(timeline).toBeDefined();
+      expect(timeline.skill_slug).toBe('active-listening');
+      expect(timeline.skill_name).toBeDefined();
+      expect(Array.isArray(timeline.points)).toBe(true);
+      expect(['improving', 'declining', 'stable']).toContain(timeline.trend);
+    });
+
+    it('getSkillTimeline accepts date range and limit parameters', async () => {
+      const timeline = await dataProvider.getSkillTimeline('decision-justification', {
+        from_date: '2026-01-01T00:00:00Z',
+        to_date: '2026-03-31T23:59:59Z',
+        limit: 20,
+      });
+      expect(timeline).toBeDefined();
+      expect(timeline.skill_slug).toBe('decision-justification');
+    });
   });
 
   describe('Assistant Methods', () => {

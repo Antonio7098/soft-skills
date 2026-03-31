@@ -1,6 +1,6 @@
-"""Progression and recommendation view contracts."""
-
 from __future__ import annotations
+
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -122,3 +122,71 @@ class ProgressRecalculationView(BaseModel):
     next_recommendation_id: str | None = None
     config_version: str
     diff_summary: dict[str, float | int | str] = Field(default_factory=dict)
+
+
+class SkillHistoryPointView(BaseModel):
+    """Single skill state at a point in time."""
+
+    skill_slug: str
+    score: float
+    confidence: float
+    confidence_band: str
+    evidence_count: int
+    delta: float
+    recorded_at: str
+
+
+class CompetencyHistoryPointView(BaseModel):
+    """Single competency state at a point in time."""
+
+    competency_slug: str
+    score: float
+    confidence: float
+    confidence_band: str
+    delta: float
+    recorded_at: str
+
+
+class ProgressHistorySnapshotView(BaseModel):
+    """Lightweight snapshot for history list."""
+
+    snapshot_id: str
+    recorded_at: str
+    source_assessment_id: str
+    skill_states: list[SkillHistoryPointView] = Field(default_factory=list)
+    competency_states: list[CompetencyHistoryPointView] = Field(default_factory=list)
+    weak_skill_slugs: list[str] = Field(default_factory=list)
+    stagnating_skill_slugs: list[str] = Field(default_factory=list)
+    coverage_gap_skill_slugs: list[str] = Field(default_factory=list)
+
+
+class ProgressHistoryView(BaseModel):
+    """Collection of progress snapshots over time."""
+
+    learner_id: str
+    snapshots: list[ProgressHistorySnapshotView] = Field(default_factory=list)
+    from_date: str | None = None
+    to_date: str | None = None
+
+
+class SkillTimelinePointView(BaseModel):
+    """Single data point for a skill timeline."""
+
+    recorded_at: str
+    score: float
+    confidence: float
+    evidence_count: int
+    delta: float
+    source_assessment_id: str
+
+
+class SkillTimelineView(BaseModel):
+    """Time-series data for a specific skill."""
+
+    skill_slug: str
+    skill_name: str
+    points: list[SkillTimelinePointView] = Field(default_factory=list)
+    from_date: str | None = None
+    to_date: str | None = None
+    overall_change: float = 0.0
+    trend: Literal["improving", "declining", "stable"] = "stable"

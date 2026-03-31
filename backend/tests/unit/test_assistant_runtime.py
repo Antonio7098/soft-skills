@@ -14,7 +14,6 @@ from soft_skills_backend.modules.assistant.workflows.service import (
     _generation_clarification_for_invalid_tool_request,
     _generation_clarification_for_tool_error,
     _required_tool_name,
-    _should_include_read_schema_context,
     _should_rewrite_final_response,
 )
 from soft_skills_backend.modules.assistant.workflows.tools import (
@@ -44,7 +43,9 @@ def test_assistant_decision_requires_exactly_one_action() -> None:
                 {  # type: ignore[list-item]
                     "call_id": "call-1",
                     "tool_name": "query_user_context",
-                    "arguments": {"sql": "SELECT attempt_id FROM assistant_safe_attempt_summaries_v"},
+                    "arguments": {
+                        "sql": "SELECT attempt_id FROM assistant_safe_attempt_summaries_v"
+                    },
                 }
             ],
             final_response="Both set",
@@ -356,17 +357,18 @@ def test_normalize_collection_generation_command_can_infer_taxonomy_targets_from
     assert normalized.rubric_ids == ["interview_text@v1"]
 
 
-def test_should_include_read_schema_context_only_for_read_like_requests() -> None:
-    assert _should_include_read_schema_context("show my recent attempts") is True
-    assert _should_include_read_schema_context("generate a collection for me") is False
-
-
 def test_should_rewrite_final_response_only_after_tool_usage() -> None:
-    assert _should_rewrite_final_response(
-        draft_response="Here is a quick answer.",
-        planning_messages=[{"role": "assistant", "content": "draft"}],
-    ) is False
-    assert _should_rewrite_final_response(
-        draft_response="Here is a grounded answer.",
-        planning_messages=[{"role": "tool", "content": "{\"rows\": []}"}],
-    ) is True
+    assert (
+        _should_rewrite_final_response(
+            draft_response="Here is a quick answer.",
+            planning_messages=[{"role": "assistant", "content": "draft"}],
+        )
+        is False
+    )
+    assert (
+        _should_rewrite_final_response(
+            draft_response="Here is a grounded answer.",
+            planning_messages=[{"role": "tool", "content": '{"rows": []}'}],
+        )
+        is True
+    )

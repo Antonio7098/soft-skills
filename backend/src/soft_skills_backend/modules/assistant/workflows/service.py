@@ -88,10 +88,6 @@ _PRACTICE_RECALL_PATTERN = re.compile(
     r"\bshow\b.*\b(question|prompt)\b",
     re.IGNORECASE,
 )
-_READ_TOOL_PATTERN = re.compile(
-    r"\b(progress|history|attempt|attempts|score|scores|feedback|profile|profiles|recommend|dashboard|recent|previous|how many|show|list)\b",
-    re.IGNORECASE,
-)
 
 
 @dataclass(slots=True)
@@ -350,7 +346,6 @@ class AssistantWorkflowService:
         async def planning_prompt_request(ctx: StageContext) -> Any:
             history = cast(list[Any], payload_from_inputs(ctx, "history_enrich"))
             latest_user_message = _latest_user_message(history)
-            include_read_schema = _should_include_read_schema_context(latest_user_message)
             prompt_request = PromptRenderRequest(
                 name=ASSISTANT_PROMPT_NAME,
                 version=ASSISTANT_PROMPT_VERSION,
@@ -371,11 +366,7 @@ class AssistantWorkflowService:
                         sort_keys=True,
                         separators=(",", ":"),
                     ),
-                    "read_schema_context": (
-                        self._schema_registry.render_prompt_context()
-                        if include_read_schema
-                        else "Not needed for this turn unless you choose query_user_context."
-                    ),
+                    "read_schema_context": self._schema_registry.render_prompt_context(),
                     "taxonomy_context": self._taxonomy.render_prompt_context(
                         execution.actor.organisation_id
                     ),
@@ -1199,6 +1190,22 @@ def _generation_clarification_for_tool_error(
     return None
 
 
+def _should_rewrite_final_response(
+    *, draft_response: str, planning_messages: list[dict[str, Any]]
+) -> bool:
+    if not draft_response.strip():
+        return False
+    return any(message.get("role") == "tool" for message in planning_messages)
+
+
+def _is_practice_control_message(message: str) -> bool:
+    return bool(message and _PRACTICE_STOP_PATTERN.search(message))
+
+
+def _is_practice_recall_message(message: str) -> bool:
+    return bool(message and _PRACTICE_RECALL_PATTERN.search(message))
+
+
 def _latest_user_message(history: list[Any]) -> str:
     return next(
         (
@@ -1208,52 +1215,6 @@ def _latest_user_message(history: list[Any]) -> str:
         ),
         "",
     )
-
-
-def _should_include_read_schema_context(message: str) -> bool:
-    return bool(message and _READ_TOOL_PATTERN.search(message))
-
-
-def _should_rewrite_final_response(
-    *, draft_response: str, planning_messages: list[dict[str, Any]]
-) -> bool:
-    if not draft_response.strip():
-        return False
-    return any(message.get("role") == "tool" for message in planning_messages)
-
-
-def _provider_tool_call_message(
-    *,
-    content: str | None,
-    tool_requests: list[Any],
-) -> dict[str, Any]:
-    return {
-        "role": "assistant",
-        "content": content or "",
-        "tool_calls": [
-            {
-                "id": tool_request.call_id,
-                "type": "function",
-                "function": {
-                    "name": tool_request.tool_name,
-                    "arguments": json.dumps(
-                        tool_request.arguments_payload(),
-                        sort_keys=True,
-                        separators=(",", ":"),
-                    ),
-                },
-            }
-            for tool_request in tool_requests
-        ],
-    }
-
-
-def _is_practice_control_message(message: str) -> bool:
-    return bool(message and _PRACTICE_STOP_PATTERN.search(message))
-
-
-def _is_practice_recall_message(message: str) -> bool:
-    return bool(message and _PRACTICE_RECALL_PATTERN.search(message))
 
 
 def _utcnow() -> datetime:

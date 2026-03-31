@@ -2358,6 +2358,136 @@ export const mockDataProvider: DataProvider = {
     return _attempts;
   },
 
+  async getProgressHistory(params?: { from_date?: string; to_date?: string; limit?: number }): Promise<import('./types').ProgressHistory> {
+    await delay(300);
+    const userId = _user.id;
+    const limit = params?.limit ?? 50;
+    
+    // Generate mock historical snapshots based on attempts
+    const snapshots: import('./types').ProgressHistorySnapshot[] = [];
+    const skills = SEED_COMPETENCY_PROGRESS.flatMap(c => c.skills);
+    
+    // Create 10-20 historical snapshots
+    const numSnapshots = Math.min(limit, Math.max(10, _attempts.length));
+    const now = new Date();
+    
+    for (let i = 0; i < numSnapshots; i++) {
+      const daysAgo = (numSnapshots - i) * 2; // Spread over time
+      const recordedAt = new Date(now);
+      recordedAt.setDate(recordedAt.getDate() - daysAgo);
+      
+      const skillStates: import('./types').SkillHistoryPoint[] = skills.map(skill => {
+        // Simulate gradual improvement with some noise
+        const baseScore = skill.score / 100; // Convert from 0-100 to 0-1
+        const improvement = (i / numSnapshots) * 0.2; // Up to 20% improvement
+        const noise = (Math.random() - 0.5) * 0.1; // Random variation
+        const score = Math.max(0, Math.min(1, baseScore + improvement + noise));
+        
+        return {
+          skill_slug: skill.slug,
+          score: Math.round(score * 100) / 100,
+          confidence: 0.5 + (i / numSnapshots) * 0.4, // Confidence increases with more evidence
+          confidence_band: i > numSnapshots * 0.7 ? 'high' : i > numSnapshots * 0.4 ? 'medium' : 'low',
+          evidence_count: Math.floor(i * 1.5) + 1,
+          delta: i > 0 ? Math.round((Math.random() - 0.4) * 0.1 * 100) / 100 : 0,
+          recorded_at: recordedAt.toISOString(),
+        };
+      });
+      
+      const competencyStates: import('./types').CompetencyHistoryPoint[] = SEED_COMPETENCY_PROGRESS.map(comp => {
+        const compSkills = skillStates.filter(s => comp.skills.some(cs => cs.slug === s.skill_slug));
+        const avgScore = compSkills.length > 0 ? compSkills.reduce((sum, s) => sum + s.score, 0) / compSkills.length : 0.5;
+        
+        return {
+          competency_slug: comp.slug,
+          score: Math.round(avgScore * 100) / 100,
+          confidence: 0.5 + (i / numSnapshots) * 0.4,
+          confidence_band: i > numSnapshots * 0.7 ? 'high' : i > numSnapshots * 0.4 ? 'medium' : 'low',
+          delta: i > 0 ? Math.round((Math.random() - 0.4) * 0.1 * 100) / 100 : 0,
+          recorded_at: recordedAt.toISOString(),
+        };
+      });
+      
+      // Determine weak/skagnating/gap skills based on scores
+      const weakSkills = skillStates.filter(s => s.score < 0.4).map(s => s.skill_slug);
+      const stagnatingSkills = skillStates.filter(s => s.delta < -0.02).map(s => s.skill_slug);
+      const gapSkills = skillStates.filter(s => s.evidence_count < 3).map(s => s.skill_slug);
+      
+      snapshots.push({
+        snapshot_id: `snap-hist-${uid()}-${i}`,
+        recorded_at: recordedAt.toISOString(),
+        source_assessment_id: `assess-${uid()}-${i}`,
+        skill_states: skillStates,
+        competency_states: competencyStates,
+        weak_skill_slugs: weakSkills,
+        stagnating_skill_slugs: stagnatingSkills,
+        coverage_gap_skill_slugs: gapSkills,
+      });
+    }
+    
+    return {
+      learner_id: userId,
+      snapshots: snapshots.reverse(), // Oldest first
+      from_date: params?.from_date ?? null,
+      to_date: params?.to_date ?? null,
+    };
+  },
+
+  async getSkillTimeline(skillSlug: string, params?: { from_date?: string; to_date?: string; limit?: number }): Promise<import('./types').SkillTimeline> {
+    await delay(250);
+    const limit = params?.limit ?? 50;
+    
+    // Find the skill name
+    const skill = SEED_COMPETENCY_PROGRESS.flatMap(c => c.skills).find(s => s.slug === skillSlug);
+    const skillName = skill?.name ?? skillSlug;
+    
+    // Generate mock timeline points
+    const points: import('./types').SkillTimelinePoint[] = [];
+    const now = new Date();
+    const numPoints = Math.min(limit, 20);
+    
+    let lastScore = 0.4 + Math.random() * 0.3; // Starting score between 0.4 and 0.7
+    
+    for (let i = 0; i < numPoints; i++) {
+      const daysAgo = (numPoints - i) * 3;
+      const recordedAt = new Date(now);
+      recordedAt.setDate(recordedAt.getDate() - daysAgo);
+      
+      // Gradual improvement with noise
+      const improvement = 0.02 + Math.random() * 0.03; // 2-5% improvement per point
+      const noise = (Math.random() - 0.5) * 0.05;
+      lastScore = Math.max(0, Math.min(1, lastScore + improvement + noise));
+      
+      points.push({
+        recorded_at: recordedAt.toISOString(),
+        score: Math.round(lastScore * 100) / 100,
+        confidence: 0.4 + (i / numPoints) * 0.5,
+        evidence_count: i + 1,
+        delta: i > 0 ? Math.round((points[i-1]?.score ?? lastScore) - lastScore * 100) / 100 : 0,
+        source_assessment_id: `assess-${uid()}-${i}`,
+      });
+    }
+    
+    // Calculate overall trend
+    const firstScore = points[0]?.score ?? 0;
+    const lastScore2 = points[points.length - 1]?.score ?? 0;
+    const overallChange = Math.round((lastScore2 - firstScore) * 100) / 100;
+    
+    let trend: 'improving' | 'declining' | 'stable' = 'stable';
+    if (overallChange > 0.05) trend = 'improving';
+    else if (overallChange < -0.05) trend = 'declining';
+    
+    return {
+      skill_slug: skillSlug,
+      skill_name: skillName,
+      points: points.reverse(), // Oldest first
+      from_date: params?.from_date ?? null,
+      to_date: params?.to_date ?? null,
+      overall_change: overallChange,
+      trend,
+    };
+  },
+
   // --- Practice Runs (Aggregate) ---------------------------------------------
 
   async createPracticeRun(cmd: StartPracticeRunCommand): Promise<PracticeRunView> {

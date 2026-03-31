@@ -18,7 +18,9 @@ from soft_skills_backend.modules.practice.domain.practice import (
 )
 from soft_skills_backend.modules.practice.models import (
     AttemptHistoryItemView,
+    AttemptQuestionSummaryView,
     AttemptView,
+    PerSkillAssessmentView,
     PracticeAssessmentView,
     PracticeRunItemView,
     PracticeRunListItemView,
@@ -85,17 +87,25 @@ def build_attempt_history_item(session: Session, attempt: AttemptRecord) -> Atte
         )
     prompt = PracticePromptView.model_validate(practice_session.prompt_payload)
     assessment = (
-        None if attempt.assessment_id is None else session.get(AssessmentRecord, attempt.assessment_id)
+        None
+        if attempt.assessment_id is None
+        else session.get(AssessmentRecord, attempt.assessment_id)
     )
     skill_slugs = list(prompt.target_skill_slugs)
     if assessment is not None and assessment.skill_scores:
-        skill_slugs = [str(item.get("skill_slug")) for item in assessment.skill_scores if item.get("skill_slug")]
+        skill_slugs = [
+            str(item.get("skill_slug"))
+            for item in assessment.skill_scores
+            if item.get("skill_slug")
+        ]
     return AttemptHistoryItemView(
         id=attempt.id,
         session_id=attempt.session_id,
         title=prompt.title,
         practice_type=PracticeType(attempt.practice_type),
-        score=0.0 if assessment is None or assessment.overall_score is None else float(assessment.overall_score),
+        score=0.0
+        if assessment is None or assessment.overall_score is None
+        else float(assessment.overall_score),
         skill_slugs=skill_slugs,
         created_at=attempt.created_at.isoformat(),
         status=AttemptStatus(attempt.status),
@@ -160,6 +170,24 @@ def build_practice_run_list_item(
 def _assessment_record_to_view(record: AssessmentRecord) -> PracticeAssessmentView:
     """Build the learner-facing assessment view."""
 
+    skill_scores = [SkillScore.model_validate(item) for item in record.skill_scores]
+    evidence_items = [EvidenceItem.model_validate(item) for item in record.evidence]
+
+    # Build per_skill_assessments by grouping evidence by skill_slug
+    evidence_by_skill: dict[str, list[EvidenceItem]] = defaultdict(list)
+    for e in evidence_items:
+        evidence_by_skill[e.skill_slug].append(e)
+
+    per_skill_assessments = [
+        PerSkillAssessmentView(
+            skill_slug=ss.skill_slug,
+            score=ss.score,
+            rationale=ss.rationale,
+            evidence=evidence_by_skill.get(ss.skill_slug, []),
+        )
+        for ss in skill_scores
+    ]
+
     return PracticeAssessmentView(
         assessment_id=record.id,
         attempt_id=record.attempt_id,
@@ -173,8 +201,9 @@ def _assessment_record_to_view(record: AssessmentRecord) -> PracticeAssessmentVi
         provider=record.provider,
         model_slug=record.model_slug,
         overall_score=record.overall_score,
-        skill_scores=[SkillScore.model_validate(item) for item in record.skill_scores],
-        evidence=[EvidenceItem.model_validate(item) for item in record.evidence],
+        per_skill_assessments=per_skill_assessments,
+        skill_scores=skill_scores,
+        evidence=evidence_items,
         rationale=record.rationale,
         strengths=list(record.strengths),
         weaknesses=list(record.weaknesses),

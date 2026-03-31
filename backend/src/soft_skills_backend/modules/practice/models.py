@@ -114,6 +114,15 @@ class PracticeSessionView(BaseModel):
     trace_id: str
 
 
+class PerSkillAssessmentView(BaseModel):
+    """Per-skill assessment summary."""
+
+    skill_slug: str
+    score: int | float
+    rationale: str = ""
+    evidence: list[EvidenceItem] = Field(default_factory=list)
+
+
 class PracticeAssessmentView(BaseModel):
     """Learner-facing assessment artifact."""
 
@@ -129,6 +138,7 @@ class PracticeAssessmentView(BaseModel):
     provider: str
     model_slug: str
     overall_score: int | None = None
+    per_skill_assessments: list[PerSkillAssessmentView] = Field(default_factory=list)
     skill_scores: list[SkillScore] = Field(default_factory=list)
     evidence: list[EvidenceItem] = Field(default_factory=list)
     rationale: str | None = None
@@ -224,6 +234,15 @@ class PracticeRunListItemView(BaseModel):
     completed_at: str | None = None
 
 
+class AttemptQuestionSummaryView(BaseModel):
+    """Per-question summary within an attempt."""
+
+    question_index: int
+    question_text: str
+    score: float | None = None
+    skill_slugs: list[str] = Field(default_factory=list)
+
+
 class AttemptHistoryItemView(BaseModel):
     """Compact learner history row."""
 
@@ -235,6 +254,7 @@ class AttemptHistoryItemView(BaseModel):
     skill_slugs: list[str] = Field(default_factory=list)
     created_at: str
     status: AttemptStatus
+    questions: list[AttemptQuestionSummaryView] = Field(default_factory=list)
 
 
 class StartPracticeSessionCommand(BaseModel):
@@ -363,9 +383,7 @@ class StartScenarioRunItemCommand(BaseModel):
 
 
 PracticeRunItemCommand = Annotated[
-    StartQuickPracticeRunItemCommand
-    | StartInterviewRunItemCommand
-    | StartScenarioRunItemCommand,
+    StartQuickPracticeRunItemCommand | StartInterviewRunItemCommand | StartScenarioRunItemCommand,
     Field(discriminator="practice_type"),
 ]
 
@@ -388,5 +406,6 @@ class SubmitAttemptCommand(BaseModel):
         if not cleaned:
             raise ValueError("response_text must not be blank")
         return cleaned
+
 
 AttemptView = PracticeAttemptView

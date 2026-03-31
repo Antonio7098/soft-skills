@@ -230,3 +230,63 @@ export interface StartPracticeRunCommand {
     readonly prompt_type?: string;
   }[];
 }
+
+// ============================================================================
+// Progress History Types
+// ============================================================================
+
+export interface SkillHistoryPoint {
+  readonly skill_slug: string;
+  readonly score: number;
+  readonly confidence: number;
+  readonly confidence_band: 'low' | 'medium' | 'high';
+  readonly evidence_count: number;
+  readonly delta: number;
+  readonly recorded_at: string;
+}
+
+export interface CompetencyHistoryPoint {
+  readonly competency_slug: string;
+  readonly score: number;
+  readonly confidence: number;
+  readonly confidence_band: 'low' | 'medium' | 'high';
+  readonly delta: number;
+  readonly recorded_at: string;
+}
+
+export interface ProgressHistorySnapshot {
+  readonly snapshot_id: string;
+  readonly recorded_at: string;
+  readonly source_assessment_id: string;
+  readonly skill_states: SkillHistoryPoint[];
+  readonly competency_states: CompetencyHistoryPoint[];
+  readonly weak_skill_slugs: string[];
+  readonly stagnating_skill_slugs: string[];
+  readonly coverage_gap_skill_slugs: string[];
+}
+
+export interface ProgressHistory {
+  readonly learner_id: string;
+  readonly snapshots: ProgressHistorySnapshot[];
+  readonly from_date: string | null;
+  readonly to_date: string | null;
+}
+
+export interface SkillTimelinePoint {
+  readonly recorded_at: string;
+  readonly score: number;
+  readonly confidence: number;
+  readonly evidence_count: number;
+  readonly delta: number;
+  readonly source_assessment_id: string;
+}
+
+export interface SkillTimeline {
+  readonly skill_slug: string;
+  readonly skill_name: string;
+  readonly points: SkillTimelinePoint[];
+  readonly from_date: string | null;
+  readonly to_date: string | null;
+  readonly overall_change: number;
+  readonly trend: 'improving' | 'declining' | 'stable';
+}

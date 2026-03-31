@@ -81,6 +81,12 @@ export {
   type PracticeRunView,
   type PracticeSessionView,
   type StartPracticeRunCommand,
+  type SkillHistoryPoint,
+  type CompetencyHistoryPoint,
+  type ProgressHistorySnapshot,
+  type ProgressHistory,
+  type SkillTimelinePoint,
+  type SkillTimeline,
 } from './practice';
 
 export {

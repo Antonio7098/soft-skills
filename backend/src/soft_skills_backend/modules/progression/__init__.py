@@ -5,9 +5,11 @@ from soft_skills_backend.modules.progression.contracts.commands import (
 )
 from soft_skills_backend.modules.progression.contracts.views import (
     ProgressDashboardView,
+    ProgressHistoryView,
     ProgressRecalculationView,
     ProgressSnapshotView,
     RecommendationView,
+    SkillTimelineView,
 )
 from soft_skills_backend.modules.progression.use_cases.progression_service import (
     ProgressionService,
@@ -15,9 +17,11 @@ from soft_skills_backend.modules.progression.use_cases.progression_service impor
 
 __all__ = [
     "ProgressDashboardView",
+    "ProgressHistoryView",
     "ProgressRecalculationCommand",
     "ProgressRecalculationView",
     "ProgressSnapshotView",
     "ProgressionService",
     "RecommendationView",
+    "SkillTimelineView",
 ]
