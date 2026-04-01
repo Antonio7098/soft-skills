@@ -8,7 +8,8 @@ Create Date: 2026-03-30 09:00:00.000000
 
 from __future__ import annotations
 
-from alembic import context, op
+from alembic import context as _context
+from alembic import op
 
 
 revision = "20260330_0022"
@@ -19,7 +20,7 @@ depends_on = None
 
 def get_sql_for_dialect(sqlite_sql: str, postgres_sql: str) -> str:
     """Return SQL appropriate for the current database dialect."""
-    dialect = context.get_context().dialect.name
+    dialect = _context.get_context().dialect.name
     if dialect == "postgresql":
         return postgres_sql
     return sqlite_sql
