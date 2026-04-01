@@ -66,11 +66,11 @@ def upgrade() -> None:
             a.assessment_id,
             ass.overall_score,
             CASE
-                WHEN ass.strengths IS NULL OR jsonb_array_length(ass.strengths) = 0 THEN NULL
+                WHEN ass.strengths IS NULL OR jsonb_array_length(ass.strengths::jsonb) = 0 THEN NULL
                 ELSE ass.strengths->>0
             END AS strength_summary,
             CASE
-                WHEN ass.next_actions IS NULL OR jsonb_array_length(ass.next_actions) = 0 THEN NULL
+                WHEN ass.next_actions IS NULL OR jsonb_array_length(ass.next_actions::jsonb) = 0 THEN NULL
                 ELSE ass.next_actions->>0
             END AS next_action_summary,
             a.created_at,
