@@ -1036,11 +1036,13 @@ def _build_compact_learner_context(
     progress: dict[str, Any],
     attempts: list[dict[str, Any]],
 ) -> dict[str, Any]:
+    user = profile.get("user", {})
     compact_profile = {
-        key: profile.get(key)
-        for key in ("display_name", "email", "organisation_id")
-        if profile.get(key) is not None
+        key: user.get(key) for key in ("display_name", "email") if user.get(key) is not None
     }
+    org_id = profile.get("organisation_id")
+    if org_id is not None:
+        compact_profile["organisation_id"] = org_id
     context: dict[str, Any] = {"profile": compact_profile}
     context["progress"] = _compact_progress_context(progress)
     context["recent_attempts"] = [
@@ -1090,6 +1092,8 @@ def _compact_progress_context(progress: dict[str, Any]) -> dict[str, Any]:
 
 def _required_tool_name(history: list[Any], practice_state: AssistantPracticeState) -> str | None:
     return None
+
+
 def _should_rewrite_final_response(
     *, draft_response: str, planning_messages: list[dict[str, Any]]
 ) -> bool:

@@ -371,6 +371,34 @@ def test_summarize_streamed_generation_payload_preserves_progress_metadata() -> 
     assert payload["scenario_count"] == 1
 
 
+def test_build_compact_learner_context_extracts_nested_user_fields() -> None:
+    """Test that _build_compact_learner_context correctly extracts display_name and email from nested user dict."""
+    profile = {
+        "user": {
+            "display_name": "Test User",
+            "email": "test@example.com",
+        },
+        "profile": {
+            "target_role": "developer",
+            "goals": ["learn python"],
+        },
+    }
+    progress = {}
+    attempts = []
+
+    result = _build_compact_learner_context(
+        latest_user_message="Hello",
+        profile=profile,
+        progress=progress,
+        attempts=attempts,
+    )
+
+    assert result["profile"] == {
+        "display_name": "Test User",
+        "email": "test@example.com",
+    }
+
+
 @pytest.mark.asyncio
 async def test_started_tool_failure_is_returned_to_model_as_failed_tool_payload() -> None:
     class _ToolCallView:
@@ -500,9 +528,7 @@ async def test_started_tool_failure_is_returned_to_model_as_failed_tool_payload(
     assert result.call_id == "call-1"
     assert result.payload["status"] == "failed"
     assert result.payload["error"]["code"] == "SS-VALIDATION-318"
-    assert (
-        "assistant-safe SQL surface" in result.payload["error"]["message"]
-    )
+    assert "assistant-safe SQL surface" in result.payload["error"]["message"]
     assert repository.failed_tool_call is not None
     published_events = [call.args[1]["event_type"] for call in broker.publish.await_args_list]
     assert published_events == ["tool.started", "tool.failed"]
