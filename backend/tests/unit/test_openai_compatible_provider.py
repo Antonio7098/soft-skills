@@ -173,6 +173,86 @@ async def test_openai_compatible_provider_switches_to_backup_model_on_third_atte
 
 
 @pytest.mark.asyncio
+async def test_openai_compatible_provider_carries_attempt_count_across_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested_models: list[str] = []
+
+    class _Response:
+        def __init__(self, payload: dict[str, object]) -> None:
+            self.status_code = 200
+            self._payload = payload
+
+        def json(self) -> dict[str, object]:
+            return self._payload
+
+    class _AsyncClient:
+        def __init__(self, **_: object) -> None:
+            return None
+
+        async def __aenter__(self) -> _AsyncClient:
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def post(self, *_args: object, **kwargs: object) -> _Response:
+            payload = kwargs["json"]
+            assert isinstance(payload, dict)
+            requested_models.append(str(payload["model"]))
+            return _Response(
+                {
+                    "model": payload["model"],
+                    "choices": [{"message": {"content": '{"ok": true}'}}],
+                    "usage": {"total_tokens": 1},
+                }
+            )
+
+    monkeypatch.setattr(
+        "soft_skills_backend.platform.providers.llm.openai_compatible.httpx.AsyncClient",
+        _AsyncClient,
+    )
+
+    provider = OpenAICompatibleLLMProvider(
+        settings=Settings(
+            _env_file=None,  # type: ignore[call-arg]
+            provider_api_key="test-key",
+            provider_base_url="https://example.com/v1",
+            llm_default_model="primary-model",
+            llm_default_backup_model="backup-model",
+            provider_max_retries=0,
+        ),
+        provider_call_logger=_NoOpProviderCallLogger(),
+    )
+    call_context = ProviderCallContext(
+        operation="catalog_prompt_item_worker_generation",
+        request_id="request-id",
+        trace_id="trace-id",
+        pipeline_run_id="pipeline-id",
+        workflow_id="workflow-id",
+        user_id="user-id",
+    )
+    response_schema = JsonSchemaResponseFormat(
+        name="simple",
+        schema={
+            "type": "object",
+            "properties": {"ok": {"type": "boolean"}},
+            "required": ["ok"],
+        },
+        strict=True,
+    )
+
+    for _ in range(3):
+        await provider.complete_json(
+            messages=[{"role": "user", "content": "Return JSON"}],
+            call_context=call_context,
+            response_schema=response_schema,
+        )
+
+    assert requested_models == ["primary-model", "primary-model", "backup-model"]
+
+
+@pytest.mark.asyncio
 async def test_assistant_provider_switches_to_backup_model_on_first_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

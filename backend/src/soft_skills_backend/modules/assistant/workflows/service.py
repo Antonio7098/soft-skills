@@ -11,7 +11,6 @@ from time import perf_counter
 from typing import Any, cast
 from uuid import uuid4
 
-from pydantic import ValidationError
 from stageflow.agent.security import PromptSecurityError, PromptSecurityPolicy
 from stageflow.api import Pipeline, StageKind, stage
 from stageflow.core import StageContext, StageOutput
@@ -69,7 +68,7 @@ from soft_skills_backend.platform.workflows.stageflow import (
 )
 from soft_skills_backend.platform.workflows.stageflow_runtime import StageflowRuntime
 from soft_skills_backend.shared.auth import Actor
-from soft_skills_backend.shared.errors import AppError, orchestration_error, validation_error
+from soft_skills_backend.shared.errors import orchestration_error, validation_error
 from soft_skills_backend.shared.ports.llm import LLMProvider
 from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
@@ -673,24 +672,7 @@ class AssistantWorkflowService:
                     planning_messages=list(messages),
                     used_tools=has_executed_tool,
                 )
-            try:
-                tool_requests = parse_assistant_tool_requests(completion.tool_calls)
-            except ValidationError as exc:
-                clarification = _generation_clarification_for_invalid_tool_request(
-                    raw_tool_calls=completion.tool_calls,
-                    error=exc,
-                )
-                if clarification is not None:
-                    return _AssistantLoopResult(
-                        cancelled=False,
-                        reason=None,
-                        final_response=clarification,
-                        prompt_version=rendered_prompt.version,
-                        model_slug=completion.model_slug,
-                        planning_messages=list(messages),
-                        used_tools=has_executed_tool,
-                    )
-                raise
+            tool_requests = parse_assistant_tool_requests(completion.tool_calls)
             messages.append(
                 _provider_tool_call_message(
                     content=completion.content,
@@ -712,36 +694,19 @@ class AssistantWorkflowService:
                         "workflow_id": execution.workflow_id,
                     },
                 )
-            try:
-                tool_results = await self._tools.execute_many(
-                    stage_ctx=ctx,
-                    execution=ToolExecutionContext(
-                        actor=execution.actor,
-                        request_id=execution.request_id,
-                        trace_id=execution.trace_id,
-                        workflow_id=execution.workflow_id,
-                        session_id=execution.session_id,
-                        turn_id=execution.turn_id,
-                        stream_token=execution.stream_token,
-                    ),
-                    tool_requests=tool_requests,
-                )
-            except AppError as exc:
-                clarification = _generation_clarification_for_tool_error(
-                    tool_requests=tool_requests,
-                    error=exc,
-                )
-                if clarification is not None:
-                    return _AssistantLoopResult(
-                        cancelled=False,
-                        reason=None,
-                        final_response=clarification,
-                        prompt_version=rendered_prompt.version,
-                        model_slug=completion.model_slug,
-                        planning_messages=list(messages),
-                        used_tools=has_executed_tool,
-                    )
-                raise
+            tool_results = await self._tools.execute_many(
+                stage_ctx=ctx,
+                execution=ToolExecutionContext(
+                    actor=execution.actor,
+                    request_id=execution.request_id,
+                    trace_id=execution.trace_id,
+                    workflow_id=execution.workflow_id,
+                    session_id=execution.session_id,
+                    turn_id=execution.turn_id,
+                    stream_token=execution.stream_token,
+                ),
+                tool_requests=tool_requests,
+            )
             has_executed_tool = has_executed_tool or bool(tool_results)
             if active.cancel_reason is not None:
                 return _AssistantLoopResult(cancelled=True, reason=active.cancel_reason)
@@ -1125,69 +1090,6 @@ def _compact_progress_context(progress: dict[str, Any]) -> dict[str, Any]:
 
 def _required_tool_name(history: list[Any], practice_state: AssistantPracticeState) -> str | None:
     return None
-
-
-def _should_rewrite_final_response(
-    *,
-    raw_tool_calls: list[Any],
-    error: ValidationError,
-) -> str | None:
-    generation_tool_names = {
-        str(getattr(tool_call, "tool_name", "")) for tool_call in raw_tool_calls
-    } & {"generate_collection", "generate_prompt_items"}
-    if not generation_tool_names:
-        return None
-    return (
-        "I can generate that, but I need valid platform-ready generation inputs first. "
-        "Please give me at least one real skill or competency to target, or ask me to pick from "
-        "your weak skills. Use platform content formats only: "
-        "`quick_practice_prompt`, `interview_prompt`, or `scenario_step`."
-    )
-
-
-def _generation_clarification_for_invalid_tool_request(
-    *,
-    raw_tool_calls: list[Any],
-    error: ValidationError,
-) -> str | None:
-    generation_tool_names = {
-        str(getattr(tool_call, "tool_name", "")) for tool_call in raw_tool_calls
-    } & {"generate_collection", "generate_prompt_items"}
-    if not generation_tool_names:
-        return None
-    return (
-        "I can generate that, but I need valid platform-ready generation inputs first. "
-        "Please give me at least one real skill or competency to target, or ask me to pick from "
-        "your weak skills. Use platform content formats only: "
-        "`quick_practice_prompt`, `interview_prompt`, or `scenario_step`."
-    )
-
-
-def _generation_clarification_for_tool_error(
-    *,
-    tool_requests: list[Any],
-    error: AppError,
-) -> str | None:
-    if not any(
-        getattr(tool_request, "tool_name", None) in {"generate_collection", "generate_prompt_items"}
-        for tool_request in tool_requests
-    ):
-        return None
-    if error.category.value == "validation":
-        return (
-            "I can generate that, but I still need valid platform targets before I can run the "
-            "generation pipeline. Tell me a real skill or competency to focus on, or ask me to "
-            "pick from your weak skills."
-        )
-    child_error = str((error.details or {}).get("error", ""))
-    if error.code == "SS-ORCHESTRATION-204" and "SS-VALIDATION-" in child_error:
-        return (
-            "I can generate that, but the request still needs valid platform targets and formats. "
-            "Tell me a skill or competency to focus on, or ask me to pick from your weak skills."
-        )
-    return None
-
-
 def _should_rewrite_final_response(
     *, draft_response: str, planning_messages: list[dict[str, Any]]
 ) -> bool:

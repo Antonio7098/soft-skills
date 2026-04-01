@@ -116,6 +116,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
         self._provider_call_logger = provider_call_logger
         self._task = task
         self._resolved = self._resolve_config(settings, task)
+        self._complete_json_attempt_counts: dict[tuple[str, ...], int] = {}
 
     def _resolve_config(
         self,
@@ -188,72 +189,118 @@ class OpenAICompatibleLLMProvider(LLMProvider):
 
         url = f"{self._resolved.base_url.rstrip('/')}/chat/completions"
         resolved_timeout_seconds = timeout_seconds or self._settings.smoke_timeout_seconds
-        
-        # DEBUG: Log timeout values
-        import sys
-        print(
-            f"DEBUG complete_json: operation={call_context.operation}, "
-            f"timeout_input={timeout_seconds}, resolved={resolved_timeout_seconds}, "
-            f"smoke_default={self._settings.smoke_timeout_seconds}",
-            file=sys.stderr, flush=True
-        )
-        
+
         headers = {
             "Authorization": f"Bearer {self._resolved.api_key}",
             "Content-Type": "application/json",
         }
         max_retries = self._max_retries()
+        attempt_key = self._complete_json_attempt_key(call_context)
+        starting_attempt = (
+            self._complete_json_attempt_counts.get(attempt_key, 0) if attempt_key is not None else 0
+        )
+        attempts_used = 0
 
-        for attempt in range(max_retries + 1):
-            active_model_slug = self._model_slug_for_attempt(attempt)
-            payload = {
-                "model": active_model_slug,
-                "messages": messages,
-                "temperature": 0,
-                "response_format": _build_json_response_format(
-                    response_schema,
+        try:
+            for attempt in range(max_retries + 1):
+                attempts_used = attempt + 1
+                active_model_slug = self._model_slug_for_attempt(starting_attempt + attempt)
+                payload = {
+                    "model": active_model_slug,
+                    "messages": messages,
+                    "temperature": 0,
+                    "response_format": _build_json_response_format(
+                        response_schema,
+                        provider_name=self._resolved.provider_name,
+                    ),
+                }
+                provider_preferences = _build_provider_preferences(
                     provider_name=self._resolved.provider_name,
-                ),
-            }
-            provider_preferences = _build_provider_preferences(
-                provider_name=self._resolved.provider_name,
-                response_schema=response_schema,
-            )
-            if provider_preferences is not None:
-                payload["provider"] = provider_preferences
-            call_id = await self._provider_call_logger.log_call_start(
-                operation=call_context.operation,
-                provider=self._resolved.provider_name,
-                model_id=active_model_slug,
-                pipeline_run_id=call_context.pipeline_run_id,
-                request_id=call_context.request_id,
-                trace_id=call_context.trace_id,
-                workflow_id=call_context.workflow_id,
-                user_id=call_context.user_id,
-            )
-            start = perf_counter()
-            response_payload: dict[str, Any] | None = None
-            try:
-                # Use explicit httpx timeout configuration to ensure proper timeout handling
-                from httpx import Timeout
-                timeout_config = Timeout(
-                    resolved_timeout_seconds,
-                    connect=min(5.0, resolved_timeout_seconds),
-                    read=resolved_timeout_seconds,
-                    write=min(5.0, resolved_timeout_seconds),
+                    response_schema=response_schema,
                 )
-                async with asyncio.timeout(resolved_timeout_seconds):
-                    async with httpx.AsyncClient(timeout=timeout_config) as client:
-                        response = await client.post(url, headers=headers, json=payload)
-                latency_ms = int((perf_counter() - start) * 1000)
-                response_payload = response.json()
-                if response.status_code >= 400:
-                    error_message = _provider_error_message(response_payload)
+                if provider_preferences is not None:
+                    payload["provider"] = provider_preferences
+                call_id = await self._provider_call_logger.log_call_start(
+                    operation=call_context.operation,
+                    provider=self._resolved.provider_name,
+                    model_id=active_model_slug,
+                    pipeline_run_id=call_context.pipeline_run_id,
+                    request_id=call_context.request_id,
+                    trace_id=call_context.trace_id,
+                    workflow_id=call_context.workflow_id,
+                    user_id=call_context.user_id,
+                )
+                start = perf_counter()
+                response_payload: dict[str, Any] | None = None
+                try:
+                    from httpx import Timeout
+
+                    timeout_config = Timeout(
+                        resolved_timeout_seconds,
+                        connect=min(5.0, resolved_timeout_seconds),
+                        read=resolved_timeout_seconds,
+                        write=min(5.0, resolved_timeout_seconds),
+                    )
+                    async with asyncio.timeout(resolved_timeout_seconds):
+                        async with httpx.AsyncClient(timeout=timeout_config) as client:
+                            response = await client.post(url, headers=headers, json=payload)
+                    latency_ms = int((perf_counter() - start) * 1000)
+                    response_payload = response.json()
+                    if response.status_code >= 400:
+                        error_message = _provider_error_message(response_payload)
+                        await self._provider_call_logger.log_call_end(
+                            call_id,
+                            success=False,
+                            latency_ms=latency_ms,
+                            error=error_message,
+                            operation=call_context.operation,
+                            provider=self._resolved.provider_name,
+                            model_id=active_model_slug,
+                            pipeline_run_id=call_context.pipeline_run_id,
+                            request_id=call_context.request_id,
+                            trace_id=call_context.trace_id,
+                            workflow_id=call_context.workflow_id,
+                            user_id=call_context.user_id,
+                            http_status=response.status_code,
+                            timeout_seconds=resolved_timeout_seconds,
+                            response_format_type=str(
+                                cast(dict[str, object], payload["response_format"])["type"]
+                            ),
+                        )
+                        if (
+                            _is_retryable_structured_output_failure(
+                                status_code=response.status_code,
+                                error_message=error_message,
+                            )
+                            and attempt < max_retries
+                        ):
+                            await asyncio.sleep(
+                                self._settings.provider_retry_backoff_seconds * (attempt + 1)
+                            )
+                            continue
+                        if (
+                            response.status_code in TRANSIENT_PROVIDER_STATUS_CODES
+                            and attempt < max_retries
+                        ):
+                            await asyncio.sleep(
+                                self._settings.provider_retry_backoff_seconds * (attempt + 1)
+                            )
+                            continue
+                        raise provider_error(
+                            "Provider completion request failed",
+                            code="SS-PROVIDER-004",
+                            details={
+                                "status_code": response.status_code,
+                                "reason": error_message,
+                            },
+                        )
+                    content = _extract_message_content(response_payload)
+                    usage = _extract_usage(response_payload)
+                    finish_reason = _extract_finish_reason(response_payload)
                     await self._provider_call_logger.log_call_end(
                         call_id,
-                        success=False,
+                        success=True,
                         latency_ms=latency_ms,
-                        error=error_message,
                         operation=call_context.operation,
                         provider=self._resolved.provider_name,
                         model_id=active_model_slug,
@@ -262,172 +309,130 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                         trace_id=call_context.trace_id,
                         workflow_id=call_context.workflow_id,
                         user_id=call_context.user_id,
-                        http_status=response.status_code,
+                        usage=usage,
+                        finish_reason=finish_reason,
                         timeout_seconds=resolved_timeout_seconds,
                         response_format_type=str(
                             cast(dict[str, object], payload["response_format"])["type"]
                         ),
                     )
-                    if (
-                        _is_retryable_structured_output_failure(
-                            status_code=response.status_code,
-                            error_message=error_message,
-                        )
-                        and attempt < max_retries
-                    ):
+                    _add_llm_span_attributes(
+                        operation=call_context.operation,
+                        provider=self._resolved.provider_name,
+                        model_slug=active_model_slug,
+                        usage=usage,
+                    )
+                    return ProviderCompletion(
+                        content=content,
+                        model_slug=str(response_payload.get("model", active_model_slug)),
+                        usage=usage,
+                        raw_response=response_payload,
+                    )
+                except AppError as exc:
+                    latency_ms = int((perf_counter() - start) * 1000)
+                    persisted_error = (
+                        str(exc.details.get("reason"))
+                        if exc.details and isinstance(exc.details.get("reason"), str)
+                        else str(exc)
+                    )
+                    await self._provider_call_logger.log_call_end(
+                        call_id,
+                        success=False,
+                        latency_ms=latency_ms,
+                        error=persisted_error,
+                        operation=call_context.operation,
+                        provider=self._resolved.provider_name,
+                        model_id=active_model_slug,
+                        pipeline_run_id=call_context.pipeline_run_id,
+                        request_id=call_context.request_id,
+                        trace_id=call_context.trace_id,
+                        workflow_id=call_context.workflow_id,
+                        user_id=call_context.user_id,
+                        timeout_seconds=resolved_timeout_seconds,
+                        response_format_type=str(
+                            cast(dict[str, object], payload["response_format"])["type"]
+                        ),
+                        error_code=exc.code,
+                        response_diagnostics=_build_response_diagnostics(response_payload),
+                    )
+                    if exc.code in RETRYABLE_PROVIDER_PAYLOAD_CODES and attempt < max_retries:
                         await asyncio.sleep(
                             self._settings.provider_retry_backoff_seconds * (attempt + 1)
                         )
                         continue
-                    if (
-                        response.status_code in TRANSIENT_PROVIDER_STATUS_CODES
-                        and attempt < max_retries
-                    ):
+                    raise
+                except TimeoutError as exc:
+                    latency_ms = int((perf_counter() - start) * 1000)
+                    timeout_error = "Provider completion request exceeded the configured timeout budget"
+                    await self._provider_call_logger.log_call_end(
+                        call_id,
+                        success=False,
+                        latency_ms=latency_ms,
+                        error=timeout_error,
+                        operation=call_context.operation,
+                        provider=self._resolved.provider_name,
+                        model_id=active_model_slug,
+                        pipeline_run_id=call_context.pipeline_run_id,
+                        request_id=call_context.request_id,
+                        trace_id=call_context.trace_id,
+                        workflow_id=call_context.workflow_id,
+                        user_id=call_context.user_id,
+                    )
+                    if attempt < max_retries:
                         await asyncio.sleep(
                             self._settings.provider_retry_backoff_seconds * (attempt + 1)
                         )
                         continue
                     raise provider_error(
                         "Provider completion request failed",
-                        code="SS-PROVIDER-004",
+                        code="SS-PROVIDER-005",
                         details={
-                            "status_code": response.status_code,
-                            "reason": error_message,
+                            "reason": timeout_error,
+                            "timeout_seconds": resolved_timeout_seconds,
+                            "url": url,
                         },
+                    ) from exc
+                except httpx.HTTPError as exc:
+                    latency_ms = int((perf_counter() - start) * 1000)
+                    await self._provider_call_logger.log_call_end(
+                        call_id,
+                        success=False,
+                        latency_ms=latency_ms,
+                        error=str(exc),
+                        operation=call_context.operation,
+                        provider=self._resolved.provider_name,
+                        model_id=active_model_slug,
+                        pipeline_run_id=call_context.pipeline_run_id,
+                        request_id=call_context.request_id,
+                        trace_id=call_context.trace_id,
+                        workflow_id=call_context.workflow_id,
+                        user_id=call_context.user_id,
+                        timeout_seconds=resolved_timeout_seconds,
+                        response_format_type=str(
+                            cast(dict[str, object], payload["response_format"])["type"]
+                        ),
                     )
-                content = _extract_message_content(response_payload)
-                usage = _extract_usage(response_payload)
-                finish_reason = _extract_finish_reason(response_payload)
-                await self._provider_call_logger.log_call_end(
-                    call_id,
-                    success=True,
-                    latency_ms=latency_ms,
-                    operation=call_context.operation,
-                    provider=self._resolved.provider_name,
-                    model_id=active_model_slug,
-                    pipeline_run_id=call_context.pipeline_run_id,
-                    request_id=call_context.request_id,
-                    trace_id=call_context.trace_id,
-                    workflow_id=call_context.workflow_id,
-                    user_id=call_context.user_id,
-                    usage=usage,
-                    finish_reason=finish_reason,
-                    timeout_seconds=resolved_timeout_seconds,
-                    response_format_type=str(
-                        cast(dict[str, object], payload["response_format"])["type"]
-                    ),
-                )
-                _add_llm_span_attributes(
-                    operation=call_context.operation,
-                    provider=self._resolved.provider_name,
-                    model_slug=active_model_slug,
-                    usage=usage,
-                )
-                return ProviderCompletion(
-                    content=content,
-                    model_slug=str(response_payload.get("model", active_model_slug)),
-                    usage=usage,
-                    raw_response=response_payload,
-                )
-            except AppError as exc:
-                latency_ms = int((perf_counter() - start) * 1000)
-                persisted_error = (
-                    str(exc.details.get("reason"))
-                    if exc.details and isinstance(exc.details.get("reason"), str)
-                    else str(exc)
-                )
-                await self._provider_call_logger.log_call_end(
-                    call_id,
-                    success=False,
-                    latency_ms=latency_ms,
-                    error=persisted_error,
-                    operation=call_context.operation,
-                    provider=self._resolved.provider_name,
-                    model_id=active_model_slug,
-                    pipeline_run_id=call_context.pipeline_run_id,
-                    request_id=call_context.request_id,
-                    trace_id=call_context.trace_id,
-                    workflow_id=call_context.workflow_id,
-                    user_id=call_context.user_id,
-                    timeout_seconds=resolved_timeout_seconds,
-                    response_format_type=str(
-                        cast(dict[str, object], payload["response_format"])["type"]
-                    ),
-                    error_code=exc.code,
-                    response_diagnostics=_build_response_diagnostics(response_payload),
-                )
-                if exc.code in RETRYABLE_PROVIDER_PAYLOAD_CODES and attempt < max_retries:
-                    await asyncio.sleep(
-                        self._settings.provider_retry_backoff_seconds * (attempt + 1)
-                    )
-                    continue
-                raise
-            except TimeoutError as exc:
-                latency_ms = int((perf_counter() - start) * 1000)
-                timeout_error = "Provider completion request exceeded the configured timeout budget"
-                await self._provider_call_logger.log_call_end(
-                    call_id,
-                    success=False,
-                    latency_ms=latency_ms,
-                    error=timeout_error,
-                    operation=call_context.operation,
-                    provider=self._resolved.provider_name,
-                    model_id=active_model_slug,
-                    pipeline_run_id=call_context.pipeline_run_id,
-                    request_id=call_context.request_id,
-                    trace_id=call_context.trace_id,
-                    workflow_id=call_context.workflow_id,
-                    user_id=call_context.user_id,
-                )
-                if attempt < max_retries:
-                    await asyncio.sleep(
-                        self._settings.provider_retry_backoff_seconds * (attempt + 1)
-                    )
-                    continue
-                raise provider_error(
-                    "Provider completion request failed",
-                    code="SS-PROVIDER-005",
-                    details={
-                        "reason": timeout_error,
-                        "timeout_seconds": resolved_timeout_seconds,
-                        "url": url,
-                    },
-                ) from exc
-            except httpx.HTTPError as exc:
-                latency_ms = int((perf_counter() - start) * 1000)
-                await self._provider_call_logger.log_call_end(
-                    call_id,
-                    success=False,
-                    latency_ms=latency_ms,
-                    error=str(exc),
-                    operation=call_context.operation,
-                    provider=self._resolved.provider_name,
-                    model_id=active_model_slug,
-                    pipeline_run_id=call_context.pipeline_run_id,
-                    request_id=call_context.request_id,
-                    trace_id=call_context.trace_id,
-                    workflow_id=call_context.workflow_id,
-                    user_id=call_context.user_id,
-                    timeout_seconds=resolved_timeout_seconds,
-                    response_format_type=str(
-                        cast(dict[str, object], payload["response_format"])["type"]
-                    ),
-                )
-                if attempt < max_retries:
-                    await asyncio.sleep(
-                        self._settings.provider_retry_backoff_seconds * (attempt + 1)
-                    )
-                    continue
-                raise provider_error(
-                    "Provider completion request failed",
-                    code="SS-PROVIDER-005",
-                    details={"reason": str(exc), "url": url},
-                ) from exc
+                    if attempt < max_retries:
+                        await asyncio.sleep(
+                            self._settings.provider_retry_backoff_seconds * (attempt + 1)
+                        )
+                        continue
+                    raise provider_error(
+                        "Provider completion request failed",
+                        code="SS-PROVIDER-005",
+                        details={"reason": str(exc), "url": url},
+                    ) from exc
 
-        raise provider_error(
-            "Provider completion request exhausted retries",
-            code="SS-PROVIDER-006",
-        )
+            raise provider_error(
+                "Provider completion request exhausted retries",
+                code="SS-PROVIDER-006",
+            )
+        finally:
+            self._record_complete_json_attempts(
+                attempt_key=attempt_key,
+                starting_attempt=starting_attempt,
+                attempts_used=attempts_used,
+            )
 
     async def complete_with_tools(
         self,
@@ -905,6 +910,32 @@ class OpenAICompatibleLLMProvider(LLMProvider):
         if self._task is LLMTaskKind.ASSISTANT:
             return 1
         return 2
+
+    def _complete_json_attempt_key(
+        self, call_context: ProviderCallContext
+    ) -> tuple[str, ...] | None:
+        parts = (
+            call_context.pipeline_run_id,
+            call_context.operation,
+            call_context.request_id,
+            call_context.workflow_id,
+        )
+        if not any(parts):
+            return None
+        return tuple(part or "" for part in parts)
+
+    def _record_complete_json_attempts(
+        self,
+        *,
+        attempt_key: tuple[str, ...] | None,
+        starting_attempt: int,
+        attempts_used: int,
+    ) -> None:
+        if attempt_key is None or attempts_used <= 0:
+            return
+        self._complete_json_attempt_counts[attempt_key] = starting_attempt + attempts_used
+        while len(self._complete_json_attempt_counts) > 2048:
+            self._complete_json_attempt_counts.pop(next(iter(self._complete_json_attempt_counts)))
 
 
 def resolve_llm_provider_config(

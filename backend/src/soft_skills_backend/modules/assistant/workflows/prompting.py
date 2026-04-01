@@ -27,7 +27,7 @@ from soft_skills_backend.shared.ports.models import (
 )
 
 ASSISTANT_PROMPT_NAME = "assistant_orchestrator"
-ASSISTANT_PROMPT_VERSION = "assistant_orchestrator@v6"
+ASSISTANT_PROMPT_VERSION = "assistant_orchestrator@v7"
 ASSISTANT_FINAL_RESPONSE_PROMPT_NAME = "assistant_final_response"
 ASSISTANT_FINAL_RESPONSE_PROMPT_VERSION = "assistant_final_response@v1"
 
@@ -74,14 +74,19 @@ def assistant_prompt_templates() -> list[PromptTemplate]:
                 "4. If the user asks you to start practice from an existing collection, FIRST query "
                 "`query_user_context` to find the collection, THEN call `start_collection_practice`.\n"
                 "5. If the user asks you to generate or create content (e.g., collection, "
-                "practice items), use your best judgment to fill in any missing details with "
-                "reasonable defaults. DO NOT ask the user for every missing field — the user "
-                "asked YOU to create something, so take initiative and make sensible choices.\n"
+                "practice items), first decide whether the brief is specific enough to execute "
+                "well. If the request is underspecified in a way that would materially change "
+                "the result, ask one short clarifying question before calling a generation tool.\n"
+                "5a. If the user explicitly tells you to decide, choose for them, use your best "
+                "judgment, surprise them, proceed now, or just generate it, do not ask a "
+                "clarifying question. Use sensible defaults and call the generation tool.\n"
+                "5b. Do not ask the user for every missing field. If only minor details are "
+                "missing, fill them in yourself with reasonable defaults.\n"
                 "- For collection generation: pick a target_audience (e.g., 'professionals', "
                 "'students'), difficulty (e.g., 'intermediate'), and content_format_mix "
                 "(e.g., ['quick_practice_prompt']). If target_skill_slugs are omitted, the "
                 "system will infer them from the brief. Counts default to 3-5 items.\n"
-                "- You have all the info you need — just call the generation tool.\n"
+                "- Ask at most one clarifying question when needed, otherwise call the generation tool.\n"
                 "6. Prefer parallel tool calls when the requests are independent.\n"
                 "7. Do not invent collection, attempt, run, or progress facts.\n"
                 "8. Keep the final response concise, practical, and grounded in the returned data.\n"
@@ -97,6 +102,10 @@ def assistant_prompt_templates() -> list[PromptTemplate]:
                 "- User: 'create a collection about stakeholder management' → You: call "
                 "generate_collection with reasonable defaults for missing fields; omit "
                 "target_skill_slugs unless you have a clear taxonomy match\n"
+                "- User: 'generate something for me' → You: ask one short clarifying question "
+                "about the goal, audience, or format before generating\n"
+                "- User: 'just decide and make me something' → You: do not clarify; generate "
+                "immediately with sensible defaults\n"
                 "- User: 'let's start practice' → You: first query collections, then start practice\n"
                 "- User: 'how am I doing?' → You: query attempt summaries and progress snapshots\n"
                 "- User: 'what's available?' → You: query collections and skills\n"
@@ -159,11 +168,12 @@ def build_assistant_tool_definitions() -> list[ProviderToolDefinition]:
             name="generate_collection",
             description=(
                 "Generate a new collection. The user wants YOU to create something — use "
-                "reasonable defaults for any missing fields: target_audience='professionals', "
+                "reasonable defaults for any minor missing fields: target_audience='professionals', "
                 "difficulty='intermediate', content_format_mix=['quick_practice_prompt'], "
-                "and counts suited to the request. If target_skill_slugs are omitted, the "
-                "system will infer and attach them from the brief. DO NOT ask the user to fill "
-                "in every field — just call the tool with sensible choices."
+                "and counts suited to the request. If the brief is too vague to generate well, "
+                "ask one short clarifying question first unless the user explicitly tells you to "
+                "decide or proceed now. If target_skill_slugs are omitted, the system will infer "
+                "and attach them from the brief."
             ),
             parameters=ChatCollectionGenerationCommand.model_json_schema(),
         ),
@@ -171,9 +181,10 @@ def build_assistant_tool_definitions() -> list[ProviderToolDefinition]:
             name="generate_prompt_items",
             description=(
                 "Generate prompt items in an existing collection. The user wants YOU to create "
-                "something — use reasonable defaults for any missing fields. DO NOT ask the user "
-                "to fill in every field — just call the tool with sensible choices. If "
-                "target_skill_slugs are omitted, the collection/default skill set will be used."
+                "something — use reasonable defaults for any minor missing fields. If the brief "
+                "is too vague to generate well, ask one short clarifying question first unless "
+                "the user explicitly tells you to decide or proceed now. If target_skill_slugs "
+                "are omitted, the collection/default skill set will be used."
             ),
             parameters=ChatPromptItemGenerationCommand.model_json_schema(),
         ),
