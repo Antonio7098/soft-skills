@@ -99,6 +99,7 @@ async def generate_collection(
     progress_callback: Callable[[str, float, dict[str, object]], None] | None = None,
     execution: GenerationExecution | None = None,
     idempotency_key_suffix: str | None = None,
+    refresh_cancellation: Callable[[GenerationExecution], None] | None = None,
 ) -> CollectionGenerationView:
     assert structured_command is not None or chat_command is not None
     command = structured_command or cast(ChatCollectionGenerationCommand, chat_command)
@@ -117,16 +118,22 @@ async def generate_collection(
     async def _yield_for_cancel() -> Any | None:
         if execution is None:
             return None
+        if refresh_cancellation is not None:
+            refresh_cancellation(execution)
         if execution.is_cancelled:
             return _cancel_output()
         # Give the websocket control path a brief chance to deliver a real user cancel
         # before starting the next expensive LLM fan-out stage.
         await asyncio.sleep(0.15)
+        if refresh_cancellation is not None:
+            refresh_cancellation(execution)
         if execution.is_cancelled:
             return _cancel_output()
         return None
 
     async def input_guard(_ctx: StageContext) -> Any:
+        if execution is not None and refresh_cancellation is not None:
+            refresh_cancellation(execution)
         if execution is not None and execution.is_cancelled:
             return _cancel_output()
         if progress_callback:

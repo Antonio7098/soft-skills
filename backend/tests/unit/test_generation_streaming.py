@@ -7,12 +7,15 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
+from starlette.datastructures import QueryParams
 
+from soft_skills_backend.platform.db.base import Base
 from soft_skills_backend.modules.catalog.contracts.stream import (
     GenerationControlMessage,
     GenerationStage,
     GenerationStreamEvent,
 )
+from soft_skills_backend.entrypoints.http.routes.generation import stream_generation
 from soft_skills_backend.modules.catalog.infra.realtime import (
     GenerationExecution,
     GenerationRealtimeBroker,
@@ -22,6 +25,10 @@ from soft_skills_backend.modules.catalog.workflows.generation.collection_pipelin
     generate_collection,
 )
 from soft_skills_backend.shared.auth import Actor
+
+
+def _create_schema(app) -> None:
+    Base.metadata.create_all(app.state.container.engine)
 
 
 class TestGenerationStage:
@@ -256,6 +263,7 @@ class TestGenerationCancellationFlow:
     async def test_run_structured_stream_stores_task_and_emits_cancelled_event(
         self, app, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        _create_schema(app)
         service = app.state.container.catalog_service._generation
         broker = app.state.container.generation_broker
         actor = Actor(user_id="user-123", email="user@example.com")
@@ -263,6 +271,15 @@ class TestGenerationCancellationFlow:
             generation_id="gen-123",
             mode="structured",
             stream_token="gen_gen-123",
+        )
+        service._stream_repository.create_generation(
+            actor=actor,
+            generation_id=execution.generation_id,
+            stream_token=execution.stream_token,
+            mode="structured",
+            request_id="req-123",
+            trace_id="trace-123",
+            workflow_id="wf-123",
         )
         broker.register_execution(execution)
         queue = broker.subscribe(execution.stream_token)
@@ -432,3 +449,173 @@ class TestGenerationCancellationFlow:
             "catalog_chat_generation:user-123:req-ctx:gen-stream-123"
         )
         assert captured["idempotency_params"] == {"prompt": "stakeholder management"}
+
+    def test_prepare_chat_stream_persists_generation_registration(self, app) -> None:
+        _create_schema(app)
+        service = app.state.container.catalog_service._generation
+        actor = Actor(user_id="user-123", email="user@example.com")
+        service.normalize_chat_generation_command = lambda actor, command: command  # type: ignore[method-assign]
+
+        started_view, _ = service.prepare_chat_draft_stream(
+            actor,
+            request_id="req-stream",
+            trace_id="trace-stream",
+            workflow_id="wf-stream",
+            command=SimpleNamespace(
+                organisation_id=None,
+                prompt="stakeholder management",
+                target_audience="Audience",
+                difficulty="intermediate",
+                target_skill_slugs=[],
+                target_competency_slugs=[],
+                content_format_mix=["quick_practice_prompt"],
+                rubric_ids=[],
+                counts=SimpleNamespace(quick_practice_prompt_count=1),
+            ),
+        )
+
+        persisted = service.get_stream(started_view.stream_token)
+        assert persisted.generation_id == started_view.generation_id
+        assert persisted.stream_token == started_view.stream_token
+        assert persisted.status == "pending"
+
+    @pytest.mark.asyncio()
+    async def test_run_chat_stream_persists_terminal_events(
+        self, app, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _create_schema(app)
+        service = app.state.container.catalog_service._generation
+        broker = app.state.container.generation_broker
+        actor = Actor(user_id="user-123", email="user@example.com")
+        execution = GenerationExecution(
+            generation_id="gen-persist-123",
+            mode="chat",
+            stream_token="gen_gen-persist-123",
+        )
+        broker.register_execution(execution)
+        service._stream_repository.create_generation(
+            actor=actor,
+            generation_id=execution.generation_id,
+            stream_token=execution.stream_token,
+            mode="chat",
+            request_id="req-persist",
+            trace_id="trace-persist",
+            workflow_id="wf-persist",
+        )
+
+        async def fake_generate_collection(**kwargs):
+            return SimpleNamespace(
+                collection=SimpleNamespace(id="collection-123"),
+                generation_artifact_id="artifact-123",
+            )
+
+        monkeypatch.setattr(
+            "soft_skills_backend.modules.catalog.workflows.generation.service.generate_collection",
+            fake_generate_collection,
+        )
+
+        await service.run_chat_draft_stream(
+            actor=actor,
+            execution=execution,
+            request_id="req-persist",
+            trace_id="trace-persist",
+            workflow_id="wf-persist",
+            command=SimpleNamespace(),
+        )
+
+        persisted = service.get_stream(execution.stream_token)
+        assert persisted.status == "completed"
+        events = service.list_stream_events(stream_token=execution.stream_token)
+        assert [event.type for event in events] == ["started", "completed"]
+        assert events[-1].payload["generation_artifact_id"] == "artifact-123"
+
+    @pytest.mark.asyncio()
+    async def test_generation_websocket_replays_persisted_events_without_local_execution(
+        self, app
+    ) -> None:
+        _create_schema(app)
+        service = app.state.container.catalog_service._generation
+        actor = Actor(user_id="user-123", email="user@example.com")
+        service.normalize_chat_generation_command = lambda actor, command: command  # type: ignore[method-assign]
+        started_view, _ = service.prepare_chat_draft_stream(
+            actor,
+            request_id="req-ws",
+            trace_id="trace-ws",
+            workflow_id="wf-ws",
+            command=SimpleNamespace(
+                organisation_id=None,
+                prompt="stakeholder management",
+                target_audience="Audience",
+                difficulty="intermediate",
+                target_skill_slugs=[],
+                target_competency_slugs=[],
+                content_format_mix=["quick_practice_prompt"],
+                rubric_ids=[],
+                counts=SimpleNamespace(quick_practice_prompt_count=1),
+            ),
+        )
+        app.state.container.generation_broker.remove_execution(started_view.generation_id)
+        started_event = GenerationStreamEvent(
+            event_id="evt-start",
+            generation_id=started_view.generation_id,
+            type="started",
+            stage=GenerationStage.PENDING,
+            sequence_number=0,
+            emitted_at=datetime.now(UTC),
+            progress_percent=0.0,
+            payload={"mode": "chat"},
+        )
+        completed_event = GenerationStreamEvent(
+            event_id="evt-complete",
+            generation_id=started_view.generation_id,
+            type="completed",
+            stage=GenerationStage.COMPLETED,
+            sequence_number=100,
+            emitted_at=datetime.now(UTC),
+            progress_percent=100.0,
+            payload={
+                "collection_id": "collection-123",
+                "generation_artifact_id": "artifact-123",
+            },
+        )
+        service._stream_repository.append_event(
+            stream_token=started_view.stream_token,
+            event=started_event,
+        )
+        service._stream_repository.append_event(
+            stream_token=started_view.stream_token,
+            event=completed_event,
+        )
+        service._stream_repository.mark_completed(
+            generation_id=started_view.generation_id,
+            collection_id="collection-123",
+            generation_artifact_id="artifact-123",
+        )
+
+        class _FakeWebSocket:
+            def __init__(self, app) -> None:
+                self.app = app
+                self.query_params = QueryParams()
+                self.accepted = False
+                self.closed: int | None = None
+                self.sent: list[dict[str, object]] = []
+
+            async def accept(self) -> None:
+                self.accepted = True
+
+            async def close(self, code: int) -> None:
+                self.closed = code
+
+            async def send_json(self, payload: dict[str, object]) -> None:
+                self.sent.append(payload)
+
+            async def receive_json(self) -> dict[str, object]:
+                await asyncio.sleep(60.0)
+                return {}
+
+        websocket = _FakeWebSocket(app)
+        await stream_generation(websocket, started_view.stream_token)
+
+        assert websocket.accepted is True
+        assert websocket.closed is None
+        assert [event["type"] for event in websocket.sent] == ["started", "completed"]

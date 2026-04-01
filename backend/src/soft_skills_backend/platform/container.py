@@ -43,6 +43,9 @@ from soft_skills_backend.modules.assistant.workflows.approval_service import (
 from soft_skills_backend.modules.assistant.workflows.service import AssistantWorkflowService
 from soft_skills_backend.modules.catalog import CatalogService
 from soft_skills_backend.modules.catalog.infra.realtime import GenerationRealtimeBroker
+from soft_skills_backend.modules.catalog.infra.stream_repository import (
+    GenerationStreamRepository,
+)
 from soft_skills_backend.modules.evaluation import EvaluationService
 from soft_skills_backend.modules.events import EventsService
 from soft_skills_backend.modules.identity import IdentityService
@@ -179,6 +182,9 @@ def build_container(settings: Settings) -> AppContainer:
     )
     assistant_broker = AssistantRealtimeBroker()
     generation_broker = GenerationRealtimeBroker()
+    generation_stream_repository = GenerationStreamRepository(
+        session_factory=session_factory
+    )
     provider_call_logger = DatabaseProviderCallLogger(provider_calls)
     llm_provider = build_llm_provider(
         settings=settings,
@@ -244,6 +250,7 @@ def build_container(settings: Settings) -> AppContainer:
         taxonomy_service=taxonomy_service,
         stageflow_runtime=stageflow_runtime,
         generation_broker=generation_broker,
+        generation_stream_repository=generation_stream_repository,
     )
     evaluation_service = EvaluationService(
         settings=settings,

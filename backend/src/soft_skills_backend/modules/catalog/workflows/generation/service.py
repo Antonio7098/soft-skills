@@ -39,6 +39,9 @@ from soft_skills_backend.modules.catalog.infra.realtime import (
     GenerationExecution,
     GenerationRealtimeBroker,
 )
+from soft_skills_backend.modules.catalog.infra.stream_repository import (
+    GenerationStreamRepository,
+)
 from soft_skills_backend.modules.catalog.workflows.generation.collection_pipeline import (
     generate_collection,
 )
@@ -86,6 +89,7 @@ class CatalogGenerationService:
         taxonomy_service: TaxonomyService,
         stageflow_runtime: StageflowRuntime,
         broker: GenerationRealtimeBroker | None = None,
+        stream_repository: GenerationStreamRepository | None = None,
     ) -> None:
         self._settings = settings
         self._session_factory = session_factory
@@ -117,9 +121,30 @@ class CatalogGenerationService:
             max_validation_retries=settings.creator_generation_validation_retries,
         )
         self._broker = broker
+        self._stream_repository = stream_repository
+
+    def get_stream(self, stream_token: str) -> Any:
+        if self._stream_repository is None:
+            raise LookupError("Generation stream repository is not configured")
+        return self._stream_repository.get_generation_by_stream_token(stream_token)
+
+    def list_stream_events(
+        self, *, stream_token: str, after_sequence: int | None = None
+    ) -> list[GenerationStreamEvent]:
+        if self._stream_repository is None:
+            raise LookupError("Generation stream repository is not configured")
+        return self._stream_repository.list_stream_events(
+            stream_token=stream_token,
+            after_sequence=after_sequence,
+        )
+
+    def request_stream_cancel(self, *, stream_token: str, reason: str) -> None:
+        if self._stream_repository is None:
+            return
+        self._stream_repository.request_cancel(stream_token=stream_token, reason=reason)
 
     def _make_progress_callback(self, execution: GenerationExecution) -> Any:
-        sequence = {"value": 0}
+        sequence = {"value": 1}
 
         def callback(stage: str, progress: float, summary: dict[str, Any]) -> None:
             event = GenerationStreamEvent(
@@ -133,10 +158,31 @@ class CatalogGenerationService:
                 payload=summary,
             )
             sequence["value"] += 1
-            if self._broker is not None:
-                self._broker.publish_nowait(execution.stream_token, event)
+            self._publish_stream_event(execution, event)
 
         return callback
+
+    def _publish_stream_event(
+        self, execution: GenerationExecution, event: GenerationStreamEvent
+    ) -> None:
+        if self._stream_repository is not None:
+            self._stream_repository.append_event(stream_token=execution.stream_token, event=event)
+        if self._broker is not None:
+            self._broker.publish_nowait(execution.stream_token, event)
+
+    async def _emit_stream_event(
+        self, execution: GenerationExecution, event: GenerationStreamEvent
+    ) -> None:
+        self._publish_stream_event(execution, event)
+
+    def _refresh_cancellation(self, execution: GenerationExecution) -> None:
+        if execution.is_cancelled or self._stream_repository is None:
+            return
+        cancel_reason = self._stream_repository.get_cancel_reason(
+            generation_id=execution.generation_id
+        )
+        if cancel_reason is not None:
+            execution.request_cancel(cancel_reason)
 
     async def generate_structured_draft(
         self,
@@ -289,6 +335,16 @@ class CatalogGenerationService:
         )
         if self._broker is not None:
             self._broker.register_execution(execution)
+        if self._stream_repository is not None:
+            self._stream_repository.create_generation(
+                actor=actor,
+                generation_id=generation_id,
+                stream_token=stream_token,
+                mode="structured",
+                request_id=request_id,
+                trace_id=trace_id,
+                workflow_id=workflow_id,
+            )
         return (
             GenerationStartedView(
                 generation_id=generation_id,
@@ -308,6 +364,8 @@ class CatalogGenerationService:
         command: StructuredCollectionGenerationCommand,
     ) -> None:
         execution.task = asyncio.current_task()
+        if self._stream_repository is not None:
+            self._stream_repository.mark_running(generation_id=execution.generation_id)
         started_event = GenerationStreamEvent(
             event_id=uuid4().hex,
             generation_id=execution.generation_id,
@@ -318,8 +376,7 @@ class CatalogGenerationService:
             progress_percent=0.0,
             payload={"mode": "structured"},
         )
-        if self._broker is not None:
-            await self._broker.publish(execution.stream_token, started_event)
+        await self._emit_stream_event(execution, started_event)
 
         try:
             progress_callback = self._make_progress_callback(execution)
@@ -348,6 +405,7 @@ class CatalogGenerationService:
                 progress_callback=progress_callback,
                 execution=execution,
                 idempotency_key_suffix=execution.generation_id,
+                refresh_cancellation=self._refresh_cancellation,
             )
             complete_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
@@ -362,8 +420,13 @@ class CatalogGenerationService:
                     "generation_artifact_id": result.generation_artifact_id,
                 },
             )
-            if self._broker is not None:
-                await self._broker.publish(execution.stream_token, complete_event)
+            if self._stream_repository is not None:
+                self._stream_repository.mark_completed(
+                    generation_id=execution.generation_id,
+                    collection_id=str(result.collection.id),
+                    generation_artifact_id=result.generation_artifact_id,
+                )
+            await self._emit_stream_event(execution, complete_event)
         except asyncio.CancelledError:
             cancelled_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
@@ -375,8 +438,12 @@ class CatalogGenerationService:
                 progress_percent=0.0,
                 payload={"reason": execution.cancel_reason or "user_requested"},
             )
-            if self._broker is not None:
-                await self._broker.publish(execution.stream_token, cancelled_event)
+            if self._stream_repository is not None:
+                self._stream_repository.mark_cancelled(
+                    generation_id=execution.generation_id,
+                    reason=execution.cancel_reason or "user_requested",
+                )
+            await self._emit_stream_event(execution, cancelled_event)
         except Exception as exc:
             error_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
@@ -388,8 +455,12 @@ class CatalogGenerationService:
                 progress_percent=0.0,
                 payload={"error": str(exc)},
             )
-            if self._broker is not None:
-                await self._broker.publish(execution.stream_token, error_event)
+            if self._stream_repository is not None:
+                self._stream_repository.mark_failed(
+                    generation_id=execution.generation_id,
+                    error_message=str(exc),
+                )
+            await self._emit_stream_event(execution, error_event)
         finally:
             execution.task = None
             if self._broker is not None:
@@ -414,6 +485,16 @@ class CatalogGenerationService:
         )
         if self._broker is not None:
             self._broker.register_execution(execution)
+        if self._stream_repository is not None:
+            self._stream_repository.create_generation(
+                actor=actor,
+                generation_id=generation_id,
+                stream_token=stream_token,
+                mode="chat",
+                request_id=request_id,
+                trace_id=trace_id,
+                workflow_id=workflow_id,
+            )
         return (
             GenerationStartedView(
                 generation_id=generation_id,
@@ -433,6 +514,8 @@ class CatalogGenerationService:
         command: ChatCollectionGenerationCommand,
     ) -> None:
         execution.task = asyncio.current_task()
+        if self._stream_repository is not None:
+            self._stream_repository.mark_running(generation_id=execution.generation_id)
         started_event = GenerationStreamEvent(
             event_id=uuid4().hex,
             generation_id=execution.generation_id,
@@ -443,8 +526,7 @@ class CatalogGenerationService:
             progress_percent=0.0,
             payload={"mode": "chat"},
         )
-        if self._broker is not None:
-            await self._broker.publish(execution.stream_token, started_event)
+        await self._emit_stream_event(execution, started_event)
 
         try:
             progress_callback = self._make_progress_callback(execution)
@@ -473,6 +555,7 @@ class CatalogGenerationService:
                 progress_callback=progress_callback,
                 execution=execution,
                 idempotency_key_suffix=execution.generation_id,
+                refresh_cancellation=self._refresh_cancellation,
             )
             complete_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
@@ -487,8 +570,13 @@ class CatalogGenerationService:
                     "generation_artifact_id": result.generation_artifact_id,
                 },
             )
-            if self._broker is not None:
-                await self._broker.publish(execution.stream_token, complete_event)
+            if self._stream_repository is not None:
+                self._stream_repository.mark_completed(
+                    generation_id=execution.generation_id,
+                    collection_id=str(result.collection.id),
+                    generation_artifact_id=result.generation_artifact_id,
+                )
+            await self._emit_stream_event(execution, complete_event)
         except asyncio.CancelledError:
             cancelled_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
@@ -500,8 +588,12 @@ class CatalogGenerationService:
                 progress_percent=0.0,
                 payload={"reason": execution.cancel_reason or "user_requested"},
             )
-            if self._broker is not None:
-                await self._broker.publish(execution.stream_token, cancelled_event)
+            if self._stream_repository is not None:
+                self._stream_repository.mark_cancelled(
+                    generation_id=execution.generation_id,
+                    reason=execution.cancel_reason or "user_requested",
+                )
+            await self._emit_stream_event(execution, cancelled_event)
         except Exception as exc:
             error_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
@@ -513,8 +605,12 @@ class CatalogGenerationService:
                 progress_percent=0.0,
                 payload={"error": str(exc)},
             )
-            if self._broker is not None:
-                await self._broker.publish(execution.stream_token, error_event)
+            if self._stream_repository is not None:
+                self._stream_repository.mark_failed(
+                    generation_id=execution.generation_id,
+                    error_message=str(exc),
+                )
+            await self._emit_stream_event(execution, error_event)
         finally:
             execution.task = None
             if self._broker is not None:

@@ -24,6 +24,7 @@ from soft_skills_backend.modules.catalog.workflows.generation.service import (
     CatalogGenerationService,
 )
 from soft_skills_backend.platform.background_tasks import BackgroundTaskRunner
+from soft_skills_backend.shared.errors import AppError
 
 router = APIRouter()
 
@@ -156,9 +157,12 @@ async def start_chat_generation(
 async def stream_generation(websocket: WebSocket, stream_token: str) -> None:
     container = websocket.app.state.container
     broker: GenerationRealtimeBroker = container.generation_broker
+    service: CatalogGenerationService = container.catalog_service._generation
 
     execution = broker.get_execution_by_token(stream_token)
-    if execution is None:
+    try:
+        generation = service.get_stream(stream_token)
+    except AppError:
         await websocket.close(code=4404)
         return
 
@@ -171,36 +175,69 @@ async def stream_generation(websocket: WebSocket, stream_token: str) -> None:
         backlog = broker.backlog(stream_token, after_sequence=last_sequence)
         if backlog:
             for event in backlog:
+                last_sequence = event.sequence_number
                 await websocket.send_json(event.model_dump(mode="json"))
         else:
-            for event in broker.backlog(stream_token, after_sequence=last_sequence):
+            for event in service.list_stream_events(
+                stream_token=stream_token,
+                after_sequence=last_sequence,
+            ):
+                last_sequence = event.sequence_number
                 await websocket.send_json(event.model_dump(mode="json"))
 
         while True:
             receive_task = asyncio.create_task(websocket.receive_json())
-            event_task = asyncio.create_task(queue.get())
-            done, pending = await asyncio.wait(
-                {receive_task, event_task},
-                return_when=asyncio.FIRST_COMPLETED,
-            )
+            if execution is not None:
+                wait_task = asyncio.create_task(queue.get())
+            else:
+                wait_task = asyncio.create_task(asyncio.sleep(0.5))
+            done, pending = await asyncio.wait({receive_task, wait_task}, return_when=asyncio.FIRST_COMPLETED)
             for task in pending:
                 task.cancel()
 
-            if event_task in done:
-                event = event_task.result()
-                await websocket.send_json(event.model_dump(mode="json"))
+            if wait_task in done:
+                if execution is not None:
+                    event = wait_task.result()
+                    last_sequence = event.sequence_number
+                    await websocket.send_json(event.model_dump(mode="json"))
+                    if event.type in {"completed", "failed", "cancelled"}:
+                        return
+                    continue
+                polled = service.list_stream_events(
+                    stream_token=stream_token,
+                    after_sequence=last_sequence,
+                )
+                if polled:
+                    for event in polled:
+                        last_sequence = event.sequence_number
+                        await websocket.send_json(event.model_dump(mode="json"))
+                    if polled[-1].type in {"completed", "failed", "cancelled"}:
+                        return
+                    generation = service.get_stream(stream_token)
+                    execution = broker.get_execution_by_token(stream_token)
+                    continue
+                generation = service.get_stream(stream_token)
+                if generation.status in {"completed", "failed", "cancelled"}:
+                    return
+                execution = broker.get_execution_by_token(stream_token)
                 continue
 
             message = GenerationControlMessage.model_validate(receive_task.result())
             if message.action == "cancel":
-                execution.request_cancel(message.reason or "user_requested")
-                if execution.task is not None:
-                    execution.task.cancel()
+                service.request_stream_cancel(
+                    stream_token=stream_token,
+                    reason=message.reason or "user_requested",
+                )
+                execution = broker.get_execution_by_token(stream_token)
+                if execution is not None:
+                    execution.request_cancel(message.reason or "user_requested")
+                    if execution.task is not None:
+                        execution.task.cancel()
             elif message.action == "ping":
                 await websocket.send_json(
                     {
                         "type": "pong",
-                        "generation_id": execution.generation_id,
+                        "generation_id": generation.generation_id,
                     }
                 )
     except WebSocketDisconnect:

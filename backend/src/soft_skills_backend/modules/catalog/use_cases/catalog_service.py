@@ -36,6 +36,9 @@ from soft_skills_backend.modules.catalog.contracts.scenario_commands import (
 )
 from soft_skills_backend.modules.catalog.contracts.scenario_views import ScenarioView
 from soft_skills_backend.modules.catalog.infra.realtime import GenerationRealtimeBroker
+from soft_skills_backend.modules.catalog.infra.stream_repository import (
+    GenerationStreamRepository,
+)
 from soft_skills_backend.modules.catalog.workflows.collections.service import CollectionService
 from soft_skills_backend.modules.catalog.workflows.generation.service import (
     CatalogGenerationService,
@@ -64,6 +67,7 @@ class CatalogService:
         taxonomy_service: TaxonomyService,
         stageflow_runtime: StageflowRuntime,
         generation_broker: GenerationRealtimeBroker | None = None,
+        generation_stream_repository: GenerationStreamRepository | None = None,
     ) -> None:
         events = WorkflowEventRecorder(workflow_events)
         self._collections = CollectionService(
@@ -93,6 +97,7 @@ class CatalogService:
             taxonomy_service=taxonomy_service,
             stageflow_runtime=stageflow_runtime,
             broker=generation_broker,
+            stream_repository=generation_stream_repository,
         )
 
     async def create_collection(
