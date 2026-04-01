@@ -91,8 +91,7 @@ class DefaultAssessmentMarkingProvider:
 
     def _required_rubric_skills(self, prompt_payload: ResolvedAttemptPayload) -> list[str] | None:
         if prompt_payload.prompt.practice_type == PracticeType.QUICK_PRACTICE:
-            if not prompt_payload.prompt.target_skill_slugs:
-                return None
+            return None
         return list(prompt_payload.prompt.target_skill_slugs)
 
     async def mark_attempt(

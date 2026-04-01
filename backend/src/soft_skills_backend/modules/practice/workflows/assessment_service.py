@@ -37,9 +37,7 @@ from ..infra.repository import PracticeRepository
 
 def _required_rubric_skills(prompt_payload: ResolvedAttemptPayload) -> list[str] | None:
     if prompt_payload.prompt.practice_type == PracticeType.QUICK_PRACTICE:
-        return None if not prompt_payload.prompt.target_skill_slugs else list(
-            prompt_payload.prompt.target_skill_slugs
-        )
+        return None
     return list(prompt_payload.prompt.target_skill_slugs)
 
 
@@ -159,13 +157,14 @@ class AssessmentService:
                 raw_payload=transform_payload.raw_payload,
             )
         try:
+            required_rubric_skills = _required_rubric_skills(prompt_payload)
             rubric_definition = self._rubric_repository.get_rubric_definition(
                 prompt_payload.prompt.rubric_id,
-                required_skill_slugs=_required_rubric_skills(prompt_payload),
+                required_skill_slugs=required_rubric_skills,
             )
             validate_assessment_draft(
                 response_text=prompt_payload.response_text,
-                required_skill_slugs=prompt_payload.prompt.target_skill_slugs,
+                required_skill_slugs=required_rubric_skills or [],
                 draft=draft,
                 rubric_definition=rubric_definition,
             )

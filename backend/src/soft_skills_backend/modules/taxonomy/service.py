@@ -470,17 +470,6 @@ class TaxonomyService:
                                 weight=1.0,
                             )
                         )
-            if session.query(RubricRecord).count() == 0:
-                for rubric_seed in RUBRIC_SEEDS:
-                    session.add(
-                        RubricRecord(
-                            id=rubric_seed.rubric_id,
-                            skill_slug="general",
-                            name=rubric_seed.name,
-                            content_type=rubric_seed.content_type,
-                            schema_version=rubric_seed.schema_version,
-                        )
-                    )
             for rubric_seed in RUBRIC_SEEDS:
                 criteria_data = _criteria_data_from_seed(rubric_seed.criteria)
                 rubric_record = session.get(RubricRecord, rubric_seed.rubric_id)

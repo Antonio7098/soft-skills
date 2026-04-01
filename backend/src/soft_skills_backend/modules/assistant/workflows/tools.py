@@ -155,33 +155,6 @@ class AssistantToolExecutor:
                     arguments_payload=arguments_payload,
                 )
                 tool_call = self._repository.mark_tool_call_running(tool_call_id=tool_call.id)
-            await self._publish_tool_started(
-                execution=execution,
-                tool_request=tool_request,
-                tool_call=tool_call,
-            )
-            result_payload, child_run_id = await self._dispatch_tool(
-                stage_ctx=stage_ctx,
-                execution=execution,
-                tool_request=tool_request,
-                tool_call_id=tool_call.id,
-            )
-            completed = self._repository.complete_tool_call(
-                tool_call_id=tool_call.id,
-                result_payload=result_payload,
-                child_run_id=child_run_id,
-            )
-            await self._publish_tool_event(
-                execution=execution,
-                tool_request=tool_request,
-                tool_call=completed,
-                event_type="tool.completed",
-            )
-            return ToolPromptResult(
-                tool_name=tool_request.tool_name,
-                call_id=tool_request.call_id,
-                payload=result_payload,
-            )
         except ValidationError as exc:
             app_error = validation_error(
                 "Assistant tool arguments were invalid",
@@ -212,7 +185,48 @@ class AssistantToolExecutor:
                 tool_call=failed,
                 event_type="tool.failed",
             )
-            raise exc
+            raise
+
+        await self._publish_tool_started(
+            execution=execution,
+            tool_request=tool_request,
+            tool_call=tool_call,
+        )
+        try:
+            result_payload, child_run_id = await self._dispatch_tool(
+                stage_ctx=stage_ctx,
+                execution=execution,
+                tool_request=tool_request,
+                tool_call_id=tool_call.id,
+            )
+            completed = self._repository.complete_tool_call(
+                tool_call_id=tool_call.id,
+                result_payload=result_payload,
+                child_run_id=child_run_id,
+            )
+            await self._publish_tool_event(
+                execution=execution,
+                tool_request=tool_request,
+                tool_call=completed,
+                event_type="tool.completed",
+            )
+            return ToolPromptResult(
+                tool_name=tool_request.tool_name,
+                call_id=tool_request.call_id,
+                payload=result_payload,
+            )
+        except (ValidationError, AppError) as exc:
+            _, app_error = await self._fail_started_tool_call(
+                execution=execution,
+                tool_request=tool_request,
+                tool_call_id=tool_call.id,
+                error=exc,
+            )
+            return ToolPromptResult(
+                tool_name=tool_request.tool_name,
+                call_id=tool_request.call_id,
+                payload=_tool_failure_payload(tool_name=tool_request.tool_name, error=app_error),
+            )
         except Exception as exc:  # pragma: no cover - defensive wrapper
             app_error = orchestration_error(
                 "Assistant tool execution failed unexpectedly",
@@ -230,7 +244,11 @@ class AssistantToolExecutor:
                 tool_call=failed,
                 event_type="tool.failed",
             )
-            raise app_error from exc
+            return ToolPromptResult(
+                tool_name=tool_request.tool_name,
+                call_id=tool_request.call_id,
+                payload=_tool_failure_payload(tool_name=tool_request.tool_name, error=app_error),
+            )
 
     def _requires_approval(self, tool_name: str) -> bool:
         return tool_name not in self._auto_allow_tools
@@ -636,6 +654,35 @@ class AssistantToolExecutor:
             code="SS-ORCHESTRATION-204",
         )
 
+    async def _fail_started_tool_call(
+        self,
+        *,
+        execution: ToolExecutionContext,
+        tool_request: AssistantToolRequest,
+        tool_call_id: str,
+        error: ValidationError | AppError,
+    ) -> tuple[Any, AppError]:
+        if isinstance(error, ValidationError):
+            app_error = validation_error(
+                "Assistant tool arguments were invalid",
+                code="SS-VALIDATION-201",
+                details={"tool_name": tool_request.tool_name, "reason": str(error)},
+            )
+        else:
+            app_error = error
+        failed = self._repository.fail_tool_call(
+            tool_call_id=tool_call_id,
+            error_code=app_error.code,
+            error_message=app_error.message,
+        )
+        await self._publish_tool_event(
+            execution=execution,
+            tool_request=tool_request,
+            tool_call=failed,
+            event_type="tool.failed",
+        )
+        return failed, app_error
+
 
 async def _gather_strict(tasks: list[Any]) -> list[Any]:
     results = await __import__("asyncio").gather(*tasks)
@@ -766,6 +813,18 @@ def _stream_tool_call_payload(tool_call: Any, *, call_id: str) -> dict[str, Any]
     payload = tool_call.model_dump(mode="json")
     payload["call_id"] = call_id
     return payload
+
+
+def _tool_failure_payload(*, tool_name: str, error: AppError) -> dict[str, Any]:
+    return {
+        "status": "failed",
+        "tool_name": tool_name,
+        "error": {
+            "code": error.code,
+            "message": error.message,
+            "details": dict(error.details or {}),
+        },
+    }
 
 
 def _normalize_collection_generation_command(

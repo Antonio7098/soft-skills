@@ -2,6 +2,12 @@ from __future__ import annotations
 
 import pytest
 
+from soft_skills_backend.engines.marking import (
+    RubricCriterion,
+    RubricDefinition,
+    RubricLevel,
+    RubricScale,
+)
 from soft_skills_backend.modules.practice.domain.practice import (
     AssessmentDraft,
     AttemptStatus,
@@ -147,6 +153,73 @@ def test_assessment_draft_rejects_inconsistent_overall_score() -> None:
         )
 
     assert exc_info.value.code == "SS-SCORING-006"
+
+
+def test_assessment_draft_uses_loaded_rubric_criteria_when_required_skills_are_empty() -> None:
+    validate_assessment_draft(
+        response_text=(
+            "I’ll clarify the expectation, acknowledge the ambiguity, and confirm the next step."
+        ),
+        required_skill_slugs=[],
+        draft=_draft(
+            overall_score=2,
+            skill_scores=[
+                {
+                    "skill_slug": "clarity_of_expectations",
+                    "score": 2,
+                    "rationale": "The response clarified what would happen next.",
+                },
+                {
+                    "skill_slug": "acknowledgment_of_ambiguity",
+                    "score": 2,
+                    "rationale": "The response acknowledged uncertainty directly.",
+                },
+            ],
+            evidence=[
+                {
+                    "skill_slug": "clarity_of_expectations",
+                    "quote": "clarify the expectation",
+                    "explanation": "The learner made the expectation explicit.",
+                },
+                {
+                    "skill_slug": "acknowledgment_of_ambiguity",
+                    "quote": "acknowledge the ambiguity",
+                    "explanation": "The learner named the ambiguity directly.",
+                },
+            ],
+        ),
+        rubric_definition=RubricDefinition(
+            rubric_id="quick_practice_generated_test",
+            rubric_version="v1",
+            scale=RubricScale(minimum_score=1, maximum_score=2),
+            criteria=[
+                RubricCriterion(
+                    criterion_ref="clarity_of_expectations",
+                    description="Clarify what will happen next.",
+                    levels=[
+                        RubricLevel(level=1, description="Missing", examples=["No clear expectation."]),
+                        RubricLevel(
+                            level=2,
+                            description="Present",
+                            examples=["Clear expectation and next step."],
+                        ),
+                    ],
+                ),
+                RubricCriterion(
+                    criterion_ref="acknowledgment_of_ambiguity",
+                    description="Acknowledge uncertainty explicitly.",
+                    levels=[
+                        RubricLevel(level=1, description="Missing", examples=["No acknowledgment."]),
+                        RubricLevel(
+                            level=2,
+                            description="Present",
+                            examples=["Named the ambiguity directly."],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    )
 
 
 @pytest.mark.skip(

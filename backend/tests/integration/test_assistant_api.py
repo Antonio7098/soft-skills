@@ -960,7 +960,14 @@ async def test_assistant_query_user_context_denies_non_allowlisted_sql(
                     }
                 ],
                 "final_response": None,
-            }
+            },
+            {
+                "action": "final_response",
+                "tool_calls": [],
+                "final_response": (
+                    "I couldn't run that query because it is outside the assistant-safe SQL surface."
+                ),
+            },
         ]
     )
     learner = await _bootstrap_admin_and_learner(
@@ -983,17 +990,22 @@ async def test_assistant_query_user_context_denies_non_allowlisted_sql(
     )
     assert turn_response.status_code == 200
     turn = turn_response.json()["data"]
-    await _wait_for_turn_status(container, turn_id=turn["id"], expected_status="failed")
+    await _wait_for_turn_status(container, turn_id=turn["id"], expected_status="completed")
 
     session_view_response = await client.get(
         f"/api/assistant/sessions/{session_id}",
         headers={"X-User-ID": learner["id"]},
     )
     assert session_view_response.status_code == 200
-    tool_call = session_view_response.json()["data"]["turns"][0]["tool_calls"][0]
+    session_view = session_view_response.json()["data"]
+    tool_call = session_view["turns"][0]["tool_calls"][0]
     assert tool_call["tool_name"] == "query_user_context"
     assert tool_call["status"] == "failed"
     assert tool_call["error_code"] == "SS-VALIDATION-318"
+    assert (
+        "outside the assistant-safe SQL surface"
+        in session_view["messages"][-1]["content"]
+    )
 
 
 @pytest.mark.asyncio
