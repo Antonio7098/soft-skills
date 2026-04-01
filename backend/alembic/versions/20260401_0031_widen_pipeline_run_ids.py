@@ -23,6 +23,9 @@ def _drop_admin_agent_views() -> None:
     op.execute("DROP VIEW IF EXISTS admin_agent_assistant_sessions_v")
     op.execute("DROP VIEW IF EXISTS admin_agent_provider_calls_v")
     op.execute("DROP VIEW IF EXISTS admin_agent_pipeline_runs_v")
+    op.execute("DROP VIEW IF EXISTS assistant_safe_attempt_summaries_v")
+    op.execute("DROP VIEW IF EXISTS assistant_safe_collections_v")
+    op.execute("DROP VIEW IF EXISTS assistant_safe_taxonomy_v")
 
 
 def _create_admin_agent_views() -> None:
@@ -212,23 +215,95 @@ def _create_admin_agent_views() -> None:
 
 def upgrade() -> None:
     _drop_admin_agent_views()
-    op.alter_column("pipeline_runs", "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32))
-    op.alter_column("provider_calls", "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32), existing_nullable=True)
-    op.alter_column("pipeline_execution_traces", "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32))
-    op.alter_column("assistant_turns", "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32), existing_nullable=True)
-    op.alter_column("assistant_tool_calls", "child_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32), existing_nullable=True)
-    op.alter_column("assessments", "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32))
-    op.alter_column("evaluation_runs", "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32), existing_nullable=True)
+    with op.batch_alter_table("pipeline_runs") as batch_op:
+        batch_op.alter_column(
+            "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32)
+        )
+    with op.batch_alter_table("provider_calls") as batch_op:
+        batch_op.alter_column(
+            "pipeline_run_id",
+            type_=sa.String(length=64),
+            existing_type=sa.String(length=32),
+            existing_nullable=True,
+        )
+    with op.batch_alter_table("pipeline_execution_traces") as batch_op:
+        batch_op.alter_column(
+            "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32)
+        )
+    with op.batch_alter_table("assistant_turns") as batch_op:
+        batch_op.alter_column(
+            "pipeline_run_id",
+            type_=sa.String(length=64),
+            existing_type=sa.String(length=32),
+            existing_nullable=True,
+        )
+    with op.batch_alter_table("assistant_tool_calls") as batch_op:
+        batch_op.alter_column(
+            "child_run_id",
+            type_=sa.String(length=64),
+            existing_type=sa.String(length=32),
+            existing_nullable=True,
+        )
+    with op.batch_alter_table("assessments") as batch_op:
+        batch_op.alter_column(
+            "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32)
+        )
+    with op.batch_alter_table("evaluation_runs") as batch_op:
+        batch_op.alter_column(
+            "pipeline_run_id",
+            type_=sa.String(length=64),
+            existing_type=sa.String(length=32),
+            existing_nullable=True,
+        )
     _create_admin_agent_views()
 
 
 def downgrade() -> None:
     _drop_admin_agent_views()
-    op.alter_column("evaluation_runs", "pipeline_run_id", type_=sa.String(length=32), existing_type=sa.String(length=64), existing_nullable=True)
-    op.alter_column("assessments", "pipeline_run_id", type_=sa.String(length=32), existing_type=sa.String(length=64))
-    op.alter_column("assistant_tool_calls", "child_run_id", type_=sa.String(length=32), existing_type=sa.String(length=64), existing_nullable=True)
-    op.alter_column("assistant_turns", "pipeline_run_id", type_=sa.String(length=32), existing_type=sa.String(length=64), existing_nullable=True)
-    op.alter_column("pipeline_execution_traces", "pipeline_run_id", type_=sa.String(length=32), existing_type=sa.String(length=64))
-    op.alter_column("provider_calls", "pipeline_run_id", type_=sa.String(length=32), existing_type=sa.String(length=64), existing_nullable=True)
-    op.alter_column("pipeline_runs", "pipeline_run_id", type_=sa.String(length=32), existing_type=sa.String(length=64))
+    op.alter_column(
+        "evaluation_runs",
+        "pipeline_run_id",
+        type_=sa.String(length=32),
+        existing_type=sa.String(length=64),
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "assessments",
+        "pipeline_run_id",
+        type_=sa.String(length=32),
+        existing_type=sa.String(length=64),
+    )
+    op.alter_column(
+        "assistant_tool_calls",
+        "child_run_id",
+        type_=sa.String(length=32),
+        existing_type=sa.String(length=64),
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "assistant_turns",
+        "pipeline_run_id",
+        type_=sa.String(length=32),
+        existing_type=sa.String(length=64),
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "pipeline_execution_traces",
+        "pipeline_run_id",
+        type_=sa.String(length=32),
+        existing_type=sa.String(length=64),
+    )
+    op.alter_column(
+        "provider_calls",
+        "pipeline_run_id",
+        type_=sa.String(length=32),
+        existing_type=sa.String(length=64),
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "pipeline_runs",
+        "pipeline_run_id",
+        type_=sa.String(length=32),
+        existing_type=sa.String(length=64),
+    )
     _create_admin_agent_views()

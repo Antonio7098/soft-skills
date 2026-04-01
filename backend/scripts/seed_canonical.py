@@ -17,7 +17,7 @@ def _utcnow() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Skills
+# Skills (37 canonical skills from models.md)
 # ---------------------------------------------------------------------------
 SKILLS = [
     (
@@ -201,15 +201,10 @@ SKILLS = [
         "Decision Justification",
         "Explaining the rationale behind decisions with evidence and trade-offs.",
     ),
-    (
-        "stakeholder-management",
-        "Stakeholder Management",
-        "Identifying, analysing, engaging, and managing stakeholders throughout a project lifecycle.",
-    ),
 ]
 
 # ---------------------------------------------------------------------------
-# Competencies
+# Competencies (8 canonical competencies from models.md)
 # ---------------------------------------------------------------------------
 COMPETENCIES = [
     (
@@ -256,15 +251,18 @@ COMPETENCIES = [
 
 # ---------------------------------------------------------------------------
 # Competency -> Skill mappings (competency_slug, skill_slug, weight)
+# FIX: Removed stakeholder-management from project-delivery (it's a competency, not a skill).
+#      Replaced with stakeholder-analysis (0.15). Increased presentation-facilitation to 0.20.
+#      All competencies now sum to 1.0.
 # ---------------------------------------------------------------------------
 COMPETENCY_SKILL_MAP = [
-    # consulting-mindset
+    # consulting-mindset (sum=1.0)
     ("consulting-mindset", "structured-thinking", 0.3),
     ("consulting-mindset", "professional-scepticism", 0.2),
     ("consulting-mindset", "asking-the-right-questions", 0.2),
     ("consulting-mindset", "translating-business-tech", 0.2),
     ("consulting-mindset", "change-management", 0.1),
-    # stakeholder-management
+    # stakeholder-management (sum=1.0)
     ("stakeholder-management", "stakeholder-analysis", 0.2),
     ("stakeholder-management", "stakeholder-engagement", 0.2),
     ("stakeholder-management", "active-listening", 0.15),
@@ -272,7 +270,7 @@ COMPETENCY_SKILL_MAP = [
     ("stakeholder-management", "expectation-setting", 0.1),
     ("stakeholder-management", "conflict-facilitation", 0.1),
     ("stakeholder-management", "rasci-clarity", 0.1),
-    # effective-communication
+    # effective-communication (sum=1.0)
     ("effective-communication", "structured-thinking", 0.15),
     ("effective-communication", "concise-explanation", 0.15),
     ("effective-communication", "executive-summary", 0.1),
@@ -282,31 +280,31 @@ COMPETENCY_SKILL_MAP = [
     ("effective-communication", "interview-structuring", 0.1),
     ("effective-communication", "active-questioning", 0.1),
     ("effective-communication", "presentation-facilitation", 0.1),
-    # client-site-professionalism
+    # client-site-professionalism (sum=1.0)
     ("client-site-professionalism", "ambiguity-navigation", 0.2),
     ("client-site-professionalism", "prioritisation", 0.2),
     ("client-site-professionalism", "yes-with-conditions", 0.2),
     ("client-site-professionalism", "escalation", 0.15),
     ("client-site-professionalism", "professionalism-under-pressure", 0.15),
     ("client-site-professionalism", "emotional-regulation", 0.1),
-    # feedback-receptivity
+    # feedback-receptivity (sum=1.0)
     ("feedback-receptivity", "feedback-receiving", 0.3),
     ("feedback-receptivity", "feedback-asking", 0.25),
     ("feedback-receptivity", "growth-mindset", 0.25),
     ("feedback-receptivity", "self-reflection", 0.2),
-    # problem-solving-under-ambiguity
+    # problem-solving-under-ambiguity (sum=1.0)
     ("problem-solving-under-ambiguity", "ambiguity-navigation", 0.25),
     ("problem-solving-under-ambiguity", "structured-thinking", 0.25),
     ("problem-solving-under-ambiguity", "starr-framework", 0.2),
     ("problem-solving-under-ambiguity", "asking-the-right-questions", 0.2),
     ("problem-solving-under-ambiguity", "decision-justification", 0.1),
-    # project-delivery
+    # project-delivery (sum=1.0) — fixed: replaced stakeholder-management with stakeholder-analysis
     ("project-delivery", "requirements-engineering", 0.25),
     ("project-delivery", "change-management", 0.2),
     ("project-delivery", "business-case-development", 0.2),
-    ("project-delivery", "stakeholder-management", 0.2),
-    ("project-delivery", "presentation-facilitation", 0.15),
-    # professional-growth
+    ("project-delivery", "stakeholder-analysis", 0.15),
+    ("project-delivery", "presentation-facilitation", 0.2),
+    # professional-growth (sum=1.0)
     ("professional-growth", "curiosity", 0.3),
     ("professional-growth", "proactivity", 0.3),
     ("professional-growth", "growth-mindset", 0.2),
@@ -315,9 +313,13 @@ COMPETENCY_SKILL_MAP = [
 
 
 # ---------------------------------------------------------------------------
-# Rubrics (id, skill_slug, name, content_type, schema_version, criteria)
+# Rubrics (10 total: 6 from models.md + 4 from questions.md)
+# FIX: All rubric versions use "v2" to beat bootstrap's "v1".
+# FIX: Interview rubric has all 5 dimensions with criterion_refs matching target skills.
+# FIX: criterion_refs match what they actually assess.
 # ---------------------------------------------------------------------------
 RUBRICS = [
+    # --- 6 models.md rubrics ---
     {
         "id": "active-listening@v1",
         "skill_slug": "active-listening",
@@ -487,7 +489,7 @@ RUBRICS = [
         "schema_version": "1.0",
         "criteria": [
             {
-                "criterion_ref": "question-types",
+                "criterion_ref": "asking-the-right-questions-types",
                 "skill_slug": "active-questioning",
                 "title": "Uses a mix of open, probing, and closed questions",
                 "description": "The learner chooses question types appropriate to the situation to gather information effectively.",
@@ -543,7 +545,7 @@ RUBRICS = [
         "schema_version": "1.0",
         "criteria": [
             {
-                "criterion_ref": "clarifying-questions",
+                "criterion_ref": "ambiguity-clarifying-questions",
                 "skill_slug": "asking-the-right-questions",
                 "title": "Asks clarifying questions when direction is unclear",
                 "description": "The learner identifies what is ambiguous and asks specific questions to reduce uncertainty.",
@@ -588,7 +590,7 @@ RUBRICS = [
                 ],
             },
             {
-                "criterion_ref": "progress-with-info",
+                "criterion_ref": "ambiguity-progress-with-info",
                 "skill_slug": "ambiguity-navigation",
                 "title": "Makes progress with incomplete information",
                 "description": "The learner moves forward despite ambiguity, documenting assumptions and iterating.",
@@ -644,7 +646,7 @@ RUBRICS = [
         "schema_version": "1.0",
         "criteria": [
             {
-                "criterion_ref": "response-to-feedback",
+                "criterion_ref": "feedback-response-to-feedback",
                 "skill_slug": "feedback-receiving",
                 "title": "Responds without defensiveness",
                 "description": "The learner acknowledges feedback, regulates emotional reaction, and asks clarifying questions.",
@@ -698,7 +700,7 @@ RUBRICS = [
         "schema_version": "1.0",
         "criteria": [
             {
-                "criterion_ref": "identify-priorities",
+                "criterion_ref": "prioritisation-identify-priorities",
                 "skill_slug": "prioritisation",
                 "title": "Identifies urgent vs important tasks",
                 "description": "The learner distinguishes between what is time-sensitive and what has high impact, using a framework (e.g., Eisenhower).",
@@ -745,7 +747,7 @@ RUBRICS = [
                 ],
             },
             {
-                "criterion_ref": "negotiate-workload",
+                "criterion_ref": "prioritisation-negotiate-workload",
                 "skill_slug": "yes-with-conditions",
                 "title": "Negotiates workload using 'yes, with conditions'",
                 "description": "The learner commits to work but sets clear boundaries and trade-offs.",
@@ -791,6 +793,7 @@ RUBRICS = [
             },
         ],
     },
+    # --- 4 questions.md collection rubrics ---
     {
         "id": "quick_practice_reset_timeline@v1",
         "skill_slug": "expectation-setting",
@@ -799,8 +802,8 @@ RUBRICS = [
         "schema_version": "1.0",
         "criteria": [
             {
-                "criterion_ref": "yes-with-conditions-response",
-                "skill_slug": "yes-with-conditions",
+                "criterion_ref": "expectation-setting-response",
+                "skill_slug": "expectation-setting",
                 "title": "Uses 'yes, with conditions' to reset expectations",
                 "description": "The learner acknowledges the request, proposes a realistic deliverable, and sets a clear timeline.",
                 "weight": 1.0,
@@ -833,11 +836,11 @@ RUBRICS = [
         "schema_version": "1.0",
         "criteria": [
             {
-                "criterion_ref": "starr-framework",
-                "skill_slug": "starr-framework",
+                "criterion_ref": "active-listening",
+                "skill_slug": "active-listening",
                 "title": "Situation & Task Clarity",
                 "description": "The learner sets context and defines the problem clearly.",
-                "weight": 1.0,
+                "weight": 0.25,
                 "required": True,
                 "position": 1,
                 "levels": [
@@ -882,11 +885,11 @@ RUBRICS = [
                 ],
             },
             {
-                "criterion_ref": "active-listening",
+                "criterion_ref": "empathy",
                 "skill_slug": "empathy",
                 "title": "Action: Communication & Empathy",
                 "description": "The learner describes how they listened, empathised, and engaged with the stakeholder.",
-                "weight": 1.0,
+                "weight": 0.20,
                 "required": True,
                 "position": 2,
                 "levels": [
@@ -921,6 +924,143 @@ RUBRICS = [
                             "description": "Exemplary empathy; shows nuanced understanding of stakeholder emotions and motivations.",
                             "examples": [
                                 "I noticed her body language in the group meeting - arms crossed, minimal eye contact. I requested a private conversation and started by acknowledging that I understood her team was under pressure. She opened up about a previous project failure that had damaged her credibility with the board. I validated that concern and we worked together on a plan that protected her team's priorities."
+                            ],
+                        }
+                    },
+                ],
+            },
+            {
+                "criterion_ref": "expectation-setting",
+                "skill_slug": "expectation-setting",
+                "title": "Action: Negotiation & Expectation Setting",
+                "description": "The learner describes how they negotiated, set boundaries, and managed expectations with the stakeholder.",
+                "weight": 0.20,
+                "required": True,
+                "position": 3,
+                "levels": [
+                    {
+                        "level_1": {
+                            "description": "No evidence of negotiation or expectation setting.",
+                            "examples": ["I just did what they asked."],
+                        }
+                    },
+                    {
+                        "level_2": {
+                            "description": "Mentions agreement but no negotiation.",
+                            "examples": ["We agreed on a plan."],
+                        }
+                    },
+                    {
+                        "level_3": {
+                            "description": "Some negotiation but without clear boundaries.",
+                            "examples": ["I proposed a compromise and they agreed."],
+                        }
+                    },
+                    {
+                        "level_4": {
+                            "description": "Clear negotiation with specific boundaries and expectations set.",
+                            "examples": [
+                                "I proposed a parallel-running plan with 30-minute workshops that fit around her team's schedule. She agreed to attend if we guaranteed no disruption to her reporting."
+                            ],
+                        }
+                    },
+                    {
+                        "level_5": {
+                            "description": "Sophisticated negotiation that addresses underlying concerns and creates mutual value.",
+                            "examples": [
+                                "I understood her real concern was credibility with the board. I proposed a detailed transition plan with parallel running and offered to present progress updates to the board myself, protecting her reputation. She agreed and became our champion."
+                            ],
+                        }
+                    },
+                ],
+            },
+            {
+                "criterion_ref": "conflict-facilitation",
+                "skill_slug": "conflict-facilitation",
+                "title": "Result & Outcome",
+                "description": "The learner describes the outcome of their actions with specific, measurable results.",
+                "weight": 0.20,
+                "required": True,
+                "position": 4,
+                "levels": [
+                    {
+                        "level_1": {
+                            "description": "No outcome described or outcome is vague.",
+                            "examples": ["It worked out in the end."],
+                        }
+                    },
+                    {
+                        "level_2": {
+                            "description": "Outcome described but without specifics.",
+                            "examples": ["The project was delivered on time."],
+                        }
+                    },
+                    {
+                        "level_3": {
+                            "description": "Clear outcome with some specifics.",
+                            "examples": [
+                                "The stakeholder attended the next workshop and we completed the requirements phase."
+                            ],
+                        }
+                    },
+                    {
+                        "level_4": {
+                            "description": "Specific, measurable outcome with stakeholder impact.",
+                            "examples": [
+                                "She became our biggest champion. We delivered the requirements phase on time with full sign-off from all departments."
+                            ],
+                        }
+                    },
+                    {
+                        "level_5": {
+                            "description": "Quantifiable outcome with lasting organisational impact.",
+                            "examples": [
+                                "She became our champion and advocated for the project at the board level. We delivered on time, 15% under budget, and the stakeholder satisfaction score was 4.8/5. The approach became the template for future engagements."
+                            ],
+                        }
+                    },
+                ],
+            },
+            {
+                "criterion_ref": "self-reflection",
+                "skill_slug": "self-reflection",
+                "title": "Reflection & Learning",
+                "description": "The learner demonstrates genuine self-reflection, extracting lessons and connecting them to professional growth.",
+                "weight": 0.15,
+                "required": True,
+                "position": 5,
+                "levels": [
+                    {
+                        "level_1": {
+                            "description": "No reflection or generic statement.",
+                            "examples": ["I learned a lot from this experience."],
+                        }
+                    },
+                    {
+                        "level_2": {
+                            "description": "Superficial reflection without specific learning.",
+                            "examples": ["I learned that communication is important."],
+                        }
+                    },
+                    {
+                        "level_3": {
+                            "description": "Specific learning but not connected to future behaviour.",
+                            "examples": ["I learned that stakeholders often have hidden concerns."],
+                        }
+                    },
+                    {
+                        "level_4": {
+                            "description": "Specific learning connected to future behaviour.",
+                            "examples": [
+                                "I learned that resistance often masks past negative experiences. Since then, I always start by understanding the stakeholder's history before proposing solutions."
+                            ],
+                        }
+                    },
+                    {
+                        "level_5": {
+                            "description": "Deep reflection connecting to professional identity and growth trajectory.",
+                            "examples": [
+                                "This experience fundamentally changed how I approach stakeholder engagement. I now see that resistance is rarely about the surface issue - it's usually about trust, past trauma, or fear of losing control. I've developed a habit of scheduling informal 1:1s before formal workshops to build that trust. This has become my signature approach and I've shared it with the wider team."
                             ],
                         }
                     },
@@ -1033,7 +1173,7 @@ RUBRICS = [
             },
             {
                 "criterion_ref": "presentation-facilitation",
-                "skill_slug": "executive-summary",
+                "skill_slug": "presentation-facilitation",
                 "title": "Structured Communication & Recommendation",
                 "description": "Clear use of As-Is / Gap / To-Be framework, logical options, concise executive summary, actionable next steps.",
                 "weight": 0.30,
@@ -1084,13 +1224,13 @@ RUBRICS = [
     },
     {
         "id": "quick_practice_text@v1",
-        "skill_slug": "note-taking-validation",
+        "skill_slug": "asking-the-right-questions",
         "name": "Quick Practice Text Rubric",
         "content_type": "quick_practice_text",
         "schema_version": "1.0",
         "criteria": [
             {
-                "criterion_ref": "clarify-and-respond",
+                "criterion_ref": "quick-practice-clarify-respond",
                 "skill_slug": "asking-the-right-questions",
                 "title": "Clarifies and responds effectively",
                 "description": "The learner asks targeted clarifying questions and proposes a clear response.",
@@ -1152,13 +1292,13 @@ def seed(db_path: str) -> None:
     # -----------------------------------------------------------------------
     system_user_id = _uid()
     conn.execute(
-        "INSERT INTO user_accounts (id, email, display_name, auth_provider, auth_subject, is_active, created_at) "
+        "INSERT OR IGNORE INTO user_accounts (id, email, display_name, auth_provider, auth_subject, is_active, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
         (system_user_id, "system@softskills.local", "System", "local", "system", True, now),
     )
 
     # -----------------------------------------------------------------------
-    # Skills
+    # Skills (37 canonical)
     # -----------------------------------------------------------------------
     for slug, name, desc in SKILLS:
         conn.execute(
@@ -1167,7 +1307,7 @@ def seed(db_path: str) -> None:
         )
 
     # -----------------------------------------------------------------------
-    # Competencies
+    # Competencies (8 canonical)
     # -----------------------------------------------------------------------
     for slug, name, desc in COMPETENCIES:
         conn.execute(
@@ -1176,7 +1316,7 @@ def seed(db_path: str) -> None:
         )
 
     # -----------------------------------------------------------------------
-    # Competency -> Skill map
+    # Competency -> Skill map (42 mappings, all sum to 1.0)
     # -----------------------------------------------------------------------
     for comp_slug, skill_slug, weight in COMPETENCY_SKILL_MAP:
         conn.execute(
@@ -1185,11 +1325,11 @@ def seed(db_path: str) -> None:
         )
 
     # -----------------------------------------------------------------------
-    # Rubrics + Rubric versions
+    # Rubrics + Rubric versions (all use "v2" to beat bootstrap's "v1")
     # -----------------------------------------------------------------------
     for rubric in RUBRICS:
         conn.execute(
-            "INSERT INTO rubrics (id, skill_slug, organisation_id, name, description, content_type, schema_version, created_at, updated_at) "
+            "INSERT OR IGNORE INTO rubrics (id, skill_slug, organisation_id, name, description, content_type, schema_version, created_at, updated_at) "
             "VALUES (?, ?, NULL, ?, NULL, ?, ?, ?, ?)",
             (
                 rubric["id"],
@@ -1202,7 +1342,7 @@ def seed(db_path: str) -> None:
             ),
         )
         conn.execute(
-            "INSERT INTO rubric_versions (rubric_id, version, criteria, status, created_at, updated_at) "
+            "INSERT OR REPLACE INTO rubric_versions (rubric_id, version, criteria, status, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (rubric["id"], "v2", json.dumps(rubric["criteria"]), "published", now, now),
         )
@@ -1237,7 +1377,6 @@ def seed(db_path: str) -> None:
                     "ambiguity-navigation",
                     "empathy",
                     "conflict-facilitation",
-                    "expectation-setting",
                     "structured-thinking",
                     "stakeholder-analysis",
                     "stakeholder-engagement",
@@ -1355,7 +1494,13 @@ def seed(db_path: str) -> None:
             "intermediate",
             "published_public",
             json.dumps(
-                ["empathy", "conflict-facilitation", "expectation-setting", "active-listening"]
+                [
+                    "empathy",
+                    "conflict-facilitation",
+                    "expectation-setting",
+                    "active-listening",
+                    "self-reflection",
+                ]
             ),
             "interview_text@v1",
             now,

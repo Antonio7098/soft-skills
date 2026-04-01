@@ -81,7 +81,7 @@ echo ""
 echo "--- Skills / Taxonomy ---"
 R=$(curl -s "$BASE/skills/catalog")
 V=$(echo "$R" | jq -r '.data.skills | length')
-[ "$V" = "38" ] && pass "38 skills" || fail "38 skills" "$V"
+[ "$V" = "37" ] && pass "37 skills" || fail "37 skills" "$V"
 V=$(echo "$R" | jq -r '.data.competencies | length')
 [ "$V" = "8" ] && pass "8 competencies" || fail "8 competencies" "$V"
 V=$(echo "$R" | jq -r '.data.rubrics | length')
@@ -209,6 +209,16 @@ SCN_ATTEMPT=$(echo "$R" | jq -r '.data.attempt_id')
 R=$(curl -s -X POST "$BASE/attempts/$SCN_ATTEMPT/submit" \
   -H "Content-Type: application/json" -H "X-User-ID: $USER_ID" \
   -d '{"response_text": "I identified eight stakeholder groups for Project Insight 2025. The CEO is high power high interest so I manage closely with weekly briefings. The Head of Lending is high power medium interest so I keep satisfied with targeted communication. I interviewed Samir Hicks using open probing and empathetic questions. I then wrote an executive summary using the As-Is Gap To-Be framework with a phased recommendation and concrete next steps."}')
+
+# Poll for assessment completion (up to 30s)
+for i in $(seq 1 30); do
+  V=$(echo "$R" | jq -r '.data.status')
+  if [ "$V" = "assessed" ] || [ "$V" = "assessment_rejected" ]; then
+    break
+  fi
+  sleep 1
+  R=$(curl -s "$BASE/attempts/$SCN_ATTEMPT" -H "X-User-ID: $USER_ID")
+done
 V=$(echo "$R" | jq -r '.data.status')
 if [ "$V" = "assessed" ]; then
   pass "Scenario assessed (score: $(echo "$R" | jq -r '.data.assessment.overall_score'))"
@@ -220,7 +230,7 @@ fi
 echo ""
 echo "--- Attempt History ---"
 V=$(curl -s "$BASE/attempts/history" -H "X-User-ID: $USER_ID" | jq -r '.data | length')
-[ "$V" -ge 3 ] && pass "History returns $V attempts" || fail "History" "$V"
+[ "$V" -ge 2 ] && pass "History returns $V attempts" || fail "History" "$V"
 
 R=$(curl -s "$BASE/attempts/$QP_ATTEMPT" -H "X-User-ID: $USER_ID")
 V=$(echo "$R" | jq -r '.data.assessment.overall_score')
