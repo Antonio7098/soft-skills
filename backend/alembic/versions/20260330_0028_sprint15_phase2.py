@@ -140,7 +140,7 @@ def upgrade() -> None:
             "name VARCHAR(128) NOT NULL,"
             "description TEXT,"
             "prompt_type VARCHAR(32) NOT NULL,"
-            "variables_schema JSON NOT NULL DEFAULT '{}',"
+            "variables_schema JSON NOT NULL DEFAULT '{{}}',"
             "created_at {ts} NOT NULL,"
             "updated_at {ts} NOT NULL"
             ")".format(ts=timestamp_type)
@@ -165,7 +165,7 @@ def upgrade() -> None:
             "prompt_id VARCHAR(32) NOT NULL,"
             "version VARCHAR(64) NOT NULL,"
             "template TEXT NOT NULL,"
-            "variables_schema JSON NOT NULL DEFAULT '{}',"
+            "variables_schema JSON NOT NULL DEFAULT '{{}}',"
             "output_schema JSON,"
             "status VARCHAR(32) NOT NULL DEFAULT 'draft',"
             "parent_version_id INTEGER,"
