@@ -8,12 +8,22 @@ Create Date: 2026-03-30 14:00:00.000000
 
 from __future__ import annotations
 
+from alembic import context as _context
 from alembic import op
+
 
 revision = "20260330_0026"
 down_revision = "20260330_0025"
 branch_labels = None
 depends_on = None
+
+
+def get_sql_for_dialect(sqlite_sql: str, postgres_sql: str) -> str:
+    """Return SQL appropriate for the current database dialect."""
+    dialect = _context.get_context().dialect.name
+    if dialect == "postgresql":
+        return postgres_sql
+    return sqlite_sql
 
 
 def upgrade() -> None:
@@ -33,7 +43,8 @@ def upgrade() -> None:
     )
 
     op.execute(
-        """
+        get_sql_for_dialect(
+            sqlite_sql="""
         CREATE VIEW assistant_safe_competencies_v AS
         SELECT
             c.organisation_id,
@@ -62,7 +73,36 @@ def upgrade() -> None:
                 )
             END AS skill_slugs
         FROM competencies AS c
-        """
+            """,
+            postgres_sql="""
+        CREATE VIEW assistant_safe_competencies_v AS
+        SELECT
+            c.organisation_id,
+            c.slug AS competency_slug,
+            c.name,
+            c.description,
+            CASE
+                WHEN c.organisation_id IS NULL THEN (
+                    SELECT jsonb_agg(skill_slug ORDER BY skill_slug)
+                    FROM (
+                        SELECT csm.skill_slug AS skill_slug
+                        FROM competency_skill_map AS csm
+                        WHERE csm.competency_slug = c.slug
+                    ) AS sub
+                )
+                ELSE (
+                    SELECT jsonb_agg(skill_slug ORDER BY skill_slug)
+                    FROM (
+                        SELECT osm.skill_slug AS skill_slug
+                        FROM org_skill_maps AS osm
+                        WHERE osm.organisation_id = c.organisation_id
+                          AND osm.competency_slug = c.slug
+                    ) AS sub
+                )
+            END AS skill_slugs
+        FROM competencies AS c
+            """,
+        )
     )
 
 
