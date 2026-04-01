@@ -4,6 +4,7 @@ import { Badge } from '@/design-system/primitives/Badge';
 import { Button } from '@/design-system/primitives/Button';
 import { Brain, Target, Briefcase, Mic, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { getDifficultyVariant } from '@/lib/variant-helpers';
 
 interface PracticeModePreviewModalProps {
   readonly isOpen: boolean;
@@ -117,15 +118,6 @@ export function PracticeModePreviewModal({
   onStartPractice,
 }: PracticeModePreviewModalProps) {
   const questions = SAMPLE_QUESTIONS[modeId] ?? [];
-
-  function getDifficultyVariant(difficulty: string): string {
-    const map: Record<string, string> = {
-      Beginner: 'default',
-      Intermediate: 'accent',
-      Advanced: 'warning',
-    };
-    return map[difficulty] ?? 'default';
-  }
 
   return (
     <Modal
