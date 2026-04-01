@@ -453,6 +453,21 @@ class AssistantRepository:
             session.commit()
             return self._build_tool_call_view(record)
 
+    def update_tool_call_result(
+        self,
+        *,
+        tool_call_id: str,
+        result_payload: dict[str, Any],
+        child_run_id: str | None = None,
+    ) -> AssistantToolCallView:
+        with self._session_factory() as session:
+            record = self._load_tool_call(session, tool_call_id)
+            record.result_payload = result_payload
+            if child_run_id is not None:
+                record.child_run_id = child_run_id
+            session.commit()
+            return self._build_tool_call_view(record)
+
     def fail_tool_call(
         self,
         *,

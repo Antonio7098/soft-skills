@@ -1015,6 +1015,8 @@ export const apiDataProvider: DataProvider = {
         
         if (data.type === 'tool.started' && callbacks.onToolStarted) {
           callbacks.onToolStarted(data.payload);
+        } else if (data.type === 'tool.updated' && callbacks.onToolUpdated) {
+          callbacks.onToolUpdated(data.payload);
         } else if (data.type === 'tool.completed' && callbacks.onToolCompleted) {
           callbacks.onToolCompleted(data.payload);
         } else if (data.type === 'tool.failed' && callbacks.onToolFailed) {

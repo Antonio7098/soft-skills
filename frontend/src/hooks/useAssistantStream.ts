@@ -373,6 +373,7 @@ export function useAssistantChat() {
       cleanupRef.current?.();
       cleanupRef.current = data.streamAssistantTurn(turn.stream_token, {
         onToolStarted: (tc) => dispatch({ type: 'TOOL_STARTED', toolCall: tc }),
+        onToolUpdated: (tc) => dispatch({ type: 'TOOL_UPDATED', toolCall: tc }),
         onToolCompleted: (tc) => dispatch({ type: 'TOOL_UPDATED', toolCall: tc }),
         onToolFailed: (tc) => dispatch({ type: 'TOOL_UPDATED', toolCall: tc }),
         onTurnFailed: (payload) => {

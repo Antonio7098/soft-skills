@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 import re
@@ -32,7 +33,12 @@ from soft_skills_backend.modules.catalog import CatalogService
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
     ChatCollectionGenerationCommand,
 )
+from soft_skills_backend.modules.catalog.contracts.stream import GenerationStreamEvent
 from soft_skills_backend.modules.catalog.domain.models import CollectionGenerationCounts
+from soft_skills_backend.modules.catalog.workflows.generation.service import (
+    CatalogGenerationService,
+    GenerationStartedView,
+)
 from soft_skills_backend.modules.catalog.contracts.prompt_item_commands import (
     ChatPromptItemGenerationCommand,
 )
@@ -152,33 +158,24 @@ class AssistantToolExecutor:
             await self._publish_tool_started(
                 execution=execution,
                 tool_request=tool_request,
-                tool_call_id=tool_call.id,
-                emitted_at=tool_call.started_at,
+                tool_call=tool_call,
             )
             result_payload, child_run_id = await self._dispatch_tool(
                 stage_ctx=stage_ctx,
                 execution=execution,
                 tool_request=tool_request,
+                tool_call_id=tool_call.id,
             )
             completed = self._repository.complete_tool_call(
                 tool_call_id=tool_call.id,
                 result_payload=result_payload,
                 child_run_id=child_run_id,
             )
-            await self._broker.publish(
-                execution.stream_token,
-                self._repository.create_stream_event(
-                    turn_id=execution.turn_id,
-                    event_type="tool.completed",
-                    payload={
-                        "tool_call_id": completed.id,
-                        "call_id": tool_request.call_id,
-                        "tool_name": completed.tool_name,
-                        "result": result_payload,
-                        "child_run_id": child_run_id,
-                    },
-                    emitted_at=completed.completed_at or completed.started_at,
-                ),
+            await self._publish_tool_event(
+                execution=execution,
+                tool_request=tool_request,
+                tool_call=completed,
+                event_type="tool.completed",
             )
             return ToolPromptResult(
                 tool_name=tool_request.tool_name,
@@ -196,11 +193,11 @@ class AssistantToolExecutor:
                 error_code=app_error.code,
                 error_message=app_error.message,
             )
-            await self._publish_tool_failure(
+            await self._publish_tool_event(
                 execution=execution,
                 tool_request=tool_request,
-                tool_call_id=failed.id,
-                error=app_error,
+                tool_call=failed,
+                event_type="tool.failed",
             )
             raise app_error from exc
         except AppError as exc:
@@ -209,11 +206,11 @@ class AssistantToolExecutor:
                 error_code=exc.code,
                 error_message=exc.message,
             )
-            await self._publish_tool_failure(
+            await self._publish_tool_event(
                 execution=execution,
                 tool_request=tool_request,
-                tool_call_id=failed.id,
-                error=exc,
+                tool_call=failed,
+                event_type="tool.failed",
             )
             raise exc
         except Exception as exc:  # pragma: no cover - defensive wrapper
@@ -227,11 +224,11 @@ class AssistantToolExecutor:
                 error_code=app_error.code,
                 error_message=app_error.message,
             )
-            await self._publish_tool_failure(
+            await self._publish_tool_event(
                 execution=execution,
                 tool_request=tool_request,
-                tool_call_id=failed.id,
-                error=app_error,
+                tool_call=failed,
+                event_type="tool.failed",
             )
             raise app_error from exc
 
@@ -325,6 +322,7 @@ class AssistantToolExecutor:
         stage_ctx: StageContext,
         execution: ToolExecutionContext,
         tool_request: AssistantToolRequest,
+        tool_call_id: str,
     ) -> tuple[dict[str, Any], str | None]:
         arguments = tool_request.arguments_payload()
         if tool_request.tool_name == "query_user_context":
@@ -378,6 +376,8 @@ class AssistantToolExecutor:
                 parent_ctx=stage_ctx,
                 execution=execution,
                 command=command,
+                tool_request=tool_request,
+                tool_call_id=tool_call_id,
             )
         if tool_request.tool_name == "generate_prompt_items":
             collection_id = _require_string(arguments, "collection_id")
@@ -388,6 +388,7 @@ class AssistantToolExecutor:
                 execution=execution,
                 collection_id=collection_id,
                 command=ChatPromptItemGenerationCommand.model_validate(command_payload),
+                tool_request=tool_request,
             )
         raise validation_error(
             "Assistant requested an unknown tool",
@@ -401,50 +402,123 @@ class AssistantToolExecutor:
         parent_ctx: StageContext,
         execution: ToolExecutionContext,
         command: ChatCollectionGenerationCommand,
+        tool_request: AssistantToolRequest,
+        tool_call_id: str,
     ) -> tuple[dict[str, Any], str | None]:
-        async def generation_stage(_ctx: StageContext) -> Any:
-            result = await self._catalog.generate_chat_draft(
-                execution.actor,
+        del parent_ctx
+        generation_service = self._catalog_generation_service()
+        started_view, normalized_command = generation_service.prepare_chat_draft_stream(
+            execution.actor,
+            request_id=execution.request_id,
+            trace_id=execution.trace_id,
+            workflow_id=execution.workflow_id,
+            command=command,
+        )
+        broker = getattr(generation_service, "_broker", None)
+        if broker is None:
+            raise orchestration_error(
+                "Assistant generation streaming is unavailable",
+                code="SS-ORCHESTRATION-204",
+            )
+        generation_execution = broker.get_execution_by_token(started_view.stream_token)
+        if generation_execution is None:
+            raise orchestration_error(
+                "Assistant generation stream could not be initialized",
+                code="SS-ORCHESTRATION-204",
+                details={"stream_token": started_view.stream_token},
+            )
+
+        progress_state = _initial_generation_progress_state(started_view)
+        await self._publish_generation_tool_update(
+            execution=execution,
+            tool_request=tool_request,
+            tool_call_id=tool_call_id,
+            result_payload=progress_state,
+        )
+
+        queue = broker.subscribe(started_view.stream_token)
+        runner_task = asyncio.create_task(
+            generation_service.run_chat_draft_stream(
+                actor=execution.actor,
+                execution=generation_execution,
                 request_id=execution.request_id,
                 trace_id=execution.trace_id,
                 workflow_id=execution.workflow_id,
-                command=command,
+                command=normalized_command,
             )
-            return ok_output(
-                StageflowStageResult(
-                    payload=result.model_dump(mode="json"),
-                    summary={
-                        "collection_id": result.collection.id,
-                        "generation_artifact_id": result.generation_artifact_id,
-                    },
-                )
-            )
+        )
+        terminal_event: GenerationStreamEvent | None = None
 
-        pipeline = Pipeline.from_stages(
-            stage("generation", generation_stage, StageKind.WORK),
-            name="assistant_generate_collection",
-        )
-        result = await run_logged_subpipeline(
-            self._stageflow,
-            parent_ctx=parent_ctx,
-            parent_stage_name=ASSISTANT_RUNTIME_STAGE,
-            correlation_id=uuid4(),
-            pipeline=pipeline,
-            result_stage_name="generation",
-            execution_mode="assistant_generation",
-            service="soft_skills_backend.assistant",
-            timeout_ms=self._generation_timeout_ms,
-        )
-        if not result.success or result.data is None:
+        try:
+            while True:
+                event = await queue.get()
+                progress_state = _merge_generation_stream_event(
+                    progress_state,
+                    started_view=started_view,
+                    event=event,
+                )
+                await self._publish_generation_tool_update(
+                    execution=execution,
+                    tool_request=tool_request,
+                    tool_call_id=tool_call_id,
+                    result_payload=progress_state,
+                )
+                if event.type in {"completed", "failed", "cancelled"}:
+                    terminal_event = event
+                    break
+            await runner_task
+        except asyncio.CancelledError:
+            generation_execution.request_cancel("assistant_cancelled")
+            runner_task.cancel()
+            raise
+        finally:
+            broker.unsubscribe(started_view.stream_token, queue)
+            if not runner_task.done():
+                runner_task.cancel()
+                await asyncio.gather(runner_task, return_exceptions=True)
+
+        if terminal_event is None:
+            raise orchestration_error(
+                "Assistant generation stream ended without a terminal event",
+                code="SS-ORCHESTRATION-204",
+                details={"generation_id": started_view.generation_id},
+            )
+        if terminal_event.type == "failed":
             raise orchestration_error(
                 "Assistant generation subpipeline failed",
                 code="SS-ORCHESTRATION-204",
-                details={"child_run_id": str(result.child_run_id), "error": result.error},
+                details={
+                    "generation_id": started_view.generation_id,
+                    "stream_token": started_view.stream_token,
+                    "error": terminal_event.payload.get("error"),
+                },
             )
-        return (
-            {"generation": _summarize_generation_payload(result.data["payload"])},
-            str(result.child_run_id),
+        if terminal_event.type == "cancelled":
+            raise orchestration_error(
+                "Assistant generation was cancelled",
+                code="SS-ORCHESTRATION-204",
+                details={
+                    "generation_id": started_view.generation_id,
+                    "stream_token": started_view.stream_token,
+                    "reason": terminal_event.payload.get("reason"),
+                },
+            )
+
+        collection_id = str(terminal_event.payload.get("collection_id") or "")
+        if not collection_id:
+            raise orchestration_error(
+                "Assistant generation completed without a collection identifier",
+                code="SS-ORCHESTRATION-204",
+                details={"generation_id": started_view.generation_id},
+            )
+        collection = self._catalog.get_collection(execution.actor, collection_id)
+        generation_summary = _summarize_streamed_generation_payload(
+            progress_state=progress_state,
+            collection=collection.model_dump(mode="json"),
+            generation_artifact_id=str(terminal_event.payload.get("generation_artifact_id") or ""),
+            provider=getattr(generation_service._llm_provider, "provider_name", None),
         )
+        return ({"generation": generation_summary}, None)
 
     async def _run_generate_prompt_items(
         self,
@@ -453,6 +527,7 @@ class AssistantToolExecutor:
         execution: ToolExecutionContext,
         collection_id: str,
         command: ChatPromptItemGenerationCommand,
+        tool_request: AssistantToolRequest,
     ) -> tuple[dict[str, Any], str | None]:
         async def generation_stage(_ctx: StageContext) -> Any:
             result = await self._catalog.generate_prompt_items_chat(
@@ -504,46 +579,61 @@ class AssistantToolExecutor:
         *,
         execution: ToolExecutionContext,
         tool_request: AssistantToolRequest,
-        tool_call_id: str,
-        emitted_at: Any,
+        tool_call: Any,
+    ) -> None:
+        await self._publish_tool_event(
+            execution=execution,
+            tool_request=tool_request,
+            tool_call=tool_call,
+            event_type="tool.started",
+            emitted_at=tool_call.started_at,
+        )
+
+    async def _publish_tool_event(
+        self,
+        *,
+        execution: ToolExecutionContext,
+        tool_request: AssistantToolRequest,
+        tool_call: Any,
+        event_type: str,
+        emitted_at: Any | None = None,
     ) -> None:
         await self._broker.publish(
             execution.stream_token,
             self._repository.create_stream_event(
                 turn_id=execution.turn_id,
-                event_type="tool.started",
-                payload={
-                    "tool_call_id": tool_call_id,
-                    "call_id": tool_request.call_id,
-                    "tool_name": tool_request.tool_name,
-                    "arguments": tool_request.arguments_payload(),
-                },
-                emitted_at=emitted_at,
+                event_type=event_type,
+                payload=_stream_tool_call_payload(tool_call, call_id=tool_request.call_id),
+                emitted_at=emitted_at or tool_call.completed_at or tool_call.started_at or stage_now(),
             ),
         )
 
-    async def _publish_tool_failure(
+    async def _publish_generation_tool_update(
         self,
         *,
         execution: ToolExecutionContext,
         tool_request: AssistantToolRequest,
         tool_call_id: str,
-        error: AppError,
+        result_payload: dict[str, Any],
     ) -> None:
-        await self._broker.publish(
-            execution.stream_token,
-            self._repository.create_stream_event(
-                turn_id=execution.turn_id,
-                event_type="tool.failed",
-                payload={
-                    "tool_call_id": tool_call_id,
-                    "call_id": tool_request.call_id,
-                    "tool_name": tool_request.tool_name,
-                    "error_code": error.code,
-                    "message": error.message,
-                },
-                emitted_at=stage_now(),
-            ),
+        updated_tool_call = self._repository.update_tool_call_result(
+            tool_call_id=tool_call_id,
+            result_payload=result_payload,
+        )
+        await self._publish_tool_event(
+            execution=execution,
+            tool_request=tool_request,
+            tool_call=updated_tool_call,
+            event_type="tool.updated",
+        )
+
+    def _catalog_generation_service(self) -> CatalogGenerationService:
+        generation_service = getattr(self._catalog, "_generation", None)
+        if isinstance(generation_service, CatalogGenerationService):
+            return generation_service
+        raise orchestration_error(
+            "Assistant generation service is unavailable",
+            code="SS-ORCHESTRATION-204",
         )
 
 
@@ -593,6 +683,89 @@ def _summarize_generation_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "provider": payload.get("provider"),
         "model_slug": payload.get("model_slug"),
     }
+
+
+def _initial_generation_progress_state(started_view: GenerationStartedView) -> dict[str, Any]:
+    return {
+        "generation": {
+            "generation_id": started_view.generation_id,
+            "stream_token": started_view.stream_token,
+            "generation_mode": started_view.mode,
+            "current_stage": "pending",
+            "progress_percent": 0.0,
+            "blueprint": None,
+            "prompt_items": [],
+        }
+    }
+
+
+def _merge_generation_stream_event(
+    state: dict[str, Any],
+    *,
+    started_view: GenerationStartedView,
+    event: GenerationStreamEvent,
+) -> dict[str, Any]:
+    generation = dict(state.get("generation", {}))
+    generation.update(
+        {
+            "generation_id": started_view.generation_id,
+            "stream_token": started_view.stream_token,
+            "generation_mode": started_view.mode,
+            "current_stage": event.stage.value,
+            "progress_percent": event.progress_percent,
+        }
+    )
+    payload = dict(event.payload)
+    if event.stage.value == "blueprint_llm_transform":
+        generation["blueprint"] = {
+            "title": payload.get("title"),
+            "summary": payload.get("summary"),
+            "prompt_items_count": payload.get("prompt_items_count", 0),
+            "scenarios_count": payload.get("scenarios_count", 0),
+        }
+    if event.stage.value == "prompt_items_work" and isinstance(payload.get("prompt_items"), list):
+        generation["prompt_items"] = list(payload["prompt_items"])
+    if payload:
+        generation["latest_event_payload"] = payload
+    return {"generation": generation}
+
+
+def _summarize_streamed_generation_payload(
+    *,
+    progress_state: dict[str, Any],
+    collection: dict[str, Any],
+    generation_artifact_id: str,
+    provider: str | None,
+) -> dict[str, Any]:
+    generation = dict(progress_state.get("generation", {}))
+    prompt_items = collection.get("prompt_items", [])
+    scenarios = collection.get("scenarios", [])
+    generation.update(
+        {
+            "collection_id": collection.get("id"),
+            "title": collection.get("title"),
+            "difficulty": collection.get("difficulty"),
+            "content_format_mix": collection.get("content_format_mix", []),
+            "prompt_item_count": len(prompt_items) if isinstance(prompt_items, list) else 0,
+            "scenario_count": len(scenarios) if isinstance(scenarios, list) else 0,
+            "generation_artifact_id": generation_artifact_id,
+            "provider": provider,
+            "model_slug": (
+                generation.get("latest_event_payload", {}).get("model_slug")
+                if isinstance(generation.get("latest_event_payload"), dict)
+                else None
+            ),
+            "current_stage": "completed",
+            "progress_percent": 100.0,
+        }
+    )
+    return generation
+
+
+def _stream_tool_call_payload(tool_call: Any, *, call_id: str) -> dict[str, Any]:
+    payload = tool_call.model_dump(mode="json")
+    payload["call_id"] = call_id
+    return payload
 
 
 def _normalize_collection_generation_command(

@@ -14,6 +14,16 @@ from fastapi.testclient import TestClient
 
 from alembic import command as alembic_command
 from soft_skills_backend.engines.config import load_marking_runtime_config
+from soft_skills_backend.modules.catalog.contracts.stream import (
+    GenerationStage,
+    GenerationStreamEvent,
+)
+from soft_skills_backend.modules.catalog.domain.models import (
+    CollectionView,
+    PromptItemView,
+)
+from soft_skills_backend.modules.catalog.infra.realtime import GenerationExecution
+from soft_skills_backend.modules.catalog.workflows.generation.service import GenerationStartedView
 from soft_skills_backend.modules.practice.domain.practice import AssessmentDraft
 from soft_skills_backend.modules.practice.workflows.assessment import (
     AssessmentTransformPayload,
@@ -546,6 +556,227 @@ async def test_assistant_turn_streams_tool_events_and_persists_messages(
     assert "token_count_prompt" in final_event.payload
     assert "token_count_completion" in final_event.payload
     assert "token_count_total" in final_event.payload
+
+
+@pytest.mark.asyncio
+async def test_assistant_generation_tool_streams_progress_updates(
+    app: Any, client: Any, test_settings: Any
+) -> None:
+    _migrate(test_settings)
+    container = app.state.container
+    container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
+        payloads=[
+            {
+                "action": "tool_calls",
+                "tool_calls": [
+                    {
+                        "call_id": "call-gen-1",
+                        "tool_name": "generate_collection",
+                        "arguments": {
+                            "prompt": "Build a conflict resolution collection.",
+                            "target_audience": "team leads",
+                            "difficulty": "intermediate",
+                            "content_format_mix": ["quick_practice_prompt"],
+                            "target_skill_slugs": ["active-listening"],
+                            "target_competency_slugs": ["stakeholder-management"],
+                            "rubric_ids": ["quick_practice_reset_timeline@v1"],
+                            "counts": {
+                                "quick_practice_prompt_count": 1,
+                                "interview_prompt_count": 0,
+                                "scenario_count": 0,
+                                "scenario_artifact_count": 0,
+                            },
+                        },
+                    }
+                ],
+                "final_response": None,
+            },
+            {
+                "action": "final_response",
+                "tool_calls": [],
+                "final_response": "Your collection is ready.",
+            },
+        ]
+    )
+
+    learner = await _register_user_async(
+        client,
+        email="assistant-generation@example.com",
+        display_name="Assistant Generation User",
+    )
+
+    generation_service = container.catalog_service._generation
+    broker = container.generation_broker
+
+    def fake_prepare_chat_draft_stream(
+        actor: Any,
+        *,
+        request_id: str,
+        trace_id: str,
+        workflow_id: str | None,
+        command: Any,
+    ) -> tuple[GenerationStartedView, Any]:
+        del actor, request_id, trace_id, workflow_id
+        started_view = GenerationStartedView(
+            generation_id="gen-123",
+            stream_token="gen_stream_token",
+            mode="chat",
+        )
+        broker.register_execution(
+            GenerationExecution(
+                generation_id=started_view.generation_id,
+                mode=started_view.mode,
+                stream_token=started_view.stream_token,
+            )
+        )
+        return started_view, command
+
+    async def fake_run_chat_draft_stream(
+        *,
+        actor: Any,
+        execution: Any,
+        request_id: str,
+        trace_id: str,
+        workflow_id: str | None,
+        command: Any,
+    ) -> None:
+        del actor, request_id, trace_id, workflow_id, command
+        events = [
+            GenerationStreamEvent(
+                event_id=uuid4().hex,
+                generation_id=execution.generation_id,
+                type="started",
+                stage=GenerationStage.PENDING,
+                sequence_number=0,
+                emitted_at=datetime.now(UTC),
+                progress_percent=0.0,
+                payload={"mode": "chat"},
+            ),
+            GenerationStreamEvent(
+                event_id=uuid4().hex,
+                generation_id=execution.generation_id,
+                type="progress",
+                stage=GenerationStage.BLUEPRINT_LLM_TRANSFORM,
+                sequence_number=1,
+                emitted_at=datetime.now(UTC),
+                progress_percent=15.0,
+                payload={
+                    "title": "Conflict reset",
+                    "summary": "Practice resetting tense stakeholder conversations.",
+                    "prompt_items_count": 1,
+                    "scenarios_count": 0,
+                },
+            ),
+            GenerationStreamEvent(
+                event_id=uuid4().hex,
+                generation_id=execution.generation_id,
+                type="progress",
+                stage=GenerationStage.PROMPT_ITEMS_WORK,
+                sequence_number=2,
+                emitted_at=datetime.now(UTC),
+                progress_percent=50.0,
+                payload={
+                    "generated_prompt_items": 1,
+                    "prompt_items": [
+                        {
+                            "title": "Reset the room",
+                            "prompt_type": "quick_practice_prompt",
+                            "difficulty": "intermediate",
+                        }
+                    ],
+                },
+            ),
+            GenerationStreamEvent(
+                event_id=uuid4().hex,
+                generation_id=execution.generation_id,
+                type="completed",
+                stage=GenerationStage.COMPLETED,
+                sequence_number=3,
+                emitted_at=datetime.now(UTC),
+                progress_percent=100.0,
+                payload={
+                    "collection_id": "col-generated-1",
+                    "generation_artifact_id": "artifact-generated-1",
+                },
+            ),
+        ]
+        for event in events:
+            await broker.publish(execution.stream_token, event)
+            await asyncio.sleep(0)
+
+    def fake_get_collection(actor: Any, collection_id: str) -> CollectionView:
+        del actor
+        assert collection_id == "col-generated-1"
+        return CollectionView(
+            id=collection_id,
+            author_user_id=str(learner["id"]),
+            organisation_id=None,
+            title="Conflict reset",
+            summary="Practice resetting tense stakeholder conversations.",
+            target_audience="team leads",
+            difficulty="intermediate",
+            lifecycle_state="draft",
+            verification_state="unverified",
+            discovery_tier="private",
+            source_type="generated",
+            content_format_mix=["quick_practice_prompt"],
+            target_skill_slugs=["active-listening"],
+            target_competency_slugs=["stakeholder-management"],
+            rubric_ids=["quick_practice_reset_timeline@v1"],
+            last_generation_artifact_id="artifact-generated-1",
+            prompt_items=[
+                PromptItemView(
+                    id="pi-generated-1",
+                    prompt_type="quick_practice_prompt",
+                    title="Reset the room",
+                    prompt_text="A stakeholder conversation has become tense. Reset it.",
+                    difficulty="intermediate",
+                    lifecycle_state="draft",
+                    target_skill_slugs=["active-listening"],
+                    rubric_id="quick_practice_reset_timeline@v1",
+                    organisation_id=None,
+                )
+            ],
+            scenarios=[],
+        )
+
+    generation_service.prepare_chat_draft_stream = fake_prepare_chat_draft_stream  # type: ignore[method-assign]
+    generation_service.run_chat_draft_stream = fake_run_chat_draft_stream  # type: ignore[method-assign]
+    container.catalog_service.get_collection = fake_get_collection  # type: ignore[method-assign]
+
+    session_response = await client.post(
+        "/api/assistant/sessions",
+        headers={"X-User-ID": learner["id"]},
+        json={"title": "Generation progress"},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["data"]["id"]
+
+    turn_response = await client.post(
+        f"/api/assistant/sessions/{session_id}/turns",
+        headers={"X-User-ID": learner["id"]},
+        json={"message": "Generate a conflict resolution collection and decide the rest."},
+    )
+    assert turn_response.status_code == 200
+    turn = turn_response.json()["data"]
+
+    await _wait_for_turn_status(container, turn_id=turn["id"], expected_status="completed")
+
+    events = container.assistant_service.list_stream_events(turn["stream_token"])
+    event_types = [event.type for event in events]
+    progress_events = [event for event in events if event.type == "tool.updated"]
+    completed_event = next(event for event in events if event.type == "tool.completed")
+
+    assert "tool.started" in event_types
+    assert "tool.updated" in event_types
+    assert event_types.index("tool.updated") < event_types.index("tool.completed")
+    assert progress_events
+    assert progress_events[0].payload["status"] == "running"
+    assert progress_events[0].payload["result"]["generation"]["generation_id"]  # type: ignore[index]
+    assert progress_events[-1].payload["result"]["generation"]["current_stage"] == "completed"  # type: ignore[index]
+    assert completed_event.payload["status"] == "completed"
+    assert completed_event.payload["result"]["generation"]["title"] == "Conflict reset"  # type: ignore[index]
+    assert completed_event.payload["result"]["generation"]["progress_percent"] == 100.0  # type: ignore[index]
 
 
 @pytest.mark.asyncio

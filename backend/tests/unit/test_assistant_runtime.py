@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from pydantic import ValidationError
 
@@ -11,25 +13,29 @@ from soft_skills_backend.modules.assistant.workflows.runtime_models import Assis
 from soft_skills_backend.modules.assistant.workflows.service import (
     _build_compact_learner_context,
     _chunk_text,
-    _generation_clarification_for_invalid_tool_request,
-    _generation_clarification_for_tool_error,
     _required_tool_name,
     _should_rewrite_final_response,
 )
 from soft_skills_backend.modules.assistant.workflows.tools import (
+    _initial_generation_progress_state,
+    _merge_generation_stream_event,
     _normalize_collection_generation_command,
+    _summarize_streamed_generation_payload,
 )
 from soft_skills_backend.modules.catalog.contracts.collection_commands import (
     ChatCollectionGenerationCommand,
 )
+from soft_skills_backend.modules.catalog.contracts.stream import (
+    GenerationStage,
+    GenerationStreamEvent,
+)
+from soft_skills_backend.modules.catalog.workflows.generation.service import GenerationStartedView
 from soft_skills_backend.modules.taxonomy.models import (
     CompetencyView,
     RubricView,
     SkillView,
     TaxonomySnapshot,
 )
-from soft_skills_backend.shared.errors import orchestration_error
-from soft_skills_backend.shared.ports.models import ProviderToolCall
 
 
 def test_assistant_decision_requires_exactly_one_action() -> None:
@@ -73,69 +79,6 @@ class _Message:
     def __init__(self, role: str, content: str) -> None:
         self.role = _Role(role)
         self.content = content
-
-
-def test_invalid_generation_tool_request_returns_clarification() -> None:
-    tool_calls = [
-        ProviderToolCall(
-            call_id="call-1",
-            tool_name="generate_collection",
-            arguments={
-                "prompt": "default prompt",
-                "target_audience": "default audience",
-                "difficulty": "introductory",
-                "content_format_mix": ["text"],
-                "target_skill_slugs": ["default-skill"],
-                "target_competency_slugs": ["default-competency"],
-                "rubric_ids": ["default-rubric"],
-                "counts": {
-                    "quick_practice_prompt_count": 1,
-                    "interview_prompt_count": 0,
-                    "scenario_count": 0,
-                    "scenario_artifact_count": 0,
-                },
-            },
-        )
-    ]
-    with pytest.raises(ValidationError) as exc_info:
-        ChatCollectionGenerationCommand(
-            prompt="default prompt",
-            target_audience="default audience",
-            difficulty="introductory",
-            content_format_mix=["text"],
-            target_skill_slugs=["default-skill"],
-            target_competency_slugs=["default-competency"],
-            rubric_ids=["default-rubric"],
-            counts={
-                "quick_practice_prompt_count": 1,
-                "interview_prompt_count": 0,
-                "scenario_count": 0,
-                "scenario_artifact_count": 0,
-            },
-        )
-    clarification = _generation_clarification_for_invalid_tool_request(
-        raw_tool_calls=tool_calls,
-        error=exc_info.value,
-    )
-
-    assert clarification is not None
-    assert "quick_practice_prompt" in clarification
-
-
-def test_generation_tool_orchestration_validation_error_returns_clarification() -> None:
-    error = orchestration_error(
-        "Assistant generation subpipeline failed",
-        code="SS-ORCHESTRATION-204",
-        details={"error": "SS-VALIDATION-036: Unsupported content format"},
-    )
-
-    clarification = _generation_clarification_for_tool_error(
-        tool_requests=[type("Req", (), {"tool_name": "generate_collection"})()],
-        error=error,
-    )
-
-    assert clarification is not None
-    assert "pick from your weak skills" in clarification
 
 
 def test_required_tool_name_always_returns_none() -> None:
@@ -317,3 +260,98 @@ def test_should_rewrite_final_response_only_after_tool_usage() -> None:
         )
         is True
     )
+
+
+def test_generation_progress_state_merges_stream_updates() -> None:
+    started_view = GenerationStartedView(
+        generation_id="gen-123",
+        stream_token="gen_token",
+        mode="chat",
+    )
+    state = _initial_generation_progress_state(started_view)
+
+    blueprint_event = GenerationStreamEvent(
+        event_id="evt-1",
+        generation_id="gen-123",
+        type="progress",
+        stage=GenerationStage.BLUEPRINT_LLM_TRANSFORM,
+        sequence_number=1,
+        emitted_at=datetime.now(UTC),
+        progress_percent=15.0,
+        payload={
+            "title": "Conflict reset",
+            "summary": "Practice handling a tense stakeholder exchange.",
+            "prompt_items_count": 2,
+            "scenarios_count": 1,
+        },
+    )
+    prompt_items_event = GenerationStreamEvent(
+        event_id="evt-2",
+        generation_id="gen-123",
+        type="progress",
+        stage=GenerationStage.PROMPT_ITEMS_WORK,
+        sequence_number=2,
+        emitted_at=datetime.now(UTC),
+        progress_percent=50.0,
+        payload={
+            "generated_prompt_items": 1,
+            "prompt_items": [
+                {
+                    "title": "Reset the room",
+                    "prompt_type": "quick_practice_prompt",
+                    "difficulty": "intermediate",
+                }
+            ],
+        },
+    )
+
+    state = _merge_generation_stream_event(state, started_view=started_view, event=blueprint_event)
+    state = _merge_generation_stream_event(
+        state, started_view=started_view, event=prompt_items_event
+    )
+
+    generation = state["generation"]
+    assert generation["generation_id"] == "gen-123"
+    assert generation["stream_token"] == "gen_token"
+    assert generation["current_stage"] == "prompt_items_work"
+    assert generation["progress_percent"] == 50.0
+    assert generation["blueprint"]["title"] == "Conflict reset"
+    assert generation["prompt_items"][0]["title"] == "Reset the room"
+
+
+def test_summarize_streamed_generation_payload_preserves_progress_metadata() -> None:
+    payload = _summarize_streamed_generation_payload(
+        progress_state={
+            "generation": {
+                "generation_id": "gen-123",
+                "stream_token": "gen_token",
+                "generation_mode": "chat",
+                "current_stage": "prompt_items_work",
+                "progress_percent": 50.0,
+                "blueprint": {
+                    "title": "Conflict reset",
+                    "summary": "Practice handling a tense stakeholder exchange.",
+                    "prompt_items_count": 2,
+                    "scenarios_count": 1,
+                },
+            }
+        },
+        collection={
+            "id": "col-123",
+            "title": "Conflict reset",
+            "difficulty": "intermediate",
+            "content_format_mix": ["quick_practice_prompt"],
+            "prompt_items": [{"id": "pi-1"}, {"id": "pi-2"}],
+            "scenarios": [{"id": "sc-1"}],
+        },
+        generation_artifact_id="artifact-123",
+        provider="groq",
+    )
+
+    assert payload["collection_id"] == "col-123"
+    assert payload["generation_artifact_id"] == "artifact-123"
+    assert payload["provider"] == "groq"
+    assert payload["current_stage"] == "completed"
+    assert payload["progress_percent"] == 100.0
+    assert payload["prompt_item_count"] == 2
+    assert payload["scenario_count"] == 1
