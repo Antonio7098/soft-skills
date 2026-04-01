@@ -84,10 +84,13 @@ class FakeSuccessMarker:
         )
 
         rubric_version = prompt_payload.prompt.rubric_version
+        target_skills = list(prompt_payload.prompt.target_skill_slugs)
+        if not target_skills:
+            target_skills = ["active-listening", "expectation-setting"]
+        learner_response = "I hear why the date matters to you. The earliest realistic date is next Friday, and I can confirm scope with the team by tomorrow."
         skill_scores = []
         evidence = []
-        learner_response = "I hear why the date matters to you. The earliest realistic date is next Friday, and I can confirm scope with the team by tomorrow."
-        for slug in ALL_SKILL_SLUGS:
+        for slug in target_skills:
             skill_scores.append(
                 {
                     "skill_slug": slug,
@@ -206,7 +209,9 @@ async def _seed_assessed_attempt(app, client, org_id: str, admin_id: str | None 
             )
         },
     )
-    assert submit_response.status_code == 200
+    assert submit_response.status_code == 200, (
+        f"Submit failed: {submit_response.status_code} {submit_response.json()}"
+    )
     return learner, collection, prompt, submit_response.json()["data"]
 
 

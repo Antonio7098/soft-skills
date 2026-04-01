@@ -201,6 +201,14 @@ async def generate_collection(
             progress_callback("blueprint_guard", 20.0, {})
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "blueprint_llm_transform"))
         blueprint = cast(GeneratedCollectionBlueprint, typed_result.parsed)
+        blueprint.prompt_items = [
+            plan.model_copy(update={"target_skill_slugs": list(command.target_skill_slugs)})
+            for plan in blueprint.prompt_items
+        ]
+        blueprint.scenarios = [
+            plan.model_copy(update={"target_skill_slugs": list(command.target_skill_slugs)})
+            for plan in blueprint.scenarios
+        ]
         validate_collection_blueprint(
             config=config,
             llm_provider=llm_provider,

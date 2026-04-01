@@ -192,8 +192,7 @@ def validate_prompt_command(
                     details={"prompt_type": command.prompt_type, "rubric_id": command.rubric_id},
                 )
     if collection is not None and command.prompt_type is not None and not is_update:
-        is_quick_practice = command.prompt_type == "quick_practice_prompt"
-        if not is_quick_practice and command.target_skill_slugs is not None:
+        if command.target_skill_slugs is not None:
             if not set(command.target_skill_slugs).issubset(set(collection.target_skill_slugs)):
                 raise validation_error(
                     "Prompt item skills must be a subset of the collection skills",

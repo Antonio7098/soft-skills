@@ -35,8 +35,6 @@ from soft_skills_backend.shared.errors import domain_error
 
 
 def _normalize_prompt_item_skills(prompt_type: str, target_skill_slugs: list[str]) -> list[str]:
-    if prompt_type == "quick_practice_prompt":
-        return []
     return list(target_skill_slugs)
 
 

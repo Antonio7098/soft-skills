@@ -201,6 +201,16 @@ class CollectionGenerationCounts(BaseModel):
     scenario_count: int = Field(default=0, ge=0, le=2)
     scenario_artifact_count: int = Field(default=0, ge=0, le=3)
 
+    @model_validator(mode="after")
+    def require_at_least_one_item_or_no_skills(self) -> CollectionGenerationCounts:
+        if (
+            self.quick_practice_prompt_count == 0
+            and self.interview_prompt_count == 0
+            and self.scenario_count == 0
+        ):
+            raise ValueError("Collection must have at least one content item (counts are all zero)")
+        return self
+
 
 class StructuredCollectionGenerationCommand(BaseModel):
     title_hint: str | None = None
@@ -238,6 +248,12 @@ class PromptItemGenerationCounts(BaseModel):
     quick_practice_prompt_count: int = Field(default=3, ge=0, le=6)
     interview_prompt_count: int = Field(default=0, ge=0, le=6)
 
+    @model_validator(mode="after")
+    def require_at_least_one_item(self) -> PromptItemGenerationCounts:
+        if self.quick_practice_prompt_count == 0 and self.interview_prompt_count == 0:
+            raise ValueError("Must generate at least one prompt item (counts are all zero)")
+        return self
+
 
 class StructuredPromptItemGenerationCommand(BaseModel):
     title_hint: str | None = None
@@ -262,14 +278,14 @@ class GeneratedPromptItemPlan(BaseModel):
     title_hint: str
     generation_brief: str
     difficulty: DifficultyLevel
-    target_skill_slugs: list[str]
+    target_skill_slugs: list[str] = Field(default_factory=list)
     rubric_id: str | None = None
 
 
 class GeneratedScenarioPlan(BaseModel):
     title_hint: str
     generation_brief: str
-    target_skill_slugs: list[str]
+    target_skill_slugs: list[str] = Field(default_factory=list)
     rubric_id: str | None = None
     supporting_artifact_count: int = Field(default=0, ge=0, le=3)
 
@@ -315,7 +331,7 @@ class GeneratedPromptItemDraft(BaseModel):
     title: str
     prompt_text: str
     difficulty: DifficultyLevel
-    target_skill_slugs: list[str]
+    target_skill_slugs: list[str] = Field(default_factory=list)
     rubric_id: str | None = None
     generated_rubric: GeneratedQuickPracticeRubric | None = None
 
@@ -326,7 +342,7 @@ class GeneratedScenarioDraft(BaseModel):
     learner_objective: str
     constraints: list[str] = Field(default_factory=list)
     stakeholder_tensions: list[str] = Field(default_factory=list)
-    target_skill_slugs: list[str]
+    target_skill_slugs: list[str] = Field(default_factory=list)
     rubric_id: str | None = None
     mock_company: MockCompanyInput | None = None
     mock_people: list[MockPersonInput] = Field(default_factory=list)

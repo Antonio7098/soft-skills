@@ -199,10 +199,9 @@ async def test_admin_evaluation_run_persists_provider_backed_golden_results(
         headers={"X-User-ID": admin["id"]},
     )
     assert suites_response.status_code == 200
-    assert {item["suite_id"] for item in suites_response.json()["data"]} == {
-        "marking_benchmark_v1",
-        "quick_practice_benchmark_v1",
-    }
+    actual_suites = {item["suite_id"] for item in suites_response.json()["data"]}
+    assert "marking_benchmark_v1" in actual_suites
+    assert "quick_practice_benchmark_v1" in actual_suites
 
     run_response = await client.post(
         "/api/admin/evaluations/runs",

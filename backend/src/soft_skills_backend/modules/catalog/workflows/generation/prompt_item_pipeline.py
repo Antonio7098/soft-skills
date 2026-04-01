@@ -176,6 +176,13 @@ async def generate_prompt_items_for_collection(
     async def plan_guard(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "plan_llm_transform"))
         batch = cast(GeneratedPromptItemPlanBatch, typed_result.parsed)
+        requested_skill_slugs = cast(dict[str, Any], payload_from_inputs(ctx, "input_guard"))[
+            "requested_skill_slugs"
+        ]
+        batch.prompt_items = [
+            plan.model_copy(update={"target_skill_slugs": list(requested_skill_slugs)})
+            for plan in batch.prompt_items
+        ]
         validate_prompt_item_plan_batch(
             config=config,
             llm_provider=llm_provider,
@@ -326,7 +333,7 @@ async def generate_prompt_items_for_collection(
             "plan_guard",
             cast(Any, plan_guard),
             StageKind.GUARD,
-            dependencies=("plan_llm_transform",),
+            dependencies=("plan_llm_transform", "input_guard"),
         ),
         stage(
             "prompt_items_work",

@@ -52,12 +52,6 @@ from soft_skills_backend.shared.ports.llm import LLMProvider
 from soft_skills_backend.shared.ports.telemetry import ProviderCallContext
 
 
-def _normalize_prompt_item_skills(prompt_type: str, target_skill_slugs: list[str]) -> list[str]:
-    if prompt_type == "quick_practice_prompt":
-        return []
-    return list(target_skill_slugs)
-
-
 @dataclass(slots=True)
 class WorkerExecutionResult:
     typed_result: TypedLLMResult
@@ -114,9 +108,6 @@ def _validate_generated_prompt_item_draft(
     draft: GeneratedPromptItemDraft,
     plan: GeneratedPromptItemPlan,
 ) -> None:
-    draft.target_skill_slugs = _normalize_prompt_item_skills(
-        draft.prompt_type, draft.target_skill_slugs
-    )
     if draft.prompt_type != plan.prompt_type:
         raise validation_error(
             "Generated prompt item drifted from the worker plan metadata",
@@ -268,7 +259,7 @@ async def _run_prompt_item_worker(
     async def input_guard(_ctx: StageContext) -> Any:
         return ok_output(
             StageflowStageResult(
-                payload=plan,
+                payload=plan.model_copy(update={"target_skill_slugs": list(plan.target_skill_slugs)}),
                 summary={"prompt_type": plan.prompt_type, "rubric_id": plan.rubric_id},
             )
         )
@@ -333,6 +324,7 @@ async def _run_prompt_item_worker(
                 ),
             )
             draft = cast(GeneratedPromptItemDraft, typed_result.parsed)
+            draft.target_skill_slugs = list(plan.target_skill_slugs)
             try:
                 _validate_generated_prompt_item_draft(draft=draft, plan=plan)
                 return ok_output(
@@ -362,6 +354,7 @@ async def _run_prompt_item_worker(
     async def output_guard(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "llm_transform"))
         draft = cast(GeneratedPromptItemDraft, typed_result.parsed)
+        draft.target_skill_slugs = list(plan.target_skill_slugs)
         _validate_generated_prompt_item_draft(draft=draft, plan=plan)
         return ok_output(
             StageflowStageResult(
@@ -510,6 +503,7 @@ async def _run_scenario_worker(
                 ),
             )
             draft = cast(GeneratedScenarioDraft, typed_result.parsed)
+            draft.target_skill_slugs = list(plan.target_skill_slugs)
             try:
                 _validate_generated_scenario_draft(draft=draft, plan=plan)
                 return ok_output(
@@ -539,6 +533,7 @@ async def _run_scenario_worker(
     async def output_guard(ctx: StageContext) -> Any:
         typed_result = cast(TypedLLMResult, payload_from_inputs(ctx, "llm_transform"))
         draft = cast(GeneratedScenarioDraft, typed_result.parsed)
+        draft.target_skill_slugs = list(plan.target_skill_slugs)
         _validate_generated_scenario_draft(draft=draft, plan=plan)
         return ok_output(StageflowStageResult(payload=typed_result, summary={"title": draft.title}))
 

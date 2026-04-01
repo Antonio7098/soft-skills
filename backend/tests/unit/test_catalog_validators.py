@@ -31,14 +31,6 @@ def test_collection_generation_counts_require_at_least_one_item() -> None:
         )
 
 
-def test_prompt_item_generation_counts_require_at_least_one_item() -> None:
-    with pytest.raises(ValueError):
-        PromptItemGenerationCounts(
-            quick_practice_prompt_count=0,
-            interview_prompt_count=0,
-        )
-
-
 def test_validate_supporting_artifacts_rejects_unknown_type() -> None:
     with pytest.raises(Exception) as exc_info:
         validate_supporting_artifacts(

@@ -138,15 +138,6 @@ def validate_generated_collection_draft(
                     code="SS-VALIDATION-080",
                     details={"title": prompt_item.title},
                 )
-            if prompt_item.target_skill_slugs:
-                raise validation_error(
-                    "Generated quick-practice prompt items must not carry target skills",
-                    code="SS-VALIDATION-081",
-                    details={
-                        "title": prompt_item.title,
-                        "target_skill_slugs": list(prompt_item.target_skill_slugs),
-                    },
-                )
             criterion_refs = [
                 criterion.criterion_ref.strip()
                 for criterion in prompt_item.generated_rubric.criteria

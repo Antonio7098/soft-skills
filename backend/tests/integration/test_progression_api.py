@@ -97,6 +97,10 @@ class FakeSuccessMarker:
         )
 
         del learner_payload, call_context
+        response_text = prompt_payload.response_text
+        target_skills = list(prompt_payload.prompt.target_skill_slugs)
+        if not target_skills:
+            target_skills = ["active-listening", "decision-justification"]
         return AssessmentTransformPayload(
             draft=AssessmentDraft.model_validate(
                 {
@@ -108,27 +112,19 @@ class FakeSuccessMarker:
                     "rationale": "The response balanced listening with a defensible decision.",
                     "skill_scores": [
                         {
-                            "skill_slug": "active-listening",
+                            "skill_slug": slug,
                             "score": 4,
-                            "rationale": "It acknowledged the client concern directly.",
-                        },
-                        {
-                            "skill_slug": "decision-justification",
-                            "score": 4,
-                            "rationale": "It supported the decision with clear reasoning.",
-                        },
+                            "rationale": f"The response demonstrated {slug}.",
+                        }
+                        for slug in target_skills
                     ],
                     "evidence": [
                         {
-                            "skill_slug": "active-listening",
-                            "quote": "I first aligned the team on the uncertainty",
-                            "explanation": "The learner showed attention to stakeholder alignment.",
-                        },
-                        {
-                            "skill_slug": "decision-justification",
-                            "quote": "we chose the lower-risk option because the data was incomplete",
-                            "explanation": "The learner justified the decision directly.",
-                        },
+                            "skill_slug": slug,
+                            "quote": response_text,
+                            "explanation": f"The learner showed {slug}.",
+                        }
+                        for slug in target_skills
                     ],
                     "strengths": ["Balanced alignment with a clear rationale."],
                     "weaknesses": ["Could have made the tradeoff framing even crisper."],

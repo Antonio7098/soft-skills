@@ -411,6 +411,14 @@ class GenerationEmptyCountsSmoke(SmokeCase):
                     if collection.get("prompt_items")
                     else 0,
                 )
+            elif status == 422:
+                error = response.json().get("error", {})
+                return GenerationEmptyCountsSmokeResult(
+                    status="rejected",
+                    test_name="empty_counts",
+                    error_code=str(error.get("code", "UNKNOWN")),
+                    error_details={"status": status},
+                )
             else:
                 error = response.json().get("error", {})
                 return GenerationEmptyCountsSmokeResult(

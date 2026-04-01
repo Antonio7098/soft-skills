@@ -62,8 +62,9 @@ def assistant_prompt_templates() -> list[PromptTemplate]:
                 "1a. For learner read questions, always use `query_user_context`. Use the exact "
                 "allowlisted assistant view names from the schema context, including the `_v` "
                 "suffix, and project explicit columns instead of `SELECT *`.\n"
-                "1b. When choosing skills or competencies for generation, use the available "
-                "taxonomy context below and only use listed slugs exactly.\n"
+                "1b. When generating content, the system can infer skills from the user's brief "
+                "and attach them deterministically. If you do provide skills or competencies, "
+                "use the available taxonomy context below and only use listed slugs exactly.\n"
                 "1c. If the user asks what skills or competencies are available, answer directly "
                 "from the taxonomy context below. You may also query `query_user_context` if "
                 "taxonomy context is insufficient.\n"
@@ -77,9 +78,9 @@ def assistant_prompt_templates() -> list[PromptTemplate]:
                 "reasonable defaults. DO NOT ask the user for every missing field — the user "
                 "asked YOU to create something, so take initiative and make sensible choices.\n"
                 "- For collection generation: pick a target_audience (e.g., 'professionals', "
-                "'students'), difficulty (e.g., 'intermediate'), content_format_mix "
-                "(e.g., ['quick_practice_prompt']), and reasonable target_skill_slugs from "
-                "the available taxonomy below. Counts default to 3-5 items.\n"
+                "'students'), difficulty (e.g., 'intermediate'), and content_format_mix "
+                "(e.g., ['quick_practice_prompt']). If target_skill_slugs are omitted, the "
+                "system will infer them from the brief. Counts default to 3-5 items.\n"
                 "- You have all the info you need — just call the generation tool.\n"
                 "6. Prefer parallel tool calls when the requests are independent.\n"
                 "7. Do not invent collection, attempt, run, or progress facts.\n"
@@ -94,7 +95,8 @@ def assistant_prompt_templates() -> list[PromptTemplate]:
                 "- User: 'check my collections' → You: immediately call query_user_context with "
                 "SELECT title, difficulty, rating_count FROM assistant_safe_collections_v\n"
                 "- User: 'create a collection about stakeholder management' → You: call "
-                "generate_collection with reasonable defaults for missing fields\n"
+                "generate_collection with reasonable defaults for missing fields; omit "
+                "target_skill_slugs unless you have a clear taxonomy match\n"
                 "- User: 'let's start practice' → You: first query collections, then start practice\n"
                 "- User: 'how am I doing?' → You: query attempt summaries and progress snapshots\n"
                 "- User: 'what's available?' → You: query collections and skills\n"
@@ -159,8 +161,9 @@ def build_assistant_tool_definitions() -> list[ProviderToolDefinition]:
                 "Generate a new collection. The user wants YOU to create something — use "
                 "reasonable defaults for any missing fields: target_audience='professionals', "
                 "difficulty='intermediate', content_format_mix=['quick_practice_prompt'], "
-                "target_skill_slugs from the topic mentioned. DO NOT ask the user to fill in "
-                "every field — just call the tool with sensible choices."
+                "and counts suited to the request. If target_skill_slugs are omitted, the "
+                "system will infer and attach them from the brief. DO NOT ask the user to fill "
+                "in every field — just call the tool with sensible choices."
             ),
             parameters=ChatCollectionGenerationCommand.model_json_schema(),
         ),
@@ -169,7 +172,8 @@ def build_assistant_tool_definitions() -> list[ProviderToolDefinition]:
             description=(
                 "Generate prompt items in an existing collection. The user wants YOU to create "
                 "something — use reasonable defaults for any missing fields. DO NOT ask the user "
-                "to fill in every field — just call the tool with sensible choices."
+                "to fill in every field — just call the tool with sensible choices. If "
+                "target_skill_slugs are omitted, the collection/default skill set will be used."
             ),
             parameters=ChatPromptItemGenerationCommand.model_json_schema(),
         ),

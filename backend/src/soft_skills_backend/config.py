@@ -120,8 +120,8 @@ class Settings(BaseSettings):
         default="https://api.groq.com/openai/v1",
         validation_alias="GROQ_BASE_URL",
     )
-    groq_default_model: str = Field(default="llama-3.3-70b-versatile")
-    groq_default_backup_model: str | None = Field(default="llama-3.1-8b-instant")
+    groq_default_model: str = Field(default="openai/gpt-oss-20b")
+    groq_default_backup_model: str | None = Field(default=None)
 
     groq_llm_assistant_model: str | None = Field(default=None)
     groq_llm_admin_agent_model: str | None = Field(default=None)

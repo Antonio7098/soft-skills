@@ -338,7 +338,9 @@ class TestGenerationCancellationFlow:
             return object()
 
         monkeypatch.setattr(collection_pipeline, "run_logged_pipeline", fake_run_logged_pipeline)
-        monkeypatch.setattr(collection_pipeline, "payload_from_results", lambda *args, **kwargs: expected_view)
+        monkeypatch.setattr(
+            collection_pipeline, "payload_from_results", lambda *args, **kwargs: expected_view
+        )
 
         result = await generate_collection(
             actor=actor,
@@ -365,6 +367,7 @@ class TestGenerationCancellationFlow:
             timeout_ms=1000,
             sanitize_text=lambda text: text,
             workplace_context_for_commands=lambda *_args: "context",
+            taxonomy_context_for_commands=lambda *_args: "taxonomy",
             execution=execution,
         )
 

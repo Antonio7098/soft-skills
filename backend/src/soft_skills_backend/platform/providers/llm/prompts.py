@@ -96,12 +96,10 @@ CREATOR_COLLECTION_BLUEPRINT_OUTPUT_FORMAT = """Return JSON with these required 
   - title_hint
   - generation_brief
   - difficulty
-  - target_skill_slugs
   - rubric_id
 - scenarios: array of objects with:
   - title_hint
   - generation_brief
-  - target_skill_slugs
   - rubric_id
   - supporting_artifact_count
 Rules:
@@ -120,12 +118,11 @@ CREATOR_PROMPT_ITEM_PLAN_OUTPUT_FORMAT = """Return JSON with these required fiel
   - title_hint
   - generation_brief
   - difficulty
-  - target_skill_slugs
   - rubric_id
 Rules:
 - Preserve requested counts exactly.
 - Use only collection-enabled prompt types.
-- Use only supplied skill slugs and rubric ids.
+- Use only supplied rubric ids.
 - Make each item materially distinct from the others and from the supplied existing prompts.
 - Do not include markdown fences or prose outside the JSON object."""
 
@@ -134,7 +131,6 @@ CREATOR_PROMPT_ITEM_OUTPUT_FORMAT = """Return JSON with these required fields ex
 - title: string
 - prompt_text: string
 - difficulty: one of introductory, intermediate, advanced
-- target_skill_slugs: array of strings
 - rubric_id: string
 - generated_rubric: null or object with:
   - title
@@ -148,8 +144,7 @@ CREATOR_PROMPT_ITEM_OUTPUT_FORMAT = """Return JSON with these required fields ex
       - description
       - examples: array of strings
 Rules:
-- Preserve prompt_type, difficulty, target_skill_slugs, and rubric_id exactly as requested.
-- If prompt_type is quick_practice_prompt, target_skill_slugs must be an empty array.
+- Preserve prompt_type, difficulty, and rubric_id exactly as requested.
 - If prompt_type is quick_practice_prompt, generated_rubric is required and must define a question-specific pass/fail rubric for this exact prompt.
 - If prompt_type is quick_practice_prompt, every generated_rubric criterion must include exactly two levels, in this order: level 1 then level 2.
 - Never omit either binary rubric level. Never return a criterion with only one level.
@@ -165,13 +160,12 @@ CREATOR_SCENARIO_OUTPUT_FORMAT = """Return JSON with these required fields exact
 - learner_objective: string
 - constraints: array of strings
 - stakeholder_tensions: array of strings
-- target_skill_slugs: array of strings
 - rubric_id: string
 - mock_company: null or object with name, industry, operating_context
 - mock_people: array of objects with name, role, goals, communication_style, relationship_to_scenario
 - supporting_artifacts: array of objects with artifact_type, title, body
 Rules:
-- Preserve target_skill_slugs and rubric_id exactly as requested.
+- Preserve rubric_id exactly as requested.
 - Keep the mock world internally consistent.
 - Generate exactly the requested number of supporting artifacts.
 - Every required field must be present.
@@ -271,7 +265,7 @@ Generation brief:
 - generation focus: {generation_focus}
 - realism notes: {realism_notes}
 - requested counts: {requested_counts}
-- allowed target skills: {requested_skill_slugs}
+- deterministic target skills: {requested_skill_slugs}
 {output_format}"""
 
 CREATOR_CHAT_PROMPT_ITEM_PLAN_PROMPT = """Plan new SoftSkills prompt items for an existing collection from the user's brief.
@@ -285,7 +279,7 @@ Collection metadata:
 - compatible rubrics: {compatible_rubric_ids}
 - existing prompt fingerprints: {existing_prompt_fingerprints}
 - requested counts: {requested_counts}
-- allowed target skills: {requested_skill_slugs}
+- deterministic target skills: {requested_skill_slugs}
 Hardened user brief:
 {user_prompt}
 {output_format}"""
@@ -305,7 +299,7 @@ Creative brief:
 - title hint: {title_hint}
 - generation brief: {generation_brief}
 Rules:
-- If prompt_type is quick_practice_prompt, return target_skill_slugs as [].
+- Treat target skills as fixed system metadata that will be attached outside your response.
 - Quick-practice criteria are rubric checks, not platform skills.
 - If prompt_type is quick_practice_prompt, generated_rubric is mandatory.
 - For every quick-practice criterion, the levels array must contain exactly two objects only:
@@ -330,6 +324,7 @@ Creative brief:
 - title hint: {title_hint}
 - generation brief: {generation_brief}
 Rules:
+- Treat target skills as fixed system metadata that will be attached outside your response.
 - Return every required field explicitly.
 - If there is no mock company, set mock_company to null.
 - If mock_people contains one or more people, mock_company must be a non-null object with name, industry, and operating_context.
