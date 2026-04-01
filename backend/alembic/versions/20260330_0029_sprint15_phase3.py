@@ -11,8 +11,9 @@ Create Date: 2026-03-30
 
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import context as _context
+from alembic import op
 
 revision = "sprint15_phase3"
 down_revision = "sprint15_phase2"
@@ -20,16 +21,32 @@ branch_labels = None
 depends_on = None
 
 
+def _is_sqlite() -> bool:
+    return _context.get_context().dialect.name == "sqlite"
+
+
+def _column_exists(connection, table_name: str, column_name: str) -> bool:
+    if _is_sqlite():
+        result = connection.execute(
+            sa.text("SELECT name FROM pragma_table_info(:table) WHERE name=:col"),
+            {"table": table_name, "col": column_name},
+        )
+    else:
+        result = connection.execute(
+            sa.text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = :table AND column_name = :col"
+            ),
+            {"table": table_name, "col": column_name},
+        )
+    return result.fetchone() is not None
+
+
 def upgrade() -> None:
     connection = op.get_bind()
 
     # Check if column already exists
-    result = connection.execute(
-        sa.text(
-            "SELECT name FROM pragma_table_info('content_generation_artifacts') WHERE name='prompt_version_id'"
-        )
-    )
-    if result.fetchone() is None:
+    if not _column_exists(connection, "content_generation_artifacts", "prompt_version_id"):
         connection.execute(
             sa.text("ALTER TABLE content_generation_artifacts ADD COLUMN prompt_version_id INTEGER")
         )
@@ -38,8 +55,6 @@ def upgrade() -> None:
                 "CREATE INDEX ix_content_generation_artifacts_prompt_version_id ON content_generation_artifacts (prompt_version_id)"
             )
         )
-
-    connection.commit()
 
 
 def downgrade() -> None:
@@ -50,4 +65,3 @@ def downgrade() -> None:
     connection.execute(
         sa.text("ALTER TABLE content_generation_artifacts DROP COLUMN prompt_version_id")
     )
-    connection.commit()
