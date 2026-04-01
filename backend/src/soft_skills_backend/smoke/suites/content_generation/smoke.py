@@ -239,9 +239,17 @@ class _ContentGenerationSmoke(SmokeCase, ABC):
             collection = await self._generate_collection(backend, actors.learner_id)
             collection_id = str(collection["id"])
             prompt_items = cast(list[object], collection.get("prompt_items", []))
-            scenarios = cast(list[object], collection.get("scenarios", []))
+            scenarios = cast(list[JsonObject], collection.get("scenarios", []))
             prompt_items_count = len(prompt_items)
             scenarios_count = len(scenarios)
+            for scenario in scenarios:
+                prompt_text = str(scenario.get("prompt_text", "")).strip()
+                if not prompt_text:
+                    raise provider_error(
+                        "Generated scenario is missing its first-turn prompt text",
+                        code="SS-PROVIDER-013",
+                        details={"collection_id": collection_id, "scenario": scenario},
+                    )
             artifact = cast(JsonObject | None, collection.get("last_generation_artifact"))
             return ContentGenerationSmokeResult(
                 status="ok",
@@ -330,10 +338,10 @@ class StructuredGenerationSmoke(_ContentGenerationSmoke):
                 "title_hint": "Smoke Structured Draft",
                 "target_audience": "Early-career consultants",
                 "difficulty": "intermediate",
-                "content_format_mix": ["quick_practice_prompt"],
+                "content_format_mix": ["quick_practice_prompt", "scenario_step"],
                 "target_skill_slugs": ["active-listening", "expectation-setting"],
                 "target_competency_slugs": ["stakeholder-management"],
-                "rubric_ids": ["quick_practice_text@v1"],
+                "rubric_ids": ["quick_practice_text@v1", "scenario_text@v1"],
                 "domain": "Enterprise SaaS",
                 "workplace_context": "A launch is under time pressure after a legal escalation.",
                 "scenario_theme": "Conflicting stakeholder expectations",
@@ -341,8 +349,8 @@ class StructuredGenerationSmoke(_ContentGenerationSmoke):
                 "counts": {
                     "quick_practice_prompt_count": 1,
                     "interview_prompt_count": 0,
-                    "scenario_count": 0,
-                    "scenario_artifact_count": 0,
+                    "scenario_count": 1,
+                    "scenario_artifact_count": 1,
                 },
             },
         )

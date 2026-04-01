@@ -212,6 +212,12 @@ def validate_scenario_command(
     command: ScenarioCreateCommand | ScenarioUpdateCommand,
 ) -> None:
     is_update = isinstance(command, ScenarioUpdateCommand)
+    prompt_text = getattr(command, "prompt_text", None)
+    if prompt_text is not None and not prompt_text.strip():
+        raise validation_error(
+            "Scenario prompt text is required",
+            code="SS-VALIDATION-088",
+        )
     if command.target_skill_slugs is not None:
         require_existing_skills(session, command.target_skill_slugs, command.organisation_id)
     if command.rubric_id is not None:

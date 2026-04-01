@@ -1192,10 +1192,10 @@ const SEED_ORG_PROMPT_ITEMS: PromptItemView[] = [
 ];
 
 const SEED_ORG_SCENARIOS: ScenarioView[] = [
-  { id: 'org-scenario-001', title: 'Budget Presentation', business_context: 'Present a budget proposal to senior leadership', learner_objective: 'Develop executive presence and financial communication skills', constraints: ['Time limit of 15 minutes', 'Must address all stakeholder concerns'], stakeholder_tensions: ['Cost vs. quality', 'Short-term vs. long-term priorities'], lifecycle_state: 'published_private', target_skill_slugs: ['communication', 'leadership'], rubric_id: 'org-rubric-002', mock_company: null, mock_people: [], organisation_id: 'org-001' },
-  { id: 'org-scenario-002', title: 'New Hire Onboarding', business_context: 'Onboard a new team member with company processes', learner_objective: 'Master onboarding best practices and team integration', constraints: ['Must complete within 30 minutes', 'Cover all mandatory topics'], stakeholder_tensions: ['Thoroughness vs. efficiency', 'Standard process vs. personalized approach'], lifecycle_state: 'published_private', target_skill_slugs: ['leadership', 'communication'], rubric_id: 'org-rubric-002', mock_company: null, mock_people: [], organisation_id: 'org-001' },
-  { id: 'org-scenario-003', title: 'Crisis Communication', business_context: 'Handle internal communication during a company crisis', learner_objective: 'Practice crisis communication and stakeholder management', constraints: ['Must address employee concerns within 24 hours', 'All communications must be approved by legal'], stakeholder_tensions: ['Transparency vs. legal risk', 'Employee concerns vs. business continuity'], lifecycle_state: 'published_private', target_skill_slugs: ['communication', 'problem-solving'], rubric_id: 'org-rubric-003', mock_company: null, mock_people: [], organisation_id: 'org-001' },
-  { id: 'org-scenario-004', title: 'Cross-functional Collaboration', business_context: 'Coordinate a project across multiple departments', learner_objective: 'Improve cross-departmental collaboration skills', constraints: ['Limited budget', 'Tight timeline'], stakeholder_tensions: ['Different departmental priorities', 'Resource allocation conflicts'], lifecycle_state: 'draft', target_skill_slugs: ['team-collaboration', 'problem-solving'], rubric_id: 'org-rubric-003', mock_company: null, mock_people: [], organisation_id: 'org-001' },
+  { id: 'org-scenario-001', title: 'Budget Presentation', prompt_text: 'Open the meeting by presenting the budget tradeoff you recommend and the decision you need from leadership.', business_context: 'Present a budget proposal to senior leadership', learner_objective: 'Develop executive presence and financial communication skills', constraints: ['Time limit of 15 minutes', 'Must address all stakeholder concerns'], stakeholder_tensions: ['Cost vs. quality', 'Short-term vs. long-term priorities'], lifecycle_state: 'published_private', target_skill_slugs: ['communication', 'leadership'], rubric_id: 'org-rubric-002', mock_company: null, mock_people: [], organisation_id: 'org-001' },
+  { id: 'org-scenario-002', title: 'New Hire Onboarding', prompt_text: 'Deliver the first message you would give the new hire to set expectations and build confidence.', business_context: 'Onboard a new team member with company processes', learner_objective: 'Master onboarding best practices and team integration', constraints: ['Must complete within 30 minutes', 'Cover all mandatory topics'], stakeholder_tensions: ['Thoroughness vs. efficiency', 'Standard process vs. personalized approach'], lifecycle_state: 'published_private', target_skill_slugs: ['leadership', 'communication'], rubric_id: 'org-rubric-002', mock_company: null, mock_people: [], organisation_id: 'org-001' },
+  { id: 'org-scenario-003', title: 'Crisis Communication', prompt_text: 'Write the internal update you would send first to address employee concern without creating unnecessary legal risk.', business_context: 'Handle internal communication during a company crisis', learner_objective: 'Practice crisis communication and stakeholder management', constraints: ['Must address employee concerns within 24 hours', 'All communications must be approved by legal'], stakeholder_tensions: ['Transparency vs. legal risk', 'Employee concerns vs. business continuity'], lifecycle_state: 'published_private', target_skill_slugs: ['communication', 'problem-solving'], rubric_id: 'org-rubric-003', mock_company: null, mock_people: [], organisation_id: 'org-001' },
+  { id: 'org-scenario-004', title: 'Cross-functional Collaboration', prompt_text: 'Send the kickoff message you would use to align the departments on one decision-making process.', business_context: 'Coordinate a project across multiple departments', learner_objective: 'Improve cross-departmental collaboration skills', constraints: ['Limited budget', 'Tight timeline'], stakeholder_tensions: ['Different departmental priorities', 'Resource allocation conflicts'], lifecycle_state: 'draft', target_skill_slugs: ['team-collaboration', 'problem-solving'], rubric_id: 'org-rubric-003', mock_company: null, mock_people: [], organisation_id: 'org-001' },
 ];
 
 let _orgSkills = [...SEED_ORG_SKILLS];
@@ -1695,6 +1695,7 @@ export const mockDataProvider: DataProvider = {
     const newScenario = {
       id: `sc-${uid()}`,
       title: cmd.title,
+      prompt_text: cmd.prompt_text,
       business_context: cmd.business_context,
       learner_objective: cmd.learner_objective,
       constraints: cmd.constraints ?? [],
@@ -1757,6 +1758,7 @@ export const mockDataProvider: DataProvider = {
       scenarios.push({
         id: `sc-${uid()}`,
         title: `${cmd.title_hint ?? 'Generated Scenario'} ${i + 1}`,
+        prompt_text: `What would you say first to align the stakeholders on ${cmd.scenario_theme.toLowerCase()}?`,
         business_context: cmd.workplace_context,
         learner_objective: `Navigate ${cmd.scenario_theme.toLowerCase()} using ${cmd.target_skill_slugs.map((s) => s.replace(/-/g, ' ')).join(', ')}.`,
         constraints: ['Time-sensitive decision required', 'Multiple stakeholder perspectives to consider'],
@@ -1854,6 +1856,7 @@ export const mockDataProvider: DataProvider = {
       scenarios.push({
         id: `sc-${uid()}`,
         title: `AI Generated Scenario ${i + 1}`,
+        prompt_text: `What action or message would you deliver first in response to: ${cmd.prompt.slice(0, 80)}?`,
         business_context: `Based on your prompt about: ${cmd.prompt.slice(0, 100)}...`,
         learner_objective: `Address the scenario using ${cmd.target_skill_slugs.map((s) => s.replace(/-/g, ' ')).join(', ')}.`,
         constraints: ['Multiple perspectives to balance', 'Decision required'],
@@ -2278,18 +2281,14 @@ export const mockDataProvider: DataProvider = {
     const sessionId = `sess-${uid()}`;
     const attemptId = `att-${uid()}`;
 
-    const stepPrompts = [
-      `You've just entered the meeting room. ${scenario.mock_people[0]?.name ?? 'The stakeholder'} is visibly frustrated. How do you open the conversation?`,
-      `${scenario.mock_people[0]?.name ?? 'The stakeholder'} has raised concerns about the timeline. Present your recovery plan while addressing their specific worries.`,
-      `The meeting is wrapping up. Summarize the agreed-upon next steps and set clear expectations for the follow-up.`,
-    ];
+    const stepPrompts = [scenario.prompt_text];
 
     _scenarioSessions.set(sessionId, {
       session_id: sessionId,
       attempt_id: attemptId,
       status: 'active',
       scenario,
-      total_steps: stepPrompts.length,
+      total_steps: 1,
       current_step: 1,
       current_prompt_text: stepPrompts[0]!,
       history: [],
@@ -2311,11 +2310,7 @@ export const mockDataProvider: DataProvider = {
 
     const isComplete = session.current_step >= session.total_steps;
 
-    const stepPrompts = [
-      '',
-      `${session.scenario.mock_people[0]?.name ?? 'The stakeholder'} has raised concerns about the timeline. Present your recovery plan while addressing their specific worries.`,
-      `The meeting is wrapping up. Summarize the agreed-upon next steps and set clear expectations for the follow-up.`,
-    ];
+    const stepPrompts = [''];
 
     const updated: ScenarioSessionView = {
       ...session,
@@ -4112,6 +4107,7 @@ export const mockDataProvider: DataProvider = {
     const scenario: ScenarioView = {
       id: `org-scenario-${uid()}`,
       title: cmd.title,
+      prompt_text: cmd.prompt_text,
       business_context: cmd.business_context,
       learner_objective: cmd.learner_objective,
       constraints: cmd.constraints ?? [],
@@ -4142,6 +4138,7 @@ export const mockDataProvider: DataProvider = {
     const updated: ScenarioView = {
       ...existing,
       title: cmd.title ?? existing.title,
+      prompt_text: cmd.prompt_text ?? existing.prompt_text,
       business_context: cmd.business_context ?? existing.business_context,
       learner_objective: cmd.learner_objective ?? existing.learner_objective,
       constraints: cmd.constraints ?? existing.constraints,

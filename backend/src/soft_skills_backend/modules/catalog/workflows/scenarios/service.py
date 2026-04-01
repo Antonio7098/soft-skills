@@ -87,6 +87,7 @@ class ScenarioService:
                     collection_id=collection_id,
                     author_user_id=actor.user_id,
                     title=command.title,
+                    prompt_text=command.prompt_text,
                     business_context=command.business_context,
                     learner_objective=command.learner_objective,
                     constraints=list(command.constraints),
@@ -177,6 +178,7 @@ class ScenarioService:
                 collection = self._collection_or_error(session, collection_id)
                 scenario = self._scenario_or_error(session, scenario_id)
                 scenario.title = command.title
+                scenario.prompt_text = command.prompt_text
                 scenario.business_context = command.business_context
                 scenario.learner_objective = command.learner_objective
                 scenario.constraints = list(command.constraints)

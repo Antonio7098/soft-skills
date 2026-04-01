@@ -131,6 +131,7 @@ async def _seed_scenario(client) -> tuple[dict[str, object], dict[str, object]]:
         headers={"X-User-ID": learner["id"]},
         json={
             "title": "Escalating launch risk",
+            "prompt_text": "Jordan Singh says launch cannot proceed without stronger controls. What do you say next?",
             "business_context": "An AI feature launch is at risk after legal review surfaced new concerns.",
             "learner_objective": "Re-align the executive sponsor without hiding the delivery risk.",
             "constraints": ["The launch date is on the board agenda tomorrow."],
@@ -295,6 +296,14 @@ async def test_scenario_runtime_persists_rich_context_and_artifacts(
     assert start_response.status_code == 200
     session_payload = start_response.json()["data"]
     assert session_payload["prompt"]["practice_type"] == "scenario"
+    assert (
+        session_payload["prompt"]["prompt_text"]
+        == "Jordan Singh says launch cannot proceed without stronger controls. What do you say next?"
+    )
+    assert (
+        session_payload["prompt"]["scenario_context"]["prompt_text"]
+        == "Jordan Singh says launch cannot proceed without stronger controls. What do you say next?"
+    )
     assert session_payload["prompt"]["scenario_context"]["mock_people"][0]["name"] == "Jordan Singh"
     assert session_payload["prompt"]["scenario_context"]["artifacts"][0]["title"] == (
         "CEO escalation note"

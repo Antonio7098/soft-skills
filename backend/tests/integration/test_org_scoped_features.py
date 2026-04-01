@@ -331,6 +331,7 @@ async def test_org_scenarios_crud(client, test_settings) -> None:
         headers=headers,
         json={
             "title": "Custom org scenario",
+            "prompt_text": "Ava asks whether the launch can still happen this month. What do you say first?",
             "business_context": "A product launch is behind schedule.",
             "learner_objective": "Align stakeholders on a realistic next step.",
             "constraints": ["Two-week deadline"],
@@ -356,6 +357,10 @@ async def test_org_scenarios_crud(client, test_settings) -> None:
     assert create_response.status_code == 200
     scenario = create_response.json()["data"]
     assert scenario["title"] == "Custom org scenario"
+    assert (
+        scenario["prompt_text"]
+        == "Ava asks whether the launch can still happen this month. What do you say first?"
+    )
     assert scenario["organisation_id"] == org_id
     scenario_id = scenario["id"]
 
@@ -370,10 +375,15 @@ async def test_org_scenarios_crud(client, test_settings) -> None:
         headers=headers,
         json={
             "title": "Updated custom org scenario",
+            "prompt_text": "Write the first reply you would send after the stakeholder escalation.",
         },
     )
     assert update_response.status_code == 200
     assert update_response.json()["data"]["title"] == "Updated custom org scenario"
+    assert (
+        update_response.json()["data"]["prompt_text"]
+        == "Write the first reply you would send after the stakeholder escalation."
+    )
 
     delete_response = await client.delete(
         f"/api/organisations/{org_id}/scenarios/{scenario_id}", headers=headers

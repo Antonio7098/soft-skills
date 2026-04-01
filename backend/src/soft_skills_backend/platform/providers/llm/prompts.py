@@ -100,6 +100,7 @@ CREATOR_COLLECTION_BLUEPRINT_OUTPUT_FORMAT = """Return JSON with these required 
 - scenarios: array of objects with:
   - title_hint
   - generation_brief
+  - prompt_text_hint
   - rubric_id
   - supporting_artifact_count
 Rules:
@@ -156,6 +157,7 @@ Rules:
 
 CREATOR_SCENARIO_OUTPUT_FORMAT = """Return JSON with these required fields exactly:
 - title: string
+- prompt_text: string
 - business_context: string
 - learner_objective: string
 - constraints: array of strings
@@ -167,6 +169,8 @@ CREATOR_SCENARIO_OUTPUT_FORMAT = """Return JSON with these required fields exact
 Rules:
 - Preserve rubric_id exactly as requested.
 - Keep the mock world internally consistent.
+- prompt_text must be a concrete first-turn question, message, or action prompt for the learner.
+- prompt_text must be answerable from the scenario context without extra setup text.
 - Generate exactly the requested number of supporting artifacts.
 - Every required field must be present.
 - Use [] for empty arrays and null for absent mock_company.
@@ -323,9 +327,12 @@ Fixed worker metadata:
 Creative brief:
 - title hint: {title_hint}
 - generation brief: {generation_brief}
+- prompt text hint: {prompt_text_hint}
 Rules:
 - Treat target skills as fixed system metadata that will be attached outside your response.
 - Return every required field explicitly.
+- prompt_text must be a realistic first-turn ask the learner can answer directly.
+- Prefer a concrete stakeholder message or decision prompt over a generic "what would you do next?" instruction.
 - If there is no mock company, set mock_company to null.
 - If mock_people contains one or more people, mock_company must be a non-null object with name, industry, and operating_context.
 - Do not return mock_people unless they clearly belong to the same mock_company context.

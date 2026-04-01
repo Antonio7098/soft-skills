@@ -10,12 +10,14 @@ from soft_skills_backend.modules.catalog.domain.models import (
     PromptItemGenerationCounts,
     ScenarioCreateCommand,
     ScenarioSupportingArtifactInput,
+    ScenarioUpdateCommand,
 )
 from soft_skills_backend.modules.catalog.domain.validators import (
     discovery_tier_for_collection,
     validate_collection_filters,
     validate_generated_prompt_item_uniqueness,
     validate_mock_world,
+    validate_scenario_command,
     validate_supporting_artifacts,
 )
 from soft_skills_backend.platform.db.models import CollectionRecord, PromptItemRecord
@@ -49,6 +51,7 @@ def test_validate_supporting_artifacts_rejects_unknown_type() -> None:
 def test_validate_mock_world_requires_company_when_people_exist() -> None:
     command = ScenarioCreateCommand(
         title="Scenario",
+        prompt_text="Open the meeting by acknowledging the sponsor concern and setting the next step.",
         business_context="Context",
         learner_objective="Objective",
         constraints=[],
@@ -155,3 +158,14 @@ def test_generated_prompt_item_uniqueness_rejects_existing_duplicates() -> None:
         )
 
     assert "SS-VALIDATION-065" in str(exc_info.value)
+
+
+def test_validate_scenario_command_rejects_blank_prompt_text() -> None:
+    command = ScenarioUpdateCommand(
+        prompt_text="   ",
+    )
+
+    with pytest.raises(Exception) as exc_info:
+        validate_scenario_command(None, None, command)  # type: ignore[arg-type]
+
+    assert "SS-VALIDATION-088" in str(exc_info.value)

@@ -37,6 +37,7 @@ export interface PromptItemView {
 export interface ScenarioView {
   readonly id: string;
   readonly title: string;
+  readonly prompt_text: string;
   readonly business_context: string;
   readonly learner_objective: string;
   readonly constraints: string[];
@@ -126,6 +127,7 @@ export interface MockPersonInput {
 
 export interface ScenarioCreateCommand {
   readonly title: string;
+  readonly prompt_text: string;
   readonly business_context: string;
   readonly learner_objective: string;
   readonly constraints?: string[];

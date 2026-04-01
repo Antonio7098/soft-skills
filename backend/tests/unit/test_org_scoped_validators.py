@@ -199,6 +199,7 @@ def test_validate_supporting_artifacts_rejects_unknown_type() -> None:
 def test_validate_mock_world_requires_company_when_people_exist() -> None:
     command = ScenarioCreateCommand(
         title="Scenario",
+        prompt_text="Respond to the sponsor's first escalation message.",
         business_context="Context",
         learner_objective="Objective",
         constraints=[],

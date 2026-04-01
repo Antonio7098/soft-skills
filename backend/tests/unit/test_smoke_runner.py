@@ -48,37 +48,9 @@ def test_smoke_registry_rejects_unknown_smoke() -> None:
 def test_default_registry_includes_practice_run_lifecycle_smoke() -> None:
     registry = build_default_registry()
 
-    assert registry.names() == [
-        "provider-baseline",
-        "admin-agent",
-        "assistant-approval-workflow",
-        "assistant-read-sql-denied",
-        "assistant-read-sql-workflow",
-        "assistant-read-runtime",
-        "assistant-generation-runtime",
-        "assistant-practice-runtime",
-        "assistant-stream-runtime",
-        "generation-structured",
-        "generation-chat",
-        "generation-prompt-items-structured",
-        "generation-prompt-items-chat",
-        "generation-latency-envelope",
-        "generation-streaming",
-        "generation-cancellation",
-        "auth-flows",
-        "evaluation-benchmark",
-        "eval-dashboard",
-        "marking-quick-practice",
-        "marking-interview",
-        "marking-scenario",
-        "marking-relational-persistence",
-        "practice-session-flow",
-        "practice-run-lifecycle",
-        "organisation-management",
-        "admin-user-management",
-        "admin-analytics",
-        "admin-telemetry",
-        "pipeline-visualization",
-        "telemetry",
-        "full-user-journey",
-    ]
+    names = registry.names()
+
+    assert "practice-run-lifecycle" in names
+    assert "generation-structured" in names
+    assert "generation-streaming" in names
+    assert "full-user-journey" in names

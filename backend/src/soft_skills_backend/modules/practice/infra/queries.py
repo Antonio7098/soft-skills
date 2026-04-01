@@ -218,6 +218,7 @@ def _load_scenario_context(
         .all()
     )
     scenario_context = ScenarioContextView(
+        prompt_text=scenario.prompt_text,
         business_context=scenario.business_context,
         learner_objective=scenario.learner_objective,
         constraints=list(scenario.constraints),
@@ -249,7 +250,7 @@ def _load_scenario_context(
         content_item_type="scenario_step",
         prompt_type="scenario_step",
         title=scenario.title,
-        prompt_text=_build_scenario_prompt_text(scenario_context),
+        prompt_text=scenario.prompt_text,
         difficulty=collection.difficulty,
         delivery_version=PRACTICE_DELIVERY_VERSIONS[PracticeType.SCENARIO],
         response_mode="text",
@@ -408,38 +409,7 @@ def load_resolved_attempt(
 
 
 def _build_scenario_prompt_text(context: ScenarioContextView) -> str:
-    sections = [
-        "Work through the following workplace scenario in a single written response.",
-        f"Business context: {context.business_context}",
-        f"Learner objective: {context.learner_objective}",
-    ]
-    if context.constraints:
-        sections.append(f"Constraints: {_join_items(context.constraints)}")
-    if context.stakeholder_tensions:
-        sections.append(f"Stakeholder tensions: {_join_items(context.stakeholder_tensions)}")
-    if context.mock_company is not None:
-        sections.append(
-            "Company context: "
-            f"{context.mock_company.name} ({context.mock_company.industry}) - "
-            f"{context.mock_company.operating_context}"
-        )
-    if context.mock_people:
-        sections.append(
-            "Stakeholders: "
-            + " | ".join(
-                f"{person.name} ({person.role}): {person.relationship_to_scenario}"
-                for person in context.mock_people
-            )
-        )
-    if context.artifacts:
-        sections.append(
-            "Artifacts: "
-            + " | ".join(
-                f"{artifact.title} [{artifact.artifact_type}]" for artifact in context.artifacts
-            )
-        )
-    sections.append("Respond with the action or message you would deliver next.")
-    return "\n".join(sections)
+    return context.prompt_text
 
 
 def _join_items(values: list[str]) -> str:

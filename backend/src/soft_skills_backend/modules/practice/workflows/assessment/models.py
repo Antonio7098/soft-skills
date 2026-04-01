@@ -58,6 +58,7 @@ class ScenarioActorView(BaseModel):
 class ScenarioContextView(BaseModel):
     """Scenario-specific prompt context."""
 
+    prompt_text: str
     business_context: str
     learner_objective: str
     constraints: list[str] = Field(default_factory=list)

@@ -23,6 +23,7 @@ export function AdminOrgScenarios() {
   const [actionLoading, setActionLoading] = useState(false);
   const [newScenario, setNewScenario] = useState({
     title: '',
+    prompt_text: '',
     business_context: '',
     learner_objective: '',
     rubric_id: '',
@@ -69,11 +70,12 @@ export function AdminOrgScenarios() {
   }, [dataProvider, organisationId]);
 
   const handleCreateScenario = async () => {
-    if (!newScenario.title || !newScenario.business_context || !organisationId) return;
+    if (!newScenario.title || !newScenario.prompt_text || !newScenario.business_context || !organisationId) return;
     setActionLoading(true);
     try {
       await dataProvider.createOrgScenario(organisationId, {
         title: newScenario.title,
+        prompt_text: newScenario.prompt_text,
         business_context: newScenario.business_context,
         learner_objective: newScenario.learner_objective,
         rubric_id: newScenario.rubric_id,
@@ -84,6 +86,7 @@ export function AdminOrgScenarios() {
       setShowCreateModal(false);
       setNewScenario({
         title: '',
+        prompt_text: '',
         business_context: '',
         learner_objective: '',
         rubric_id: '',
@@ -335,6 +338,16 @@ export function AdminOrgScenarios() {
                   onChange={(e) => setNewScenario({ ...newScenario, business_context: e.target.value })}
                   placeholder="Describe the business context..."
                   rows={3}
+                  className="w-full px-3 py-2 rounded-lg border border-line bg-surface-primary text-content-primary placeholder:text-content-tertiary focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none"
+                />
+              </div>
+              <div>
+                <label className="text-body-sm text-content-secondary mb-1 block">Opening Question</label>
+                <textarea
+                  value={newScenario.prompt_text}
+                  onChange={(e) => setNewScenario({ ...newScenario, prompt_text: e.target.value })}
+                  placeholder="What should the learner respond to first?"
+                  rows={2}
                   className="w-full px-3 py-2 rounded-lg border border-line bg-surface-primary text-content-primary placeholder:text-content-tertiary focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none"
                 />
               </div>

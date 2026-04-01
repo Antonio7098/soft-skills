@@ -494,6 +494,7 @@ export const apiDataProvider: DataProvider = {
       scenario: {
         id: p.content_item_id ?? scenarioId,
         title: p.title ?? 'Scenario Practice',
+        prompt_text: p.prompt_text ?? '',
         business_context: sc.business_context ?? '',
         learner_objective: sc.learner_objective ?? '',
         constraints: sc.constraints ?? [],
@@ -539,6 +540,7 @@ export const apiDataProvider: DataProvider = {
       scenario: {
         id: p.content_item_id ?? '',
         title: p.title ?? 'Scenario Practice',
+        prompt_text: p.prompt_text ?? '',
         business_context: sc.business_context ?? '',
         learner_objective: sc.learner_objective ?? '',
         constraints: sc.constraints ?? [],

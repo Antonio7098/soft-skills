@@ -116,6 +116,7 @@ def persist_generated_collection(
                 collection_id=collection.id,
                 author_user_id=actor.user_id,
                 title=scenario.title,
+                prompt_text=scenario.prompt_text,
                 business_context=scenario.business_context,
                 learner_objective=scenario.learner_objective,
                 constraints=list(scenario.constraints),

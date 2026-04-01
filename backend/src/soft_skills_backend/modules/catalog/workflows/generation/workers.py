@@ -100,6 +100,12 @@ def _validate_generated_scenario_draft(
                 "actual": len(draft.supporting_artifacts),
             },
         )
+    if not draft.prompt_text.strip():
+        raise validation_error(
+            "Generated scenario must include a first-turn prompt",
+            code="SS-VALIDATION-087",
+            details={"title": draft.title},
+        )
     validate_mock_world(cast(Any, draft))
 
 
@@ -458,6 +464,7 @@ async def _run_scenario_worker(
                 "allowed_artifact_types": ", ".join(sorted(ALLOWED_SCENARIO_ARTIFACT_TYPES)),
                 "title_hint": plan.title_hint,
                 "generation_brief": plan.generation_brief,
+                "prompt_text_hint": plan.prompt_text_hint or "",
                 "output_format": CREATOR_SCENARIO_OUTPUT_FORMAT,
             },
         )

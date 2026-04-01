@@ -1002,6 +1002,7 @@ class OrganisationService:
             author_user_id=actor.user_id,
             organisation_id=organisation_id,
             title=command.title,
+            prompt_text=command.prompt_text,
             business_context=command.business_context,
             learner_objective=command.learner_objective,
             constraints=list(command.constraints),
@@ -1017,6 +1018,7 @@ class OrganisationService:
         return ScenarioView(
             id=created.id,
             title=created.title,
+            prompt_text=created.prompt_text,
             business_context=created.business_context,
             learner_objective=created.learner_objective,
             constraints=created.constraints,
@@ -1051,6 +1053,7 @@ class OrganisationService:
         return ScenarioView(
             id=scenario.id,
             title=scenario.title,
+            prompt_text=scenario.prompt_text,
             business_context=scenario.business_context,
             learner_objective=scenario.learner_objective,
             constraints=scenario.constraints,
@@ -1077,6 +1080,7 @@ class OrganisationService:
             ScenarioView(
                 id=s.id,
                 title=s.title,
+                prompt_text=s.prompt_text,
                 business_context=s.business_context,
                 learner_objective=s.learner_objective,
                 constraints=s.constraints,
@@ -1120,6 +1124,8 @@ class OrganisationService:
 
         if command.title is not None:
             scenario.title = command.title
+        if command.prompt_text is not None:
+            scenario.prompt_text = command.prompt_text
         if command.business_context is not None:
             scenario.business_context = command.business_context
         if command.learner_objective is not None:
@@ -1139,6 +1145,7 @@ class OrganisationService:
         return ScenarioView(
             id=updated.id,
             title=updated.title,
+            prompt_text=updated.prompt_text,
             business_context=updated.business_context,
             learner_objective=updated.learner_objective,
             constraints=updated.constraints,

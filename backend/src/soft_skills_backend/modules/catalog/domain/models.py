@@ -32,6 +32,7 @@ class MockPersonInput(BaseModel):
 
 class ScenarioCreateCommand(BaseModel):
     title: str
+    prompt_text: str
     business_context: str
     learner_objective: str
     constraints: list[str] = Field(default_factory=list)
@@ -46,6 +47,7 @@ class ScenarioCreateCommand(BaseModel):
 
 class ScenarioUpdateCommand(BaseModel):
     title: str | None = None
+    prompt_text: str | None = None
     business_context: str | None = None
     learner_objective: str | None = None
     constraints: list[str] | None = None
@@ -84,6 +86,7 @@ class MockPersonView(BaseModel):
 class ScenarioView(BaseModel):
     id: str
     title: str
+    prompt_text: str
     business_context: str
     learner_objective: str
     constraints: list[str]
@@ -284,6 +287,7 @@ class GeneratedPromptItemPlan(BaseModel):
 
 class GeneratedScenarioPlan(BaseModel):
     title_hint: str
+    prompt_text_hint: str | None = None
     generation_brief: str
     target_skill_slugs: list[str] = Field(default_factory=list)
     rubric_id: str | None = None
@@ -338,6 +342,7 @@ class GeneratedPromptItemDraft(BaseModel):
 
 class GeneratedScenarioDraft(BaseModel):
     title: str
+    prompt_text: str
     business_context: str
     learner_objective: str
     constraints: list[str] = Field(default_factory=list)

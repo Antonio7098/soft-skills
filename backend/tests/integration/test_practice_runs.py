@@ -160,6 +160,7 @@ async def _seed_scenario(client, learner_id: str) -> dict[str, object]:
         headers={"X-User-ID": learner_id},
         json={
             "title": "Escalating launch risk",
+            "prompt_text": "Maya Chen asks whether you can still support the current launch date. How do you respond first?",
             "business_context": "An AI feature launch is at risk after legal review surfaced new concerns.",
             "learner_objective": "Re-align the executive sponsor without hiding the delivery risk.",
             "constraints": ["The launch date is on the board agenda tomorrow."],
@@ -314,6 +315,10 @@ async def test_practice_run_start_submit_review_and_history(app, client, test_se
     assert items[0]["attempt"]["prompt"]["practice_type"] == "quick_practice"
     assert items[1]["attempt"]["prompt"]["practice_type"] == "interview"
     assert items[2]["attempt"]["prompt"]["practice_type"] == "scenario"
+    assert (
+        items[2]["attempt"]["prompt"]["prompt_text"]
+        == "Maya Chen asks whether you can still support the current launch date. How do you respond first?"
+    )
     assert run_payload["current_attempt_id"] == items[0]["attempt"]["id"]
 
     first_attempt_id = items[0]["attempt"]["id"]

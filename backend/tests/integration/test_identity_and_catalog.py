@@ -146,6 +146,7 @@ async def test_identity_bootstrap_and_private_draft_authoring(app, client, test_
         headers={"X-User-ID": learner["id"]},
         json={
             "title": "Conflicting stakeholder asks",
+            "prompt_text": "Ava opens by demanding the original launch date. What do you say first?",
             "business_context": "A product launch is behind schedule.",
             "learner_objective": "Align stakeholders on a realistic next step.",
             "constraints": ["Two-week deadline", "Limited engineering capacity"],
@@ -169,6 +170,10 @@ async def test_identity_bootstrap_and_private_draft_authoring(app, client, test_
         },
     )
     assert scenario_response.status_code == 200
+    assert (
+        scenario_response.json()["data"]["prompt_text"]
+        == "Ava opens by demanding the original launch date. What do you say first?"
+    )
 
     publish_response = await client.patch(
         f"/api/collections/{collection['id']}/lifecycle",
@@ -338,6 +343,7 @@ async def test_catalog_supports_updates_save_reuse_and_verified_discovery(
         headers={"X-User-ID": author["id"]},
         json={
             "title": "Initial scenario",
+            "prompt_text": "Send the first message you would use to realign the sponsor on delivery risk.",
             "business_context": "A sponsor wants to ship before legal is ready.",
             "learner_objective": "Reset expectations without losing trust.",
             "constraints": ["Board review tomorrow"],
@@ -369,6 +375,10 @@ async def test_catalog_supports_updates_save_reuse_and_verified_discovery(
     )
     assert scenario_response.status_code == 200
     scenario_id = scenario_response.json()["data"]["id"]
+    assert (
+        scenario_response.json()["data"]["prompt_text"]
+        == "Send the first message you would use to realign the sponsor on delivery risk."
+    )
     assert len(scenario_response.json()["data"]["supporting_artifacts"]) == 1
 
     update_collection_response = await client.patch(
@@ -408,6 +418,7 @@ async def test_catalog_supports_updates_save_reuse_and_verified_discovery(
         headers={"X-User-ID": author["id"]},
         json={
             "title": "Updated scenario",
+            "prompt_text": "Write the first response you would give the sponsor after the escalation.",
             "business_context": "A product launch is at risk because legal review is incomplete.",
             "learner_objective": "Negotiate a credible next step across sales and legal.",
             "constraints": ["Board review tomorrow", "Only one engineering team is free"],
@@ -438,6 +449,10 @@ async def test_catalog_supports_updates_save_reuse_and_verified_discovery(
         },
     )
     assert update_scenario_response.status_code == 200
+    assert (
+        update_scenario_response.json()["data"]["prompt_text"]
+        == "Write the first response you would give the sponsor after the escalation."
+    )
     assert (
         update_scenario_response.json()["data"]["supporting_artifacts"][0]["artifact_type"]
         == "brief"
@@ -540,6 +555,7 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
                     {
                         "title_hint": "Generated scenario",
                         "generation_brief": "A launch is at risk after legal review and conflicting stakeholder expectations.",
+                        "prompt_text_hint": "Jordan Singh says legal cannot sign off yet. How do you respond first?",
                         "target_skill_slugs": ["expectation-setting"],
                         "rubric_id": "scenario_text@v1",
                         "supporting_artifact_count": 1,
@@ -597,6 +613,7 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
             },
             {
                 "title": "Generated scenario",
+                "prompt_text": "Jordan Singh says legal cannot sign off yet. How do you respond first?",
                 "business_context": "A launch is at risk after legal review.",
                 "learner_objective": "Reset expectations without damaging trust.",
                 "constraints": ["Board review tomorrow"],

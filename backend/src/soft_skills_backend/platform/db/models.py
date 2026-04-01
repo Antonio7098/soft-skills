@@ -323,6 +323,7 @@ class ScenarioRecord(Base):
         String(32), ForeignKey("organisations.id"), index=True, nullable=True
     )
     title: Mapped[str] = mapped_column(String(255))
+    prompt_text: Mapped[str] = mapped_column(Text)
     business_context: Mapped[str] = mapped_column(Text)
     learner_objective: Mapped[str] = mapped_column(Text)
     constraints: Mapped[list[str]] = mapped_column(JSON, default=list)

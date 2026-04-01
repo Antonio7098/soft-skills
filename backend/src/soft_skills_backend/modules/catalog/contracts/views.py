@@ -79,6 +79,7 @@ def build_collection_view(
             ScenarioView(
                 id=scenario.id,
                 title=scenario.title,
+                prompt_text=scenario.prompt_text,
                 business_context=scenario.business_context,
                 learner_objective=scenario.learner_objective,
                 constraints=list(scenario.constraints),

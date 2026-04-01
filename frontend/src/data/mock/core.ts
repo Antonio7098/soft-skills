@@ -559,6 +559,7 @@ const SCENARIOS: ScenarioView[] = [
   {
     id: 'sc-001',
     title: 'The Unhappy Sponsor',
+    prompt_text: 'James has opened the meeting by saying the sponsor has lost confidence in the plan. How do you respond first?',
     business_context: 'NexaTech Solutions is midway through a platform migration for a major financial services client. The latest sprint demo revealed significant gaps in the reporting module.',
     learner_objective: 'De-escalate the sponsor\'s frustration, acknowledge the gaps, and present a credible recovery plan.',
     constraints: ['Cannot extend the deadline', 'Cannot add more engineers mid-sprint', 'Client contract has a penalty clause'],
@@ -572,6 +573,7 @@ const SCENARIOS: ScenarioView[] = [
   {
     id: 'sc-002',
     title: 'AI Model Compliance Review',
+    prompt_text: 'The CMO asks whether you can still support launch this quarter. What do you say next?',
     business_context: 'Greenfield Health is preparing to launch an AI-powered diagnostic assistant. The CMO has requested a compliance review before go-live.',
     learner_objective: 'Present the model\'s capabilities and limitations transparently while building confidence in the compliance posture.',
     constraints: ['Regulatory approval pending', 'Must address bias concerns', 'Limited clinical trial data'],

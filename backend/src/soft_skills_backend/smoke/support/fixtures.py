@@ -87,6 +87,10 @@ class PracticeFixtureSeeder:
             user_id=user_id,
             payload={
                 "title": "Escalating launch risk",
+                "prompt_text": (
+                    "The board expects a recommendation before 9am tomorrow. What do you say "
+                    "to the sponsor first?"
+                ),
                 "business_context": (
                     "An AI feature launch is at risk after legal review surfaced new concerns."
                 ),
