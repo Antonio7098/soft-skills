@@ -213,7 +213,7 @@ class OrganisationRubricConfigRecord(Base):
 
     organisation_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     skill_slug: Mapped[str] = mapped_column(String(64), primary_key=True)
-    rubric_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    rubric_id: Mapped[str] = mapped_column(String(64), nullable=False)
     rubric_version_id: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
@@ -223,7 +223,7 @@ class RubricRecord(Base):
 
     __tablename__ = "rubrics"
 
-    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
     skill_slug: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     organisation_id: Mapped[str | None] = mapped_column(
         String(32), ForeignKey("organisations.id"), index=True, nullable=True
@@ -246,7 +246,7 @@ class RubricVersionRecord(Base):
     __tablename__ = "rubric_versions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    rubric_id: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    rubric_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     version: Mapped[str] = mapped_column(String(64), nullable=False)
     criteria: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft", index=True)
