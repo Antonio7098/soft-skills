@@ -201,7 +201,7 @@ class OrganisationPromptConfigRecord(Base):
 
     organisation_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     task_kind: Mapped[str] = mapped_column(String(32), primary_key=True)
-    prompt_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    prompt_id: Mapped[str] = mapped_column(String(64), nullable=False)
     prompt_version_id: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
@@ -453,7 +453,7 @@ class PromptRecord(Base):
 
     __tablename__ = "prompts"
 
-    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
     organisation_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -471,7 +471,7 @@ class PromptVersionRecord(Base):
     __tablename__ = "prompt_versions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    prompt_id: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    prompt_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     version: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     template: Mapped[str] = mapped_column(Text, nullable=False)
     variables_schema: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
