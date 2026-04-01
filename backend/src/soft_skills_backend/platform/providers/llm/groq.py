@@ -20,7 +20,7 @@ class GroqLLMProvider(OpenAICompatibleLLMProvider):
     provider_name: ClassVar[str] = "groq"
     base_url: ClassVar[str] = "https://api.groq.com/openai/v1"
     default_model_slug: ClassVar[str] = "llama-3.3-70b-versatile"
-    backup_model_slug: ClassVar[str | None] = "llama-3.1-8b-instant"
+    backup_model_slug: ClassVar[str | None] = "openai/gpt-oss-120b"
     supports_structured_outputs: ClassVar[bool] = True
 
     def _get_api_key(self, settings: Settings) -> str | None:

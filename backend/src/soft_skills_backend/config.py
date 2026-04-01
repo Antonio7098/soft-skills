@@ -111,7 +111,7 @@ class Settings(BaseSettings):
         validation_alias="GROQ_BASE_URL",
     )
     groq_default_model: str = Field(default="openai/gpt-oss-20b")
-    groq_default_backup_model: str | None = Field(default=None)
+    groq_default_backup_model: str | None = Field(default="openai/gpt-oss-120b")
 
     groq_llm_assistant_model: str | None = Field(default=None)
     groq_llm_admin_agent_model: str | None = Field(default=None)

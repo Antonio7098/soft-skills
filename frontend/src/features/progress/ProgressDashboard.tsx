@@ -109,6 +109,20 @@ export function ProgressDashboard({ className }: ProgressDashboardProps) {
     );
   }
 
+  if (!progressHistory || progressHistory.snapshots.length === 0) {
+    return (
+      <Card className="text-center py-16">
+        <BarChart3 size={48} className="mx-auto text-content-tertiary mb-4" />
+        <h3 className="font-display text-display-xs text-content-primary mb-2">
+          No progress data yet
+        </h3>
+        <p className="text-content-secondary max-w-md mx-auto">
+          Complete some assessments or practice sessions to start tracking your skill progression.
+        </p>
+      </Card>
+    );
+  }
+
   return (
     <div className={cn('space-y-6', className)}>
       {/* View Mode Tabs */}

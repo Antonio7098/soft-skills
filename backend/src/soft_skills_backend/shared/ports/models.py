@@ -91,15 +91,6 @@ def _normalize_schema_node(node: Any) -> None:
             if isinstance(properties, dict):
                 for value in properties.values():
                     _normalize_schema_node(value)
-                if node.get("additionalProperties") is False:
-                    required = node.get("required")
-                    if isinstance(required, list):
-                        all_props = set(required)
-                    else:
-                        all_props = set()
-                        node["required"] = []
-                    all_props.update(properties.keys())
-                    node["required"] = sorted(all_props)
             additional_properties = node.get("additionalProperties")
             if isinstance(additional_properties, dict):
                 _normalize_schema_node(additional_properties)

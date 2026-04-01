@@ -7,6 +7,7 @@ import pytest
 from soft_skills_backend.config import LLMTaskKind, Settings
 from soft_skills_backend.platform.providers.llm.openai_compatible import (
     OpenAICompatibleLLMProvider,
+    _build_json_response_format,
     resolve_llm_provider_config,
 )
 from soft_skills_backend.shared.ports.models import JsonSchemaResponseFormat
@@ -20,6 +21,29 @@ class _NoOpProviderCallLogger:
 
     async def log_call_end(self, _call_id: object, **_: object) -> None:
         return None
+
+
+def test_build_json_response_format_disables_strict_mode_for_groq() -> None:
+    response_format = JsonSchemaResponseFormat(
+        name="test",
+        schema={
+            "type": "object",
+            "properties": {
+                "required_field": {"type": "string"},
+                "optional_field": {"type": "string"},
+            },
+            "required": ["required_field"],
+        },
+        strict=True,
+    )
+
+    payload = _build_json_response_format(response_format, provider_name="groq")
+
+    assert payload["type"] == "json_schema"
+    assert payload["json_schema"]["strict"] is False
+
+    openai_payload = _build_json_response_format(response_format, provider_name="openai")
+    assert openai_payload["json_schema"]["strict"] is True
 
 
 @pytest.mark.asyncio
@@ -263,6 +287,7 @@ async def test_openai_compatible_provider_uses_json_schema_response_format_when_
     provider = OpenAICompatibleLLMProvider(
         settings=Settings(
             _env_file=None,  # type: ignore[call-arg]
+            provider_name="openai",
             provider_api_key="test-key",
             provider_base_url="https://example.com/v1",
             llm_default_model="test-model",

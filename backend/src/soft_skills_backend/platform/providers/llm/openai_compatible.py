@@ -210,7 +210,10 @@ class OpenAICompatibleLLMProvider(LLMProvider):
                 "model": active_model_slug,
                 "messages": messages,
                 "temperature": 0,
-                "response_format": _build_json_response_format(response_schema),
+                "response_format": _build_json_response_format(
+                    response_schema,
+                    provider_name=self._resolved.provider_name,
+                ),
             }
             provider_preferences = _build_provider_preferences(
                 provider_name=self._resolved.provider_name,
@@ -975,14 +978,29 @@ def build_llm_provider(
 
 def _build_json_response_format(
     response_schema: JsonSchemaResponseFormat | None,
+    *,
+    provider_name: str | None = None,
 ) -> dict[str, Any]:
     if response_schema is None:
         return {"type": "json_object"}
+    if provider_name == "groq":
+        # Groq rejects strict JSON schemas that contain optional properties.
+        # Keep provider-side schema guidance, but disable strict mode and rely
+        # on app-side typed validation/repair for the final contract.
+        return {
+            "type": "json_schema",
+            "json_schema": {
+                "name": response_schema.name,
+                "strict": False,
+                "schema": response_schema.normalized_schema(),
+            },
+        }
+    strict = response_schema.strict
     return {
         "type": "json_schema",
         "json_schema": {
             "name": response_schema.name,
-            "strict": response_schema.strict,
+            "strict": strict,
             "schema": response_schema.normalized_schema(),
         },
     }
