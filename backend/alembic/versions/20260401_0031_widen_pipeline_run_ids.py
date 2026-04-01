@@ -23,9 +23,13 @@ def upgrade() -> None:
     op.alter_column("pipeline_execution_traces", "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32))
     op.alter_column("assistant_turns", "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32), existing_nullable=True)
     op.alter_column("assistant_tool_calls", "child_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32), existing_nullable=True)
+    op.alter_column("assessments", "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32))
+    op.alter_column("evaluation_runs", "pipeline_run_id", type_=sa.String(length=64), existing_type=sa.String(length=32), existing_nullable=True)
 
 
 def downgrade() -> None:
+    op.alter_column("evaluation_runs", "pipeline_run_id", type_=sa.String(length=32), existing_type=sa.String(length=64), existing_nullable=True)
+    op.alter_column("assessments", "pipeline_run_id", type_=sa.String(length=32), existing_type=sa.String(length=64))
     op.alter_column("assistant_tool_calls", "child_run_id", type_=sa.String(length=32), existing_type=sa.String(length=64), existing_nullable=True)
     op.alter_column("assistant_turns", "pipeline_run_id", type_=sa.String(length=32), existing_type=sa.String(length=64), existing_nullable=True)
     op.alter_column("pipeline_execution_traces", "pipeline_run_id", type_=sa.String(length=32), existing_type=sa.String(length=64))

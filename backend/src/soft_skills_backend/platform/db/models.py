@@ -618,7 +618,7 @@ class AssessmentRecord(Base):
     raw_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     rejection_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     trace_id: Mapped[str] = mapped_column(String(32), index=True)
-    pipeline_run_id: Mapped[str] = mapped_column(String(32), index=True)
+    pipeline_run_id: Mapped[str] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
@@ -850,7 +850,7 @@ class EvaluationRunRecord(Base):
     request_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
     trace_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
     workflow_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
-    pipeline_run_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    pipeline_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     subject_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     subject_ref: Mapped[str | None] = mapped_column(String(128), nullable=True)
     passed: Mapped[bool]
