@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -44,7 +45,7 @@ from soft_skills_backend.modules.catalog.workflows.generation.collection_pipelin
 from soft_skills_backend.modules.catalog.workflows.generation.prompt_item_pipeline import (
     generate_prompt_items_for_collection,
 )
-from soft_skills_backend.modules.taxonomy import TaxonomyService
+from soft_skills_backend.modules.taxonomy import TaxonomyService, TaxonomySnapshot
 from soft_skills_backend.modules.practice.workflows.assessment import TypedLLMOutput
 from soft_skills_backend.platform.db.models import RubricRecord
 from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
@@ -53,6 +54,14 @@ from soft_skills_backend.platform.workflows.stageflow_runtime import StageflowRu
 from soft_skills_backend.shared.auth import Actor
 from soft_skills_backend.shared.errors import validation_error
 from soft_skills_backend.shared.ports.llm import LLMProvider
+
+_WORD_PATTERN = re.compile(r"[a-z0-9]+")
+_DEFAULT_SKILL_PRIORITY = (
+    "active-listening",
+    "structured-communication",
+    "expectation-setting",
+    "decision-justification",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +180,7 @@ class CatalogGenerationService:
         workflow_id: str | None,
         command: ChatCollectionGenerationCommand,
     ) -> CollectionGenerationView:
+        command = self.normalize_chat_generation_command(actor, command)
         return await generate_collection(
             actor=actor,
             request_id=request_id,
@@ -393,6 +403,7 @@ class CatalogGenerationService:
         workflow_id: str | None,
         command: ChatCollectionGenerationCommand,
     ) -> tuple[GenerationStartedView, ChatCollectionGenerationCommand]:
+        command = self.normalize_chat_generation_command(actor, command)
         generation_id = uuid4().hex
         stream_token = f"gen_{generation_id}"
         execution = GenerationExecution(
@@ -559,3 +570,128 @@ class CatalogGenerationService:
     @property
     def _generation_timeout_ms(self) -> int:
         return int(max(60_000, self._settings.smoke_timeout_seconds * 4_000))
+
+    def normalize_chat_generation_command(
+        self,
+        actor: Actor,
+        command: ChatCollectionGenerationCommand,
+    ) -> ChatCollectionGenerationCommand:
+        organisation_id = command.organisation_id or actor.organisation_id
+        snapshot = self._taxonomy_service.snapshot(organisation_id)
+
+        skill_slugs = list(command.target_skill_slugs)
+        competency_slugs = list(command.target_competency_slugs)
+        skill_index = {skill.slug: skill for skill in snapshot.skills}
+        competency_index = {competency.slug: competency for competency in snapshot.competencies}
+
+        if not skill_slugs:
+            skill_slugs = self._infer_skill_slugs(
+                text=" ".join(
+                    part for part in (command.prompt, command.target_audience) if part.strip()
+                ),
+                snapshot=snapshot,
+            )
+        if not skill_slugs:
+            skill_slugs = self._default_skill_slugs(snapshot)
+
+        if skill_slugs and not competency_slugs:
+            competency_slugs = self._infer_competency_slugs(
+                skill_slugs=skill_slugs,
+                snapshot=snapshot,
+            )
+
+        if competency_slugs and skill_slugs:
+            aligned = [
+                skill_slug
+                for skill_slug in skill_slugs
+                if any(
+                    skill_slug in competency_index[competency_slug].skill_slugs
+                    for competency_slug in competency_slugs
+                    if competency_slug in competency_index
+                )
+            ]
+            if aligned:
+                skill_slugs = aligned
+
+        content_format_mix = list(dict.fromkeys(command.content_format_mix))
+        if command.counts.quick_practice_prompt_count > 0 and "quick_practice_prompt" not in content_format_mix:
+            content_format_mix.append("quick_practice_prompt")
+        if command.counts.interview_prompt_count > 0 and "interview_prompt" not in content_format_mix:
+            content_format_mix.append("interview_prompt")
+        if command.counts.scenario_count > 0 and "scenario_step" not in content_format_mix:
+            content_format_mix.append("scenario_step")
+
+        rubric_ids = list(dict.fromkeys(command.rubric_ids))
+        if not rubric_ids:
+            rubric_ids = self._default_rubric_ids_for_formats(
+                content_format_mix=content_format_mix,
+                snapshot=snapshot,
+            )
+
+        counts = command.counts
+        if counts.scenario_count == 0 and counts.scenario_artifact_count > 0:
+            counts = counts.model_copy(update={"scenario_artifact_count": 0})
+
+        return command.model_copy(
+            update={
+                "target_skill_slugs": [slug for slug in skill_slugs if slug in skill_index],
+                "target_competency_slugs": [
+                    slug for slug in competency_slugs if slug in competency_index
+                ],
+                "content_format_mix": content_format_mix,
+                "rubric_ids": rubric_ids,
+                "counts": counts,
+                "organisation_id": organisation_id,
+            }
+        )
+
+    def _infer_skill_slugs(self, *, text: str, snapshot: TaxonomySnapshot) -> list[str]:
+        terms = set(_WORD_PATTERN.findall(text.lower()))
+        scored: list[tuple[int, str]] = []
+        for skill in snapshot.skills:
+            skill_terms = set(_WORD_PATTERN.findall(skill.slug.replace("-", " "))) | set(
+                _WORD_PATTERN.findall(skill.name.lower())
+            )
+            score = len(terms & skill_terms)
+            if score > 0:
+                scored.append((score, skill.slug))
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        return [slug for _, slug in scored[:4]]
+
+    def _infer_competency_slugs(
+        self,
+        *,
+        skill_slugs: list[str],
+        snapshot: TaxonomySnapshot,
+    ) -> list[str]:
+        requested = set(skill_slugs)
+        scored: list[tuple[int, str]] = []
+        for competency in snapshot.competencies:
+            overlap = len(requested & set(competency.skill_slugs))
+            if overlap > 0:
+                scored.append((overlap, competency.slug))
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        return [slug for _, slug in scored[:2]]
+
+    def _default_rubric_ids_for_formats(
+        self,
+        *,
+        content_format_mix: list[str],
+        snapshot: TaxonomySnapshot,
+    ) -> list[str]:
+        selected: list[str] = []
+        for content_type in content_format_mix:
+            matching = [rubric for rubric in snapshot.rubrics if rubric.content_type == content_type]
+            if not matching:
+                continue
+            general = [rubric for rubric in matching if rubric.skill_slug == "general"]
+            chosen = sorted(general or matching, key=lambda rubric: rubric.rubric_id)[0]
+            selected.append(chosen.rubric_id)
+        return list(dict.fromkeys(selected))
+
+    def _default_skill_slugs(self, snapshot: TaxonomySnapshot) -> list[str]:
+        available = {skill.slug for skill in snapshot.skills}
+        prioritized = [slug for slug in _DEFAULT_SKILL_PRIORITY if slug in available]
+        if prioritized:
+            return prioritized[:4]
+        return sorted(available)[:4]

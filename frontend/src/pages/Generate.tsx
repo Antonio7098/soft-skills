@@ -247,6 +247,22 @@ export function Generate() {
     }
     return null;
   })();
+  const isStructuredBlocked = isTaxonomyLoading || Boolean(taxonomyStatusMessage);
+  const catalogStatusVariant = mode === 'structured'
+    ? (taxonomyStatusMessage ? 'error' : 'success')
+    : 'success';
+  const catalogStatusLabel = mode === 'structured'
+    ? (isTaxonomyLoading ? 'Loading' : taxonomyStatusMessage ? 'Blocked' : 'Ready')
+    : 'Inferred';
+  const catalogStatusDescription = mode === 'structured'
+    ? (
+      isTaxonomyLoading
+        ? 'Loading skills, competencies, and rubrics.'
+        : taxonomyStatusMessage
+          ? taxonomyStatusMessage
+          : `Using ${taxonomy?.skills.length ?? 0} skills, ${taxonomy?.competencies.length ?? 0} competencies, and ${taxonomy?.rubrics.length ?? 0} rubrics from the live catalog.`
+    )
+    : 'Skills, competencies, and default rubrics are inferred server-side from your prompt and the taxonomy catalog.';
 
   const handleStructuredGenerate = async () => {
     const defaults = buildGenerationDefaults();
@@ -268,16 +284,12 @@ export function Generate() {
   };
 
   const handleChatGenerate = async () => {
-    const defaults = buildGenerationDefaults();
     setCollectionTitle('Generated from prompt');
     await startGeneration({
       prompt: chatForm.prompt,
       target_audience: chatForm.target_audience,
       difficulty: chatForm.difficulty,
       content_format_mix: ['quick_practice_prompt', 'interview_prompt', 'scenario_step'],
-      target_skill_slugs: defaults.target_skill_slugs,
-      target_competency_slugs: defaults.target_competency_slugs,
-      rubric_ids: defaults.rubric_ids,
       counts,
     });
   };
@@ -519,16 +531,12 @@ export function Generate() {
                 <Card variant="outlined" padding="md" className="flex flex-col gap-2 bg-surface-secondary/40">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-body-sm font-medium text-content-primary">Catalog Readiness</span>
-                    <Badge variant={taxonomyStatusMessage ? 'error' : 'success'} size="sm">
-                      {isTaxonomyLoading ? 'Loading' : taxonomyStatusMessage ? 'Blocked' : 'Ready'}
+                    <Badge variant={catalogStatusVariant} size="sm">
+                      {catalogStatusLabel}
                     </Badge>
                   </div>
                   <p className="text-body-sm text-content-secondary">
-                    {isTaxonomyLoading
-                      ? 'Loading skills, competencies, and rubrics.'
-                      : taxonomyStatusMessage
-                        ? taxonomyStatusMessage
-                        : `Using ${taxonomy?.skills.length ?? 0} skills, ${taxonomy?.competencies.length ?? 0} competencies, and ${taxonomy?.rubrics.length ?? 0} rubrics from the live catalog.`}
+                    {catalogStatusDescription}
                   </p>
                 </Card>
 
@@ -537,7 +545,10 @@ export function Generate() {
                   size="lg"
                   icon={<Wand2 className="w-4 h-4" />}
                   onClick={mode === 'structured' ? handleStructuredGenerate : handleChatGenerate}
-                  disabled={isTaxonomyLoading || Boolean(taxonomyStatusMessage) || (mode === 'chat' && !chatForm.prompt.trim())}
+                  disabled={
+                    (mode === 'structured' && isStructuredBlocked)
+                    || (mode === 'chat' && !chatForm.prompt.trim())
+                  }
                   className="w-full mt-2"
                 >
                   Generate Collection

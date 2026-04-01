@@ -49,6 +49,12 @@ from soft_skills_backend.shared.errors import AppError, orchestration_error, val
 
 ASSISTANT_RUNTIME_STAGE = "assistant_runtime"
 _WORD_PATTERN = re.compile(r"[a-z0-9]+")
+_DEFAULT_SKILL_PRIORITY = (
+    "active-listening",
+    "structured-communication",
+    "expectation-setting",
+    "decision-justification",
+)
 
 
 @dataclass(slots=True)
@@ -605,6 +611,8 @@ def _normalize_collection_generation_command(
             ),
             snapshot=snapshot,
         )
+    if not skill_slugs:
+        skill_slugs = _default_skill_slugs(snapshot)
 
     if skill_slugs and not competency_slugs:
         competency_slugs = _infer_competency_slugs(skill_slugs=skill_slugs, snapshot=snapshot)
@@ -702,6 +710,14 @@ def _default_rubric_ids_for_formats(
         chosen = sorted(general or matching, key=lambda rubric: rubric.rubric_id)[0]
         selected.append(chosen.rubric_id)
     return list(dict.fromkeys(selected))
+
+
+def _default_skill_slugs(snapshot: TaxonomySnapshot) -> list[str]:
+    available = {skill.slug for skill in snapshot.skills}
+    prioritized = [slug for slug in _DEFAULT_SKILL_PRIORITY if slug in available]
+    if prioritized:
+        return prioritized[:4]
+    return sorted(available)[:4]
 
 
 def stage_now() -> datetime:

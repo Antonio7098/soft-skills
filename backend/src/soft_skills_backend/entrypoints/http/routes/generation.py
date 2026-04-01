@@ -112,6 +112,7 @@ async def start_chat_generation(
     background_tasks: BackgroundTaskRunner = container.background_tasks
     session_factory = container.session_factory
     correlation = _correlation_from_request(request)
+    command = catalog_service.normalize_chat_generation_command(actor, command)
 
     # Validate input synchronously before returning 200
     with session_factory() as session:

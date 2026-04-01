@@ -244,6 +244,8 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const cleanupRef = useRef<(() => void) | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const terminalStatusRef = useRef<'completed' | 'failed' | 'cancelled' | null>(null);
+  const lastFailureMessageRef = useRef<string | null>(null);
   const GENERATION_TIMEOUT_MS = 600_000;
 
   const startGeneration = useCallback(
@@ -252,6 +254,8 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
       try {
         cleanupRef.current?.();
         dispatch({ type: 'RESET' });
+        terminalStatusRef.current = null;
+        lastFailureMessageRef.current = null;
         dispatch({
           type: 'START',
           generation_id: 'pending',
@@ -325,10 +329,13 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
                 throw new Error('Generation completed without a collection id.');
               }
               const collection = await data.getCollection(collectionId);
+              terminalStatusRef.current = 'completed';
               dispatch({ type: 'COMPLETE', collection });
               options.onComplete?.(collection);
             } catch (err) {
               const errorMessage = err instanceof Error ? err.message : 'Failed to load generated collection';
+              terminalStatusRef.current = 'failed';
+              lastFailureMessageRef.current = errorMessage;
               dispatch({ type: 'FAIL', error: errorMessage });
               options.onError?.(errorMessage);
             }
@@ -344,6 +351,8 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
               (typeof payload.error === 'string' && payload.error)
               || (typeof payload.reason === 'string' && payload.reason)
               || 'Generation failed';
+            terminalStatusRef.current = 'failed';
+            lastFailureMessageRef.current = errorMessage;
             dispatch({ type: 'FAIL', error: errorMessage });
             options.onError?.(errorMessage);
           },
@@ -352,6 +361,8 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
               clearTimeout(timeoutRef.current);
               timeoutRef.current = null;
             }
+            terminalStatusRef.current = 'failed';
+            lastFailureMessageRef.current = errorMessage;
             dispatch({ type: 'FAIL', error: errorMessage });
             options.onError?.(errorMessage);
           },
@@ -361,8 +372,10 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
               timeoutRef.current = null;
             }
             cleanupRef.current = null;
-            if (state.status !== 'completed' && state.status !== 'failed' && state.status !== 'cancelled') {
-              const errorMessage = 'Generation stream closed unexpectedly';
+            if (terminalStatusRef.current !== 'completed' && terminalStatusRef.current !== 'failed' && terminalStatusRef.current !== 'cancelled') {
+              const errorMessage = lastFailureMessageRef.current ?? 'Generation stream closed unexpectedly';
+              terminalStatusRef.current = 'failed';
+              lastFailureMessageRef.current = errorMessage;
               dispatch({ type: 'FAIL', error: errorMessage });
               options.onError?.(errorMessage);
             }
@@ -388,6 +401,7 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
     }
     cleanupRef.current?.();
     cleanupRef.current = null;
+    terminalStatusRef.current = 'cancelled';
     dispatch({ type: 'CANCEL' });
   }, []);
 
@@ -398,6 +412,8 @@ export function useGenerationStream(options: UseGenerationStreamOptions = {}) {
     }
     cleanupRef.current?.();
     cleanupRef.current = null;
+    terminalStatusRef.current = null;
+    lastFailureMessageRef.current = null;
     dispatch({ type: 'RESET' });
   }, []);
 

@@ -721,6 +721,28 @@ async def test_catalog_generation_flows_persist_artifacts_and_fail_on_drift(
     chat_payload = chat_response.json()["data"]
     assert chat_payload
 
+    inferred_chat_response = await client.post(
+        "/api/collections/generate/chat",
+        headers={"X-User-ID": creator["id"]},
+        json={
+            "prompt": "Create realistic interview practice for a tricky consulting situation with difficult stakeholders.",
+            "target_audience": "Consultants",
+            "difficulty": "advanced",
+            "content_format_mix": ["interview_prompt"],
+            "counts": {
+                "quick_practice_prompt_count": 0,
+                "interview_prompt_count": 1,
+                "scenario_count": 0,
+                "scenario_artifact_count": 0,
+            },
+        },
+    )
+    assert inferred_chat_response.status_code == 200
+    inferred_chat_payload = inferred_chat_response.json()["data"]
+    assert inferred_chat_payload["generation_id"]
+    assert inferred_chat_payload["stream_token"]
+    assert inferred_chat_payload["mode"] == "chat"
+
 
 @pytest.mark.asyncio
 async def test_catalog_generates_prompt_items_for_existing_collections(

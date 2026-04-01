@@ -163,9 +163,9 @@ export interface ChatCollectionGenerationCommand {
   readonly target_audience: string;
   readonly difficulty: Difficulty;
   readonly content_format_mix: string[];
-  readonly target_skill_slugs: string[];
-  readonly target_competency_slugs: string[];
-  readonly rubric_ids: string[];
+  readonly target_skill_slugs?: string[];
+  readonly target_competency_slugs?: string[];
+  readonly rubric_ids?: string[];
   readonly counts: GenerationCounts;
 }
 
