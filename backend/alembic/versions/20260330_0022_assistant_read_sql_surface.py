@@ -156,8 +156,8 @@ def upgrade() -> None:
             ps.snapshot_payload->'weak_skill_slugs' AS weak_skill_slugs,
             ps.snapshot_payload->'stagnating_skill_slugs' AS stagnating_skill_slugs,
             ps.snapshot_payload->'coverage_gap_skill_slugs' AS coverage_gap_skill_slugs,
-            COALESCE(jsonb_array_length(ps.snapshot_payload->'skill_states'), 0) AS skill_state_count,
-            COALESCE(jsonb_array_length(ps.snapshot_payload->'competency_states'), 0) AS competency_state_count,
+            COALESCE(jsonb_array_length((ps.snapshot_payload->>'skill_states')::jsonb), 0) AS skill_state_count,
+            COALESCE(jsonb_array_length((ps.snapshot_payload->>'competency_states')::jsonb), 0) AS competency_state_count,
             ps.created_at
         FROM progression_snapshots AS ps
         JOIN organisation_memberships AS om
