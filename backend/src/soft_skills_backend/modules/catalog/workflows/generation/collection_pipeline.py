@@ -98,6 +98,7 @@ async def generate_collection(
     ],
     progress_callback: Callable[[str, float, dict[str, object]], None] | None = None,
     execution: GenerationExecution | None = None,
+    idempotency_key_suffix: str | None = None,
 ) -> CollectionGenerationView:
     assert structured_command is not None or chat_command is not None
     command = structured_command or cast(ChatCollectionGenerationCommand, chat_command)
@@ -502,6 +503,9 @@ async def generate_collection(
         name=f"catalog_{mode}_generation",
     )
     resolved_workflow_id = workflow_id or f"catalog-{mode}-generation:{actor.user_id}:{request_id}"
+    idempotency_key = f"catalog_{mode}_generation:{actor.user_id}:{request_id}"
+    if idempotency_key_suffix:
+        idempotency_key = f"{idempotency_key}:{idempotency_key_suffix}"
     events.record(
         "catalog.generation.started.v1",
         request_id=request_id,
@@ -530,7 +534,7 @@ async def generate_collection(
             user_id=actor.user_id,
             execution_mode="catalog_generation",
             service="soft_skills_backend.catalog",
-            idempotency_key=f"catalog_{mode}_generation:{actor.user_id}:{request_id}",
+            idempotency_key=idempotency_key,
             idempotency_params=command.model_dump(mode="json"),
             timeout_ms=timeout_ms,
             on_context_ready=on_context_ready,

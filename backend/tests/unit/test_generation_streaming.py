@@ -375,3 +375,60 @@ class TestGenerationCancellationFlow:
         assert execution.pipeline_context is None
         assert isinstance(captured["ctx"], _DummyContext)
         assert captured["ctx"].mark_canceled_calls == 1
+
+    @pytest.mark.asyncio()
+    async def test_generate_collection_appends_stream_generation_id_to_idempotency_key(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        actor = Actor(user_id="user-123", email="user@example.com")
+        execution = GenerationExecution(
+            generation_id="gen-stream-123",
+            mode="chat",
+            stream_token="gen_stream_123",
+        )
+        captured: dict[str, object] = {}
+
+        async def fake_run_logged_pipeline(*args, **kwargs):
+            captured["idempotency_key"] = kwargs["idempotency_key"]
+            captured["idempotency_params"] = kwargs["idempotency_params"]
+            return object()
+
+        monkeypatch.setattr(collection_pipeline, "run_logged_pipeline", fake_run_logged_pipeline)
+        monkeypatch.setattr(
+            collection_pipeline, "payload_from_results", lambda *args, **kwargs: object()
+        )
+
+        await generate_collection(
+            actor=actor,
+            request_id="req-ctx",
+            trace_id="trace-ctx",
+            workflow_id="wf-ctx",
+            mode="chat",
+            structured_command=None,
+            chat_command=SimpleNamespace(
+                model_dump=lambda mode="json": {"prompt": "stakeholder management"},
+                difficulty="intermediate",
+                target_audience="Audience",
+            ),
+            session_factory=SimpleNamespace(),
+            events=SimpleNamespace(record=lambda *args, **kwargs: None),
+            llm_provider=SimpleNamespace(provider_name="test-provider"),
+            prompt_security_policy=SimpleNamespace(),
+            stageflow=SimpleNamespace(),
+            prompt_registry=SimpleNamespace(),
+            config=SimpleNamespace(),
+            blueprint_output=SimpleNamespace(),
+            prompt_item_worker_output=SimpleNamespace(),
+            scenario_worker_output=SimpleNamespace(),
+            timeout_ms=1000,
+            sanitize_text=lambda text: text,
+            workplace_context_for_commands=lambda *_args: "context",
+            taxonomy_context_for_commands=lambda *_args: "taxonomy",
+            execution=execution,
+            idempotency_key_suffix=execution.generation_id,
+        )
+
+        assert captured["idempotency_key"] == (
+            "catalog_chat_generation:user-123:req-ctx:gen-stream-123"
+        )
+        assert captured["idempotency_params"] == {"prompt": "stakeholder management"}

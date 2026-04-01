@@ -347,6 +347,7 @@ class CatalogGenerationService:
                 taxonomy_context_for_commands=self._collection_taxonomy_context,
                 progress_callback=progress_callback,
                 execution=execution,
+                idempotency_key_suffix=execution.generation_id,
             )
             complete_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
@@ -471,6 +472,7 @@ class CatalogGenerationService:
                 taxonomy_context_for_commands=self._collection_taxonomy_context,
                 progress_callback=progress_callback,
                 execution=execution,
+                idempotency_key_suffix=execution.generation_id,
             )
             complete_event = GenerationStreamEvent(
                 event_id=uuid4().hex,
