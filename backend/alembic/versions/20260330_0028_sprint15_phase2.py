@@ -13,8 +13,9 @@ Create Date: 2026-03-30
 
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import context as _context
+from alembic import op
 
 revision = "sprint15_phase2"
 down_revision = "sprint15_phase1"
@@ -22,53 +23,43 @@ branch_labels = None
 depends_on = None
 
 
+def _is_sqlite() -> bool:
+    return _context.get_context().dialect.name == "sqlite"
+
+
+def _is_postgres() -> bool:
+    return _context.get_context().dialect.name == "postgresql"
+
+
+def _table_exists(connection, table_name: str) -> bool:
+    if _is_sqlite():
+        result = connection.execute(
+            sa.text("SELECT name FROM sqlite_master WHERE type='table' AND name=:name"),
+            {"name": table_name},
+        )
+    else:
+        result = connection.execute(
+            sa.text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_name = :name"
+            ),
+            {"name": table_name},
+        )
+    return result.fetchone() is not None
+
+
 def upgrade() -> None:
     connection = op.get_bind()
 
     # Check what exists
-    result = connection.execute(
-        sa.text("SELECT name FROM sqlite_master WHERE type='table' AND name='prompts'")
-    )
-    prompts_exists = result.fetchone() is not None
-
-    result = connection.execute(
-        sa.text("SELECT name FROM sqlite_master WHERE type='table' AND name='_legacy_prompts'")
-    )
-    legacy_prompts_exists = result.fetchone() is not None
-
-    result = connection.execute(
-        sa.text("SELECT name FROM sqlite_master WHERE type='table' AND name='prompt_versions'")
-    )
-    prompt_versions_exists = result.fetchone() is not None
-
-    result = connection.execute(
-        sa.text(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='_legacy_prompt_versions'"
-        )
-    )
-    legacy_prompt_versions_exists = result.fetchone() is not None
-
-    result = connection.execute(
-        sa.text("SELECT name FROM sqlite_master WHERE type='table' AND name='rubrics'")
-    )
-    rubrics_exists = result.fetchone() is not None
-
-    result = connection.execute(
-        sa.text("SELECT name FROM sqlite_master WHERE type='table' AND name='_legacy_rubrics'")
-    )
-    legacy_rubrics_exists = result.fetchone() is not None
-
-    result = connection.execute(
-        sa.text("SELECT name FROM sqlite_master WHERE type='table' AND name='rubric_criteria'")
-    )
-    rubric_criteria_exists = result.fetchone() is not None
-
-    result = connection.execute(
-        sa.text(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='_legacy_rubric_criteria'"
-        )
-    )
-    legacy_rubric_criteria_exists = result.fetchone() is not None
+    prompts_exists = _table_exists(connection, "prompts")
+    legacy_prompts_exists = _table_exists(connection, "_legacy_prompts")
+    prompt_versions_exists = _table_exists(connection, "prompt_versions")
+    legacy_prompt_versions_exists = _table_exists(connection, "_legacy_prompt_versions")
+    rubrics_exists = _table_exists(connection, "rubrics")
+    legacy_rubrics_exists = _table_exists(connection, "_legacy_rubrics")
+    rubric_criteria_exists = _table_exists(connection, "rubric_criteria")
+    legacy_rubric_criteria_exists = _table_exists(connection, "_legacy_rubric_criteria")
 
     # Handle prompts - rename or drop
     if prompts_exists:
@@ -102,9 +93,14 @@ def upgrade() -> None:
                 sa.text("ALTER TABLE rubric_criteria RENAME TO _legacy_rubric_criteria")
             )
 
-    connection.commit()
+    # Dialect-specific type for auto-increment PK
+    if _is_postgres():
+        autoincrement_pk = "SERIAL"
+        timestamp_type = "TIMESTAMP WITH TIME ZONE"
+    else:
+        autoincrement_pk = "INTEGER PRIMARY KEY AUTOINCREMENT"
+        timestamp_type = "DATETIME"
 
-    # Use raw SQL for tables with unique constraints (SQLite limitation)
     # --- NEW RUBRICS TABLE (parent) ---
     connection.execute(
         sa.text(
@@ -116,9 +112,9 @@ def upgrade() -> None:
             "description TEXT,"
             "content_type VARCHAR(64) NOT NULL,"
             "schema_version VARCHAR(32) NOT NULL,"
-            "created_at DATETIME NOT NULL,"
-            "updated_at DATETIME NOT NULL"
-            ")"
+            "created_at {ts} NOT NULL,"
+            "updated_at {ts} NOT NULL"
+            ")".format(ts=timestamp_type)
         )
     )
     connection.execute(
@@ -145,9 +141,9 @@ def upgrade() -> None:
             "description TEXT,"
             "prompt_type VARCHAR(32) NOT NULL,"
             "variables_schema JSON NOT NULL DEFAULT '{}',"
-            "created_at DATETIME NOT NULL,"
-            "updated_at DATETIME NOT NULL"
-            ")"
+            "created_at {ts} NOT NULL,"
+            "updated_at {ts} NOT NULL"
+            ")".format(ts=timestamp_type)
         )
     )
     connection.execute(
@@ -165,7 +161,7 @@ def upgrade() -> None:
     connection.execute(
         sa.text(
             "CREATE TABLE prompt_versions ("
-            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "id {pk},"
             "prompt_id VARCHAR(32) NOT NULL,"
             "version VARCHAR(64) NOT NULL,"
             "template TEXT NOT NULL,"
@@ -173,9 +169,9 @@ def upgrade() -> None:
             "output_schema JSON,"
             "status VARCHAR(32) NOT NULL DEFAULT 'draft',"
             "parent_version_id INTEGER,"
-            "created_at DATETIME NOT NULL,"
-            "updated_at DATETIME NOT NULL"
-            ")"
+            "created_at {ts} NOT NULL,"
+            "updated_at {ts} NOT NULL"
+            ")".format(pk=autoincrement_pk, ts=timestamp_type)
         )
     )
     connection.execute(
@@ -196,14 +192,14 @@ def upgrade() -> None:
     connection.execute(
         sa.text(
             "CREATE TABLE rubric_versions ("
-            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "id {pk},"
             "rubric_id VARCHAR(32) NOT NULL,"
             "version VARCHAR(64) NOT NULL,"
             "criteria JSON NOT NULL DEFAULT '[]',"
             "status VARCHAR(32) NOT NULL DEFAULT 'draft',"
-            "created_at DATETIME NOT NULL,"
-            "updated_at DATETIME NOT NULL"
-            ")"
+            "created_at {ts} NOT NULL,"
+            "updated_at {ts} NOT NULL"
+            ")".format(pk=autoincrement_pk, ts=timestamp_type)
         )
     )
     connection.execute(
@@ -228,9 +224,9 @@ def upgrade() -> None:
             "task_kind VARCHAR(32) NOT NULL,"
             "prompt_id VARCHAR(32) NOT NULL,"
             "prompt_version_id INTEGER NOT NULL,"
-            "created_at DATETIME NOT NULL,"
+            "created_at {ts} NOT NULL,"
             "PRIMARY KEY (organisation_id, task_kind)"
-            ")"
+            ")".format(ts=timestamp_type)
         )
     )
 
@@ -242,13 +238,11 @@ def upgrade() -> None:
             "skill_slug VARCHAR(64) NOT NULL,"
             "rubric_id VARCHAR(32) NOT NULL,"
             "rubric_version_id INTEGER NOT NULL,"
-            "created_at DATETIME NOT NULL,"
+            "created_at {ts} NOT NULL,"
             "PRIMARY KEY (organisation_id, skill_slug)"
-            ")"
+            ")".format(ts=timestamp_type)
         )
     )
-
-    connection.commit()
 
 
 def downgrade() -> None:
@@ -261,4 +255,3 @@ def downgrade() -> None:
     connection.execute(sa.text("ALTER TABLE _legacy_rubric_criteria RENAME TO rubric_criteria"))
     connection.execute(sa.text("ALTER TABLE _legacy_rubrics RENAME TO rubrics"))
     connection.execute(sa.text("ALTER TABLE _legacy_prompts RENAME TO prompts"))
-    connection.commit()
