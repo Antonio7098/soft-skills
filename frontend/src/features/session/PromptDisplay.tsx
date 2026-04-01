@@ -40,7 +40,7 @@ export function PromptDisplay({ title, promptText, difficulty, skillSlugs, conte
           </p>
         )}
 
-        <p className="text-body-md text-content-primary leading-relaxed">{promptText}</p>
+        <p className="text-body-md text-content-primary leading-relaxed whitespace-pre-line">{promptText}</p>
 
         {skillSlugs && skillSlugs.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-2 border-t border-line">

@@ -46,14 +46,7 @@ import { cn } from '@/lib/cn';
 type Phase = 'loading' | 'practicing' | 'assessing' | 'complete' | 'error';
 
 function extractScenarioQuestion(promptText: string): string {
-  const lines = promptText.split('\n').map(l => l.trim()).filter(Boolean);
-  if (lines.length === 0) return promptText;
-  const firstLine = lines[0]!;
-  const lastLine = lines[lines.length - 1]!;
-  if (firstLine !== lastLine) {
-    return `${firstLine}\n\n${lastLine}`;
-  }
-  return lastLine;
+  return promptText;
 }
 
 function RunProgressSidebar({ run, currentIndex }: { run: PracticeRunView; currentIndex: number }) {

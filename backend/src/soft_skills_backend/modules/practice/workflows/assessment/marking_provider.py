@@ -351,6 +351,12 @@ class DefaultAssessmentMarkingProvider:
                         "content": (
                             "Return JSON only. The previous output failed verification. "
                             f"Fix these issues exactly: {exc.message}"
+                            + (
+                                " Evidence.quote must be an exact verbatim substring copied from the learner response,"
+                                " not a paraphrase, summary, or invented quote."
+                                if exc.code == "SS-SCORING-004"
+                                else ""
+                            )
                         ),
                     },
                 ]
