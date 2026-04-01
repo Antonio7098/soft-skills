@@ -69,6 +69,8 @@ class Settings(BaseSettings):
     provider_max_retries: int = Field(default=2, ge=0, le=5)
     provider_retry_backoff_seconds: float = Field(default=0.25, gt=0, le=10.0)
     assessment_validation_retries: int = Field(default=1, ge=0, le=3)
+    assessment_structured_output_retries: int | None = Field(default=None, ge=0, le=3)
+    assessment_semantic_validation_retries: int | None = Field(default=None, ge=0, le=3)
     creator_generation_validation_retries: int = Field(default=2, ge=0, le=3)
     otel_enabled: bool = Field(default=False)
     otel_service_name: str = Field(default="soft-skills-backend")
@@ -220,6 +222,18 @@ class Settings(BaseSettings):
                     self.llm_creator_scenario_prompt_version
                     or _latest_catalog_generation_runtime_config().scenario_worker_prompt_version
                 )
+
+    def get_assessment_structured_output_retries(self) -> int:
+        """Resolve typed-output repair retries for assessment marking."""
+        if self.assessment_structured_output_retries is not None:
+            return self.assessment_structured_output_retries
+        return self.assessment_validation_retries
+
+    def get_assessment_semantic_validation_retries(self) -> int:
+        """Resolve semantic verification retries for assessment marking."""
+        if self.assessment_semantic_validation_retries is not None:
+            return self.assessment_semantic_validation_retries
+        return self.assessment_validation_retries
 
     @property
     def creator_structured_generation_prompt_version(self) -> str:

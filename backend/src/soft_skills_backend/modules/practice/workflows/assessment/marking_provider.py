@@ -69,17 +69,19 @@ class DefaultAssessmentMarkingProvider:
         *,
         settings: Settings,
         llm_provider: LLMProvider,
+        backup_llm_provider: LLMProvider | None = None,
         prompt_library: PromptLibrary,
         per_skill_typed_output: TypedLLMOutput,
         aggregation_typed_output: TypedLLMOutput,
         rubric_repository: RubricRepository,
     ) -> None:
         self._llm_provider = llm_provider
+        self._backup_llm_provider = backup_llm_provider
         self._prompt_library = prompt_library
         self._per_skill_typed_output = per_skill_typed_output
         self._aggregation_typed_output = aggregation_typed_output
         self._rubric_repository = rubric_repository
-        self._verification_retries = settings.assessment_validation_retries
+        self._verification_retries = settings.get_assessment_semantic_validation_retries()
 
     @property
     def provider_name(self) -> str:
@@ -88,6 +90,15 @@ class DefaultAssessmentMarkingProvider:
     @property
     def model_slug(self) -> str:
         return self._llm_provider.model_slug
+
+    def _provider_for_attempt(self, attempt: int) -> LLMProvider:
+        if (
+            self._backup_llm_provider is not None
+            and attempt == self._verification_retries
+            and self._verification_retries > 0
+        ):
+            return self._backup_llm_provider
+        return self._llm_provider
 
     def _required_rubric_skills(self, prompt_payload: ResolvedAttemptPayload) -> list[str] | None:
         if prompt_payload.prompt.practice_type == PracticeType.QUICK_PRACTICE:
@@ -313,8 +324,9 @@ class DefaultAssessmentMarkingProvider:
         retry_messages = list(messages)
         last_result: TypedLLMResult | None = None
         for attempt in range(self._verification_retries + 1):
+            active_provider = self._provider_for_attempt(attempt)
             typed_result = await typed_output.generate(
-                self._llm_provider,
+                active_provider,
                 messages=retry_messages,
                 call_context=call_context,
             )
@@ -392,7 +404,7 @@ def build_per_skill_typed_output(settings: Settings) -> TypedLLMOutput:
     return TypedLLMOutput(
         PerSkillAssessment,
         schema_version=config.per_skill_output_schema_version,
-        max_validation_retries=settings.assessment_validation_retries,
+        max_validation_retries=settings.get_assessment_structured_output_retries(),
         timeout_seconds=settings.llm_marking_timeout_seconds,
     )
 
@@ -404,7 +416,7 @@ def build_aggregation_typed_output(settings: Settings) -> TypedLLMOutput:
     return TypedLLMOutput(
         AssessmentAggregationOutput,
         schema_version=config.aggregation_output_schema_version,
-        max_validation_retries=settings.assessment_validation_retries,
+        max_validation_retries=settings.get_assessment_structured_output_retries(),
         timeout_seconds=settings.llm_marking_timeout_seconds,
     )
 

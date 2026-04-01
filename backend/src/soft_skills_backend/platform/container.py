@@ -184,6 +184,20 @@ def build_container(settings: Settings) -> AppContainer:
         settings=settings,
         provider_call_logger=provider_call_logger,
     )
+    marking_backup_llm_provider = (
+        build_llm_provider(
+            settings=settings.model_copy(
+                update={
+                    "llm_marking_per_skill_model": settings.llm_marking_backup_model,
+                    "llm_marking_aggregation_model": settings.llm_marking_backup_model,
+                    "llm_default_backup_model": None,
+                }
+            ),
+            provider_call_logger=provider_call_logger,
+        )
+        if settings.llm_marking_backup_model
+        else None
+    )
     assistant_llm_provider = build_llm_provider(
         settings=settings,
         provider_call_logger=provider_call_logger,
@@ -255,6 +269,7 @@ def build_container(settings: Settings) -> AppContainer:
         assessment_marker=DefaultAssessmentMarkingProvider(
             settings=settings,
             llm_provider=llm_provider,
+            backup_llm_provider=marking_backup_llm_provider,
             prompt_library=build_prompt_library(settings),
             per_skill_typed_output=build_per_skill_typed_output(settings),
             aggregation_typed_output=build_aggregation_typed_output(settings),

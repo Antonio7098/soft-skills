@@ -189,9 +189,20 @@ class MarkingBenchmarkRunner:
             }
         )
         provider = self._provider_factory(settings, self._provider_call_logger)
+        backup_provider = None
+        if self._settings.llm_marking_backup_model:
+            backup_settings = settings.model_copy(
+                update={
+                    "llm_marking_per_skill_model": self._settings.llm_marking_backup_model,
+                    "llm_marking_aggregation_model": self._settings.llm_marking_backup_model,
+                    "llm_default_backup_model": None,
+                }
+            )
+            backup_provider = self._provider_factory(backup_settings, self._provider_call_logger)
         return DefaultAssessmentMarkingProvider(
             settings=settings,
             llm_provider=provider,
+            backup_llm_provider=backup_provider,
             prompt_library=build_prompt_library(settings),
             per_skill_typed_output=build_per_skill_typed_output(settings),
             aggregation_typed_output=build_aggregation_typed_output(settings),
