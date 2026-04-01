@@ -2,7 +2,7 @@
 
 ## 1. System Overview
 
-The Soft Skills backend is an AI-driven simulation, assessment, and progression platform built on FastAPI. It uses **Stageflow** as its core workflow orchestration engine to manage complex, multi-stage AI pipelines with built-in observability, idempotency, and cancellation support.
+The Soft Skills backend is an AI-driven simulation, assessment, and progression platform built on FastAPI. It uses **Stageflow** as its core workflow orchestration engine to manage complex, multi-stage AI pipelines with built-in observability, idempotency, and cancellation support. Three **app-agnostic engines** (marking, progression, recommendation) provide reusable domain logic that Stageflow pipelines consume through adapter layers.
 
 ### 1.1 Technology Stack
 
@@ -10,6 +10,9 @@ The Soft Skills backend is an AI-driven simulation, assessment, and progression 
 |-------|------------|
 | Web Framework | FastAPI (ASGI) |
 | Workflow Engine | Stageflow (custom pipeline orchestration library) |
+| Assessment Engine | App-agnostic marking engine (rubric-based judgment, per-skill fan-out) |
+| Progression Engine | App-agnostic capability aggregation (decay weighting, confidence, gating) |
+| Recommendation Engine | App-agnostic next-step scoring (deficit alignment, constraint enforcement) |
 | ORM | SQLAlchemy 2.0 |
 | Migrations | Alembic |
 | LLM Providers | OpenAI-compatible, Groq, OpenRouter (swappable via `LLMProvider` protocol) |
@@ -46,7 +49,8 @@ AppContainer
 │   ├── provider_calls: SqlAlchemyProviderCallRepository
 │   ├── pipeline_definitions: SqlAlchemyPipelineDefinitionRepository
 │   ├── stage_definitions: SqlAlchemyStageDefinitionRepository
-│   └── pipeline_execution_traces: SqlAlchemyPipelineExecutionTraceRepository
+│   ├── pipeline_execution_traces: SqlAlchemyPipelineExecutionTraceRepository
+│   └── rubric_repository: SqlAlchemyRubricRepository
 │
 ├── Services
 │   ├── health_service: HealthService
@@ -186,11 +190,188 @@ Every pipeline execution carries:
 
 ---
 
-## 4. AI Workflow: Catalog Generation
+## 4. Engine Layer
+
+The `engines/` package contains three app-agnostic engines that provide reusable assessment, progression, and recommendation logic independent of domain-specific taxonomy. Modules consume engines through adapter layers that translate between domain-specific contracts and engine-generic contracts.
+
+The dependency flow is: **Stageflow orchestrates → Engines compute → Modules adapt**.
+
+### 4.1 Package Structure
+
+```
+engines/
+├── config/              — Versioned JSON config artifacts + typed loaders
+│   ├── artifacts/       — Reviewed JSON files (lru_cache loaded)
+│   ├── models.py        — Pydantic config models
+│   └── loader.py        — Artifact loading with validation
+├── marking/             — Assessment judgment engine
+│   ├── contracts/       — Canonical schemas (Prompt, Rubric, Decision)
+│   ├── domain/          — Validation, per-skill aggregation, rubric repository
+│   └── use_cases/       — Decision builder, typed LLM output parser
+├── progression/         — Learner capability aggregation engine
+│   ├── contracts/       — Assessment events, dimension/aggregate states
+│   └── domain/          — Decay weighting, confidence, gating logic
+└── recommendation/      — Next-step recommendation engine
+    ├── contracts/       — Candidate items, weights, config
+    └── domain/          — Scoring components, constraint enforcement
+```
+
+### 4.2 Marking Engine
+
+**Purpose**: Takes a prompt, candidate response, and rubric → produces a validated judgment artifact. Portable across domains (soft skills, education, certification, QA review).
+
+**Core Contracts**:
+
+| Contract | Purpose |
+|----------|---------|
+| `PromptContract` | Versioned task/stimulus presented to the user |
+| `CandidateResponse` | User-submitted answer with actor and timestamp |
+| `RubricDefinition` | Versioned scoring spec with criteria, levels, and scale |
+| `RubricCriterion` | Single criterion with levels, weights, and evidence requirements |
+| `MarkingDecision` | Finalized output with criterion judgments, evidence, rationale |
+
+**Processing Pipeline**:
+
+1. Resolve prompt, response, and rubric versions
+2. Validate that the prompt can be judged by the selected rubric
+3. Normalize the response into a canonical input shape
+4. Generate provisional judgment (per-skill via fan-out)
+5. Validate provisional output against the decision schema
+6. Check evidence coverage and contradiction rules
+7. Finalize and persist the marking decision
+8. Emit evaluation and observability artifacts
+
+**Per-Skill Fan-Out**: The marking engine assesses each skill independently via `asyncio.gather()` with semaphore-bounded concurrency. Each skill assessment:
+- Receives exactly one rubric criterion with full level definitions
+- Returns `PerSkillAssessment` with score, rationale, and 1-2 evidence quotes
+- Undergoes deterministic verification (skill slug match, score range, evidence grounding)
+- Supports bounded corrective retries for malformed output
+
+**Deterministic Aggregation**: After all skills are assessed:
+- `overall_score` = rounded weighted mean of per-skill scores
+- `strengths` = top 1-2 highest-scoring skills with grounded rationale
+- `weaknesses` = bottom 1-2 lowest-scoring skills with evidence excerpts
+- An optional LLM aggregation call generates only `summary` and `next_actions` — it cannot override scores
+
+**TypedLLMOutput**: Wraps `LLMProvider.complete_json()` with bounded corrective retries, schema validation, and self-correction mode. Rejects malformed output via `StructuredOutputRejectionError`.
+
+**Fail-Closed**: If any required skill assessment fails after retries, the entire parent assessment fails. Partial results are never persisted.
+
+**Rubric Repository**: `SqlAlchemyRubricRepository` loads rubric definitions from the database, resolving the latest published version and filtering criteria by required skill slugs.
+
+### 4.3 Progression Engine
+
+**Purpose**: Converts validated assessments into persistent views of learner capability across arbitrary dimensions (skills) and aggregates (competencies). Pure deterministic functions — no external dependencies.
+
+**Core Contracts**:
+
+| Contract | Purpose |
+|----------|---------|
+| `AssessmentEvent` | Validated assessment with dimension scores and evidence |
+| `DimensionState` | Current state for one dimension: score, confidence, streak, contributions |
+| `AggregateState` | Current state for one aggregate: score, confidence, gating |
+| `ComputedProgressionSnapshot` | Full snapshot with weak/stagnating/coverage-gap dimensions |
+
+**Dimension Aggregation**:
+- **Normalization**: Rubric-specific scales (1-5) mapped to canonical 0-1 range
+- **Decay weighting**: Linear decay over configurable retention window (default 180 days), with minimum weight floor (default 0.35)
+- **Confidence**: Composite of evidence volume (45%), recency (35%), and time decay (20%)
+- **Confidence bands**: `high` (≥0.75), `medium` (≥0.40), `low` (<0.40)
+- **Evidence ledger**: Every contribution records assessment ID, weight, prompt/rubric version, and trace ID
+
+**Aggregate Computation**:
+- Weighted combination of constituent dimension states
+- Gating rules prevent aggregates from exceeding ceilings when critical dimensions fall below floors
+- Aggregate confidence derived from constituent confidences
+
+**Recalculation Support**: Deterministic by design — identical inputs + config produce identical outputs. Supports replay of historical assessments under new config versions.
+
+### 4.4 Recommendation Engine
+
+**Purpose**: Turns learner state plus content metadata into transparent, explainable next-step recommendations. Pure deterministic functions — no external dependencies.
+
+**Core Contracts**:
+
+| Contract | Purpose |
+|----------|---------|
+| `LearnerContext` | Goals, persona tags, target role |
+| `CandidateItem` | Content candidate with dimension targets, lifecycle state, attempt history |
+| `RecommendedCandidate` | Scored candidate with component breakdown and reason codes |
+| `ComputedRecommendation` | Ranked items plus alternatives with context snapshot ID |
+
+**Scoring Components**:
+
+```
+score = Σ(component_i × weight_i) - repeat_penalty
+```
+
+| Component | Logic |
+|-----------|-------|
+| `dimension_deficit_alignment` | (1 - score) × confidence for overlapping weak dimensions |
+| `stagnation_relief` | 1 - score for dimensions with minimal delta and sufficient evidence |
+| `coverage_gap_fit` | 1 - min(1, evidence_count / 2) for under-assessed dimensions |
+| `goal_alignment` | Token overlap between learner goals and candidate metadata |
+| `verification_boost` | Fixed boost for verified content |
+| `recent_repeat_penalty` | Cooldown-based penalty for recently attempted items |
+
+**Constraint Enforcement**:
+- Lifecycle state filtering (`allowed_lifecycle_states`)
+- Advanced content readiness gates (aggregate score must exceed threshold)
+- Cooldown windows preventing immediate re-recommendation
+- Attempt-count-based penalty capping
+
+**Output**: Ranked recommendations with per-component score breakdown, reason codes (e.g., `weak_dimension:active-listening`, `stagnation:negotiation`), and cooldown expiry timestamps.
+
+### 4.5 Configuration Artifacts
+
+Engines load configuration from versioned JSON files in `engines/config/artifacts/`:
+
+| Artifact | Engine |
+|----------|--------|
+| `soft_skills_marking_runtime.v1.json` | Marking engine (prompt names, schema versions, concurrency) |
+| `soft_skills_progression_engine.v1.json` | Progression engine (decay profile, confidence thresholds, gate rules) |
+| `soft_skills_recommendation_engine.v1.json` | Recommendation engine (weights, cooldowns, lifecycle filters) |
+| `soft_skills_catalog_generation_runtime.v1.json` | Catalog generation (prompt references, concurrency limits) |
+
+Each artifact is:
+- Validated against a Pydantic model at load time
+- Cached via `@lru_cache(maxsize=1)` for performance
+- Versioned with explicit `engine_version`, `schema_version`, `config_version` fields
+- Raises `SS-VALIDATION-038` (missing), `SS-VALIDATION-039` (invalid JSON), or `SS-VALIDATION-040` (schema violation) on failure
+
+### 4.6 Adapter Pattern
+
+Modules translate between domain-specific types and engine-generic types:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Modules (Domain-Specific)                                   │
+│  practice/  progression/  evaluation/  catalog/              │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+┌───────────────────────▼─────────────────────────────────────┐
+│  Adapter Layer (modules/progression/domain/progression.py)   │
+│  - AssessmentSignal → EngineAssessmentEvent                  │
+│  - SkillProgressView ↔ DimensionState                        │
+│  - CatalogCandidate → EngineCandidateItem                    │
+│  - normalize_score(): rubric 1-5 → canonical 0-1             │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+┌───────────────────────▼─────────────────────────────────────┐
+│  Engines (App-Agnostic)                                      │
+│  marking/  progression/  recommendation/                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Engines contain no domain assumptions about skills, competencies, or soft-skills. Domain projects supply prompt content, rubric content, criterion semantics, and score interpretation rules.
+
+---
+
+## 5. AI Workflow: Catalog Generation
 
 The catalog generation system creates assessment collections (prompt items + scenarios) using a **fan-out/fan-in** pattern.
 
-### 4.1 Collection Generation Pipeline
+### 5.1 Collection Generation Pipeline
 
 **File**: `modules/catalog/workflows/generation/collection_pipeline.py`
 
@@ -251,7 +432,7 @@ persistence_work                     (WORK) — saves to DB, records manifest
 - **Execution mode**: `catalog_generation`
 - **Service namespace**: `soft_skills_backend.catalog`
 
-### 4.2 Fan-Out: Worker Subpipelines
+### 5.2 Fan-Out: Worker Subpipelines
 
 **File**: `modules/catalog/workflows/generation/workers.py`
 
@@ -302,7 +483,7 @@ Each worker has a unique idempotency key:
 - Prompt items: `catalog_prompt_item_worker:{request_id}:{worker_index}`
 - Scenarios: `catalog_scenario_worker:{request_id}:{worker_index}`
 
-### 4.3 Fan-In: Assembly
+### 5.3 Fan-In: Assembly
 
 The `assemble_transform` stage performs the fan-in:
 
@@ -324,7 +505,7 @@ draft = GeneratedCollectionDraft(
 )
 ```
 
-### 4.4 Persistence and Manifest
+### 5.4 Persistence and Manifest
 
 The `persistence_work` stage creates a `GenerationManifest` for full auditability:
 
@@ -343,7 +524,7 @@ GenerationManifest
     └── Each: provider_name, pipeline_name, prompt_version, worker result
 ```
 
-### 4.5 Progress Tracking
+### 5.5 Progress Tracking
 
 A `progress_callback` reports percentage completion at key stages:
 
@@ -362,7 +543,7 @@ A `progress_callback` reports percentage completion at key stages:
 
 Progress events are streamed via `GenerationRealtimeBroker` over WebSocket.
 
-### 4.6 Cancellation Support
+### 5.6 Cancellation Support
 
 Between expensive stages, the pipeline checks for cancellation:
 
@@ -377,7 +558,7 @@ The `_yield_for_cancel()` function:
 2. Yields briefly (`asyncio.sleep(0.15)`) to let WebSocket deliver cancel signal
 3. Returns `StageOutput.cancel` if cancelled
 
-### 4.7 Prompt Item Generation (Existing Collection)
+### 5.7 Prompt Item Generation (Existing Collection)
 
 **File**: `modules/catalog/workflows/generation/prompt_item_pipeline.py`
 
@@ -410,11 +591,11 @@ persistence_work                     (WORK) — saves items, records manifest
 
 ---
 
-## 5. AI Workflow: Assistant
+## 6. AI Workflow: Assistant
 
 The assistant workflow handles conversational turns with tool execution, streaming, and cancellation.
 
-### 5.1 Assistant Turn Pipeline
+### 6.1 Assistant Turn Pipeline
 
 **File**: `modules/assistant/workflows/service.py`
 
@@ -461,7 +642,7 @@ All five enrichment stages depend only on `input_guard`, so they execute in para
 | `attempts_enrich` | Recent practice attempts (via SQL guard, limited by `llm_assistant_recent_attempt_limit`) |
 | `session_state_enrich` | Practice session state from session metadata |
 
-### 5.2 Agent Loop (Tool Execution)
+### 6.2 Agent Loop (Tool Execution)
 
 The `assistant_runtime` stage runs an iterative tool execution loop:
 
@@ -499,7 +680,7 @@ The assistant has access to tools for:
 - Catalog operations
 - Progression queries
 
-### 5.3 Final Response Generation
+### 6.3 Final Response Generation
 
 After the agent loop completes, the `final_response_work` stage:
 
@@ -509,7 +690,7 @@ After the agent loop completes, the `final_response_work` stage:
 4. Streams the response to the client via `AssistantRealtimeBroker`
 5. Marks the turn as completed in the database
 
-### 5.4 Realtime Communication
+### 6.4 Realtime Communication
 
 **AssistantRealtimeBroker** manages WebSocket streaming:
 
@@ -519,11 +700,11 @@ After the agent loop completes, the `final_response_work` stage:
 
 ---
 
-## 6. AI Workflow: Evaluation
+## 7. AI Workflow: Evaluation
 
 **File**: `modules/evaluation/workflows/service.py`
 
-The evaluation pipeline runs benchmark suites against the marking engine:
+The evaluation pipeline runs benchmark suites against the marking engine (see [Section 4.2](#42-marking-engine)):
 
 ```
 input_guard                          (GUARD) — prepares evaluation request
@@ -539,11 +720,13 @@ work                                 (WORK) — persists evaluation results
 - **Timeout**: 240,000ms (4 minutes)
 - **Execution mode**: `evaluation_runtime`
 
+The `MarkingBenchmarkRunner` uses `SqlAlchemyRubricRepository` to load rubric definitions and exercises the full marking pipeline (per-skill assessment, aggregation, validation) against golden benchmark cases.
+
 ---
 
-## 7. LLM Provider Abstraction
+## 8. LLM Provider Abstraction
 
-### 7.1 Protocol
+### 8.1 Protocol
 
 **File**: `shared/ports/llm.py`
 
@@ -572,7 +755,7 @@ class LLMProvider(Protocol):
     ) -> AsyncIterator[ProviderTextChunk]: ...
 ```
 
-### 7.2 Implementations
+### 8.2 Implementations
 
 | Provider | File |
 |----------|------|
@@ -580,7 +763,7 @@ class LLMProvider(Protocol):
 | Groq | `platform/providers/llm/groq.py` |
 | OpenRouter | `platform/providers/llm/openrouter.py` |
 
-### 7.3 Provider Selection
+### 8.3 Provider Selection
 
 LLM providers are instantiated per task kind via `build_llm_provider()`:
 
@@ -590,7 +773,7 @@ LLM providers are instantiated per task kind via `build_llm_provider()`:
 | `LLMTaskKind.ASSISTANT` | Assistant conversational turns |
 | `LLMTaskKind.ADMIN_AGENT` | Admin agent SQL operations |
 
-### 7.4 Telemetry
+### 8.4 Telemetry
 
 Every LLM call is logged via `ProviderCallContext` which carries:
 - `operation` — Semantic operation name
@@ -600,7 +783,7 @@ The `DatabaseProviderCallLogger` persists all provider calls to the database.
 
 ---
 
-## 8. Prompt Registry
+## 9. Prompt Registry
 
 **File**: `modules/admin/domain/prompt_registry.py`
 
@@ -611,7 +794,7 @@ The prompt registry manages versioned prompt templates:
 - `PromptRenderRequest` specifies prompt name, version, and template variables
 - `create_prompt_render_stage()` creates a Stageflow stage that resolves and renders a prompt
 
-### 8.1 Prompt Rendering Stage
+### 9.1 Prompt Rendering Stage
 
 **File**: `modules/admin/workflows/prompt_render_stage.py`
 
@@ -621,11 +804,15 @@ The prompt render stage is a reusable TRANSFORM stage that:
 3. Renders the template with the provided variables
 4. Returns a `RenderedPrompt` with the final prompt content
 
+### 9.2 Engine Prompt Library
+
+The marking engine also includes a lightweight in-memory `PromptLibrary` (see [Section 4.2](#42-marking-engine)) for engine-managed prompts that are loaded from config artifacts rather than the database. This is used by the assessment marking provider for per-skill and aggregation prompts.
+
 ---
 
-## 9. Observability
+## 10. Observability
 
-### 9.1 Wide Events
+### 10.1 Wide Events
 
 Every stage emits wide events via `AgentWideEventEmitter`:
 
@@ -633,7 +820,7 @@ Every stage emits wide events via `AgentWideEventEmitter`:
 - Events include stage payload, summary, and correlation metadata
 - Persisted via `DurableEventSink` → `SqlAlchemyWorkflowEventRepository`
 
-### 9.2 Pipeline Run Logging
+### 10.2 Pipeline Run Logging
 
 `DatabasePipelineRunLogger` records:
 
@@ -641,7 +828,7 @@ Every stage emits wide events via `AgentWideEventEmitter`:
 - Run completed (duration, status, stage summaries)
 - Run failed (error, stage name, request, trace)
 
-### 9.3 OpenTelemetry
+### 10.3 OpenTelemetry
 
 When `otel_enabled` is true:
 
@@ -650,7 +837,7 @@ When `otel_enabled` is true:
 - `OpenTelemetryInterceptor` creates spans for each stage execution
 - `StageflowTracer` wraps the OTel tracer for pipeline-level spans
 
-### 9.4 Circuit Breaker
+### 10.4 Circuit Breaker
 
 The `CircuitBreakerInterceptor` (part of Stageflow's default interceptors) prevents cascading failures by:
 - Tracking failure rates per circuit
@@ -659,7 +846,7 @@ The `CircuitBreakerInterceptor` (part of Stageflow's default interceptors) preve
 
 ---
 
-## 10. API Surface
+## 11. API Surface
 
 **File**: `entrypoints/http/router.py`
 
@@ -685,7 +872,7 @@ The `CircuitBreakerInterceptor` (part of Stageflow's default interceptors) preve
 
 ---
 
-## 11. Module Architecture
+## 12. Module Architecture
 
 The codebase follows a **modular monolith** pattern with clear domain boundaries:
 
@@ -695,12 +882,12 @@ modules/
 ├── admin_agent/    — AI-powered admin agent with SQL execution
 ├── assistant/      — Conversational assistant with tool execution
 ├── catalog/        — Assessment collection generation and management
-├── evaluation/     — Benchmark evaluation suites
+├── evaluation/     — Benchmark evaluation suites (exercises marking engine)
 ├── events/         — Workflow event querying
 ├── identity/       — User identity management
 ├── organisations/  — Multi-tenancy support
-├── practice/       — Practice session execution and assessment
-├── progression/    — Skill progression tracking
+├── practice/       — Practice session execution and assessment (consumes marking engine)
+├── progression/    — Skill progression tracking (consumes progression + recommendation engines)
 ├── taxonomy/       — Skill and competency taxonomy
 └── voice/          — Voice transcription
 ```
@@ -716,17 +903,26 @@ module/
 └── workflows/      — Stageflow pipeline orchestration
 ```
 
+### 12.1 Engine Consumption Map
+
+| Module | Engine | Integration Point |
+|--------|--------|-------------------|
+| `practice/` | Marking | `AssessmentMarkingProvider` uses `RubricRepository`, `TypedLLMOutput`, per-skill aggregation |
+| `progression/` | Progression | `compute_progress_snapshot()` adapts `AssessmentSignal` → `AssessmentEvent` |
+| `progression/` | Recommendation | `compute_recommendation()` adapts `CatalogCandidate` → `CandidateItem` |
+| `evaluation/` | Marking | `MarkingBenchmarkRunner` exercises full marking pipeline against golden cases |
+
 ---
 
-## 12. Security Model
+## 13. Security Model
 
-### 12.1 Authentication
+### 13.1 Authentication
 
 - `HeaderAuthProvider` extracts user identity from HTTP headers
 - `Actor` carries `user_id` and `organisation_id` through the request lifecycle
 - Auth events are recorded via `WorkflowEventRepository`
 
-### 12.2 Prompt Security
+### 13.2 Prompt Security
 
 `PromptSecurityPolicy` enforces:
 - Maximum user message length: 12,000 characters
@@ -734,7 +930,7 @@ module/
 - Content sanitization via `build_user_message()` and `build_tool_message()`
 - `PromptSecurityError` is raised on policy violations
 
-### 12.3 SQL Guard
+### 13.3 SQL Guard
 
 Both the assistant and admin agent have SQL guards (`AssistantSqlGuard`, `AdminAgentSqlGuard`):
 - Validate SQL queries against a schema registry
@@ -742,7 +938,7 @@ Both the assistant and admin agent have SQL guards (`AssistantSqlGuard`, `AdminA
 - Scope queries to the user's organisation
 - Results are redacted via `ResultRedactor` implementations
 
-### 12.4 Approval Workflow
+### 13.4 Approval Workflow
 
 Certain assistant tool calls require human approval:
 - Configurable auto-allow list (`tool_approval_auto_allow`)
@@ -751,7 +947,9 @@ Certain assistant tool calls require human approval:
 
 ---
 
-## 13. Configuration
+## 14. Configuration
+
+### 14.1 Application Settings
 
 **File**: `config.py`
 
@@ -768,29 +966,56 @@ Key configuration categories:
 | Database | `database_url` |
 | Application | `app_name`, `app_version`, `environment`, `api_prefix`, `cors_allowed_origins` |
 
+### 14.2 Engine Config Artifacts
+
+Engines load additional configuration from versioned JSON artifacts (see [Section 4.5](#45-configuration-artifacts)):
+
+| Artifact | Loaded By | Key Parameters |
+|----------|-----------|----------------|
+| `soft_skills_marking_runtime.v1.json` | `load_marking_runtime_config()` | Prompt names/versions, schema versions, `max_parallel_skill_children` |
+| `soft_skills_progression_engine.v1.json` | `load_progression_engine_config()` | Decay profile, confidence profile, aggregate gate rules |
+| `soft_skills_recommendation_engine.v1.json` | `load_recommendation_engine_config()` | Scoring weights, cooldown hours, lifecycle state filters |
+| `soft_skills_catalog_generation_runtime.v1.json` | `load_catalog_generation_runtime_config()` | Prompt references, worker concurrency limits |
+
+These artifacts are separate from `config.py` because they represent **reviewed behavioral contracts** — changes require deliberate review and version bumping, unlike runtime toggles.
+
 ---
 
-## 14. Error Handling
+## 15. Error Handling
 
-### 14.1 Error Codes
+### 15.1 Error Codes
 
 Errors use a structured code format:
 
 | Prefix | Domain |
 |--------|--------|
 | `SS-ORCHESTRATION-xxx` | Pipeline orchestration failures |
-| `SS-VALIDATION-xxx` | Validation failures |
+| `SS-VALIDATION-xxx` | Validation failures (input, schema, engine config) |
+| `SS-SCORING-xxx` | Assessment scoring and marking failures |
+| `SS-DOMAIN-xxx` | Domain logic violations |
 
-### 14.2 Error Propagation
+### 15.2 Error Propagation
 
 - `AppError` is the base application error with `code`, `message`, `details`, and `status_code`
 - `orchestration_error()` — For pipeline-level failures
 - `validation_error()` — For input/data validation failures
+- `scoring_error()` — For assessment marking failures
+- `domain_error()` — For domain logic violations
 - Pipeline errors are caught, logged, and translated to appropriate HTTP responses via error handlers
 
-### 14.3 Pipeline Error Handling
+### 15.3 Pipeline Error Handling
 
 `run_logged_pipeline()` handles:
 - `UnifiedPipelineCancelled` — Logged as "cancelled", results returned
 - `UnifiedStageExecutionError` — Original exception re-raised after logging
 - Generic `Exception` — Wrapped in `orchestration_error("SS-ORCHESTRATION-005")`
+
+### 15.4 Engine Error Semantics
+
+The marking engine enforces strict fail-closed behavior:
+- Per-skill assessment failures after retries → `StructuredOutputRejectionError` → parent pipeline fails
+- Invalid marking decisions → `scoring_error("SS-SCORING-xxx")` with specific violation details
+- Missing rubric/repository failures → `validation_error("SS-VALIDATION-071/072/073/074")`
+- Engine config artifact failures → `validation_error("SS-VALIDATION-038/039/040")`
+
+The progression engine rejects assessments missing version metadata and requires at least one validated assessment. The recommendation engine rejects empty candidate lists and invalid lifecycle states.
