@@ -434,17 +434,147 @@ export const apiDataProvider: DataProvider = {
   }),
 
   // --- Interview (maps to same backend endpoint, returns PracticeSessionView) ---
-  startInterviewSession: (promptItemId) =>
-    request<InterviewSessionView>('/attempts/interview/sessions', { method: 'POST', body: JSON.stringify({ prompt_item_id: promptItemId }) }),
-  submitInterviewTurn: (_sessionId, _cmd) => {
-    throw new Error('submitInterviewTurn not yet implemented in backend - use mock provider');
+  startInterviewSession: async (promptItemId) => {
+    const raw = await request<any>('/attempts/interview/sessions', { method: 'POST', body: JSON.stringify({ prompt_item_id: promptItemId }) });
+    const p = raw.prompt ?? {};
+    const ic = p.interview_context ?? {};
+    return {
+      session_id: raw.session_id,
+      attempt_id: raw.attempt_id,
+      status: raw.status,
+      total_turns: 0,
+      current_turn: 1,
+      current_question: p.prompt_text ?? '',
+      competency_context: ic.competency_context ?? '',
+      history: [],
+      target_skill_slugs: p.target_skill_slugs ?? [],
+      difficulty: p.difficulty ?? 'introductory',
+      started_at: raw.started_at,
+    } as InterviewSessionView;
+  },
+  submitInterviewTurn: async (sessionId, cmd) => {
+    const session = await request<any>(`/attempts/${sessionId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(cmd),
+    });
+    const p = session.prompt ?? {};
+    const ic = p.interview_context ?? {};
+    const attempt = session.assessment;
+    const isComplete = session.status === 'completed' || session.status === 'assessed' || !!attempt;
+    return {
+      session_id: session.session_id,
+      attempt_id: session.attempt_id,
+      status: isComplete ? 'completed' : session.status,
+      total_turns: 3,
+      current_turn: isComplete ? 3 : 2,
+      current_question: isComplete ? 'Interview complete — generating your assessment.' : (p.prompt_text ?? ''),
+      competency_context: isComplete ? 'Interview complete — generating your assessment.' : (ic.competency_context ?? ''),
+      history: [
+        {
+          turn_number: 1,
+          question: p.prompt_text ?? '',
+          response: cmd.response_text,
+        },
+      ],
+      target_skill_slugs: p.target_skill_slugs ?? [],
+      difficulty: p.difficulty ?? 'introductory',
+      started_at: session.started_at ?? new Date().toISOString(),
+    } as InterviewSessionView;
   },
 
   // --- Scenario (maps to same backend endpoint, returns PracticeSessionView) ---
-  startScenarioSession: (scenarioId) =>
-    request<ScenarioSessionView>('/attempts/scenario/sessions', { method: 'POST', body: JSON.stringify({ scenario_id: scenarioId }) }),
-  submitScenarioStep: (_sessionId, _cmd) => {
-    throw new Error('submitScenarioStep not yet implemented in backend - use mock provider');
+  startScenarioSession: async (scenarioId) => {
+    const raw = await request<any>('/attempts/scenario/sessions', { method: 'POST', body: JSON.stringify({ scenario_id: scenarioId }) });
+    const p = raw.prompt ?? {};
+    const sc = p.scenario_context ?? {};
+    return {
+      session_id: raw.session_id,
+      attempt_id: raw.attempt_id,
+      status: raw.status,
+      scenario: {
+        id: p.content_item_id ?? scenarioId,
+        title: p.title ?? 'Scenario Practice',
+        business_context: sc.business_context ?? '',
+        learner_objective: sc.learner_objective ?? '',
+        constraints: sc.constraints ?? [],
+        stakeholder_tensions: sc.stakeholder_tensions ?? [],
+        lifecycle_state: 'published_private',
+        target_skill_slugs: p.target_skill_slugs ?? [],
+        rubric_id: p.rubric_id ?? '',
+        mock_company: sc.mock_company
+          ? {
+              id: `${p.content_item_id ?? scenarioId}-company`,
+              name: sc.mock_company.name ?? '',
+              industry: sc.mock_company.industry ?? '',
+              operating_context: sc.mock_company.operating_context ?? '',
+            }
+          : null,
+        mock_people: (sc.mock_people ?? []).map((person: any, index: number) => ({
+          id: `${p.content_item_id ?? scenarioId}-person-${index + 1}`,
+          name: person.name ?? '',
+          role: person.role ?? '',
+          goals: person.goals ?? [],
+          communication_style: person.communication_style ?? '',
+          relationship_to_scenario: person.relationship_to_scenario ?? '',
+        })),
+      },
+      total_steps: 1,
+      current_step: 1,
+      current_prompt_text: p.prompt_text ?? '',
+      history: [],
+      started_at: raw.started_at,
+    } as ScenarioSessionView;
+  },
+  submitScenarioStep: async (attemptId, cmd) => {
+    const attempt = await request<any>(`/attempts/${attemptId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(cmd),
+    });
+    const p = attempt.prompt ?? {};
+    const sc = p.scenario_context ?? {};
+    return {
+      session_id: attempt.session_id,
+      attempt_id: attempt.id,
+      status: 'completed',
+      scenario: {
+        id: p.content_item_id ?? '',
+        title: p.title ?? 'Scenario Practice',
+        business_context: sc.business_context ?? '',
+        learner_objective: sc.learner_objective ?? '',
+        constraints: sc.constraints ?? [],
+        stakeholder_tensions: sc.stakeholder_tensions ?? [],
+        lifecycle_state: 'published_private',
+        target_skill_slugs: p.target_skill_slugs ?? [],
+        rubric_id: p.rubric_id ?? '',
+        mock_company: sc.mock_company
+          ? {
+              id: `${p.content_item_id ?? 'scenario'}-company`,
+              name: sc.mock_company.name ?? '',
+              industry: sc.mock_company.industry ?? '',
+              operating_context: sc.mock_company.operating_context ?? '',
+            }
+          : null,
+        mock_people: (sc.mock_people ?? []).map((person: any, index: number) => ({
+          id: `${p.content_item_id ?? 'scenario'}-person-${index + 1}`,
+          name: person.name ?? '',
+          role: person.role ?? '',
+          goals: person.goals ?? [],
+          communication_style: person.communication_style ?? '',
+          relationship_to_scenario: person.relationship_to_scenario ?? '',
+        })),
+      },
+      total_steps: 1,
+      current_step: 1,
+      current_prompt_text: p.prompt_text ?? '',
+      history: [
+        {
+          step_number: 1,
+          prompt: p.prompt_text ?? '',
+          response: cmd.response_text,
+        },
+      ],
+      started_at: attempt.submitted_at ?? new Date().toISOString(),
+    } as ScenarioSessionView;
   },
 
   // --- Practice Runs (Aggregate) -------------------------------------------
@@ -502,7 +632,7 @@ export const apiDataProvider: DataProvider = {
         started_at: raw.started_at,
         completed_at: raw.completed_at,
         items: (raw.items ?? []).map((item: any) => ({
-          id: item.attempt?.id ?? item.attempt?.prompt?.content_item_id ?? '',
+          id: item.attempt?.prompt?.content_item_id ?? item.attempt?.id ?? '',
           item_type: item.attempt?.prompt?.content_item_type === 'quick_practice_prompt' || item.attempt?.prompt?.content_item_type === 'interview_prompt' ? 'prompt_item' : 'scenario',
           title: item.attempt?.prompt?.title ?? '',
           prompt_text: item.attempt?.prompt?.prompt_text ?? '',

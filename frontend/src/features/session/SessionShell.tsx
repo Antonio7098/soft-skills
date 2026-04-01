@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { X, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +15,9 @@ interface SessionShellProps {
   readonly stepLabel?: string;
   readonly children: ReactNode;
   readonly sidebar?: ReactNode;
+  readonly secondarySidebar?: ReactNode;
+  readonly secondarySidebarPosition?: 'before-main' | 'after-main';
+  readonly contentKey?: string | number;
   readonly onEnd?: () => void;
   readonly className?: string;
   readonly wide?: boolean;
@@ -39,11 +43,23 @@ export function SessionShell({
   stepLabel,
   children,
   sidebar,
+  secondarySidebar,
+  secondarySidebarPosition = 'after-main',
+  contentKey,
   onEnd,
   className,
   wide = false,
 }: SessionShellProps) {
   const navigate = useNavigate();
+  const mainRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const node = mainRef.current;
+    if (!node) {
+      return;
+    }
+    node.scrollTo({ top: 0, behavior: 'auto' });
+  }, [contentKey]);
 
   function handleEnd() {
     if (onEnd) {
@@ -87,11 +103,21 @@ export function SessionShell({
             {sidebar}
           </motion.aside>
         )}
-        <motion.main variants={childVariants} className="flex-1 overflow-y-auto p-6 md:p-10">
+        {secondarySidebar && secondarySidebarPosition === 'before-main' && (
+          <motion.aside variants={childVariants} className="w-[380px] border-r border-line overflow-y-auto p-6 shrink-0 hidden xl:block">
+            {secondarySidebar}
+          </motion.aside>
+        )}
+        <motion.main ref={mainRef} variants={childVariants} className="flex-1 overflow-y-auto p-6 md:p-10">
           <div className={cn('flex flex-col gap-8', wide ? 'w-full' : 'max-w-2xl mx-auto')}>
             {children}
           </div>
         </motion.main>
+        {secondarySidebar && secondarySidebarPosition === 'after-main' && (
+          <motion.aside variants={childVariants} className="w-[380px] border-l border-line overflow-y-auto p-6 shrink-0 hidden xl:block">
+            {secondarySidebar}
+          </motion.aside>
+        )}
       </div>
     </motion.div>
   );

@@ -28,7 +28,7 @@ export function getLevelDescription(
   rubricId: string,
   skillSlug: string,
   score: number,
-  rubricCriteria: RubricCriterionView[],
+  rubricCriteria: RubricCriterionView[] | undefined,
 ): string {
   const criterion = getRubricCriteriaForSkill(rubricId, skillSlug, rubricCriteria);
   if (!criterion) return `Score ${score}`;

@@ -9,10 +9,16 @@ import {
   SkipForward,
   Brain,
   Target,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  Lightbulb,
+  ThumbsUp,
 } from 'lucide-react';
 import { Card } from '@/design-system/primitives/Card';
 import { Badge } from '@/design-system/primitives/Badge';
 import { Button } from '@/design-system/primitives/Button';
+import { ProgressBar } from '@/design-system/primitives/ProgressBar';
 import { LoadingState } from '@/design-system/patterns/LoadingState';
 import { ErrorState } from '@/design-system/patterns/ErrorState';
 import { SessionShell } from '@/features/session/SessionShell';
@@ -20,6 +26,7 @@ import { PromptDisplay } from '@/features/session/PromptDisplay';
 import { ResponseInput } from '@/features/session/ResponseInput';
 import { AssessingOverlay } from '@/features/session/AssessingOverlay';
 import { ContextPanel } from '@/features/session/ContextPanel';
+import { PostSessionResults } from '@/features/session/PostSessionResults';
 import { useData } from '@/data';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
 import type {
@@ -28,7 +35,12 @@ import type {
   AttemptView,
   ScenarioView,
 } from '@/data';
-import { getDomainDifficultyVariant } from '@/lib/variant-helpers';
+import {
+  isBinaryRubric,
+  getLevelDescription,
+  formatScore,
+} from '@/data';
+import { getScoreVariant, getDomainDifficultyVariant } from '@/lib/variant-helpers';
 import { cn } from '@/lib/cn';
 
 type Phase = 'loading' | 'practicing' | 'assessing' | 'complete' | 'error';
@@ -95,11 +107,89 @@ function RunProgressSidebar({ run, currentIndex }: { run: PracticeRunView; curre
   );
 }
 
+function PerSkillFeedbackCard({
+  assessment,
+  rubricId,
+  index,
+}: {
+  assessment: import('@/data').PerSkillAssessment;
+  rubricId: string;
+  index: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const binary = isBinaryRubric(rubricId, undefined);
+  const maxScore = binary ? 2 : 5;
+  const levelDescription = getLevelDescription(rubricId, assessment.skill_slug, assessment.score, undefined);
+  const scoreLabel = formatScore(rubricId, assessment.score, undefined);
+  const skillName = assessment.skill_slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1 + index * 0.06, duration: 0.25 }}
+    >
+      <Card variant="outlined" padding="sm" className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Target className="w-3.5 h-3.5 text-accent" />
+            <span className="text-body-xs font-medium text-content-primary">{skillName}</span>
+          </div>
+          <Badge variant={getScoreVariant(assessment.score)} size="sm">
+            {scoreLabel}
+          </Badge>
+        </div>
+
+        <ProgressBar
+          value={(assessment.score / maxScore) * 100}
+          size="sm"
+          variant={assessment.score >= (binary ? 2 : 4) ? 'success' : 'accent'}
+        />
+
+        <p className="text-body-xs text-content-secondary leading-relaxed">
+          <span className="font-medium">Level {assessment.score}:</span> {levelDescription}
+        </p>
+
+        {assessment.rationale && (
+          <p className="text-body-xs text-content-tertiary leading-relaxed italic">
+            {assessment.rationale}
+          </p>
+        )}
+
+        {(assessment.evidence?.length ?? 0) > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1 text-body-xs text-accent hover:text-accent/80 transition-colors"
+          >
+            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {expanded ? 'Hide' : 'Show'} evidence ({assessment.evidence?.length ?? 0})
+          </button>
+        )}
+
+        {expanded && (
+          <div className="flex flex-col gap-2 pt-2 border-t border-line">
+            {(assessment.evidence ?? []).map((ev, i) => (
+              <div key={i} className="flex flex-col gap-1">
+                <p className="text-body-xs text-content-primary italic">"{ev.quote}"</p>
+                <p className="text-body-xs text-content-secondary">{ev.explanation}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </motion.div>
+  );
+}
+
 function ItemResultCard({ attempt, onNext, isLast }: {
   attempt: AttemptView;
   onNext: () => void;
   isLast: boolean;
 }) {
+  const assessment = attempt.assessment;
+  const rubricId = assessment?.rubric_id ?? '';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -114,29 +204,67 @@ function ItemResultCard({ attempt, onNext, isLast }: {
             <span className="text-body-md font-medium text-content-primary">Response Submitted</span>
           </div>
           <Badge variant="success" size="sm">
-            Score: {Math.round(attempt.assessment?.overall_score ?? 0)}%
+            Score: {Math.round(assessment?.overall_score ?? 0)}%
           </Badge>
         </div>
 
-        {attempt.assessment && (
+        {assessment && (
           <>
-            {attempt.assessment.strengths.length > 0 && (
+            {assessment.summary && (
+              <p className="text-body-sm text-content-secondary leading-relaxed">{assessment.summary}</p>
+            )}
+
+            {(assessment.per_skill_assessments?.length ?? 0) > 0 && (
+              <div className="flex flex-col gap-3">
+                <span className="text-body-xs font-semibold text-content-secondary uppercase tracking-wider">Skill Breakdown</span>
+                {assessment.per_skill_assessments.map((psa, i) => (
+                  <PerSkillFeedbackCard
+                    key={psa.skill_slug}
+                    assessment={psa}
+                    rubricId={rubricId}
+                    index={i}
+                  />
+                ))}
+              </div>
+            )}
+
+            {assessment.strengths.length > 0 && (
               <div className="flex flex-col gap-2">
-                <span className="text-body-xs font-semibold text-content-secondary uppercase tracking-wider">Strengths</span>
+                <div className="flex items-center gap-2">
+                  <ThumbsUp className="w-3.5 h-3.5 text-status-success" />
+                  <span className="text-body-xs font-semibold text-status-success">Strengths</span>
+                </div>
                 <ul className="flex flex-col gap-1 pl-5">
-                  {attempt.assessment.strengths.map((s, i) => (
+                  {assessment.strengths.map((s, i) => (
                     <li key={i} className="text-body-sm text-content-primary list-disc">{s}</li>
                   ))}
                 </ul>
               </div>
             )}
 
-            {attempt.assessment.weaknesses.length > 0 && (
+            {assessment.weaknesses.length > 0 && (
               <div className="flex flex-col gap-2">
-                <span className="text-body-xs font-semibold text-content-secondary uppercase tracking-wider">Areas to Improve</span>
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 text-status-warning" />
+                  <span className="text-body-xs font-semibold text-status-warning">Areas to Improve</span>
+                </div>
                 <ul className="flex flex-col gap-1 pl-5">
-                  {attempt.assessment.weaknesses.map((w, i) => (
+                  {assessment.weaknesses.map((w, i) => (
                     <li key={i} className="text-body-sm text-content-primary list-disc">{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {assessment.next_actions.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="w-3.5 h-3.5 text-accent" />
+                  <span className="text-body-xs font-semibold text-accent-text">Next Steps</span>
+                </div>
+                <ul className="flex flex-col gap-1 pl-5">
+                  {assessment.next_actions.map((a, i) => (
+                    <li key={i} className="text-body-sm text-content-primary list-disc">{a}</li>
                   ))}
                 </ul>
               </div>
@@ -163,8 +291,70 @@ function ItemResultCard({ attempt, onNext, isLast }: {
   );
 }
 
+function PerQuestionSummary({ run, attempts }: { run: PracticeRunView; attempts: AttemptView[] }) {
+  return (
+    <Card variant="default" padding="lg" className="flex flex-col gap-4">
+      <h3 className="text-body-sm font-semibold text-content-secondary uppercase tracking-wider">
+        Per-Question Results
+      </h3>
+      <div className="flex flex-col gap-3">
+        {run.items.map((item, idx) => {
+          const attempt = attempts.find(a => a.prompt.title === item.title);
+          const itemScore = attempt?.assessment?.overall_score;
+          const rubricId = attempt?.assessment?.rubric_id ?? '';
+          const binary = rubricId.includes('quick_practice');
+
+          return (
+            <Card key={`${item.item_type}-${item.id}`} variant="outlined" padding="md" className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    'w-6 h-6 rounded-full flex items-center justify-center text-xs',
+                    item.status === 'completed' ? 'bg-status-success/20 text-status-success' : 'bg-surface-secondary text-content-tertiary',
+                  )}>
+                    {item.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5" /> : idx + 1}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-body-sm font-medium text-content-primary">{item.title}</span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={getDomainDifficultyVariant(item.difficulty)} size="sm">
+                        {item.difficulty}
+                      </Badge>
+                      <Badge variant="default" size="sm">
+                        {item.item_type === 'prompt_item' ? 'Question' : 'Scenario'}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                {itemScore !== undefined && itemScore !== null && (
+                  <Badge variant={itemScore >= (binary ? 2 : 4) ? 'success' : itemScore >= (binary ? 1 : 3) ? 'warning' : 'error'} size="md">
+                    {binary
+                      ? (itemScore >= 2 ? 'Pass' : 'Fail')
+                      : `${Math.round(itemScore)}/5`}
+                  </Badge>
+                )}
+              </div>
+
+              {attempt?.assessment && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {attempt.assessment.per_skill_assessments.map(psa => (
+                    <Badge key={psa.skill_slug} variant="accent" size="sm">
+                      {psa.skill_slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}: {binary ? (psa.score >= 2 ? 'Pass' : 'Fail') : `${psa.score}/5`}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 function RunResultsBreakdown({ run, attempts }: { run: PracticeRunView; attempts: AttemptView[] }) {
   const score = run.summary.overall_score;
+  const lastAttempt = attempts.length > 0 ? attempts[attempts.length - 1] : null;
 
   return (
     <motion.div
@@ -174,7 +364,7 @@ function RunResultsBreakdown({ run, attempts }: { run: PracticeRunView; attempts
       }}
       initial="hidden"
       animate="visible"
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-8"
     >
       <motion.div
         variants={{
@@ -200,69 +390,15 @@ function RunResultsBreakdown({ run, attempts }: { run: PracticeRunView; attempts
         )}
       </motion.div>
 
-      <Card variant="default" padding="lg" className="flex flex-col gap-4">
-        <h3 className="text-body-sm font-semibold text-content-secondary uppercase tracking-wider">
-          Per-Question Results
-        </h3>
-        <div className="flex flex-col gap-4">
-          {run.items.map((item, idx) => {
-            const attempt = attempts.find(a => a.prompt.title === item.title);
-            const itemScore = attempt?.assessment?.overall_score;
-            const rubricId = attempt?.assessment?.rubric_id ?? '';
-            const binary = rubricId.includes('quick_practice');
+      <PerQuestionSummary run={run} attempts={attempts} />
 
-            return (
-              <Card key={`${item.item_type}-${item.id}`} variant="outlined" padding="md" className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      'w-6 h-6 rounded-full flex items-center justify-center text-xs',
-                      item.status === 'completed' ? 'bg-status-success/20 text-status-success' : 'bg-surface-secondary text-content-tertiary',
-                    )}>
-                      {item.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5" /> : idx + 1}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-body-sm font-medium text-content-primary">{item.title}</span>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={getDomainDifficultyVariant(item.difficulty)} size="sm">
-                          {item.difficulty}
-                        </Badge>
-                        <Badge variant="default" size="sm">
-                          {item.item_type === 'prompt_item' ? 'Question' : 'Scenario'}
-                        </Badge>
-                        {binary && <Badge variant="warning" size="sm">Pass/Fail</Badge>}
-                        {!binary && <Badge variant="accent" size="sm">1-5 Scale</Badge>}
-                      </div>
-                    </div>
-                  </div>
-                  {itemScore !== undefined && itemScore !== null && (
-                    <Badge variant={itemScore >= (binary ? 2 : 4) ? 'success' : itemScore >= (binary ? 1 : 3) ? 'warning' : 'error'} size="md">
-                      {binary
-                        ? (itemScore >= 2 ? 'Pass' : 'Fail')
-                        : `${Math.round(itemScore)}/5`}
-                    </Badge>
-                  )}
-                </div>
-
-                {attempt?.assessment && (
-                  <div className="flex flex-col gap-2 pt-2 border-t border-line">
-                    <div className="flex flex-wrap gap-1">
-                      {attempt.assessment.per_skill_assessments.map(psa => (
-                        <Badge key={psa.skill_slug} variant="accent" size="sm">
-                          {psa.skill_slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}: {binary ? (psa.score >= 2 ? 'Pass' : 'Fail') : `${psa.score}/5`}
-                        </Badge>
-                      ))}
-                    </div>
-                    {attempt.assessment.summary && (
-                      <p className="text-body-xs text-content-secondary">{attempt.assessment.summary}</p>
-                    )}
-                  </div>
-                )}
-              </Card>
-            );
-          })}
-        </div>
-      </Card>
+      {lastAttempt?.assessment && (
+        <PostSessionResults
+          attempt={lastAttempt}
+          onRetry={() => undefined}
+          continueLabel="Next Question"
+        />
+      )}
     </motion.div>
   );
 }
@@ -311,7 +447,8 @@ export function PracticeRunSession() {
   }, [loadSession]);
 
   useEffect(() => {
-    if (!run || sessions.length === 0) {
+    const currentSession = sessions[currentSessionIndex];
+    if (!run || !currentSession) {
       setCurrentScenario(null);
       return;
     }
@@ -324,7 +461,9 @@ export function PracticeRunSession() {
 
     data.listCollections()
       .then(cols => {
-        const scenario = cols.flatMap(c => c.scenarios).find(s => s.id === item.id);
+        const scenario = cols
+          .flatMap(c => c.scenarios)
+          .find(s => s.id === currentSession.content_item_id || s.id === item.id);
         setCurrentScenario(scenario ?? null);
       });
   }, [run, sessions, currentSessionIndex, data]);
@@ -444,32 +583,28 @@ export function PracticeRunSession() {
       totalSteps={sessions.length}
       stepLabel="Item"
       sidebar={<RunProgressSidebar run={run} currentIndex={currentSessionIndex} />}
+      secondarySidebar={isScenario ? <ContextPanel scenario={currentScenario} /> : undefined}
+      secondarySidebarPosition="before-main"
+      contentKey={`${currentSessionIndex}-${phase}`}
       onEnd={handleEnd}
       wide={!!isScenario}
     >
       {phase === 'practicing' && currentItem && (
         <>
           {currentItem.item_type === 'scenario' && currentScenario ? (
-            <div className="flex gap-6">
-              <div className="w-80 shrink-0">
-                <ContextPanel scenario={currentScenario} />
-              </div>
-              <div className="flex-1 flex justify-center">
-                <div className="w-full max-w-2xl flex flex-col gap-6">
-                  <PromptDisplay
-                    title={currentItem.title}
-                    promptText={scenarioPromptText ?? ''}
-                    difficulty={currentItem.difficulty}
-                    skillSlugs={currentItem.target_skill_slugs}
-                  />
-                  <ResponseInput
-                    onSubmit={handleSubmit}
-                    placeholder="Write your response here..."
-                    submitLabel="Submit Response"
-                    minLength={10}
-                  />
-                </div>
-              </div>
+            <div className="w-full max-w-2xl mx-auto flex flex-col gap-6">
+              <PromptDisplay
+                title={currentItem.title}
+                promptText={scenarioPromptText ?? ''}
+                difficulty={currentItem.difficulty}
+                skillSlugs={currentItem.target_skill_slugs}
+              />
+              <ResponseInput
+                onSubmit={handleSubmit}
+                placeholder="Write your response here..."
+                submitLabel="Submit Response"
+                minLength={10}
+              />
             </div>
           ) : (
             <div className="flex flex-col gap-6">

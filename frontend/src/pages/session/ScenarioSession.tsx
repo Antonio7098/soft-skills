@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useData, buildMockAttemptView } from '@/data';
+import { useData } from '@/data';
 import type { ScenarioSessionView, AttemptView } from '@/data';
 import { useSessionTimer } from '@/hooks/useSessionTimer';
 import { LoadingState } from '@/design-system/patterns/LoadingState';
@@ -11,7 +11,6 @@ import { ResponseInput } from '@/features/session/ResponseInput';
 import { AssessingOverlay } from '@/features/session/AssessingOverlay';
 import { PostSessionResults } from '@/features/session/PostSessionResults';
 import { ContextPanel } from '@/features/session/ContextPanel';
-import { TurnHistory } from '@/features/session/TurnHistory';
 
 type Phase = 'loading' | 'responding' | 'submitting' | 'assessing' | 'complete' | 'error';
 
@@ -37,26 +36,11 @@ export function ScenarioSession() {
     if (!session) return;
     setPhase('submitting');
     try {
-      const updated = await data.submitScenarioStep(session.session_id, { response_text: text });
-      setSession(updated);
-      if (updated.status === 'completed') {
-        setPhase('assessing');
-        timer.pause();
-        const allResponses = updated.history?.map((h) => h.response).join('\n\n') ?? '';
-        const mockResult = buildMockAttemptView({
-          attemptId: updated.attempt_id,
-          sessionId: updated.session_id,
-          title: updated.scenario?.title ?? 'Scenario Practice',
-          promptText: updated.scenario?.business_context ?? '',
-          difficulty: 'intermediate',
-          skillSlugs: updated.scenario?.target_skill_slugs ?? [],
-          responseText: allResponses,
-        });
-        setResult(mockResult);
-        setTimeout(() => setPhase('complete'), 1500);
-      } else {
-        setPhase('responding');
-      }
+      const attempt = await data.submitAttempt(session.attempt_id, { response_text: text });
+      setPhase('assessing');
+      timer.pause();
+      setResult(attempt);
+      setTimeout(() => setPhase('complete'), 1500);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Submission failed');
       setPhase('error');
@@ -66,32 +50,27 @@ export function ScenarioSession() {
   if (phase === 'loading') return <LoadingState message="Setting up the scenario..." />;
   if (phase === 'error') return <ErrorState message={error} onRetry={() => navigate('/practice')} />;
 
-  const previousTurns = session?.history?.map((h) => ({
-    question: h.prompt,
-    response: h.response,
-  })) ?? [];
-
   return (
     <SessionShell
       title={session?.scenario?.title ?? 'Scenario Practice'}
       timer={timer.formatted}
-      currentStep={session?.current_step ?? 1}
-      totalSteps={session?.total_steps ?? 3}
-      stepLabel="Step"
+      currentStep={1}
+      totalSteps={1}
+      stepLabel="Response"
       sidebar={session?.scenario ? <ContextPanel scenario={session.scenario} /> : undefined}
     >
       {(phase === 'responding' || phase === 'submitting') && session && (
         <>
-          <TurnHistory turns={previousTurns} />
           <PromptDisplay
-            title={`Step ${session.current_step} of ${session.total_steps}`}
+            title={session.scenario?.title ?? 'Scenario Practice'}
             promptText={session.current_prompt_text}
+            skillSlugs={session.scenario?.target_skill_slugs ?? []}
           />
           <ResponseInput
             onSubmit={handleSubmit}
             loading={phase === 'submitting'}
             minLength={10}
-            submitLabel={session.current_step >= session.total_steps ? 'Complete Scenario' : 'Submit & Continue'}
+            submitLabel="Submit Response"
             placeholder="How would you respond in this situation?"
           />
         </>

@@ -47,9 +47,6 @@ class SwitchingDataProvider implements DataProvider {
   }
 
   private shouldFallbackToMock(error: unknown): boolean {
-    if (error instanceof Error && error.message.includes('not yet implemented')) {
-      return true;
-    }
     if (DATA_MODE !== 'auto') return false;
     if (error instanceof ApiRequestError) {
       return error.isNetworkError || error.status === null;

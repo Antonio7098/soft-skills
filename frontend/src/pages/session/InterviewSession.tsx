@@ -36,7 +36,7 @@ export function InterviewSession() {
     if (!session) return;
     setPhase('submitting');
     try {
-      const updated = await data.submitInterviewTurn(session.session_id, { response_text: text });
+      const updated = await data.submitInterviewTurn(session.attempt_id, { response_text: text });
       setSession(updated);
       if (updated.status === 'completed') {
         setPhase('assessing');

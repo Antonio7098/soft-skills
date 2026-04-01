@@ -111,7 +111,7 @@ export function StartPracticeSessionModal({ isOpen, onClose }: StartPracticeSess
       const title = runTitle.trim() || `Practice Session — ${selectedItems.length} items`;
       const run = await data.createPracticeRun({
         title,
-        selected_items: selectedItems.map((s) => ({ item_id: s.item_id, item_type: s.item_type })),
+        selected_items: selectedItems.map((s) => ({ item_id: s.item_id, item_type: s.item_type, prompt_type: s.prompt_type })),
       });
 
       const sessions = await data.getPracticeSessions(run.run_id);

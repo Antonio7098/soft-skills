@@ -406,6 +406,30 @@ RUBRIC_SEEDS: tuple[RubricSeed, ...] = (
 )
 
 
+def _criteria_data_from_seed(criteria: tuple[RubricCriterionSeed, ...]) -> list[dict[str, object]]:
+    return [
+        {
+            "criterion_ref": criterion.criterion_ref,
+            "skill_slug": criterion.skill_slug,
+            "title": criterion.title,
+            "description": criterion.description,
+            "weight": criterion.weight,
+            "required": criterion.required,
+            "position": criterion.position,
+            "levels": [
+                {
+                    f"level_{level.level}": {
+                        "description": level.description,
+                        "examples": list(level.examples),
+                    }
+                }
+                for level in criterion.levels
+            ],
+        }
+        for criterion in criteria
+    ]
+
+
 class TaxonomyService:
     """Seed and list the frozen Sprint 0 taxonomy and rubric model."""
 
@@ -448,45 +472,52 @@ class TaxonomyService:
                         )
             if session.query(RubricRecord).count() == 0:
                 for rubric_seed in RUBRIC_SEEDS:
-                    rubric_id = rubric_seed.rubric_id
-                    criteria_data = [
-                        {
-                            "criterion_ref": criterion.criterion_ref,
-                            "skill_slug": criterion.skill_slug,
-                            "title": criterion.title,
-                            "description": criterion.description,
-                            "weight": criterion.weight,
-                            "required": criterion.required,
-                            "position": criterion.position,
-                            "levels": [
-                                {
-                                    f"level_{level.level}": {
-                                        "description": level.description,
-                                        "examples": list(level.examples),
-                                    }
-                                }
-                                for level in criterion.levels
-                            ],
-                        }
-                        for criterion in rubric_seed.criteria
-                    ]
                     session.add(
                         RubricRecord(
-                            id=rubric_id,
+                            id=rubric_seed.rubric_id,
                             skill_slug="general",
                             name=rubric_seed.name,
                             content_type=rubric_seed.content_type,
                             schema_version=rubric_seed.schema_version,
                         )
                     )
+            for rubric_seed in RUBRIC_SEEDS:
+                criteria_data = _criteria_data_from_seed(rubric_seed.criteria)
+                rubric_record = session.get(RubricRecord, rubric_seed.rubric_id)
+                if rubric_record is None:
+                    rubric_record = RubricRecord(
+                        id=rubric_seed.rubric_id,
+                        skill_slug="general",
+                        name=rubric_seed.name,
+                        content_type=rubric_seed.content_type,
+                        schema_version=rubric_seed.schema_version,
+                    )
+                    session.add(rubric_record)
+                else:
+                    rubric_record.name = rubric_seed.name
+                    rubric_record.content_type = rubric_seed.content_type
+                    rubric_record.schema_version = rubric_seed.schema_version
+
+                version_record = (
+                    session.query(RubricVersionRecord)
+                    .filter(
+                        RubricVersionRecord.rubric_id == rubric_seed.rubric_id,
+                        RubricVersionRecord.version == rubric_seed.version,
+                    )
+                    .one_or_none()
+                )
+                if version_record is None:
                     session.add(
                         RubricVersionRecord(
-                            rubric_id=rubric_id,
+                            rubric_id=rubric_seed.rubric_id,
                             version=rubric_seed.version,
                             criteria=criteria_data,
                             status="published",
                         )
                     )
+                else:
+                    version_record.criteria = criteria_data
+                    version_record.status = "published"
             session.commit()
 
         self._workflow_events.record(
