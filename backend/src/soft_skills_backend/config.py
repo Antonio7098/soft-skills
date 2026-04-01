@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     llm_marking_per_skill_prompt_version: str | None = Field(default=None)
     llm_marking_aggregation_model: str | None = Field(default=None)
     llm_marking_aggregation_prompt_version: str | None = Field(default=None)
+    llm_marking_backup_model: str | None = Field(default=None)
     llm_marking_timeout_seconds: float = Field(default=30.0, gt=0, le=300.0)
 
     llm_creator_blueprint_model: str | None = Field(default=None)
