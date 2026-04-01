@@ -85,6 +85,9 @@ class PromptRepository:
             return record
 
     def ensure_seeded(self, definitions: list[BuiltinPromptDefinition]) -> None:
+        self.sync_builtins(definitions)
+
+    def sync_builtins(self, definitions: list[BuiltinPromptDefinition]) -> None:
         if self._builtins_seeded:
             return
         with self._session_factory() as session:
@@ -92,6 +95,8 @@ class PromptRepository:
                 prompt_record = self._get_or_create_prompt_record(
                     session, definition.name, definition.prompt_type
                 )
+                prompt_record.prompt_type = definition.prompt_type
+                prompt_record.variables_schema = definition.variables_schema
                 existing = (
                     session.query(PromptVersionRecord)
                     .filter(
@@ -100,18 +105,23 @@ class PromptRepository:
                     )
                     .first()
                 )
-                if existing is not None:
-                    continue
-                session.add(
-                    PromptVersionRecord(
-                        prompt_id=prompt_record.id,
-                        version=definition.version,
-                        template=definition.template,
-                        variables_schema=definition.variables_schema,
-                        output_schema=definition.output_schema,
-                        status=definition.status,
+                if existing is None:
+                    session.add(
+                        PromptVersionRecord(
+                            prompt_id=prompt_record.id,
+                            version=definition.version,
+                            template=definition.template,
+                            variables_schema=definition.variables_schema,
+                            output_schema=definition.output_schema,
+                            status=definition.status,
+                        )
                     )
-                )
+                    continue
+                existing.template = definition.template
+                existing.variables_schema = definition.variables_schema
+                existing.output_schema = definition.output_schema
+                existing.status = definition.status
+                existing.updated_at = datetime.now(UTC)
             session.commit()
         self._builtins_seeded = True
 

@@ -40,7 +40,7 @@ def create_app(settings: Settings | None = None, container: AppContainer | None 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         resolved_container.background_tasks.attach(asyncio.get_running_loop())
-        resolved_container.taxonomy_service.bootstrap()
+        resolved_container.bootstrap()
         logger.info(
             "application.startup",
             environment=resolved_settings.environment,

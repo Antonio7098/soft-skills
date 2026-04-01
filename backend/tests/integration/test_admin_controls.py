@@ -10,6 +10,8 @@ from soft_skills_backend.modules.practice.domain.practice import AssessmentDraft
 from soft_skills_backend.modules.practice.workflows.assessment import AssessmentTransformPayload
 from soft_skills_backend.platform.db.models import (
     CollectionVerificationReviewRecord,
+    PromptRecord,
+    PromptVersionRecord,
     WorkflowEventRecord,
 )
 
@@ -301,6 +303,64 @@ async def test_admin_prompt_registry_seeds_builtins_and_supports_crud(
     analytics = analytics_response.json()["data"]
     assert analytics["render_count"] == 0
     assert analytics["failure_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_prompt_registry_sync_updates_stale_builtin_versions(
+    app, client, test_settings
+) -> None:
+    del client
+    _migrate(test_settings)
+
+    with app.state.container.session_factory() as session:
+        session.add(
+            PromptRecord(
+                id="creator-collection-structured-blueprint",
+                name="creator-collection-structured-blueprint",
+                prompt_type="generation",
+                variables_schema={},
+            )
+        )
+        session.flush()
+        session.add(
+            PromptVersionRecord(
+                prompt_id="creator-collection-structured-blueprint",
+                version="creator.collection.structured-blueprint.v3",
+                template="stale template",
+                variables_schema={},
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "prompt_items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["target_skill_slugs"],
+                            },
+                        }
+                    },
+                },
+                status="published",
+            )
+        )
+        session.commit()
+
+    app.state.container.prompt_registry.sync_builtins()
+
+    with app.state.container.session_factory() as session:
+        record = (
+            session.query(PromptVersionRecord)
+            .join(PromptRecord, PromptRecord.id == PromptVersionRecord.prompt_id)
+            .filter(
+                PromptRecord.name == "creator-collection-structured-blueprint",
+                PromptVersionRecord.version == "creator.collection.structured-blueprint.v3",
+            )
+            .one()
+        )
+
+    assert record.template != "stale template"
+    prompt_items = record.output_schema["properties"]["prompt_items"]["items"]
+    assert "target_skill_slugs" not in prompt_items.get("required", [])
 
 
 @pytest.mark.asyncio

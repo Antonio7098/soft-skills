@@ -78,36 +78,26 @@ class Settings(BaseSettings):
     )
 
     llm_assistant_model: str = Field(default="openai/gpt-oss-20b")
-    llm_assistant_prompt_version: str = Field(default="assistant_orchestrator@v6")
+    llm_assistant_prompt_version: str | None = Field(default=None)
     llm_admin_agent_model: str | None = Field(default=None)
-    llm_admin_agent_planning_prompt_version: str = Field(default="admin-agent.plan.v1")
+    llm_admin_agent_planning_prompt_version: str | None = Field(default=None)
     admin_agent_runtime_config_version: str = Field(default="admin-agent.runtime.v1")
     admin_agent_query_timeout_seconds: float = Field(default=5.0, gt=0, le=30.0)
     admin_agent_query_row_limit: int = Field(default=50, ge=1, le=200)
     admin_agent_conversation_history_limit: int = Field(default=4, ge=0, le=10)
 
     llm_marking_per_skill_model: str | None = Field(default=None)
-    llm_marking_per_skill_prompt_version: str = Field(
-        default="assessment.quick-practice.v1",
-    )
+    llm_marking_per_skill_prompt_version: str | None = Field(default=None)
     llm_marking_aggregation_model: str | None = Field(default=None)
-    llm_marking_aggregation_prompt_version: str = Field(
-        default="assessment.aggregation.v1",
-    )
+    llm_marking_aggregation_prompt_version: str | None = Field(default=None)
     llm_marking_timeout_seconds: float = Field(default=30.0, gt=0, le=300.0)
 
     llm_creator_blueprint_model: str | None = Field(default=None)
-    llm_creator_blueprint_prompt_version: str = Field(
-        default="creator.collection.structured-blueprint.v3",
-    )
+    llm_creator_blueprint_prompt_version: str | None = Field(default=None)
     llm_creator_prompt_item_model: str | None = Field(default=None)
-    llm_creator_prompt_item_prompt_version: str = Field(
-        default="creator.prompt-item.worker.v1",
-    )
+    llm_creator_prompt_item_prompt_version: str | None = Field(default=None)
     llm_creator_scenario_model: str | None = Field(default=None)
-    llm_creator_scenario_prompt_version: str = Field(
-        default="creator.scenario.worker.v1",
-    )
+    llm_creator_scenario_prompt_version: str | None = Field(default=None)
 
     llm_default_model: str = Field(default="openai/gpt-oss-20b")
     llm_default_backup_model: str | None = Field(default=None)
@@ -156,6 +146,25 @@ class Settings(BaseSettings):
             return tuple(part.strip() for part in value.split(",") if part.strip())
         return tuple(value)
 
+    @field_validator(
+        "llm_assistant_prompt_version",
+        "llm_admin_agent_planning_prompt_version",
+        "llm_marking_per_skill_prompt_version",
+        "llm_marking_aggregation_prompt_version",
+        "llm_creator_blueprint_prompt_version",
+        "llm_creator_prompt_item_prompt_version",
+        "llm_creator_scenario_prompt_version",
+        mode="before",
+    )
+    @classmethod
+    def _normalize_optional_prompt_version(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            cleaned = value.strip()
+            return cleaned or None
+        return value
+
     @property
     def is_sqlite(self) -> bool:
         return self.database_url.startswith("sqlite")
@@ -182,27 +191,66 @@ class Settings(BaseSettings):
         """Resolve the prompt version for a given LLM task."""
         match task:
             case LLMTaskKind.ASSISTANT:
-                return self.llm_assistant_prompt_version
+                return self.llm_assistant_prompt_version or _latest_assistant_prompt_version()
             case LLMTaskKind.ADMIN_AGENT:
-                return self.llm_admin_agent_planning_prompt_version
+                return self.llm_admin_agent_planning_prompt_version or "admin-agent.plan.v1"
             case LLMTaskKind.MARKING_PER_SKILL:
-                return self.llm_marking_per_skill_prompt_version
+                return (
+                    self.llm_marking_per_skill_prompt_version
+                    or _latest_marking_runtime_config().per_skill_prompt_version
+                )
             case LLMTaskKind.MARKING_AGGREGATION:
-                return self.llm_marking_aggregation_prompt_version
+                return (
+                    self.llm_marking_aggregation_prompt_version
+                    or _latest_marking_runtime_config().aggregation_prompt_version
+                )
             case LLMTaskKind.CREATOR_BLUEPRINT:
-                return self.llm_creator_blueprint_prompt_version
+                return (
+                    self.llm_creator_blueprint_prompt_version
+                    or _latest_catalog_generation_runtime_config().structured_prompt_version
+                )
             case LLMTaskKind.CREATOR_PROMPT_ITEM:
-                return self.llm_creator_prompt_item_prompt_version
+                return (
+                    self.llm_creator_prompt_item_prompt_version
+                    or _latest_catalog_generation_runtime_config().prompt_item_worker_prompt_version
+                )
             case LLMTaskKind.CREATOR_SCENARIO:
-                return self.llm_creator_scenario_prompt_version
+                return (
+                    self.llm_creator_scenario_prompt_version
+                    or _latest_catalog_generation_runtime_config().scenario_worker_prompt_version
+                )
 
     @property
     def creator_structured_generation_prompt_version(self) -> str:
-        return self.llm_creator_blueprint_prompt_version
+        return (
+            self.llm_creator_blueprint_prompt_version
+            or _latest_catalog_generation_runtime_config().structured_prompt_version
+        )
 
     @property
     def creator_chat_generation_prompt_version(self) -> str:
-        return self.llm_creator_blueprint_prompt_version
+        return (
+            self.llm_creator_blueprint_prompt_version
+            or _latest_catalog_generation_runtime_config().chat_prompt_version
+        )
+
+
+def _latest_assistant_prompt_version() -> str:
+    from soft_skills_backend.modules.assistant.workflows.prompting import ASSISTANT_PROMPT_VERSION
+
+    return ASSISTANT_PROMPT_VERSION
+
+
+def _latest_marking_runtime_config():
+    from soft_skills_backend.engines.config import load_marking_runtime_config
+
+    return load_marking_runtime_config()
+
+
+def _latest_catalog_generation_runtime_config():
+    from soft_skills_backend.engines.config import load_catalog_generation_runtime_config
+
+    return load_catalog_generation_runtime_config()
 
 
 @lru_cache(maxsize=1)

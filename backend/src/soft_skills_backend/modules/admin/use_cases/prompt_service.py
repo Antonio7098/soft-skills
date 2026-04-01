@@ -323,7 +323,7 @@ class PromptService:
             built_in_prompt_definitions,
         )
 
-        self._prompts.ensure_seeded(built_in_prompt_definitions(self._settings))
+        self._prompts.sync_builtins(built_in_prompt_definitions(self._settings))
 
     def _validate_definition(
         self,

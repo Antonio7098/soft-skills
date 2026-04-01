@@ -162,6 +162,7 @@ class AssistantReadSqlWorkflowSmoke(SmokeCase):
             app = create_app(smoke_settings)
             app.state.container.background_tasks.attach(asyncio.get_running_loop())
             SmokeApplicationSessionFactory()._migrate(smoke_settings)
+            app.state.container.bootstrap()
             app.state.container.assistant_service._workflows._llm_provider = (
                 _ApprovalSequencedAssistantProvider(
                     payloads=[
@@ -299,6 +300,7 @@ class AssistantReadSqlDeniedSmoke(SmokeCase):
             app = create_app(smoke_settings)
             app.state.container.background_tasks.attach(asyncio.get_running_loop())
             SmokeApplicationSessionFactory()._migrate(smoke_settings)
+            app.state.container.bootstrap()
             app.state.container.assistant_service._workflows._llm_provider = (
                 _ApprovalSequencedAssistantProvider(
                     payloads=[
@@ -480,6 +482,7 @@ class AssistantApprovalWorkflowSmoke(SmokeCase):
             app = create_app(smoke_settings)
             app.state.container.background_tasks.attach(asyncio.get_running_loop())
             SmokeApplicationSessionFactory()._migrate(smoke_settings)
+            app.state.container.bootstrap()
             app.state.container.assistant_service._workflows._llm_provider = (
                 _ApprovalSequencedAssistantProvider(
                     payloads=[

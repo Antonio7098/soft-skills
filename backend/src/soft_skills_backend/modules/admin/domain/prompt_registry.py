@@ -1,4 +1,4 @@
-"""Database-backed prompt registry with render tracking and lazy built-in seeding."""
+"""Database-backed prompt registry with built-in prompt syncing and render tracking."""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ class PromptRegistry:
         """Render one prompt version and record render analytics."""
 
         del pipeline_run_id
-        self._prompts.ensure_seeded(self._built_in_definitions())
+        self.sync_builtins()
         start_time = time.monotonic()
         event_id = uuid4().hex
         record = self._prompts.get_by_name_version(name, version)
@@ -133,7 +133,12 @@ class PromptRegistry:
     def ensure_seeded(self) -> None:
         """Ensure built-in prompts are present in the registry."""
 
-        self._prompts.ensure_seeded(self._built_in_definitions())
+        self.sync_builtins()
+
+    def sync_builtins(self) -> None:
+        """Synchronize built-in prompts into the registry, updating stale definitions."""
+
+        self._prompts.sync_builtins(self._built_in_definitions())
 
     def _upsert_metrics(
         self,

@@ -67,6 +67,8 @@ class SmokeApplicationSessionFactory:
             smoke_settings = self._build_smoke_settings(settings, temp_dir)
             app = create_app(smoke_settings)
             self._migrate(smoke_settings)
+            app.state.container.background_tasks.attach(asyncio.get_running_loop())
+            app.state.container.bootstrap()
 
             transport = httpx.ASGITransport(app=app)
             async with httpx.AsyncClient(
@@ -77,6 +79,9 @@ class SmokeApplicationSessionFactory:
                     client,
                     session_factory=app.state.container.session_factory,
                 )
+            await app.state.container.background_tasks.shutdown()
+            await app.state.container.shutdown()
+            app.state.container.dispose()
 
     def _build_smoke_settings(self, settings: Settings, temp_dir: str) -> Settings:
         database_path = Path(temp_dir) / "smoke.db"

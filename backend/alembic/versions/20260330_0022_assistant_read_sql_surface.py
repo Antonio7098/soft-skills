@@ -66,12 +66,12 @@ def upgrade() -> None:
             a.assessment_id,
             ass.overall_score,
             CASE
-                WHEN ass.strengths IS NULL OR json_array_length(ass.strengths) = 0 THEN NULL
-                ELSE json_extract(ass.strengths, '$[0]')
+                WHEN ass.strengths IS NULL OR jsonb_array_length(ass.strengths) = 0 THEN NULL
+                ELSE ass.strengths->>0
             END AS strength_summary,
             CASE
-                WHEN ass.next_actions IS NULL OR json_array_length(ass.next_actions) = 0 THEN NULL
-                ELSE json_extract(ass.next_actions, '$[0]')
+                WHEN ass.next_actions IS NULL OR jsonb_array_length(ass.next_actions) = 0 THEN NULL
+                ELSE ass.next_actions->>0
             END AS next_action_summary,
             a.created_at,
             a.submitted_at,
@@ -92,11 +92,11 @@ def upgrade() -> None:
             ps.learner_id AS user_id,
             ps.id AS snapshot_id,
             ps.source_assessment_id,
-            json_extract(ps.snapshot_payload, '$.weak_skill_slugs') AS weak_skill_slugs,
-            json_extract(ps.snapshot_payload, '$.stagnating_skill_slugs') AS stagnating_skill_slugs,
-            json_extract(ps.snapshot_payload, '$.coverage_gap_skill_slugs') AS coverage_gap_skill_slugs,
-            COALESCE(json_array_length(json_extract(ps.snapshot_payload, '$.skill_states')), 0) AS skill_state_count,
-            COALESCE(json_array_length(json_extract(ps.snapshot_payload, '$.competency_states')), 0) AS competency_state_count,
+            ps.snapshot_payload->'weak_skill_slugs' AS weak_skill_slugs,
+            ps.snapshot_payload->'stagnating_skill_slugs' AS stagnating_skill_slugs,
+            ps.snapshot_payload->'coverage_gap_skill_slugs' AS coverage_gap_skill_slugs,
+            COALESCE(jsonb_array_length(ps.snapshot_payload->'skill_states'), 0) AS skill_state_count,
+            COALESCE(jsonb_array_length(ps.snapshot_payload->'competency_states'), 0) AS competency_state_count,
             ps.created_at
         FROM progression_snapshots AS ps
         JOIN organisation_memberships AS om
@@ -114,9 +114,9 @@ def upgrade() -> None:
             ra.progress_snapshot_id,
             ra.context_snapshot_id,
             ra.candidate_count,
-            json_extract(ra.artifact_payload, '$.items[0].content_id') AS top_pick_ref,
-            json_extract(ra.artifact_payload, '$.items[0].reasons[0]') AS top_pick_reason,
-            json_extract(ra.artifact_payload, '$.alternatives') AS alternative_refs,
+            ra.artifact_payload->'items'->0->>'content_id' AS top_pick_ref,
+            ra.artifact_payload->'items'->0->'reasons'->>0 AS top_pick_reason,
+            ra.artifact_payload->'alternatives' AS alternative_refs,
             ra.created_at
         FROM recommendation_artifacts AS ra
         JOIN organisation_memberships AS om

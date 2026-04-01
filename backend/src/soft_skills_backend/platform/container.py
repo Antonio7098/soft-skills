@@ -96,6 +96,7 @@ class AppContainer:
     auth_provider: AuthAdapter
     identity_service: IdentityService
     admin_service: AdminService
+    prompt_registry: PromptRegistry
     admin_agent_service: AdminAgentService
     taxonomy_service: TaxonomyService
     assistant_service: AssistantService
@@ -115,6 +116,12 @@ class AppContainer:
     pipeline_execution_traces: SqlAlchemyPipelineExecutionTraceRepository
     stageflow_runtime: StageflowRuntime
     background_tasks: BackgroundTaskRunner
+
+    def bootstrap(self) -> None:
+        """Run startup bootstrap that requires a migrated database."""
+
+        self.prompt_registry.sync_builtins()
+        self.taxonomy_service.bootstrap()
 
     async def shutdown(self) -> None:
         """Clean up async infrastructure resources."""
@@ -311,6 +318,7 @@ def build_container(settings: Settings) -> AppContainer:
         auth_provider=auth_provider,
         identity_service=identity_service,
         admin_service=admin_service,
+        prompt_registry=prompt_registry,
         admin_agent_service=admin_agent_service,
         taxonomy_service=taxonomy_service,
         assistant_service=assistant_service,
