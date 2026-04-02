@@ -30,4 +30,4 @@ export const THEMES: Record<ThemeName, ThemeMeta> = {
   },
 } as const;
 
-export const DEFAULT_THEME: ThemeName = 'obsidian';
+export const DEFAULT_THEME: ThemeName = 'verdant';
