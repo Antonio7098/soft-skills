@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import UTC, datetime
 
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from soft_skills_backend.modules.practice.domain.practice import (
@@ -85,13 +86,20 @@ def build_attempt_history_item(session: Session, attempt: AttemptRecord) -> Atte
             status_code=404,
             details={"session_id": attempt.session_id},
         )
-    prompt = PracticePromptView.model_validate(practice_session.prompt_payload)
     assessment = (
         None
         if attempt.assessment_id is None
         else session.get(AssessmentRecord, attempt.assessment_id)
     )
-    skill_slugs = list(prompt.target_skill_slugs)
+    title = _fallback_attempt_title(practice_session)
+    skill_slugs: list[str] = []
+    try:
+        prompt = PracticePromptView.model_validate(practice_session.prompt_payload)
+    except ValidationError:
+        prompt = None
+    if prompt is not None:
+        title = prompt.title
+        skill_slugs = list(prompt.target_skill_slugs)
     if assessment is not None and assessment.skill_scores:
         skill_slugs = [
             str(item.get("skill_slug"))
@@ -101,7 +109,7 @@ def build_attempt_history_item(session: Session, attempt: AttemptRecord) -> Atte
     return AttemptHistoryItemView(
         id=attempt.id,
         session_id=attempt.session_id,
-        title=prompt.title,
+        title=title,
         practice_type=PracticeType(attempt.practice_type),
         score=0.0
         if assessment is None or assessment.overall_score is None
@@ -110,6 +118,18 @@ def build_attempt_history_item(session: Session, attempt: AttemptRecord) -> Atte
         created_at=attempt.created_at.isoformat(),
         status=AttemptStatus(attempt.status),
     )
+
+
+def _fallback_attempt_title(practice_session: PracticeSessionRecord) -> str:
+    """Build a stable title when a legacy prompt payload can no longer be validated."""
+
+    content_item_type = practice_session.content_item_type.replace("_", " ").strip()
+    practice_type = practice_session.practice_type.replace("_", " ").strip()
+    if content_item_type:
+        return content_item_type.title()
+    if practice_type:
+        return practice_type.title()
+    return "Practice attempt"
 
 
 def build_practice_run_view(session: Session, run: PracticeRunRecord) -> PracticeRunView:
