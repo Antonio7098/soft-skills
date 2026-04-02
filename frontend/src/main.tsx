@@ -1,107 +1,127 @@
-import { StrictMode } from 'react';
+import { StrictMode, Suspense, lazy, type ComponentType, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthSessionProvider, AdminGuard, UserAppGuard } from './auth';
 import { DataProviderProvider } from './data';
-import { MainLayout } from './components/layout/MainLayout';
-import { SessionLayout } from './components/layout/SessionLayout';
-import { Dashboard } from './pages/Dashboard';
-import { Practice } from './pages/Practice';
-import { Generate } from './pages/Generate';
-import { Collections } from './pages/Collections';
-import { HubBrowse } from './pages/HubBrowse';
-import { Progress } from './pages/Progress';
-import { Settings } from './pages/Settings';
-import { Assessment } from './pages/Assessment';
-import { History } from './pages/History';
-import { CollectionDetail } from './pages/CollectionDetail';
-import { ScenarioDetail } from './pages/ScenarioDetail';
-import { QuickPracticeSession } from './pages/session/QuickPracticeSession';
-import { InterviewSession } from './pages/session/InterviewSession';
-import { ScenarioSession } from './pages/session/ScenarioSession';
-import { PracticeRunSession } from './pages/session/PracticeRunSession';
-import { Chat } from './pages/Chat';
-import { Login } from './pages/Login';
-import {
-  AdminLayout,
-  AdminOverview,
-  AdminUsers,
-  AdminLearners,
-  AdminCollections,
-  AdminEvaluations,
-  AdminPrompts,
-  AdminPipelines,
-  AdminRubrics,
-  AdminAudit,
-  AdminTelemetry,
-  AdminOrgSkills,
-  AdminOrgCompetencies,
-  AdminOrgRubrics,
-  AdminOrgPromptItems,
-  AdminOrgScenarios,
-  AdminRouteAliasRedirect,
-} from './features/admin';
+import { LoadingState } from './design-system/patterns/LoadingState';
 import './index.css';
+
+function lazyPage<TModule, TExport extends keyof TModule>(
+  loader: () => Promise<TModule>,
+  exportName: TExport,
+) {
+  return lazy(async () => {
+    const module = await loader();
+    return {
+      default: module[exportName] as ComponentType<any>,
+    };
+  });
+}
+
+function withSuspense(element: ReactNode) {
+  return (
+    <Suspense fallback={<LoadingState message="Loading page..." />}>
+      {element}
+    </Suspense>
+  );
+}
+
+const MainLayout = lazyPage(() => import('./components/layout/MainLayout'), 'MainLayout');
+const SessionLayout = lazyPage(() => import('./components/layout/SessionLayout'), 'SessionLayout');
+const Dashboard = lazyPage(() => import('./pages/Dashboard'), 'Dashboard');
+const Practice = lazyPage(() => import('./pages/Practice'), 'Practice');
+const Generate = lazyPage(() => import('./pages/Generate'), 'Generate');
+const Collections = lazyPage(() => import('./pages/Collections'), 'Collections');
+const HubBrowse = lazyPage(() => import('./pages/HubBrowse'), 'HubBrowse');
+const Progress = lazyPage(() => import('./pages/Progress'), 'Progress');
+const Settings = lazyPage(() => import('./pages/Settings'), 'Settings');
+const Assessment = lazyPage(() => import('./pages/Assessment'), 'Assessment');
+const History = lazyPage(() => import('./pages/History'), 'History');
+const CollectionDetail = lazyPage(() => import('./pages/CollectionDetail'), 'CollectionDetail');
+const ScenarioDetail = lazyPage(() => import('./pages/ScenarioDetail'), 'ScenarioDetail');
+const Chat = lazyPage(() => import('./pages/Chat'), 'Chat');
+const Login = lazyPage(() => import('./pages/Login'), 'Login');
+const QuickPracticeSession = lazyPage(() => import('./pages/session/QuickPracticeSession'), 'QuickPracticeSession');
+const InterviewSession = lazyPage(() => import('./pages/session/InterviewSession'), 'InterviewSession');
+const ScenarioSession = lazyPage(() => import('./pages/session/ScenarioSession'), 'ScenarioSession');
+const PracticeRunSession = lazyPage(() => import('./pages/session/PracticeRunSession'), 'PracticeRunSession');
+const AdminLayout = lazyPage(() => import('./features/admin'), 'AdminLayout');
+const AdminOverview = lazyPage(() => import('./features/admin'), 'AdminOverview');
+const AdminUsers = lazyPage(() => import('./features/admin'), 'AdminUsers');
+const AdminLearners = lazyPage(() => import('./features/admin'), 'AdminLearners');
+const AdminCollections = lazyPage(() => import('./features/admin'), 'AdminCollections');
+const AdminEvaluations = lazyPage(() => import('./features/admin'), 'AdminEvaluations');
+const AdminPrompts = lazyPage(() => import('./features/admin'), 'AdminPrompts');
+const AdminPipelines = lazyPage(() => import('./features/admin'), 'AdminPipelines');
+const AdminRubrics = lazyPage(() => import('./features/admin'), 'AdminRubrics');
+const AdminAudit = lazyPage(() => import('./features/admin'), 'AdminAudit');
+const AdminTelemetry = lazyPage(() => import('./features/admin'), 'AdminTelemetry');
+const AdminOrgSkills = lazyPage(() => import('./features/admin'), 'AdminOrgSkills');
+const AdminOrgCompetencies = lazyPage(() => import('./features/admin'), 'AdminOrgCompetencies');
+const AdminOrgRubrics = lazyPage(() => import('./features/admin'), 'AdminOrgRubrics');
+const AdminOrgPromptItems = lazyPage(() => import('./features/admin'), 'AdminOrgPromptItems');
+const AdminOrgScenarios = lazyPage(() => import('./features/admin'), 'AdminOrgScenarios');
+const AdminRouteAliasRedirect = lazyPage(() => import('./features/admin'), 'AdminRouteAliasRedirect');
 
 const router = createBrowserRouter([
   {
     path: '/login',
-    element: <Login />,
+    element: withSuspense(<Login />),
   },
   {
     path: '/',
-    element: <UserAppGuard><MainLayout /></UserAppGuard>,
+    element: <UserAppGuard>{withSuspense(<MainLayout />)}</UserAppGuard>,
     children: [
-      { index: true, element: <Dashboard /> },
-      { path: 'practice', element: <Practice /> },
-      { path: 'generate', element: <Generate /> },
-      { path: 'collections', element: <Collections /> },
-      { path: 'collections/hub/:hubType', element: <HubBrowse /> },
-      { path: 'collections/:collectionId', element: <CollectionDetail /> },
-      { path: 'collections/:collectionId/scenario/:scenarioId', element: <ScenarioDetail /> },
-      { path: 'progress', element: <Progress /> },
-      { path: 'settings', element: <Settings /> },
-      { path: 'assessment/:attemptId', element: <Assessment /> },
-      { path: 'history', element: <History /> },
-      { path: 'chat', element: <Chat /> },
-      { path: 'chat/:sessionId', element: <Chat /> },
+      { index: true, element: withSuspense(<Dashboard />) },
+      { path: 'practice', element: withSuspense(<Practice />) },
+      { path: 'generate', element: withSuspense(<Generate />) },
+      { path: 'collections', element: withSuspense(<Collections />) },
+      { path: 'collections/hub/:hubType', element: withSuspense(<HubBrowse />) },
+      { path: 'collections/:collectionId', element: withSuspense(<CollectionDetail />) },
+      { path: 'collections/:collectionId/scenario/:scenarioId', element: withSuspense(<ScenarioDetail />) },
+      { path: 'progress', element: withSuspense(<Progress />) },
+      { path: 'settings', element: withSuspense(<Settings />) },
+      { path: 'assessment/:attemptId', element: withSuspense(<Assessment />) },
+      { path: 'history', element: withSuspense(<History />) },
+      { path: 'chat', element: withSuspense(<Chat />) },
+      { path: 'chat/:sessionId', element: withSuspense(<Chat />) },
     ],
   },
   {
     path: '/session',
-    element: <UserAppGuard><SessionLayout /></UserAppGuard>,
+    element: <UserAppGuard>{withSuspense(<SessionLayout />)}</UserAppGuard>,
     children: [
-      { path: 'quick/:promptId', element: <QuickPracticeSession /> },
-      { path: 'interview/:promptId', element: <InterviewSession /> },
-      { path: 'scenario/:scenarioId', element: <ScenarioSession /> },
-      { path: 'practice-run/:runId', element: <PracticeRunSession /> },
+      { path: 'quick/:promptId', element: withSuspense(<QuickPracticeSession />) },
+      { path: 'interview/:promptId', element: withSuspense(<InterviewSession />) },
+      { path: 'scenario/:scenarioId', element: withSuspense(<ScenarioSession />) },
+      { path: 'practice-run/:runId', element: withSuspense(<PracticeRunSession />) },
     ],
   },
   {
     path: '/admin',
-    element: <AdminGuard><AdminLayout /></AdminGuard>,
+    element: <AdminGuard>{withSuspense(<AdminLayout />)}</AdminGuard>,
     children: [
-      { index: true, element: <AdminOverview /> },
-      { path: 'users', element: <AdminUsers /> },
-      { path: 'learners', element: <AdminLearners /> },
-      { path: 'collections', element: <AdminCollections /> },
-      { path: 'evaluations', element: <AdminEvaluations /> },
-      { path: 'prompts', element: <AdminPrompts /> },
-      { path: 'pipelines', element: <AdminPipelines /> },
-      { path: 'rubrics', element: <AdminRubrics /> },
-      { path: 'audit', element: <AdminAudit /> },
-      { path: 'telemetry', element: <AdminTelemetry /> },
-      { path: 'skills', element: <AdminOrgSkills /> },
-      { path: 'competencies', element: <AdminOrgCompetencies /> },
-      { path: 'org-rubrics', element: <AdminOrgRubrics /> },
-      { path: 'prompt-items', element: <AdminOrgPromptItems /> },
-      { path: 'scenarios', element: <AdminOrgScenarios /> },
-      { path: 'orgs/:organisationId/skills', element: <AdminRouteAliasRedirect to="/admin/skills" /> },
-      { path: 'orgs/:organisationId/competencies', element: <AdminRouteAliasRedirect to="/admin/competencies" /> },
-      { path: 'orgs/:organisationId/rubrics', element: <AdminRouteAliasRedirect to="/admin/org-rubrics" /> },
-      { path: 'orgs/:organisationId/prompt-items', element: <AdminRouteAliasRedirect to="/admin/prompt-items" /> },
-      { path: 'orgs/:organisationId/scenarios', element: <AdminRouteAliasRedirect to="/admin/scenarios" /> },
+      { index: true, element: withSuspense(<AdminOverview />) },
+      { path: 'users', element: withSuspense(<AdminUsers />) },
+      { path: 'learners', element: withSuspense(<AdminLearners />) },
+      { path: 'collections', element: withSuspense(<AdminCollections />) },
+      { path: 'evaluations', element: withSuspense(<AdminEvaluations />) },
+      { path: 'prompts', element: withSuspense(<AdminPrompts />) },
+      { path: 'pipelines', element: withSuspense(<AdminPipelines />) },
+      { path: 'rubrics', element: withSuspense(<AdminRubrics />) },
+      { path: 'audit', element: withSuspense(<AdminAudit />) },
+      { path: 'telemetry', element: withSuspense(<AdminTelemetry />) },
+      { path: 'skills', element: withSuspense(<AdminOrgSkills />) },
+      { path: 'competencies', element: withSuspense(<AdminOrgCompetencies />) },
+      { path: 'org-rubrics', element: withSuspense(<AdminOrgRubrics />) },
+      { path: 'prompt-items', element: withSuspense(<AdminOrgPromptItems />) },
+      { path: 'scenarios', element: withSuspense(<AdminOrgScenarios />) },
+      { path: 'orgs/:organisationId/skills', element: withSuspense(<AdminRouteAliasRedirect to="/admin/skills" />) },
+      { path: 'orgs/:organisationId/competencies', element: withSuspense(<AdminRouteAliasRedirect to="/admin/competencies" />) },
+      { path: 'orgs/:organisationId/rubrics', element: withSuspense(<AdminRouteAliasRedirect to="/admin/org-rubrics" />) },
+      { path: 'orgs/:organisationId/prompt-items', element: withSuspense(<AdminRouteAliasRedirect to="/admin/prompt-items" />) },
+      { path: 'orgs/:organisationId/scenarios', element: withSuspense(<AdminRouteAliasRedirect to="/admin/scenarios" />) },
     ],
   },
 ]);

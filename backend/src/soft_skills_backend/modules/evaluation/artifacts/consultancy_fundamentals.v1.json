@@ -457,6 +457,7 @@
         "rubric_id": "scenario_text@v1",
         "rubric_version": "v1",
         "scenario_context": {
+          "prompt_text": "You are a business analyst on Project Insight 2025. Complete the following tasks:\n\n1. Stakeholder Analysis: Identify at least six stakeholder groups. Map them onto Mendelow's Power/Interest grid and propose an engagement strategy.\n\n2. Interview Questions: Draft 5-8 questions for Samir Hicks, Head of Lending, who is resistant to centralisation. Use open, probing, and closed questions.\n\n3. Executive Summary: Write a one-page memo to the steering committee that uses the As-Is/Gap/To-Be framework, presents two transition options with pros/cons, and gives a clear recommendation with next steps.",
           "business_context": "MoneyCraft Bank has 80 data specialists across 8 departments with different tools and practices. CEO wants to centralise into a new hub in Canary Wharf.",
           "learner_objective": "Produce a stakeholder analysis, interview plan, and executive summary that facilitates a smooth transition.",
           "constraints": ["Budget £10M", "Timeline 6 months", "No layoffs"],
