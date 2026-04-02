@@ -22,6 +22,7 @@ from soft_skills_backend.modules.assistant.workflows.runtime_models import (
 from soft_skills_backend.modules.assistant.workflows.service import (
     _build_compact_learner_context,
     _chunk_text,
+    _provider_tool_result_message,
     _required_tool_name,
     _should_rewrite_final_response,
 )
@@ -274,6 +275,22 @@ def test_should_rewrite_final_response_only_after_tool_usage() -> None:
         )
         is True
     )
+
+
+def test_provider_tool_result_message_uses_tool_role_and_call_id() -> None:
+    message = _provider_tool_result_message(
+        call_id="call-1",
+        hardened_tool_message={
+            "role": "user",
+            "content": "Tool result from get_active_practice (call_id=call-1).",
+        },
+    )
+
+    assert message == {
+        "role": "tool",
+        "tool_call_id": "call-1",
+        "content": "Tool result from get_active_practice (call_id=call-1).",
+    }
 
 
 def test_generation_progress_state_merges_stream_updates() -> None:

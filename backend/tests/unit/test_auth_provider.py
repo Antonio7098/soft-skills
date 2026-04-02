@@ -154,6 +154,67 @@ class TestHeaderAuthProvider:
         assert result.is_org_admin is False
 
     @pytest.mark.asyncio
+    async def test_get_actor_falls_back_to_single_membership_without_org_header(
+        self, auth_provider, mock_session_factory
+    ) -> None:
+        request = MagicMock(spec=Request)
+        request.headers = {
+            "X-User-ID": "test-user-123",
+        }
+
+        session = MagicMock()
+        user_record = MagicMock(spec=UserAccountRecord)
+        user_record.id = "test-user-123"
+        user_record.email = "test@example.com"
+        session.get.return_value = user_record
+
+        membership_record = MagicMock(spec=OrganisationMembershipRecord)
+        membership_record.organisation_id = "test-org-456"
+        membership_record.role = "admin"
+        session.query.return_value.filter.return_value.all.return_value = [membership_record]
+
+        mock_session_factory.return_value.__enter__ = MagicMock(return_value=session)
+        mock_session_factory.return_value.__exit__ = MagicMock(return_value=False)
+
+        result = await auth_provider.get_actor(request)
+
+        assert result is not None
+        assert result.organisation_id == "test-org-456"
+        assert result.organisation_role == "admin"
+
+    @pytest.mark.asyncio
+    async def test_get_actor_does_not_guess_when_multiple_memberships_exist(
+        self, auth_provider, mock_session_factory
+    ) -> None:
+        request = MagicMock(spec=Request)
+        request.headers = {
+            "X-User-ID": "test-user-123",
+        }
+
+        session = MagicMock()
+        user_record = MagicMock(spec=UserAccountRecord)
+        user_record.id = "test-user-123"
+        user_record.email = "test@example.com"
+        session.get.return_value = user_record
+
+        membership_a = MagicMock(spec=OrganisationMembershipRecord)
+        membership_a.organisation_id = "org-a"
+        membership_a.role = "member"
+        membership_b = MagicMock(spec=OrganisationMembershipRecord)
+        membership_b.organisation_id = "org-b"
+        membership_b.role = "admin"
+        session.query.return_value.filter.return_value.all.return_value = [membership_a, membership_b]
+
+        mock_session_factory.return_value.__enter__ = MagicMock(return_value=session)
+        mock_session_factory.return_value.__exit__ = MagicMock(return_value=False)
+
+        result = await auth_provider.get_actor(request)
+
+        assert result is not None
+        assert result.organisation_id is None
+        assert result.organisation_role is None
+
+    @pytest.mark.asyncio
     async def test_require_org_admin_raises_for_non_admin(
         self, auth_provider, mock_session_factory, mock_request_with_user
     ) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,7 @@ from uuid import uuid4
 import pytest
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from alembic import command as alembic_command
 from soft_skills_backend.engines.config import load_marking_runtime_config
@@ -943,6 +945,115 @@ async def test_assistant_query_user_context_canonicalizes_safe_view_name_and_wil
 
 
 @pytest.mark.asyncio
+async def test_assistant_safe_collections_view_includes_authored_drafts(
+    app: Any, client: Any, test_settings: Any
+) -> None:
+    _migrate(test_settings)
+    container = app.state.container
+    learner = await _bootstrap_admin_and_learner(
+        client,
+        learner_email="assistant-own-drafts@example.com",
+    )
+    created = await _create_collection(
+        client,
+        learner_id=str(learner["id"]),
+        title="My Draft Collection",
+        content_format_mix=["quick_practice_prompt"],
+        rubric_ids=["quick_practice_reset_timeline@v1"],
+        target_skill_slugs=["active-listening"],
+        target_competency_slugs=["stakeholder-management"],
+    )
+
+    with container.session_factory() as session:
+        rows = session.execute(
+            text(
+                "SELECT collection_id, title, author_user_id "
+                "FROM assistant_safe_collections_v "
+                "WHERE author_user_id = :user_id "
+                "ORDER BY updated_at DESC"
+            ),
+            {"user_id": str(learner["id"])},
+        ).mappings().all()
+
+    assert any(row["collection_id"] == created["id"] for row in rows)
+
+
+@pytest.mark.asyncio
+async def test_assistant_query_user_context_reads_attempts_without_explicit_org_header_when_single_membership(
+    app: Any, client: Any, test_settings: Any
+) -> None:
+    _migrate(test_settings)
+    container = app.state.container
+    container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
+        payloads=[
+            {
+                "action": "tool_calls",
+                "tool_calls": [
+                    {
+                        "call_id": "call-1",
+                        "tool_name": "query_user_context",
+                        "arguments": {
+                            "sql": (
+                                "SELECT attempt_id, practice_type, overall_score, assessed_at "
+                                "FROM assistant_safe_attempt_summaries_v "
+                                "ORDER BY created_at DESC LIMIT 5"
+                            )
+                        },
+                    }
+                ],
+                "final_response": None,
+            },
+            {
+                "action": "final_response",
+                "tool_calls": [],
+                "final_response": "Here are your recent attempts.",
+            },
+        ]
+    )
+    learner = await _bootstrap_org_admin_and_learner(
+        client,
+        admin_email="assistant-single-org-admin@example.com",
+        learner_email="assistant-single-org-learner@example.com",
+        org_slug="assistant-single-org",
+    )
+    admin, learner_user, _org_id = learner
+    del admin
+    _seed_attempt_summary(
+        container,
+        user_id=str(learner_user["id"]),
+        practice_type="quick_practice",
+        overall_score=3,
+    )
+
+    session_response = await client.post(
+        "/api/assistant/sessions",
+        headers={"X-User-ID": learner_user["id"]},
+        json={"title": "Attempt SQL"},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["data"]["id"]
+
+    turn_response = await client.post(
+        f"/api/assistant/sessions/{session_id}/turns",
+        headers={"X-User-ID": learner_user["id"]},
+        json={"message": "What recent practice attempts have I done?"},
+    )
+    assert turn_response.status_code == 200
+    turn = turn_response.json()["data"]
+    await _wait_for_turn_status(container, turn_id=turn["id"], expected_status="completed")
+
+    session_view_response = await client.get(
+        f"/api/assistant/sessions/{session_id}",
+        headers={"X-User-ID": learner_user["id"]},
+    )
+    assert session_view_response.status_code == 200
+    tool_call = session_view_response.json()["data"]["turns"][0]["tool_calls"][0]
+    assert tool_call["tool_name"] == "query_user_context"
+    assert tool_call["status"] == "completed"
+    assert tool_call["result"]["row_count"] >= 1
+
+
+@pytest.mark.asyncio
 async def test_assistant_query_user_context_denies_non_allowlisted_sql(
     app: Any, client: Any, test_settings: Any
 ) -> None:
@@ -1619,3 +1730,120 @@ async def test_assistant_stream_replays_backlog_after_reconnect(
     )
     assert sessions_response.status_code == 200
     assert sessions_response.json()["data"][0]["id"] == session_id
+
+
+@pytest.mark.asyncio
+async def test_assistant_event_stream_replays_persisted_events(
+    app: Any, client: Any, test_settings: Any
+) -> None:
+    _migrate(test_settings)
+    container = app.state.container
+    container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
+        payloads=[
+            {
+                "action": "final_response",
+                "tool_calls": [],
+                "final_response": "Use one focused practice prompt and review the feedback.",
+            }
+        ]
+    )
+    learner = await _register_user_async(
+        client,
+        email="assistant-sse-replay@example.com",
+        display_name="Replay Stream User",
+    )
+    session_response = await client.post(
+        "/api/assistant/sessions",
+        headers={"X-User-ID": str(learner["id"])},
+        json={"title": "Replay Stream"},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["data"]["id"]
+
+    turn_response = await client.post(
+        f"/api/assistant/sessions/{session_id}/turns",
+        headers={"X-User-ID": str(learner["id"])},
+        json={"message": "How should I practice next?"},
+    )
+    assert turn_response.status_code == 200
+    turn = turn_response.json()["data"]
+
+    await _wait_for_turn_status(container, turn_id=turn["id"], expected_status="completed")
+
+    event_payloads: list[dict[str, Any]] = []
+    async with client.stream(
+        "GET",
+        f"/api/assistant/streams/{turn['stream_token']}/events",
+        headers={"X-User-ID": str(learner["id"])},
+    ) as response:
+        assert response.status_code == 200
+        async for line in response.aiter_lines():
+            if not line or not line.startswith("data: "):
+                continue
+            event_payloads.append(json.loads(line[6:]))
+
+    event_types = [payload["type"] for payload in event_payloads]
+    assert "response.completed" in event_types
+    assert "turn.completed" in event_types
+    assert event_types[-1] == "turn.completed"
+
+
+@pytest.mark.asyncio
+async def test_assistant_event_stream_can_resume_from_last_event_id(
+    app: Any, client: Any, test_settings: Any
+) -> None:
+    _migrate(test_settings)
+    container = app.state.container
+    container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
+        payloads=[
+            {
+                "action": "final_response",
+                "tool_calls": [],
+                "final_response": "Review your last attempt, then do a timed repetition.",
+            }
+        ]
+    )
+    learner = await _register_user_async(
+        client,
+        email="assistant-sse-resume@example.com",
+        display_name="Resume Stream User",
+    )
+    session_response = await client.post(
+        "/api/assistant/sessions",
+        headers={"X-User-ID": str(learner["id"])},
+        json={"title": "Resume Stream"},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["data"]["id"]
+
+    turn_response = await client.post(
+        f"/api/assistant/sessions/{session_id}/turns",
+        headers={"X-User-ID": str(learner["id"])},
+        json={"message": "What should I do next?"},
+    )
+    assert turn_response.status_code == 200
+    turn = turn_response.json()["data"]
+
+    await _wait_for_turn_status(container, turn_id=turn["id"], expected_status="completed")
+
+    all_events = container.assistant_service.list_stream_events(turn["stream_token"])
+    assert len(all_events) >= 2
+    resume_after = str(all_events[-2].sequence_number)
+
+    resumed_payloads: list[dict[str, Any]] = []
+    async with client.stream(
+        "GET",
+        f"/api/assistant/streams/{turn['stream_token']}/events",
+        headers={
+            "X-User-ID": str(learner["id"]),
+            "Last-Event-ID": resume_after,
+        },
+    ) as response:
+        assert response.status_code == 200
+        async for line in response.aiter_lines():
+            if not line or not line.startswith("data: "):
+                continue
+            resumed_payloads.append(json.loads(line[6:]))
+
+    assert len(resumed_payloads) == 1
+    assert resumed_payloads[0]["type"] == "turn.completed"

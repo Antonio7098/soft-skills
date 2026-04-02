@@ -102,6 +102,8 @@ type Action =
   | { type: 'SET_SESSION'; session: AssistantSessionView }
   | { type: 'ADD_OPTIMISTIC_MESSAGE'; message: AssistantMessageView }
   | { type: 'TURN_CREATED'; turn: AssistantTurnView }
+  | { type: 'RESPONSE_DELTA'; delta: string }
+  | { type: 'RESPONSE_COMPLETED'; content?: string; assistantMessageId?: string }
   | { type: 'TOOL_STARTED'; toolCall: AssistantToolCallView }
   | { type: 'TOOL_UPDATED'; toolCall: AssistantToolCallView }
   | { type: 'TURN_COMPLETED'; turn: AssistantTurnView }
@@ -143,6 +145,69 @@ function reducer(state: AssistantChatState, action: Action): AssistantChatState 
         activeToolCalls: [],
         status: 'streaming',
       };
+
+    case 'RESPONSE_DELTA': {
+      if (!state.activeTurn) return state;
+      const existingAssistantMessage = state.activeTurn.messages.find((msg) => msg.role === 'assistant');
+      const assistantMessage: AssistantMessageView = existingAssistantMessage
+        ? { ...existingAssistantMessage, content: `${existingAssistantMessage.content}${action.delta}` }
+        : {
+            id: `streaming-assistant-${state.activeTurn.id}`,
+            turn_id: state.activeTurn.id,
+            role: 'assistant',
+            content: action.delta,
+            metadata: {},
+            created_at: new Date().toISOString(),
+          };
+
+      const nextMessages = existingAssistantMessage
+        ? state.activeTurn.messages.map((msg) =>
+            msg.role === 'assistant' ? assistantMessage : msg,
+          )
+        : [...state.activeTurn.messages, assistantMessage];
+
+      const nextActiveTurn = { ...state.activeTurn, messages: nextMessages };
+
+      return {
+        ...state,
+        activeTurn: nextActiveTurn,
+        turns: state.turns.map((turn) => (turn.id === nextActiveTurn.id ? nextActiveTurn : turn)),
+        status: 'streaming',
+      };
+    }
+
+    case 'RESPONSE_COMPLETED': {
+      if (!state.activeTurn) return state;
+      const existingAssistantMessage = state.activeTurn.messages.find((msg) => msg.role === 'assistant');
+      if (!existingAssistantMessage && !action.content) return state;
+
+      const assistantMessage: AssistantMessageView = {
+        id: action.assistantMessageId ?? existingAssistantMessage?.id ?? `streaming-assistant-${state.activeTurn.id}`,
+        turn_id: state.activeTurn.id,
+        role: 'assistant',
+        content: action.content ?? existingAssistantMessage?.content ?? '',
+        metadata: existingAssistantMessage?.metadata ?? {},
+        created_at: existingAssistantMessage?.created_at ?? new Date().toISOString(),
+      };
+
+      const nextMessages = existingAssistantMessage
+        ? state.activeTurn.messages.map((msg) =>
+            msg.role === 'assistant' ? assistantMessage : msg,
+          )
+        : [...state.activeTurn.messages, assistantMessage];
+
+      const nextActiveTurn = {
+        ...state.activeTurn,
+        assistant_message_id: assistantMessage.id,
+        messages: nextMessages,
+      };
+
+      return {
+        ...state,
+        activeTurn: nextActiveTurn,
+        turns: state.turns.map((turn) => (turn.id === nextActiveTurn.id ? nextActiveTurn : turn)),
+      };
+    }
 
     case 'TOOL_STARTED':
       return {
@@ -372,6 +437,18 @@ export function useAssistantChat() {
       // Start streaming
       cleanupRef.current?.();
       cleanupRef.current = data.streamAssistantTurn(turn.stream_token, {
+        onResponseDelta: (payload) => {
+          if (payload.delta) {
+            dispatch({ type: 'RESPONSE_DELTA', delta: payload.delta });
+          }
+        },
+        onResponseCompleted: (payload) => {
+          dispatch({
+            type: 'RESPONSE_COMPLETED',
+            content: payload.content,
+            assistantMessageId: payload.assistant_message_id,
+          });
+        },
         onToolStarted: (tc) => dispatch({ type: 'TOOL_STARTED', toolCall: tc }),
         onToolUpdated: (tc) => dispatch({ type: 'TOOL_UPDATED', toolCall: tc }),
         onToolCompleted: (tc) => dispatch({ type: 'TOOL_UPDATED', toolCall: tc }),

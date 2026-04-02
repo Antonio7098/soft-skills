@@ -3736,6 +3736,19 @@ export const mockDataProvider: DataProvider = {
     callbacks.onToolStarted?.(runningTool);
 
     const completionDelay = isGenerate ? 2300 : isPractice ? 800 : 600;
+    const assistantMessage = turn.messages.find((item) => item.role === 'assistant');
+    const responseChunks = assistantMessage?.content
+      ? assistantMessage.content.match(/.{1,24}(\s|$)|.{1,24}/g) ?? [assistantMessage.content]
+      : [];
+    const intervalIds: number[] = [];
+
+    responseChunks.forEach((chunk, index) => {
+      const intervalId = window.setTimeout(() => {
+        callbacks.onResponseDelta?.({ index: index + 1, delta: chunk });
+      }, Math.min(completionDelay - 50, 80 * (index + 1)));
+      intervalIds.push(intervalId);
+    });
+
     const timeoutId = setTimeout(() => {
       const latestTurn = SEED_TURNS.find((item) => item.stream_token === streamToken);
       if (!latestTurn) {
@@ -3756,11 +3769,18 @@ export const mockDataProvider: DataProvider = {
         callbacks.onToolCompleted?.(completedTool);
       }
 
+      if (assistantMessage) {
+        callbacks.onResponseCompleted?.({
+          assistant_message_id: assistantMessage.id,
+          content: assistantMessage.content,
+        });
+      }
       callbacks.onTurnCompleted?.();
       callbacks.onClose?.();
     }, completionDelay);
 
     return () => {
+      intervalIds.forEach((intervalId) => clearTimeout(intervalId));
       clearTimeout(timeoutId);
       callbacks.onClose?.();
     };

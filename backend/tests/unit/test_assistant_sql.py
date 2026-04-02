@@ -80,6 +80,22 @@ def test_assistant_sql_guard_canonicalizes_collection_aliases() -> None:
     assert "title AS collection_name" in guarded.sql
 
 
+def test_assistant_sql_guard_does_not_reference_missing_collection_view_columns() -> None:
+    guard = AssistantSqlGuard(
+        schema_registry=AssistantSchemaRegistry(),
+        row_limit=25,
+    )
+
+    guarded = guard.validate_and_scope(
+        QueryUserContextCommand(
+            sql="SELECT title, difficulty, rating_count FROM assistant_safe_collections_v ORDER BY updated_at DESC"
+        )
+    )
+
+    assert "author_user_id = :user_id" in guarded.scoped_sql
+    assert "lifecycle_state" not in guarded.scoped_sql
+
+
 def test_assistant_sql_guard_accepts_taxonomy_skill_view() -> None:
     guard = AssistantSqlGuard(
         schema_registry=AssistantSchemaRegistry(),

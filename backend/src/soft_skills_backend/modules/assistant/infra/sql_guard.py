@@ -255,9 +255,7 @@ class AssistantSqlGuard:
                     "(:organisation_id IS NULL AND organisation_id IS NULL))"
                 )
             if view_name == "assistant_safe_collections_v":
-                predicates.append(
-                    "(author_user_id = :user_id OR lifecycle_state = 'published_public')"
-                )
+                predicates.append("author_user_id = :user_id")
             if "user_id" in view.scope_columns:
                 predicates.append("user_id = :user_id")
             return (

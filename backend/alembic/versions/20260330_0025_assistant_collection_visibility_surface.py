@@ -43,6 +43,7 @@ def upgrade() -> None:
             c.created_at,
             c.updated_at
         FROM collections AS c
+        WHERE c.author_user_id IS NOT NULL
         """
     )
 
@@ -73,6 +74,6 @@ def downgrade() -> None:
             c.created_at,
             c.updated_at
         FROM collections AS c
-        WHERE c.lifecycle_state = 'published'
+        WHERE c.author_user_id IS NOT NULL
         """
     )

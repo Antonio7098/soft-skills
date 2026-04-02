@@ -726,7 +726,12 @@ class AssistantWorkflowService:
                             "tool_name": tool_result.tool_name,
                         },
                     ) from exc
-                messages.append(hardened_tool)
+                messages.append(
+                    _provider_tool_result_message(
+                        call_id=tool_result.call_id,
+                        hardened_tool_message=hardened_tool,
+                    )
+                )
         raise orchestration_error(
             "Assistant exceeded the tool iteration budget",
             code="SS-ORCHESTRATION-203",
@@ -1008,6 +1013,18 @@ def _provider_tool_call_message(
             }
             for tool_request in tool_requests
         ],
+    }
+
+
+def _provider_tool_result_message(
+    *,
+    call_id: str,
+    hardened_tool_message: dict[str, str],
+) -> dict[str, Any]:
+    return {
+        "role": "tool",
+        "tool_call_id": call_id,
+        "content": hardened_tool_message.get("content", ""),
     }
 
 

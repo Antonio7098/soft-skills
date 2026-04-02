@@ -61,7 +61,7 @@ def _create_assistant_views() -> None:
             c.created_at,
             c.updated_at
         FROM collections AS c
-        WHERE c.lifecycle_state = 'published'
+        WHERE c.author_user_id IS NOT NULL
         """
     )
     op.execute(

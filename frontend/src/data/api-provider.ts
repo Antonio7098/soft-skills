@@ -205,6 +205,18 @@ function buildWebSocketUrl(path: string): string {
   return url.toString();
 }
 
+function buildApiUrl(path: string): string {
+  if (API_BASE.startsWith('http://') || API_BASE.startsWith('https://')) {
+    const base = new URL(API_BASE);
+    base.pathname = `${base.pathname.replace(/\/$/, '')}${path}`;
+    base.search = '';
+    base.hash = '';
+    return base.toString();
+  }
+
+  return new URL(`${API_BASE}${path}`, window.location.origin).toString();
+}
+
 function deriveSessionFromUser(user: UserView): AuthSessionView {
   const storedActiveOrgId = getStoredActiveOrganisation();
   const platformRole = user.role === 'superadmin'
@@ -1004,56 +1016,127 @@ export const apiDataProvider: DataProvider = {
     }),
 
   streamAssistantTurn: (streamToken, callbacks) => {
-    const wsUrl = buildWebSocketUrl(`/assistant/streams/${encodeURIComponent(streamToken)}`);
-    const ws = new WebSocket(wsUrl);
+    const controller = new AbortController();
+    const streamUrl = buildApiUrl(`/assistant/streams/${encodeURIComponent(streamToken)}/events`);
+    let closed = false;
+    let lastEventId: string | null = null;
+    let sawTerminalEvent = false;
 
-    ws.onopen = () => {
-      console.log('Assistant stream connected');
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      callbacks.onClose?.();
     };
 
-    ws.onmessage = (event) => {
+    const dispatchEvent = (data: Record<string, unknown>) => {
+      if (data.type === 'response.delta' && callbacks.onResponseDelta) {
+        callbacks.onResponseDelta((data.payload ?? {}) as { index?: number; delta?: string });
+      } else if (data.type === 'response.completed' && callbacks.onResponseCompleted) {
+        callbacks.onResponseCompleted((data.payload ?? {}) as {
+          assistant_message_id?: string;
+          content?: string;
+        });
+      } else if (data.type === 'tool.started' && callbacks.onToolStarted) {
+        callbacks.onToolStarted(data.payload as import('./types').AssistantToolCallView);
+      } else if (data.type === 'tool.updated' && callbacks.onToolUpdated) {
+        callbacks.onToolUpdated(data.payload as import('./types').AssistantToolCallView);
+      } else if (data.type === 'tool.completed' && callbacks.onToolCompleted) {
+        callbacks.onToolCompleted(data.payload as import('./types').AssistantToolCallView);
+      } else if (data.type === 'tool.failed' && callbacks.onToolFailed) {
+        callbacks.onToolFailed(data.payload as import('./types').AssistantToolCallView);
+      } else if (data.type === 'turn.failed' && callbacks.onTurnFailed) {
+        callbacks.onTurnFailed((data.payload ?? {}) as { error_code?: string; message?: string });
+      } else if (data.type === 'turn.completed' && callbacks.onTurnCompleted) {
+        callbacks.onTurnCompleted();
+      }
+
+      if (data.type === 'turn.completed' || data.type === 'turn.failed' || data.type === 'turn.cancelled') {
+        sawTerminalEvent = true;
+      }
+    };
+
+    const parseSseBlock = (block: string) => {
+      const lines = block.split(/\r?\n/);
+      const dataLines: string[] = [];
+
+      for (const line of lines) {
+        if (!line) continue;
+        if (line.startsWith(':')) continue;
+        if (line.startsWith('id:')) {
+          lastEventId = line.slice(3).trim();
+          continue;
+        }
+        if (line.startsWith('data:')) {
+          dataLines.push(line.slice(5).trim());
+        }
+      }
+
+      if (dataLines.length === 0) return;
+      const parsed = JSON.parse(dataLines.join('\n')) as Record<string, unknown>;
+      dispatchEvent(parsed);
+    };
+
+    void (async () => {
       try {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'tool.started' && callbacks.onToolStarted) {
-          callbacks.onToolStarted(data.payload);
-        } else if (data.type === 'tool.updated' && callbacks.onToolUpdated) {
-          callbacks.onToolUpdated(data.payload);
-        } else if (data.type === 'tool.completed' && callbacks.onToolCompleted) {
-          callbacks.onToolCompleted(data.payload);
-        } else if (data.type === 'tool.failed' && callbacks.onToolFailed) {
-          callbacks.onToolFailed(data.payload);
-        } else if (data.type === 'turn.failed' && callbacks.onTurnFailed) {
-          callbacks.onTurnFailed(data.payload);
-        } else if (data.type === 'turn.completed' && callbacks.onTurnCompleted) {
-          callbacks.onTurnCompleted();
+        const response = await fetch(streamUrl, {
+          method: 'GET',
+          headers: {
+            Accept: 'text/event-stream',
+            ...getAuthHeaders(),
+          },
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          callbacks.onError?.(`Assistant stream request failed (${response.status})`);
+          close();
+          return;
+        }
+
+        if (!response.body) {
+          callbacks.onError?.('Assistant stream did not provide a response body');
+          close();
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (!closed) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let separatorIndex = buffer.search(/\r?\n\r?\n/);
+          while (separatorIndex !== -1) {
+            const block = buffer.slice(0, separatorIndex);
+            const separatorLength = buffer.startsWith('\r\n\r\n', separatorIndex) ? 4 : 2;
+            buffer = buffer.slice(separatorIndex + separatorLength);
+            if (block.trim()) {
+              parseSseBlock(block);
+            }
+            separatorIndex = buffer.search(/\r?\n\r?\n/);
+          }
+        }
+
+        if (buffer.trim()) {
+          parseSseBlock(buffer);
         }
       } catch (error) {
-        console.error('Error parsing assistant stream message:', error);
-        if (callbacks.onError) {
-          callbacks.onError('Failed to parse stream message');
+        if (!controller.signal.aborted) {
+          callbacks.onError?.(error instanceof Error ? error.message : 'Assistant stream error');
+        }
+      } finally {
+        if (!controller.signal.aborted || sawTerminalEvent || lastEventId !== null) {
+          close();
         }
       }
-    };
+    })();
 
-    ws.onerror = (error) => {
-      console.error('Assistant stream error:', error);
-      if (callbacks.onError) {
-        callbacks.onError('WebSocket connection error');
-      }
-    };
-
-    ws.onclose = () => {
-      console.log('Assistant stream closed');
-      if (callbacks.onClose) {
-        callbacks.onClose();
-      }
-    };
-    // Return cleanup function
     return () => {
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        ws.close();
-      }
+      controller.abort();
+      close();
     };
   },
 };

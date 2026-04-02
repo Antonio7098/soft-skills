@@ -88,6 +88,11 @@ export interface AssistantStreamControlMessage {
 }
 
 export interface AssistantStreamCallbacks {
+  readonly onResponseDelta?: (payload: { index?: number; delta?: string }) => void;
+  readonly onResponseCompleted?: (payload: {
+    assistant_message_id?: string;
+    content?: string;
+  }) => void;
   readonly onToolStarted?: (toolCall: AssistantToolCallView) => void;
   readonly onToolUpdated?: (toolCall: AssistantToolCallView) => void;
   readonly onToolCompleted?: (toolCall: AssistantToolCallView) => void;

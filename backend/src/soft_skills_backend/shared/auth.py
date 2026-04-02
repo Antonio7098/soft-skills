@@ -94,6 +94,14 @@ class HeaderAuthProvider:
     ) -> tuple[str | None, str | None]:
         """Resolve organisation context from header and membership lookup."""
         if not org_id:
+            memberships = (
+                session.query(OrganisationMembershipRecord)
+                .filter(OrganisationMembershipRecord.user_id == user_id)
+                .all()
+            )
+            if len(memberships) == 1:
+                membership = memberships[0]
+                return membership.organisation_id, membership.role
             return None, None
         membership = (
             session.query(OrganisationMembershipRecord)

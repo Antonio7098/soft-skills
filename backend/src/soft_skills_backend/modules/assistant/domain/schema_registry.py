@@ -80,7 +80,6 @@ class AssistantSchemaRegistry:
                         "summary",
                         "target_audience",
                         "difficulty",
-                        "lifecycle_state",
                         "content_format_mix",
                         "target_skill_slugs",
                         "target_competency_slugs",
