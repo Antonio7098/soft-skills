@@ -11,6 +11,7 @@ from soft_skills_backend.modules.practice.models import (
     AttemptView,
     PracticeCorrelation,
     PracticeSessionView,
+    ScenarioSessionView,
     StartInterviewSessionCommand,
     StartPracticeSessionCommand,
     StartScenarioSessionCommand,
@@ -54,7 +55,7 @@ async def start_interview_session(
     return ok_response(request, payload)
 
 
-@router.post("/scenario/sessions", response_model=ApiEnvelope[PracticeSessionView])
+@router.post("/scenario/sessions", response_model=ApiEnvelope[ScenarioSessionView])
 async def start_scenario_session(
     request: Request,
     command: StartScenarioSessionCommand,
@@ -64,6 +65,23 @@ async def start_scenario_session(
     payload = await service.start_scenario_session(
         actor,
         _correlation_from_request(request),
+        command,
+    )
+    return ok_response(request, payload)
+
+
+@router.post("/scenario/sessions/{session_id}/steps", response_model=ApiEnvelope[ScenarioSessionView])
+async def submit_scenario_step(
+    request: Request,
+    session_id: str,
+    command: SubmitAttemptCommand,
+) -> ApiEnvelope[ScenarioSessionView]:
+    actor = await require_actor(request)
+    service = get_practice_service(request)
+    payload = await service.submit_scenario_step(
+        actor,
+        _correlation_from_request(request),
+        session_id,
         command,
     )
     return ok_response(request, payload)

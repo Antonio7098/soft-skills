@@ -69,6 +69,41 @@ class _RecordingTypedOutput:
         )
 
 
+class _RejectingThenSucceedingTypedOutput:
+    def __init__(self) -> None:
+        self.provider_models: list[str] = []
+        self.messages_history: list[list[dict[str, object]]] = []
+        self._attempt = 0
+
+    async def generate(
+        self,
+        provider: _StubProvider,
+        *,
+        messages: list[dict[str, str]],
+        call_context: ProviderCallContext,
+    ) -> TypedLLMResult:
+        del call_context
+        self.provider_models.append(provider.model_slug)
+        self.messages_history.append(list(messages))
+        if self._attempt == 0:
+            self._attempt += 1
+            raise StructuredOutputRejectionError(
+                app_error=scoring_error(
+                    "Provider returned malformed structured output",
+                    code="SS-VALIDATION-019",
+                ),
+                raw_payload={},
+            )
+        self._attempt += 1
+        return TypedLLMResult(
+            parsed={"value": "recovered"},  # type: ignore[arg-type]
+            raw_payload={"value": "recovered"},
+            schema_version="v1",
+            usage={"total_tokens": 1},
+            model_slug=provider.model_slug,
+        )
+
+
 class _NoOpRubricRepository:
     pass
 
@@ -193,6 +228,28 @@ async def test_generate_verified_output_stops_before_backup_after_success() -> N
 
     assert typed_output.provider_models == ["primary-model", "primary-model"]
     assert result.model_slug == "primary-model"
+
+
+@pytest.mark.asyncio
+async def test_generate_verified_output_retries_structured_output_rejection_and_uses_backup() -> None:
+    marker = _build_provider(
+        verification_retries=1,
+        backup_provider=_StubProvider("backup-model"),
+    )
+    typed_output = _RejectingThenSucceedingTypedOutput()
+
+    result = await marker._generate_verified_output(
+        typed_output=typed_output,  # type: ignore[arg-type]
+        messages=[{"role": "user", "content": "score this"}],
+        call_context=_call_context(),
+        verifier=lambda _: None,
+    )
+
+    assert typed_output.provider_models == ["primary-model", "backup-model"]
+    assert result.model_slug == "backup-model"
+    assert "single JSON object matching the required schema exactly" in str(
+        typed_output.messages_history[1][-1]["content"]
+    )
 
 
 def test_assessment_retry_settings_default_to_legacy_value() -> None:

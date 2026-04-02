@@ -74,6 +74,55 @@ export class ApiRequestError extends Error {
   }
 }
 
+function mapScenarioSessionView(raw: any, fallbackScenarioId = ''): ScenarioSessionView {
+  const p = raw.prompt ?? {};
+  const sc = p.scenario_context ?? {};
+  const scenarioId = p.content_item_id ?? fallbackScenarioId ?? 'scenario';
+  return {
+    session_id: raw.session_id,
+    attempt_id: raw.attempt_id,
+    status: raw.status,
+    scenario: {
+      id: scenarioId,
+      title: p.title ?? 'Scenario Practice',
+      prompt_text: p.prompt_text ?? '',
+      questions: sc.questions ?? [],
+      business_context: sc.business_context ?? '',
+      learner_objective: sc.learner_objective ?? '',
+      constraints: sc.constraints ?? [],
+      stakeholder_tensions: sc.stakeholder_tensions ?? [],
+      lifecycle_state: 'published_private',
+      target_skill_slugs: p.target_skill_slugs ?? [],
+      rubric_id: p.rubric_id ?? '',
+      mock_company: sc.mock_company
+        ? {
+            id: `${scenarioId}-company`,
+            name: sc.mock_company.name ?? '',
+            industry: sc.mock_company.industry ?? '',
+            operating_context: sc.mock_company.operating_context ?? '',
+          }
+        : null,
+      mock_people: (sc.mock_people ?? []).map((person: any, index: number) => ({
+        id: `${scenarioId}-person-${index + 1}`,
+        name: person.name ?? '',
+        role: person.role ?? '',
+        goals: person.goals ?? [],
+        communication_style: person.communication_style ?? '',
+        relationship_to_scenario: person.relationship_to_scenario ?? '',
+      })),
+    },
+    total_steps: raw.total_steps ?? Math.max(1, (sc.questions ?? []).length || 0),
+    current_step: raw.current_step ?? 1,
+    current_prompt_text: p.prompt_text ?? '',
+    history: (raw.history ?? []).map((entry: any) => ({
+      step_number: entry.step_number ?? 1,
+      prompt: entry.prompt ?? entry.prompt_text ?? '',
+      response: entry.response ?? entry.response_text ?? '',
+    })),
+    started_at: raw.started_at,
+  } as ScenarioSessionView;
+}
+
 function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
   const userId = sessionStorage.getItem(USER_ID_STORAGE_KEY);
@@ -497,100 +546,14 @@ export const apiDataProvider: DataProvider = {
   // --- Scenario (maps to same backend endpoint, returns PracticeSessionView) ---
   startScenarioSession: async (scenarioId) => {
     const raw = await request<any>('/attempts/scenario/sessions', { method: 'POST', body: JSON.stringify({ scenario_id: scenarioId }) });
-    const p = raw.prompt ?? {};
-    const sc = p.scenario_context ?? {};
-    return {
-      session_id: raw.session_id,
-      attempt_id: raw.attempt_id,
-      status: raw.status,
-      scenario: {
-        id: p.content_item_id ?? scenarioId,
-        title: p.title ?? 'Scenario Practice',
-        prompt_text: p.prompt_text ?? '',
-        questions: sc.questions ?? [],
-        business_context: sc.business_context ?? '',
-        learner_objective: sc.learner_objective ?? '',
-        constraints: sc.constraints ?? [],
-        stakeholder_tensions: sc.stakeholder_tensions ?? [],
-        lifecycle_state: 'published_private',
-        target_skill_slugs: p.target_skill_slugs ?? [],
-        rubric_id: p.rubric_id ?? '',
-        mock_company: sc.mock_company
-          ? {
-              id: `${p.content_item_id ?? scenarioId}-company`,
-              name: sc.mock_company.name ?? '',
-              industry: sc.mock_company.industry ?? '',
-              operating_context: sc.mock_company.operating_context ?? '',
-            }
-          : null,
-        mock_people: (sc.mock_people ?? []).map((person: any, index: number) => ({
-          id: `${p.content_item_id ?? scenarioId}-person-${index + 1}`,
-          name: person.name ?? '',
-          role: person.role ?? '',
-          goals: person.goals ?? [],
-          communication_style: person.communication_style ?? '',
-          relationship_to_scenario: person.relationship_to_scenario ?? '',
-        })),
-      },
-      total_steps: 1,
-      current_step: 1,
-      current_prompt_text: p.prompt_text ?? '',
-      history: [],
-      started_at: raw.started_at,
-    } as ScenarioSessionView;
+    return mapScenarioSessionView(raw, scenarioId);
   },
-  submitScenarioStep: async (attemptId, cmd) => {
-    const attempt = await request<any>(`/attempts/${attemptId}/submit`, {
+  submitScenarioStep: async (sessionId, cmd) => {
+    const raw = await request<any>(`/attempts/scenario/sessions/${sessionId}/steps`, {
       method: 'POST',
       body: JSON.stringify(cmd),
     });
-    const p = attempt.prompt ?? {};
-    const sc = p.scenario_context ?? {};
-    return {
-      session_id: attempt.session_id,
-      attempt_id: attempt.id,
-      status: 'completed',
-      scenario: {
-        id: p.content_item_id ?? '',
-        title: p.title ?? 'Scenario Practice',
-        prompt_text: p.prompt_text ?? '',
-        questions: sc.questions ?? [],
-        business_context: sc.business_context ?? '',
-        learner_objective: sc.learner_objective ?? '',
-        constraints: sc.constraints ?? [],
-        stakeholder_tensions: sc.stakeholder_tensions ?? [],
-        lifecycle_state: 'published_private',
-        target_skill_slugs: p.target_skill_slugs ?? [],
-        rubric_id: p.rubric_id ?? '',
-        mock_company: sc.mock_company
-          ? {
-              id: `${p.content_item_id ?? 'scenario'}-company`,
-              name: sc.mock_company.name ?? '',
-              industry: sc.mock_company.industry ?? '',
-              operating_context: sc.mock_company.operating_context ?? '',
-            }
-          : null,
-        mock_people: (sc.mock_people ?? []).map((person: any, index: number) => ({
-          id: `${p.content_item_id ?? 'scenario'}-person-${index + 1}`,
-          name: person.name ?? '',
-          role: person.role ?? '',
-          goals: person.goals ?? [],
-          communication_style: person.communication_style ?? '',
-          relationship_to_scenario: person.relationship_to_scenario ?? '',
-        })),
-      },
-      total_steps: 1,
-      current_step: 1,
-      current_prompt_text: p.prompt_text ?? '',
-      history: [
-        {
-          step_number: 1,
-          prompt: p.prompt_text ?? '',
-          response: cmd.response_text,
-        },
-      ],
-      started_at: attempt.submitted_at ?? new Date().toISOString(),
-    } as ScenarioSessionView;
+    return mapScenarioSessionView(raw);
   },
 
   // --- Practice Runs (Aggregate) -------------------------------------------

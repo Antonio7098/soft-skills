@@ -23,3 +23,8 @@ Object.defineProperty(window, 'matchMedia', {
 
 window.URL.createObjectURL = vi.fn(() => '');
 window.URL.revokeObjectURL = vi.fn(() => '');
+
+Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+  writable: true,
+  value: vi.fn(),
+});

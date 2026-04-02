@@ -21,6 +21,7 @@ from soft_skills_backend.modules.practice.models import (
     PracticeRunView,
     PracticeSessionView,
     PromptContextPayload,
+    ScenarioSessionView,
     SessionTransformPayload,
     StartInputPayload,
     StartInterviewRunItemCommand,
@@ -237,7 +238,7 @@ class PracticeService:
         actor: Actor,
         correlation: PracticeCorrelation,
         command: StartScenarioSessionCommand,
-    ) -> PracticeSessionView:
+    ) -> ScenarioSessionView:
         artifacts = [
             PracticeArtifactView(
                 artifact_id=f"{command.scenario_id}-artifact-{index}",
@@ -247,7 +248,7 @@ class PracticeService:
             )
             for index, artifact in enumerate(command.artifacts, start=1)
         ]
-        return await self._start_practice_session(
+        session = await self._start_practice_session(
             actor=actor,
             correlation=correlation,
             start_input=StartInputPayload(
@@ -255,6 +256,24 @@ class PracticeService:
                 content_item_id=command.scenario_id,
                 artifacts=artifacts,
             ),
+        )
+        return self._store.get_scenario_session(actor, session.session_id)
+
+    async def submit_scenario_step(
+        self,
+        actor: Actor,
+        correlation: PracticeCorrelation,
+        session_id: str,
+        command: SubmitAttemptCommand,
+    ) -> ScenarioSessionView:
+        session = self._store.get_scenario_session(actor, session_id)
+        await self.submit_attempt(actor, correlation, session.attempt_id, command)
+        return self._store.advance_scenario_session(
+            actor=actor,
+            request_id=correlation.request_id,
+            trace_id=correlation.trace_id,
+            workflow_id=correlation.workflow_id,
+            session_id=session_id,
         )
 
     async def _start_practice_session(

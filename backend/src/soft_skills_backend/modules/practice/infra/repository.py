@@ -19,11 +19,12 @@ from soft_skills_backend.modules.practice.models import (
     PracticeRunListItemView,
     PracticeRunTransformPayload,
     PracticeRunView,
+    ScenarioSessionView,
     SessionTransformPayload,
     StartInputPayload,
     ValidatedAssessmentPayload,
 )
-from soft_skills_backend.platform.db.models import AttemptRecord, PracticeRunRecord
+from soft_skills_backend.platform.db.models import AttemptRecord, PracticeRunRecord, PracticeSessionRecord
 from soft_skills_backend.platform.db.repositories import SqlAlchemyWorkflowEventRepository
 from soft_skills_backend.platform.observability.events import WorkflowEventRecorder
 from soft_skills_backend.platform.workflows.stageflow import StageflowStageResult
@@ -35,8 +36,10 @@ from ..contracts.views import (
     build_attempt_view,
     build_practice_run_list_item,
     build_practice_run_view,
+    build_scenario_session_view,
 )
 from .persistence import (
+    advance_scenario_session,
     mark_attempt_assessing,
     mark_attempt_failed,
     persist_assessment,
@@ -225,6 +228,51 @@ class PracticeRepository:
                     details={"attempt_id": attempt_id},
                 )
             return build_attempt_view(session, attempt)
+
+    def get_scenario_session(self, actor: Actor, session_id: str) -> ScenarioSessionView:
+        with self._session_factory() as session:
+            practice_session = session.get(PracticeSessionRecord, session_id)
+            if practice_session is None:
+                raise domain_error(
+                    "Practice session was not found",
+                    code="SS-DOMAIN-013",
+                    status_code=404,
+                    details={"session_id": session_id},
+                )
+            if practice_session.user_id != actor.user_id:
+                raise auth_error(
+                    "Practice session content is only visible to the owning learner",
+                    code="SS-AUTH-014",
+                    status_code=403,
+                    details={"session_id": session_id},
+                )
+            return build_scenario_session_view(session, practice_session)
+
+    def advance_scenario_session(
+        self,
+        *,
+        actor: Actor,
+        request_id: str,
+        trace_id: str,
+        workflow_id: str | None,
+        session_id: str,
+    ) -> ScenarioSessionView:
+        current = self.get_scenario_session(actor, session_id)
+        if current.attempt_id == "":
+            raise domain_error(
+                "Scenario session has no active attempt",
+                code="SS-DOMAIN-020",
+                status_code=409,
+                details={"session_id": session_id},
+            )
+        return advance_scenario_session(
+            session_factory=self._session_factory,
+            events=self._events,
+            request_id=request_id,
+            trace_id=trace_id,
+            workflow_id=workflow_id,
+            session_id=session_id,
+        )
 
     def list_attempt_history(self, actor: Actor) -> list[AttemptHistoryItemView]:
         with self._session_factory() as session:
