@@ -36,7 +36,10 @@ from ..infra.repository import PracticeRepository
 
 
 def _required_rubric_skills(prompt_payload: ResolvedAttemptPayload) -> list[str] | None:
-    if prompt_payload.prompt.practice_type == PracticeType.QUICK_PRACTICE:
+    if prompt_payload.prompt.practice_type in {
+        PracticeType.QUICK_PRACTICE,
+        PracticeType.SCENARIO,
+    }:
         return None
     return list(prompt_payload.prompt.target_skill_slugs)
 
