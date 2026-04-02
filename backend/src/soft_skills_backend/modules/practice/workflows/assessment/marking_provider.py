@@ -328,41 +328,34 @@ class DefaultAssessmentMarkingProvider:
         last_result: TypedLLMResult | None = None
         for attempt in range(self._verification_retries + 1):
             active_provider = self._provider_for_attempt(attempt)
-            typed_result = await typed_output.generate(
-                active_provider,
-                messages=retry_messages,
-                call_context=call_context,
-            )
-            last_result = typed_result
             try:
+                typed_result = await typed_output.generate(
+                    active_provider,
+                    messages=retry_messages,
+                    call_context=call_context,
+                )
+                last_result = typed_result
                 verifier(typed_result.parsed)
                 return typed_result
+            except StructuredOutputRejectionError as exc:
+                if attempt >= self._verification_retries:
+                    raise
+                retry_messages = _build_retry_messages(
+                    messages=messages,
+                    raw_payload=exc.raw_payload,
+                    error=exc.app_error,
+                )
             except AppError as exc:
                 if attempt >= self._verification_retries:
                     raise StructuredOutputRejectionError(
                         app_error=exc,
                         raw_payload=typed_result.raw_payload,
                     ) from exc
-                retry_messages = [
-                    *messages,
-                    {
-                        "role": "assistant",
-                        "content": json.dumps(typed_result.raw_payload, ensure_ascii=True),
-                    },
-                    {
-                        "role": "user",
-                        "content": (
-                            "Return JSON only. The previous output failed verification. "
-                            f"Fix these issues exactly: {exc.message}"
-                            + (
-                                " Evidence.quote must be an exact verbatim substring copied from the learner response,"
-                                " not a paraphrase, summary, or invented quote."
-                                if exc.code == "SS-SCORING-004"
-                                else ""
-                            )
-                        ),
-                    },
-                ]
+                retry_messages = _build_retry_messages(
+                    messages=messages,
+                    raw_payload=typed_result.raw_payload,
+                    error=exc,
+                )
         if last_result is None:
             raise StructuredOutputRejectionError(
                 app_error=scoring_error(
@@ -373,6 +366,44 @@ class DefaultAssessmentMarkingProvider:
                 raw_payload={},
             )
         return last_result
+
+
+def _build_retry_messages(
+    *,
+    messages: list[dict[str, str]],
+    raw_payload: dict[str, object],
+    error: AppError,
+) -> list[dict[str, str]]:
+    retry_messages: list[dict[str, str]] = list(messages)
+    if raw_payload:
+        retry_messages.append(
+            {
+                "role": "assistant",
+                "content": json.dumps(raw_payload, ensure_ascii=True),
+            }
+        )
+    retry_messages.append(
+        {
+            "role": "user",
+            "content": (
+                "Return JSON only. The previous output failed verification. "
+                f"Fix these issues exactly: {error.message}"
+                + (
+                    " The response must be a single JSON object matching the required schema exactly."
+                    " Do not include markdown fences, commentary, or extra keys."
+                    if error.code == "SS-VALIDATION-019"
+                    else ""
+                )
+                + (
+                    " Evidence.quote must be an exact verbatim substring copied from the learner response,"
+                    " not a paraphrase, summary, or invented quote."
+                    if error.code == "SS-SCORING-004"
+                    else ""
+                )
+            ),
+        }
+    )
+    return retry_messages
 
 
 def build_prompt_library(settings: Settings) -> PromptLibrary:

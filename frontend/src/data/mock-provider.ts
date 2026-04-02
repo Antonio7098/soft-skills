@@ -2284,14 +2284,14 @@ export const mockDataProvider: DataProvider = {
     const sessionId = `sess-${uid()}`;
     const attemptId = `att-${uid()}`;
 
-    const stepPrompts = [scenario.prompt_text];
+    const stepPrompts = scenario.questions.length > 0 ? scenario.questions : [scenario.prompt_text];
 
     _scenarioSessions.set(sessionId, {
       session_id: sessionId,
       attempt_id: attemptId,
       status: 'active',
       scenario,
-      total_steps: 1,
+      total_steps: stepPrompts.length,
       current_step: 1,
       current_prompt_text: stepPrompts[0]!,
       history: [],
@@ -2312,8 +2312,9 @@ export const mockDataProvider: DataProvider = {
     ];
 
     const isComplete = session.current_step >= session.total_steps;
-
-    const stepPrompts = [''];
+    const stepPrompts = session.scenario.questions.length > 0
+      ? session.scenario.questions
+      : [session.scenario.prompt_text];
 
     const updated: ScenarioSessionView = {
       ...session,

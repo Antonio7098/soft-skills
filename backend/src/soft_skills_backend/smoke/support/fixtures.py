@@ -91,6 +91,20 @@ class PracticeFixtureSeeder:
                     "The board expects a recommendation before 9am tomorrow. What do you say "
                     "to the sponsor first?"
                 ),
+                "questions": [
+                    (
+                        "Map the key stakeholders by power and interest and explain how you "
+                        "would engage each one."
+                    ),
+                    (
+                        "Draft the questions you would ask Maya Chen to clarify the commercial "
+                        "risk of delaying launch."
+                    ),
+                    (
+                        "Write the recommendation you would give to the sponsor, including your "
+                        "decision and immediate next steps."
+                    ),
+                ],
                 "business_context": (
                     "An AI feature launch is at risk after legal review surfaced new concerns."
                 ),

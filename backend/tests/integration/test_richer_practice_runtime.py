@@ -132,6 +132,11 @@ async def _seed_scenario(client) -> tuple[dict[str, object], dict[str, object]]:
         json={
             "title": "Escalating launch risk",
             "prompt_text": "Jordan Singh says launch cannot proceed without stronger controls. What do you say next?",
+            "questions": [
+                "Map the key stakeholders by power and interest and explain how you would engage each one.",
+                "Draft the questions you would ask Maya Chen to clarify the commercial risk of delaying launch.",
+                "Write the recommendation you would give to the sponsor, including your decision and immediate next steps.",
+            ],
             "business_context": "An AI feature launch is at risk after legal review surfaced new concerns.",
             "learner_objective": "Re-align the executive sponsor without hiding the delivery risk.",
             "constraints": ["The launch date is on the board agenda tomorrow."],
@@ -180,6 +185,21 @@ class FakeSuccessMarker:
         call_context,
     ) -> AssessmentTransformPayload:
         del learner_payload, call_context
+        if prompt_payload.prompt.practice_type.value == "scenario":
+            skill_slugs = [
+                "active-listening",
+                "concise-explanation",
+                "conflict-handling",
+                "decision-justification",
+                "empathy",
+                "executive-summary",
+                "expectation-setting",
+                "negotiation",
+                "prioritization-under-pressure",
+                "structured-communication",
+            ]
+        else:
+            skill_slugs = list(prompt_payload.prompt.target_skill_slugs)
         return AssessmentTransformPayload(
             draft=AssessmentDraft.model_validate(
                 {
@@ -195,7 +215,7 @@ class FakeSuccessMarker:
                             "score": 4,
                             "rationale": f"The response demonstrated {slug}.",
                         }
-                        for slug in prompt_payload.prompt.target_skill_slugs
+                        for slug in skill_slugs
                     ],
                     "evidence": [
                         {
@@ -203,7 +223,7 @@ class FakeSuccessMarker:
                             "quote": prompt_payload.response_text,
                             "explanation": f"The response text provided direct evidence for {slug}.",
                         }
-                        for slug in prompt_payload.prompt.target_skill_slugs
+                        for slug in skill_slugs
                     ],
                     "strengths": ["Stayed grounded in the actual prompt and stakeholder risk."],
                     "weaknesses": ["Could have added one clearer follow-up checkpoint."],
@@ -295,11 +315,12 @@ async def test_scenario_runtime_persists_rich_context_and_artifacts(
     )
     assert start_response.status_code == 200
     session_payload = start_response.json()["data"]
-    assert session_payload["prompt"]["practice_type"] == "scenario"
     assert (
         session_payload["prompt"]["prompt_text"]
-        == "Jordan Singh says launch cannot proceed without stronger controls. What do you say next?"
+        == "Map the key stakeholders by power and interest and explain how you would engage each one."
     )
+    assert session_payload["current_step"] == 1
+    assert session_payload["total_steps"] == 3
     assert (
         session_payload["prompt"]["scenario_context"]["prompt_text"]
         == "Jordan Singh says launch cannot proceed without stronger controls. What do you say next?"
@@ -310,37 +331,94 @@ async def test_scenario_runtime_persists_rich_context_and_artifacts(
     )
 
     submit_response = await client.post(
-        f"/api/attempts/{session_payload['attempt_id']}/submit",
+        f"/api/attempts/scenario/sessions/{session_payload['session_id']}/steps",
         headers={"X-User-ID": learner["id"]},
         json={
             "response_text": (
-                "I would tell the sponsor we need a controlled one-day delay, explain the legal risk directly, "
-                "and propose a 7am checkpoint with sales and legal before the board discussion."
+                "I would classify the board, legal, sales, and sponsor stakeholders first and use that map to tailor engagement."
             )
         },
     )
     assert submit_response.status_code == 200
-    attempt_payload = submit_response.json()["data"]
-    assert attempt_payload["status"] == "assessed"
-    assert attempt_payload["prompt"]["practice_type"] == "scenario"
+    next_payload = submit_response.json()["data"]
+    assert next_payload["status"] == "active"
+    assert next_payload["current_step"] == 2
+    assert next_payload["total_steps"] == 3
+    assert len(next_payload["history"]) == 1
+    assert next_payload["history"][0]["prompt_text"].startswith("Map the key stakeholders")
+    assert next_payload["prompt"]["prompt_text"].startswith("Draft the questions you would ask Maya Chen")
 
     with app.state.container.session_factory() as session:
         session_record = session.get(PracticeSessionRecord, session_payload["session_id"])
-        attempt_record = session.get(AttemptRecord, session_payload["attempt_id"])
-        assessment_record = session.get(
-            AssessmentRecord, attempt_payload["assessment"]["assessment_id"]
-        )
+        first_attempt = session.get(AttemptRecord, session_payload["attempt_id"])
         event_types = {record.event_type for record in session.query(WorkflowEventRecord).all()}
 
     assert session_record is not None and session_record.practice_type == "scenario"
-    assert attempt_record is not None and attempt_record.practice_type == "scenario"
-    assert assessment_record is not None and assessment_record.practice_type == "scenario"
+    assert first_attempt is not None and first_attempt.practice_type == "scenario"
+    assert first_attempt.assessment_id is not None
     assert (
         session_record.prompt_payload["scenario_context"]["artifacts"][0]["artifact_type"]
         == "email"
     )
     assert "practice.session_started.v1" in event_types
     assert "assessment.validated.v1" in event_types
+
+
+@pytest.mark.asyncio
+async def test_scenario_session_steps_through_questions_in_order(
+    app, client, test_settings
+) -> None:
+    _migrate(test_settings)
+    learner, scenario = await _seed_scenario(client)
+    app.state.container.practice_service._assessment_marker = FakeSuccessMarker()
+
+    start_response = await client.post(
+        "/api/attempts/scenario/sessions",
+        headers={"X-User-ID": learner["id"]},
+        json={"scenario_id": scenario["id"]},
+    )
+    assert start_response.status_code == 200
+    session_payload = start_response.json()["data"]
+
+    expected_prompts = [
+        "Map the key stakeholders by power and interest and explain how you would engage each one.",
+        "Draft the questions you would ask Maya Chen to clarify the commercial risk of delaying launch.",
+        "Write the recommendation you would give to the sponsor, including your decision and immediate next steps.",
+    ]
+    assert session_payload["prompt"]["prompt_text"] == expected_prompts[0]
+
+    for index, response_text in enumerate(
+        [
+            "I would map the board, sponsor, legal, and sales stakeholders first.",
+            "I would ask Maya which deals are most exposed and what fallback message is viable.",
+            "I would recommend a controlled one-day delay and assign an early-morning checkpoint.",
+        ],
+        start=1,
+    ):
+        response = await client.post(
+            f"/api/attempts/scenario/sessions/{session_payload['session_id']}/steps",
+            headers={"X-User-ID": learner["id"]},
+            json={"response_text": response_text},
+        )
+        assert response.status_code == 200
+        session_payload = response.json()["data"]
+        assert session_payload["history"][-1]["prompt_text"] == expected_prompts[index - 1]
+        assert session_payload["history"][-1]["response_text"] == response_text
+        if index < len(expected_prompts):
+            assert session_payload["status"] == "active"
+            assert session_payload["current_step"] == index + 1
+            assert session_payload["prompt"]["prompt_text"] == expected_prompts[index]
+        else:
+            assert session_payload["status"] == "completed"
+            assert session_payload["current_step"] == len(expected_prompts)
+            assert len(session_payload["history"]) == len(expected_prompts)
+
+    final_attempt_response = await client.get(
+        f"/api/attempts/{session_payload['attempt_id']}",
+        headers={"X-User-ID": learner["id"]},
+    )
+    assert final_attempt_response.status_code == 200
+    assert final_attempt_response.json()["data"]["prompt"]["prompt_text"] == expected_prompts[-1]
 
 
 @pytest.mark.asyncio

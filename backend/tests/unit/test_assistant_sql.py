@@ -22,7 +22,7 @@ def test_assistant_schema_registry_contains_allowlisted_views() -> None:
     assert "Allowed learner-safe views" in registry.render_prompt_context()
 
 
-def test_assistant_sql_guard_scopes_user_and_org_filters_and_limit() -> None:
+def test_assistant_sql_guard_scopes_attempt_reads_by_user_and_limit() -> None:
     guard = AssistantSqlGuard(
         schema_registry=AssistantSchemaRegistry(),
         row_limit=25,
@@ -39,7 +39,6 @@ def test_assistant_sql_guard_scopes_user_and_org_filters_and_limit() -> None:
     )
 
     assert guarded.source_views == ("assistant_safe_attempt_summaries_v",)
-    assert "organisation_id = :organisation_id" in guarded.scoped_sql
     assert "user_id = :user_id" in guarded.scoped_sql
     assert "LIMIT :_assistant_row_limit" in guarded.scoped_sql
 

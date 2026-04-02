@@ -66,3 +66,28 @@ def test_quick_practice_assessment_does_not_filter_rubric_by_target_skill_slugs(
     )
 
     assert _required_rubric_skills(payload) is None
+
+
+def test_scenario_assessment_does_not_filter_rubric_by_target_skill_slugs() -> None:
+    payload = ResolvedAttemptPayload(
+        attempt_id="attempt-456",
+        session_id="session-456",
+        workflow_id="workflow-456",
+        response_text="I would map stakeholders first and then recommend the transition path.",
+        prompt=PracticePromptView(
+            practice_type=PracticeType.SCENARIO,
+            content_item_id="scenario-123",
+            content_item_type="scenario_step",
+            prompt_type="scenario_step",
+            title="Data centralisation",
+            prompt_text="Question 1",
+            difficulty="intermediate",
+            delivery_version="v1",
+            response_mode="text",
+            target_skill_slugs=["custom-generated-skill"],
+            rubric_id="scenario_text@v1",
+            rubric_version="v1",
+        ),
+    )
+
+    assert _required_rubric_skills(payload) is None

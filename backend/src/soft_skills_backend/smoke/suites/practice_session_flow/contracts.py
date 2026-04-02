@@ -13,6 +13,7 @@ class PracticeSessionAttemptSmokeResult(BaseModel):
     attempt_id: str
     attempt_status: str
     assessment_id: str | None = None
+    total_steps: int = 1
 
 
 class PracticeSessionFlowSmokeResult(BaseModel):

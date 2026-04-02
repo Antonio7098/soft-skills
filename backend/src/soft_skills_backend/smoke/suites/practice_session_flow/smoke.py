@@ -112,15 +112,49 @@ class PracticeSessionFlowSmoke(SmokeCase):
                 }
             ],
         )
-        return await self._submit_and_assert(
-            backend=backend,
-            user_id=user_id,
-            session_payload=session,
+        prompts = [
+            "I would map the board, sponsor, legal, and sales stakeholders first and tailor the engagement plan to their decision rights.",
+            "I would ask Maya what commercial commitments depend on tomorrow's date, which accounts are most exposed, and what fallback messaging is viable.",
+            "I would recommend a one-day delay, explain the legal risk directly, and propose a 7am checkpoint with sales and legal before the board meeting.",
+        ]
+        for expected_step, response_text in enumerate(prompts, start=1):
+            current_step = int(session["current_step"])
+            if current_step != expected_step:
+                raise provider_error(
+                    "Scenario session did not advance in the expected order",
+                    code="SS-PROVIDER-021",
+                    details={
+                        "expected_step": expected_step,
+                        "observed_step": current_step,
+                        "session_id": session["session_id"],
+                    },
+                )
+            session = await backend.submit_scenario_step(
+                user_id=user_id,
+                session_id=str(session["session_id"]),
+                response_text=response_text,
+            )
+        attempt_id = str(session["attempt_id"])
+        complete_attempt = await backend.get_attempt(user_id=user_id, attempt_id=attempt_id)
+        attempt_status = str(complete_attempt["status"])
+        if attempt_status not in {
+            AttemptStatus.ASSESSED.value,
+            AttemptStatus.ASSESSMENT_REJECTED.value,
+            AttemptStatus.ASSESSMENT_FAILED.value,
+        }:
+            raise provider_error(
+                "Smoke scenario session did not reach a terminal attempt state",
+                code="SS-PROVIDER-020",
+                details={"practice_type": "scenario", "attempt_id": attempt_id, "status": attempt_status},
+            )
+        assessment = cast(JsonObject | None, complete_attempt["assessment"])
+        return PracticeSessionAttemptSmokeResult(
             practice_type="scenario",
-            response_text=(
-                "I would recommend a one-day delay, explain the legal risk directly, and "
-                "propose a 7am checkpoint with sales and legal before the board meeting."
-            ),
+            session_id=str(session["session_id"]),
+            attempt_id=attempt_id,
+            attempt_status=attempt_status,
+            assessment_id=None if assessment is None else str(assessment["assessment_id"]),
+            total_steps=int(session["total_steps"]),
         )
 
     async def _submit_and_assert(

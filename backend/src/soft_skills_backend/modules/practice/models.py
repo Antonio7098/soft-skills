@@ -114,6 +114,30 @@ class PracticeSessionView(BaseModel):
     trace_id: str
 
 
+class ScenarioSessionHistoryEntryView(BaseModel):
+    """One completed step within a standalone scenario session."""
+
+    step_number: int
+    prompt_text: str
+    response_text: str
+    attempt_id: str
+
+
+class ScenarioSessionView(BaseModel):
+    """Standalone scenario session progress view."""
+
+    session_id: str
+    attempt_id: str
+    workflow_id: str
+    status: SessionStatus
+    prompt: PracticePromptView
+    current_step: int = Field(ge=1)
+    total_steps: int = Field(ge=1)
+    history: list[ScenarioSessionHistoryEntryView] = Field(default_factory=list)
+    started_at: str
+    trace_id: str
+
+
 class PerSkillAssessmentView(BaseModel):
     """Per-skill assessment summary."""
 

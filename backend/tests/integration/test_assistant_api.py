@@ -1054,6 +1054,78 @@ async def test_assistant_query_user_context_reads_attempts_without_explicit_org_
 
 
 @pytest.mark.asyncio
+async def test_assistant_query_user_context_reads_attempts_without_membership(
+    app: Any, client: Any, test_settings: Any
+) -> None:
+    _migrate(test_settings)
+    container = app.state.container
+    container.assistant_service._workflows._llm_provider = _SequencedAssistantProvider(  # type: ignore[attr-defined]
+        payloads=[
+            {
+                "action": "tool_calls",
+                "tool_calls": [
+                    {
+                        "call_id": "call-1",
+                        "tool_name": "query_user_context",
+                        "arguments": {
+                            "sql": (
+                                "SELECT attempt_id, practice_type, overall_score, assessed_at "
+                                "FROM assistant_safe_attempt_summaries_v "
+                                "ORDER BY created_at DESC LIMIT 5"
+                            )
+                        },
+                    }
+                ],
+                "final_response": None,
+            },
+            {
+                "action": "final_response",
+                "tool_calls": [],
+                "final_response": "Here are your recent attempts.",
+            },
+        ]
+    )
+    learner = await _bootstrap_admin_and_learner(
+        client,
+        learner_email="assistant-no-membership-learner@example.com",
+    )
+    attempt_id = _seed_attempt_summary(
+        container,
+        user_id=str(learner["id"]),
+        practice_type="quick_practice",
+        overall_score=4,
+    )
+
+    session_response = await client.post(
+        "/api/assistant/sessions",
+        headers={"X-User-ID": learner["id"]},
+        json={"title": "Attempt SQL No Membership"},
+    )
+    assert session_response.status_code == 200
+    session_id = session_response.json()["data"]["id"]
+
+    turn_response = await client.post(
+        f"/api/assistant/sessions/{session_id}/turns",
+        headers={"X-User-ID": learner["id"]},
+        json={"message": "What recent practice attempts have I done?"},
+    )
+    assert turn_response.status_code == 200
+    turn = turn_response.json()["data"]
+    await _wait_for_turn_status(container, turn_id=turn["id"], expected_status="completed")
+
+    session_view_response = await client.get(
+        f"/api/assistant/sessions/{session_id}",
+        headers={"X-User-ID": learner["id"]},
+    )
+    assert session_view_response.status_code == 200
+    tool_call = session_view_response.json()["data"]["turns"][0]["tool_calls"][0]
+    assert tool_call["tool_name"] == "query_user_context"
+    assert tool_call["status"] == "completed"
+    assert tool_call["result"]["row_count"] >= 1
+    assert tool_call["result"]["rows"][0]["attempt_id"] == attempt_id
+
+
+@pytest.mark.asyncio
 async def test_assistant_query_user_context_denies_non_allowlisted_sql(
     app: Any, client: Any, test_settings: Any
 ) -> None:

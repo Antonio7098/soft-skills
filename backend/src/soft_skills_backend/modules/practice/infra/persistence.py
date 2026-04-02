@@ -22,6 +22,7 @@ from soft_skills_backend.modules.practice.models import (
     AttemptGuardPayload,
     PracticeRunTransformPayload,
     PracticeSessionView,
+    ScenarioSessionView,
     SessionTransformPayload,
     ValidatedAssessmentPayload,
 )
@@ -48,7 +49,14 @@ from soft_skills_backend.shared.errors import (
     persistence_error,
 )
 
-from ..contracts.views import build_attempt_view, build_practice_run_view, utcnow, utcnow_iso
+from ..contracts.views import (
+    build_attempt_view,
+    build_practice_run_view,
+    build_scenario_session_view,
+    utcnow,
+    utcnow_iso,
+)
+from ..workflows.assessment.models import PracticePromptView
 
 
 def persist_session_start(
@@ -452,6 +460,78 @@ def persist_assessment(
         payload=attempt_view,
         summary={"assessment_id": assessment_id, "status": AttemptStatus.ASSESSED.value},
     )
+
+
+def advance_scenario_session(
+    *,
+    session_factory: sessionmaker[Session],
+    events: WorkflowEventRecorder,
+    request_id: str,
+    trace_id: str,
+    workflow_id: str | None,
+    session_id: str,
+) -> ScenarioSessionView:
+    with session_factory() as session:
+        practice_session = session.get(PracticeSessionRecord, session_id)
+        if practice_session is None:
+            raise domain_error(
+                "Practice session was not found",
+                code="SS-DOMAIN-013",
+                status_code=404,
+                details={"session_id": session_id},
+            )
+        prompt = PracticePromptView.model_validate(practice_session.prompt_payload)
+        scenario_context = prompt.scenario_context
+        questions = list(scenario_context.questions) if scenario_context is not None else []
+        total_steps = len(questions) if questions else 1
+        attempts = (
+            session.query(AttemptRecord)
+            .filter(AttemptRecord.session_id == session_id)
+            .order_by(AttemptRecord.created_at.asc(), AttemptRecord.id.asc())
+            .all()
+        )
+        current_step = len(attempts)
+        if current_step < total_steps:
+            next_attempt_id = uuid4().hex
+            next_prompt_text = questions[current_step] if questions else prompt.prompt_text
+            updated_prompt = prompt.model_copy(update={"prompt_text": next_prompt_text})
+            practice_session.prompt_payload = updated_prompt.model_dump(mode="json")
+            practice_session.last_attempt_id = next_attempt_id
+            practice_session.status = SessionStatus.ACTIVE.value
+            practice_session.completed_at = None
+            session.add(
+                AttemptRecord(
+                    id=next_attempt_id,
+                    session_id=practice_session.id,
+                    user_id=practice_session.user_id,
+                    workflow_id=practice_session.workflow_id,
+                    practice_type=practice_session.practice_type,
+                    content_item_id=practice_session.content_item_id,
+                    content_item_type=practice_session.content_item_type,
+                    status=AttemptStatus.PROMPT_DELIVERED.value,
+                    response_mode=updated_prompt.response_mode,
+                    delivery_version=updated_prompt.delivery_version,
+                    rubric_id=updated_prompt.rubric_id,
+                    rubric_version=updated_prompt.rubric_version,
+                )
+            )
+            session.commit()
+            events.record(
+                event_type="practice.prompt_delivered.v1",
+                request_id=request_id,
+                trace_id=trace_id,
+                workflow_id=workflow_id,
+                payload={
+                    "session_id": practice_session.id,
+                    "attempt_id": next_attempt_id,
+                    "practice_type": updated_prompt.practice_type.value,
+                    "content_item_id": updated_prompt.content_item_id,
+                    "content_item_type": updated_prompt.content_item_type,
+                    "prompt_version": updated_prompt.delivery_version,
+                    "sequence_index": current_step + 1,
+                },
+            )
+        return build_scenario_session_view(session, practice_session)
 
 
 def persist_rejected_assessment(

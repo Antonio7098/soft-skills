@@ -101,7 +101,8 @@ class AssistantSchemaRegistry:
                     name="assistant_safe_attempt_summaries_v",
                     description=(
                         "Recent attempt summaries for the authenticated learner without raw "
-                        "response text."
+                        "response text. This view is scoped to the learner across all of their "
+                        "attempts, regardless of organisation membership."
                     ),
                     columns=(
                         "organisation_id",
@@ -121,7 +122,7 @@ class AssistantSchemaRegistry:
                         "submitted_at",
                         "assessed_at",
                     ),
-                    scope_columns=("organisation_id", "user_id"),
+                    scope_columns=("user_id",),
                     examples=(
                         "SELECT attempt_id, practice_type, overall_score, assessed_at "
                         "FROM assistant_safe_attempt_summaries_v "

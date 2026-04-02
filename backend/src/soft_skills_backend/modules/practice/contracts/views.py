@@ -14,6 +14,7 @@ from soft_skills_backend.modules.practice.domain.practice import (
     EvidenceItem,
     PracticeRunStatus,
     PracticeType,
+    SessionStatus,
     SkillScore,
     is_attempt_terminal,
 )
@@ -29,6 +30,8 @@ from soft_skills_backend.modules.practice.models import (
     PracticeRunSummaryView,
     PracticeRunTypeBreakdownView,
     PracticeRunView,
+    ScenarioSessionHistoryEntryView,
+    ScenarioSessionView,
 )
 from soft_skills_backend.modules.practice.workflows.assessment.models import PracticePromptView
 from soft_skills_backend.platform.db.models import (
@@ -157,6 +160,59 @@ def build_practice_run_view(session: Session, run: PracticeRunRecord) -> Practic
     )
 
 
+def build_scenario_session_view(
+    session: Session, practice_session: PracticeSessionRecord
+) -> ScenarioSessionView:
+    """Build standalone scenario-session progress from persisted state."""
+
+    prompt = PracticePromptView.model_validate(practice_session.prompt_payload)
+    questions = list(prompt.scenario_context.questions) if prompt.scenario_context is not None else []
+    total_steps = len(questions) if questions else 1
+    attempts = (
+        session.query(AttemptRecord)
+        .filter(AttemptRecord.session_id == practice_session.id)
+        .order_by(AttemptRecord.created_at.asc(), AttemptRecord.id.asc())
+        .all()
+    )
+
+    history: list[ScenarioSessionHistoryEntryView] = []
+    current_step = 1
+    for index, attempt in enumerate(attempts, start=1):
+        prompt_text = questions[index - 1] if len(questions) >= index else prompt.prompt_text
+        is_current_attempt = (
+            practice_session.status == SessionStatus.ACTIVE.value
+            and attempt.id == practice_session.last_attempt_id
+        )
+        if is_current_attempt:
+            current_step = index
+            break
+        history.append(
+            ScenarioSessionHistoryEntryView(
+                step_number=index,
+                prompt_text=prompt_text,
+                response_text=attempt.response_text or "",
+                attempt_id=attempt.id,
+            )
+        )
+        current_step = min(index, total_steps)
+
+    if practice_session.status == SessionStatus.COMPLETED.value:
+        current_step = total_steps
+
+    return ScenarioSessionView(
+        session_id=practice_session.id,
+        attempt_id=practice_session.last_attempt_id or "",
+        workflow_id=practice_session.workflow_id,
+        status=SessionStatus(practice_session.status),
+        prompt=prompt,
+        current_step=current_step,
+        total_steps=total_steps,
+        history=history,
+        started_at=practice_session.created_at.isoformat(),
+        trace_id=_trace_id_for_practice_session(session, practice_session),
+    )
+
+
 def build_practice_run_list_item(
     session: Session, run: PracticeRunRecord
 ) -> PracticeRunListItemView:
@@ -277,6 +333,11 @@ def _attempt_for_practice_session(
             details={"session_id": practice_session.id},
         )
     return attempt
+
+
+def _trace_id_for_practice_session(session: Session, practice_session: PracticeSessionRecord) -> str:
+    attempt = _attempt_for_practice_session(session, practice_session)
+    return attempt.trace_id or ""
 
 
 def _build_practice_run_summary(items: list[PracticeRunItemView]) -> PracticeRunSummaryView:

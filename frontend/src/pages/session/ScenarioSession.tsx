@@ -36,11 +36,18 @@ export function ScenarioSession() {
     if (!session) return;
     setPhase('submitting');
     try {
-      const attempt = await data.submitAttempt(session.attempt_id, { response_text: text });
-      setPhase('assessing');
-      timer.pause();
-      setResult(attempt);
-      setTimeout(() => setPhase('complete'), 1500);
+      const updatedSession = await data.submitScenarioStep(session.session_id, { response_text: text });
+      if (updatedSession.status === 'completed') {
+        setPhase('assessing');
+        timer.pause();
+        const attempt = await data.getAttempt(updatedSession.attempt_id);
+        setSession(updatedSession);
+        setResult(attempt);
+        setTimeout(() => setPhase('complete'), 1500);
+        return;
+      }
+      setSession(updatedSession);
+      setPhase('responding');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Submission failed');
       setPhase('error');
@@ -54,8 +61,8 @@ export function ScenarioSession() {
     <SessionShell
       title={session?.scenario?.title ?? 'Scenario Practice'}
       timer={timer.formatted}
-      currentStep={1}
-      totalSteps={1}
+      currentStep={session?.current_step ?? 1}
+      totalSteps={session?.total_steps ?? 1}
       stepLabel="Response"
       sidebar={session?.scenario ? <ContextPanel scenario={session.scenario} /> : undefined}
     >
@@ -70,7 +77,7 @@ export function ScenarioSession() {
             onSubmit={handleSubmit}
             loading={phase === 'submitting'}
             minLength={10}
-            submitLabel="Submit Response"
+            submitLabel={session.current_step >= session.total_steps ? 'Submit Response' : 'Next Question'}
             placeholder="How would you respond in this situation?"
           />
         </>

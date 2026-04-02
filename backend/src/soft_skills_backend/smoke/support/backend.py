@@ -337,6 +337,21 @@ class SmokeBackendClient:
         self.require_ok(response, "start scenario session")
         return self.data(response)
 
+    async def submit_scenario_step(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        response_text: str,
+    ) -> JsonObject:
+        response = await self._client.post(
+            f"/api/attempts/scenario/sessions/{session_id}/steps",
+            headers={"X-User-ID": user_id},
+            json={"response_text": response_text},
+        )
+        self.require_ok(response, f"submit scenario step for session {session_id}")
+        return self.data(response)
+
     async def get_attempt(self, *, user_id: str, attempt_id: str) -> JsonObject:
         response = await self._client.get(
             f"/api/attempts/{attempt_id}",
