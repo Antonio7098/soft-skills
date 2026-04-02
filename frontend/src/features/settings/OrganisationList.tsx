@@ -74,7 +74,14 @@ export function OrganisationList({ onCreateClick }: OrganisationListProps) {
           return (
             <div
               key={membership.organisation_id}
-              className="flex items-center gap-3 p-4 rounded-xl bg-surface-secondary/30 border border-line hover:border-line-strong transition-colors"
+              className="flex items-center gap-3 p-4 rounded-xl bg-surface-secondary/30 border border-line hover:border-line-strong transition-colors cursor-pointer"
+              onClick={() => {
+                if (isActive) {
+                  navigate('/admin');
+                } else {
+                  handleSwitchOrg(membership.organisation_id);
+                }
+              }}
             >
               <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
                 <Building2 className="w-5 h-5 text-accent" />
@@ -100,25 +107,10 @@ export function OrganisationList({ onCreateClick }: OrganisationListProps) {
                 </div>
               </div>
               {isActive && membership.role === 'admin' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={<Shield className="w-4 h-4" />}
-                  onClick={() => navigate('/admin')}
-                >
-                  Admin
-                </Button>
+                <Shield className="w-4 h-4 text-accent" />
               )}
               {!isActive && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={isSwitching ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
-                  onClick={() => handleSwitchOrg(membership.organisation_id)}
-                  disabled={isSwitching}
-                >
-                  {isSwitching ? 'Switching...' : 'Switch'}
-                </Button>
+                isSwitching ? <Loader2 className="w-4 h-4 animate-spin text-content-secondary" /> : <ChevronRight className="w-4 h-4 text-content-secondary" />
               )}
             </div>
           );
