@@ -38,6 +38,7 @@ export interface ScenarioView {
   readonly id: string;
   readonly title: string;
   readonly prompt_text: string;
+  readonly questions: string[];
   readonly business_context: string;
   readonly learner_objective: string;
   readonly constraints: string[];

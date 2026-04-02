@@ -1192,10 +1192,10 @@ const SEED_ORG_PROMPT_ITEMS: PromptItemView[] = [
 ];
 
 const SEED_ORG_SCENARIOS: ScenarioView[] = [
-  { id: 'org-scenario-001', title: 'Budget Presentation', prompt_text: 'Open the meeting by presenting the budget tradeoff you recommend and the decision you need from leadership.', business_context: 'Present a budget proposal to senior leadership', learner_objective: 'Develop executive presence and financial communication skills', constraints: ['Time limit of 15 minutes', 'Must address all stakeholder concerns'], stakeholder_tensions: ['Cost vs. quality', 'Short-term vs. long-term priorities'], lifecycle_state: 'published_private', target_skill_slugs: ['communication', 'leadership'], rubric_id: 'org-rubric-002', mock_company: null, mock_people: [], organisation_id: 'org-001' },
-  { id: 'org-scenario-002', title: 'New Hire Onboarding', prompt_text: 'Deliver the first message you would give the new hire to set expectations and build confidence.', business_context: 'Onboard a new team member with company processes', learner_objective: 'Master onboarding best practices and team integration', constraints: ['Must complete within 30 minutes', 'Cover all mandatory topics'], stakeholder_tensions: ['Thoroughness vs. efficiency', 'Standard process vs. personalized approach'], lifecycle_state: 'published_private', target_skill_slugs: ['leadership', 'communication'], rubric_id: 'org-rubric-002', mock_company: null, mock_people: [], organisation_id: 'org-001' },
-  { id: 'org-scenario-003', title: 'Crisis Communication', prompt_text: 'Write the internal update you would send first to address employee concern without creating unnecessary legal risk.', business_context: 'Handle internal communication during a company crisis', learner_objective: 'Practice crisis communication and stakeholder management', constraints: ['Must address employee concerns within 24 hours', 'All communications must be approved by legal'], stakeholder_tensions: ['Transparency vs. legal risk', 'Employee concerns vs. business continuity'], lifecycle_state: 'published_private', target_skill_slugs: ['communication', 'problem-solving'], rubric_id: 'org-rubric-003', mock_company: null, mock_people: [], organisation_id: 'org-001' },
-  { id: 'org-scenario-004', title: 'Cross-functional Collaboration', prompt_text: 'Send the kickoff message you would use to align the departments on one decision-making process.', business_context: 'Coordinate a project across multiple departments', learner_objective: 'Improve cross-departmental collaboration skills', constraints: ['Limited budget', 'Tight timeline'], stakeholder_tensions: ['Different departmental priorities', 'Resource allocation conflicts'], lifecycle_state: 'draft', target_skill_slugs: ['team-collaboration', 'problem-solving'], rubric_id: 'org-rubric-003', mock_company: null, mock_people: [], organisation_id: 'org-001' },
+  { id: 'org-scenario-001', title: 'Budget Presentation', prompt_text: 'Open the meeting by presenting the budget tradeoff you recommend and the decision you need from leadership.', questions: [], business_context: 'Present a budget proposal to senior leadership', learner_objective: 'Develop executive presence and financial communication skills', constraints: ['Time limit of 15 minutes', 'Must address all stakeholder concerns'], stakeholder_tensions: ['Cost vs. quality', 'Short-term vs. long-term priorities'], lifecycle_state: 'published_private', target_skill_slugs: ['communication', 'leadership'], rubric_id: 'org-rubric-002', mock_company: null, mock_people: [], organisation_id: 'org-001' },
+  { id: 'org-scenario-002', title: 'New Hire Onboarding', prompt_text: 'Deliver the first message you would give the new hire to set expectations and build confidence.', questions: [], business_context: 'Onboard a new team member with company processes', learner_objective: 'Master onboarding best practices and team integration', constraints: ['Must complete within 30 minutes', 'Cover all mandatory topics'], stakeholder_tensions: ['Thoroughness vs. efficiency', 'Standard process vs. personalized approach'], lifecycle_state: 'published_private', target_skill_slugs: ['leadership', 'communication'], rubric_id: 'org-rubric-002', mock_company: null, mock_people: [], organisation_id: 'org-001' },
+  { id: 'org-scenario-003', title: 'Crisis Communication', prompt_text: 'Write the internal update you would send first to address employee concern without creating unnecessary legal risk.', questions: [], business_context: 'Handle internal communication during a company crisis', learner_objective: 'Practice crisis communication and stakeholder management', constraints: ['Must address employee concerns within 24 hours', 'All communications must be approved by legal'], stakeholder_tensions: ['Transparency vs. legal risk', 'Employee concerns vs. business continuity'], lifecycle_state: 'published_private', target_skill_slugs: ['communication', 'problem-solving'], rubric_id: 'org-rubric-003', mock_company: null, mock_people: [], organisation_id: 'org-001' },
+  { id: 'org-scenario-004', title: 'Cross-functional Collaboration', prompt_text: 'Send the kickoff message you would use to align the departments on one decision-making process.', questions: [], business_context: 'Coordinate a project across multiple departments', learner_objective: 'Improve cross-departmental collaboration skills', constraints: ['Limited budget', 'Tight timeline'], stakeholder_tensions: ['Different departmental priorities', 'Resource allocation conflicts'], lifecycle_state: 'draft', target_skill_slugs: ['team-collaboration', 'problem-solving'], rubric_id: 'org-rubric-003', mock_company: null, mock_people: [], organisation_id: 'org-001' },
 ];
 
 let _orgSkills = [...SEED_ORG_SKILLS];
@@ -1696,6 +1696,7 @@ export const mockDataProvider: DataProvider = {
       id: `sc-${uid()}`,
       title: cmd.title,
       prompt_text: cmd.prompt_text,
+      questions: [],
       business_context: cmd.business_context,
       learner_objective: cmd.learner_objective,
       constraints: cmd.constraints ?? [],
@@ -1759,6 +1760,7 @@ export const mockDataProvider: DataProvider = {
         id: `sc-${uid()}`,
         title: `${cmd.title_hint ?? 'Generated Scenario'} ${i + 1}`,
         prompt_text: `What would you say first to align the stakeholders on ${cmd.scenario_theme.toLowerCase()}?`,
+        questions: [],
         business_context: cmd.workplace_context,
         learner_objective: `Navigate ${cmd.scenario_theme.toLowerCase()} using ${cmd.target_skill_slugs.map((s) => s.replace(/-/g, ' ')).join(', ')}.`,
         constraints: ['Time-sensitive decision required', 'Multiple stakeholder perspectives to consider'],
@@ -1857,6 +1859,7 @@ export const mockDataProvider: DataProvider = {
         id: `sc-${uid()}`,
         title: `AI Generated Scenario ${i + 1}`,
         prompt_text: `What action or message would you deliver first in response to: ${cmd.prompt.slice(0, 80)}?`,
+        questions: [],
         business_context: `Based on your prompt about: ${cmd.prompt.slice(0, 100)}...`,
         learner_objective: `Address the scenario using ${cmd.target_skill_slugs.map((s) => s.replace(/-/g, ' ')).join(', ')}.`,
         constraints: ['Multiple perspectives to balance', 'Decision required'],
@@ -4128,6 +4131,7 @@ export const mockDataProvider: DataProvider = {
       id: `org-scenario-${uid()}`,
       title: cmd.title,
       prompt_text: cmd.prompt_text,
+      questions: [],
       business_context: cmd.business_context,
       learner_objective: cmd.learner_objective,
       constraints: cmd.constraints ?? [],

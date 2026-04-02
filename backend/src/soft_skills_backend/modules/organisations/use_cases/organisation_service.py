@@ -1007,6 +1007,7 @@ class OrganisationService:
             learner_objective=command.learner_objective,
             constraints=list(command.constraints),
             stakeholder_tensions=list(command.stakeholder_tensions),
+            questions=list(command.questions),
             lifecycle_state="draft",
             target_skill_slugs=list(command.target_skill_slugs),
             rubric_id=command.rubric_id,
@@ -1023,6 +1024,7 @@ class OrganisationService:
             learner_objective=created.learner_objective,
             constraints=created.constraints,
             stakeholder_tensions=created.stakeholder_tensions,
+            questions=created.questions,
             lifecycle_state=created.lifecycle_state,
             target_skill_slugs=created.target_skill_slugs,
             rubric_id=created.rubric_id,
@@ -1058,6 +1060,7 @@ class OrganisationService:
             learner_objective=scenario.learner_objective,
             constraints=scenario.constraints,
             stakeholder_tensions=scenario.stakeholder_tensions,
+            questions=scenario.questions,
             lifecycle_state=scenario.lifecycle_state,
             target_skill_slugs=scenario.target_skill_slugs,
             rubric_id=scenario.rubric_id,
@@ -1085,6 +1088,7 @@ class OrganisationService:
                 learner_objective=s.learner_objective,
                 constraints=s.constraints,
                 stakeholder_tensions=s.stakeholder_tensions,
+                questions=s.questions,
                 lifecycle_state=s.lifecycle_state,
                 target_skill_slugs=s.target_skill_slugs,
                 rubric_id=s.rubric_id,
@@ -1134,6 +1138,8 @@ class OrganisationService:
             scenario.constraints = list(command.constraints)
         if command.stakeholder_tensions is not None:
             scenario.stakeholder_tensions = list(command.stakeholder_tensions)
+        if command.questions is not None:
+            scenario.questions = list(command.questions)
         if command.target_skill_slugs is not None:
             scenario.target_skill_slugs = list(command.target_skill_slugs)
         if command.rubric_id is not None:
@@ -1150,6 +1156,7 @@ class OrganisationService:
             learner_objective=updated.learner_objective,
             constraints=updated.constraints,
             stakeholder_tensions=updated.stakeholder_tensions,
+            questions=updated.questions,
             lifecycle_state=updated.lifecycle_state,
             target_skill_slugs=updated.target_skill_slugs,
             rubric_id=updated.rubric_id,

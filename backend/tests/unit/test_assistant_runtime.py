@@ -22,6 +22,7 @@ from soft_skills_backend.modules.assistant.workflows.runtime_models import (
 from soft_skills_backend.modules.assistant.workflows.service import (
     _build_compact_learner_context,
     _chunk_text,
+    _provider_tool_call_message,
     _provider_tool_result_message,
     _required_tool_name,
     _should_rewrite_final_response,
@@ -83,6 +84,32 @@ def test_assistant_decision_requires_exactly_one_action() -> None:
 def test_chunk_text_preserves_readable_segments() -> None:
     chunks = _chunk_text("one two three four five six", chunk_size=9)
     assert chunks == ["one two", "three", "four five", "six"]
+
+
+def test_provider_tool_call_message_preserves_provider_argument_shape() -> None:
+    tool_request = parse_assistant_tool_requests(
+        [
+            ProviderToolCall(
+                call_id="call-1",
+                tool_name="query_user_context",
+                arguments={
+                    "sql": "SELECT attempt_id FROM assistant_safe_attempt_summaries_v",
+                    "params": [{"key": "status", "value": "completed"}],
+                },
+            )
+        ]
+    )[0]
+
+    message = _provider_tool_call_message(content="", tool_requests=[tool_request])
+
+    assert message["role"] == "assistant"
+    tool_call = message["tool_calls"][0]
+    assert tool_call["id"] == "call-1"
+    assert tool_call["function"]["name"] == "query_user_context"
+    assert (
+        tool_call["function"]["arguments"]
+        == '{"params":[{"key":"status","value":"completed"}],"sql":"SELECT attempt_id FROM assistant_safe_attempt_summaries_v"}'
+    )
 
 
 class _Role:

@@ -1005,7 +1005,7 @@ def _provider_tool_call_message(
                 "function": {
                     "name": tool_request.tool_name,
                     "arguments": json.dumps(
-                        tool_request.arguments_payload(),
+                        tool_request.arguments.model_dump(mode="json", exclude_none=True),
                         sort_keys=True,
                         separators=(",", ":"),
                     ),

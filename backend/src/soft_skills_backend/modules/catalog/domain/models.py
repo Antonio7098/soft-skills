@@ -37,6 +37,7 @@ class ScenarioCreateCommand(BaseModel):
     learner_objective: str
     constraints: list[str] = Field(default_factory=list)
     stakeholder_tensions: list[str] = Field(default_factory=list)
+    questions: list[str] = Field(default_factory=list)
     target_skill_slugs: list[str]
     rubric_id: str
     mock_company: MockCompanyInput | None = None
@@ -52,6 +53,7 @@ class ScenarioUpdateCommand(BaseModel):
     learner_objective: str | None = None
     constraints: list[str] | None = None
     stakeholder_tensions: list[str] | None = None
+    questions: list[str] | None = None
     target_skill_slugs: list[str] | None = None
     rubric_id: str | None = None
     mock_company: MockCompanyInput | None = None
@@ -91,6 +93,7 @@ class ScenarioView(BaseModel):
     learner_objective: str
     constraints: list[str]
     stakeholder_tensions: list[str]
+    questions: list[str] = Field(default_factory=list)
     lifecycle_state: str
     target_skill_slugs: list[str]
     rubric_id: str
@@ -347,6 +350,7 @@ class GeneratedScenarioDraft(BaseModel):
     learner_objective: str
     constraints: list[str] = Field(default_factory=list)
     stakeholder_tensions: list[str] = Field(default_factory=list)
+    questions: list[str] = Field(default_factory=list)
     target_skill_slugs: list[str] = Field(default_factory=list)
     rubric_id: str | None = None
     mock_company: MockCompanyInput | None = None

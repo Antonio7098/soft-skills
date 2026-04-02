@@ -49,6 +49,18 @@ function extractScenarioQuestion(promptText: string): string {
   return promptText;
 }
 
+function getScenarioPromptText(
+  scenario: ScenarioView | null,
+  item: PracticeRunView['items'][number],
+  questionIndex: number,
+): string {
+  const question = scenario?.questions[questionIndex];
+  if (question && question.trim()) {
+    return `Question ${questionIndex + 1} of ${scenario.questions.length}: ${question}`;
+  }
+  return extractScenarioQuestion(item.prompt_text ?? '');
+}
+
 function RunProgressSidebar({ run, currentIndex }: { run: PracticeRunView; currentIndex: number }) {
   return (
     <div className="flex flex-col gap-4">
@@ -547,7 +559,7 @@ export function PracticeRunSession() {
    const isScenario = currentItem.item_type === 'scenario' && currentScenario;
 
    const scenarioPromptText = isScenario
-     ? extractScenarioQuestion(currentItem.prompt_text ?? '')
+     ? getScenarioPromptText(currentScenario, currentItem, currentSessionIndex)
      : currentItem.prompt_text ?? '';
 
   if (phase === 'complete' && isLastItem) {

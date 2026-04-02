@@ -223,6 +223,7 @@ def _load_scenario_context(
         learner_objective=scenario.learner_objective,
         constraints=list(scenario.constraints),
         stakeholder_tensions=list(scenario.stakeholder_tensions),
+        questions=list(scenario.questions),
         mock_company=(
             None
             if company_record is None
@@ -250,7 +251,7 @@ def _load_scenario_context(
         content_item_type="scenario_step",
         prompt_type="scenario_step",
         title=scenario.title,
-        prompt_text=scenario.prompt_text,
+        prompt_text=_build_scenario_prompt_text(scenario_context, 1),
         difficulty=collection.difficulty,
         delivery_version=PRACTICE_DELIVERY_VERSIONS[PracticeType.SCENARIO],
         response_mode="text",
@@ -408,7 +409,9 @@ def load_resolved_attempt(
         )
 
 
-def _build_scenario_prompt_text(context: ScenarioContextView) -> str:
+def _build_scenario_prompt_text(context: ScenarioContextView, step: int = 1) -> str:
+    if context.questions and len(context.questions) >= step:
+        return context.questions[step - 1]
     return context.prompt_text
 
 

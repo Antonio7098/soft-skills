@@ -92,6 +92,7 @@ class ScenarioService:
                     learner_objective=command.learner_objective,
                     constraints=list(command.constraints),
                     stakeholder_tensions=list(command.stakeholder_tensions),
+                    questions=list(command.questions),
                     lifecycle_state="draft",
                     target_skill_slugs=list(command.target_skill_slugs),
                     rubric_id=command.rubric_id,

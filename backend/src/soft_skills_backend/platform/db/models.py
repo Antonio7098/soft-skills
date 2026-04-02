@@ -328,6 +328,7 @@ class ScenarioRecord(Base):
     learner_objective: Mapped[str] = mapped_column(Text)
     constraints: Mapped[list[str]] = mapped_column(JSON, default=list)
     stakeholder_tensions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    questions: Mapped[list[str]] = mapped_column(JSON, default=list)
     lifecycle_state: Mapped[str] = mapped_column(String(32), index=True)
     target_skill_slugs: Mapped[list[str]] = mapped_column(JSON, default=list)
     rubric_id: Mapped[str] = mapped_column(String(128), index=True)

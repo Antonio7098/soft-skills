@@ -1,13 +1,13 @@
 # LLM Model Evaluation Report
 
-**Generated:** 2026-04-02 09:14:09
+**Generated:** 2026-04-02 11:40:00
 
 ## Executive Summary
 
-- **Total Models Tested:** 10
-- **Working Models:** 6
+- **Total Models Tested:** 11
+- **Working Models:** 11
 - **Perfect Accuracy (100%):** 2
-- **Failed/Unavailable:** 4
+- **Failed/Unavailable:** 0
 - **Best Overall:** Mistral Small & GPT OSS 120B (100% accuracy)
 
 ## Complete Results Summary
@@ -17,13 +17,14 @@
 | 1 | openrouter | Mistral Small | 100.0% | 8 | 0 | 21,600 | $0.0039 | 4300ms | ✓ Best |
 | 2 | groq | GPT OSS 120B (Groq) | 100.0% | 8 | 0 | 21,600 | $0.0071 | 2000ms | ✓ Fastest |
 | 3 | openrouter | Nemotron 120B | 75.0% | 6 | 2 | 14,400 | Free | 7200ms | ✓ Available |
-| 4 | openrouter | Z-AI GLM-5 | 62.5% | 5 | 3 | 14,443 | Free | 25922ms | ✓ Available |
-| 5 | openrouter | Qwen 3.5 9B | 50.0% | 4 | 4 | 4,800 | $0.0009 | 2400ms | ✓ Available |
-| 6 | openrouter | Qwen 3.6 Plus | 12.5% | 1 | 7 | 1,200 | Free | 600ms | ⚠ Poor |
-| 7 | openrouter | Xiaomi MiMo V2 Pro | 0.0% | 0 | 8 | 0 | $0.0000 | N/A | ✗ Unavailable |
-| 8 | openrouter | MiniMax M2.7 | 0.0% | 0 | 8 | 0 | $0.0000 | N/A | ✗ Unavailable |
-| 9 | openrouter | GPT 5.4 Nano | 0.0% | 0 | 8 | 0 | $0.0000 | N/A | ✗ Unavailable |
-| 10 | openrouter | Moonshot Kimi K2.5 | 0.0% | 0 | 8 | 0 | Free | N/A | ✗ Unavailable |
+| 4 | groq | GPT OSS 20B (Groq) | 62.5% | 5 | 3 | 30,345 | N/A | 2241ms | ✓ Available |
+| 5 | openrouter | Z-AI GLM-5 | 62.5% | 5 | 3 | 14,443 | Free | 25922ms | ✓ Available |
+| 6 | openrouter | Xiaomi MiMo V2 Pro | 62.5% | 5 | 3 | 12,586 | $1.0/$3.0 | 10487ms | ✓ Available |
+| 7 | openrouter | GPT 5.4 Nano | 50.0% | 4 | 4 | 16,224 | $0.2/$1.25 | 3643ms | ✓ Available |
+| 8 | openrouter | Moonshot Kimi K2.5 | 50.0% | 4 | 4 | 6,002 | Free | 63861ms | ✓ Available |
+| 9 | openrouter | Qwen 3.5 9B | 50.0% | 4 | 4 | 4,800 | $0.0009 | 2400ms | ✓ Available |
+| 10 | openrouter | MiniMax M2.7 | 37.5% | 3 | 5 | 35,459 | $0.3/$1.2 | 39152ms | ✓ Available |
+| 11 | openrouter | Qwen 3.6 Plus | 12.5% | 1 | 7 | 1,200 | Free | 600ms | ⚠ Poor |
 
 ## 🏆 Top Performers
 
@@ -35,7 +36,11 @@
 ### High Accuracy (≥50%)
 
 - **Nemotron 120B** (openrouter) - 75% accuracy
+- **GPT OSS 20B (Groq)** (groq) - 62% accuracy
 - **Z-AI GLM-5** (openrouter) - 62% accuracy
+- **Xiaomi MiMo V2 Pro** (openrouter) - 62% accuracy
+- **GPT 5.4 Nano** (openrouter) - 50% accuracy
+- **Moonshot Kimi K2.5** (openrouter) - 50% accuracy
 - **Qwen 3.5 9B** (openrouter) - 50% accuracy
 
 ## Cost Efficiency Analysis
@@ -45,35 +50,30 @@
 | Mistral Small | 100.0% | $0.0039 | $0.000039 | $0.0002 |
 | GPT OSS 120B (Groq) | 100.0% | $0.0071 | $0.000071 | $0.0003 |
 | Nemotron 120B | 75.0% | $0.0000 | $0.000000 | $0.0000 |
+| GPT OSS 20B (Groq) | 62.5% | N/A | N/A | N/A |
 | Z-AI GLM-5 | 62.5% | $0.0000 | $0.000000 | $0.0000 |
+| Xiaomi MiMo V2 Pro | 62.5% | $0.0000 | $0.000000 | $0.0000 |
+| GPT 5.4 Nano | 50.0% | $0.0000 | $0.000000 | $0.0000 |
+| Moonshot Kimi K2.5 | 50.0% | $0.0000 | $0.000000 | $0.0000 |
 | Qwen 3.5 9B | 50.0% | $0.0009 | $0.000018 | $0.0002 |
+| MiniMax M2.7 | 37.5% | $0.0000 | $0.000000 | $0.0000 |
 | Qwen 3.6 Plus | 12.5% | $0.0000 | $0.000000 | $0.0000 |
-
-## Unavailable/Failed Models
-
-These models could not be evaluated (SS-PROVIDER-004 errors):
-
-| Model | Provider | Expected Pricing | Issue |
-|-------|----------|-------------------|-------|
-| Xiaomi MiMo V2 Pro | openrouter | $1.0/$3.0 | Provider unavailable |
-| MiniMax M2.7 | openrouter | $0.3/$1.2 | Provider unavailable |
-| GPT 5.4 Nano | openrouter | $0.2/$1.25 | Provider unavailable |
-| Moonshot Kimi K2.5 | openrouter | Free/Unknown | Provider unavailable |
 
 ## Key Insights
 
 1. **Best Value:** Mistral Small ($0.0039 for 100% accuracy, ~4.3s latency)
 2. **Fastest:** GPT OSS 120B on Groq (~2s latency, 5x faster than OpenRouter)
-3. **Free Options:** Nemotron 120B (75%), Z-AI GLM-5 (62.5%), Qwen 3.6 Plus (12.5%)
-4. **Avoid:** Qwen 3.6 Plus (only 12.5% accuracy despite being free)
-5. **Not Available:** 5/10 models failed (Xiaomi, MiniMax, GPT 5.4 Nano, Moonshot, Z-AI)
+3. **All Models Now Available:** Previously "unavailable" models (Xiaomi, MiniMax, GPT 5.4 Nano, Moonshot) now produce valid evaluations after fixing OpenRouter structured-output pipeline bug
+4. **Free Options:** Nemotron 120B (75%), Z-AI GLM-5 (62.5%), Qwen 3.6 Plus (12.5%), Moonshot (50%)
+5. **Avoid:** Qwen 3.6 Plus (only 12.5% accuracy despite being free)
+6. **Pipeline Fix Applied:** OpenRouter evaluation path now uses relaxed json_object mode instead of strict json_schema to avoid provider rejections
 
 ## Methodology
 
 - **Test Cases:** 8 scenarios covering QuickPass, Interview, and Scenario simulations
 - **Pass Criteria:** Exact match between expected and actual assessment scores
 - **Metrics:** Accuracy, tokens, cost (from pricing), latency
-- **Providers:** Groq (1), OpenRouter (9)
+- **Providers:** Groq (2), OpenRouter (9)
 
 ---
 

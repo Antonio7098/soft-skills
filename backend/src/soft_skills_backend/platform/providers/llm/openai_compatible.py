@@ -1014,6 +1014,8 @@ def _build_json_response_format(
 ) -> dict[str, Any]:
     if response_schema is None:
         return {"type": "json_object"}
+    if provider_name == "openrouter":
+        return {"type": "json_object"}
     if provider_name == "groq":
         # Groq rejects strict JSON schemas that contain optional properties.
         # Keep provider-side schema guidance, but disable strict mode and rely
@@ -1046,7 +1048,7 @@ def _build_provider_preferences(
         return None
     if provider_name != "openrouter":
         return None
-    return {"require_parameters": True}
+    return None
 
 
 def _build_provider_tool_definition(tool: ProviderToolDefinition) -> dict[str, Any]:
